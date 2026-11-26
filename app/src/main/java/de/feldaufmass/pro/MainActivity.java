@@ -3281,6 +3281,42 @@ public class MainActivity extends Activity {
  root=planPage;
  sketch=new Sketch();sketch.setBackgroundColor(Color.WHITE);root.addView(sketch,new LinearLayout.LayoutParams(-1,dp(280))); LinearLayout historyBar=new LinearLayout(this);root.addView(historyBar);undoObjectsButton=new Button(this);undoObjectsButton.setText("Rückgängig");historyBar.addView(undoObjectsButton,new LinearLayout.LayoutParams(0,-2,1));redoObjectsButton=new Button(this);redoObjectsButton.setText("Wiederholen");historyBar.addView(redoObjectsButton,new LinearLayout.LayoutParams(0,-2,1));undoObjectsButton.setOnClickListener(v->restoreObjectHistory(false));redoObjectsButton.setOnClickListener(v->restoreObjectHistory(true));updateHistoryButtons();
  Button edit=new Button(this);edit.setText("Trassenmaße bearbeiten");root.addView(edit);edit.setOnClickListener(v->showPage(measurePage));
+ actionButtonSingle(planPage,"Schichtvolumen berechnen",()->{
+  try{
+   if(segments.length()==0){notice("Keine Oberflächenabschnitte vorhanden.");return;}
+   StringBuilder report=new StringBuilder("Vorberechnung – gemeinsame Schichtstärken\n\n");
+   java.util.TreeMap<String,Double> totals=new java.util.TreeMap<>();
+   for(int i=0;i<segments.length();i++){
+    org.json.JSONObject row=segments.getJSONObject(i);
+    double from=row.getDouble("from"),to=row.getDouble("to"),bw=row.getDouble("width");
+    if(!Double.isFinite(from+to+bw)||from<0||to<=from||bw<=0||(l>0&&to>l))throw new IllegalArgumentException("Ungültige Abschnittsmaße");
+    for(int j=0;j<i;j++){org.json.JSONObject prev=segments.getJSONObject(j);if(from<prev.getDouble("to")&&to>prev.getDouble("from"))throw new IllegalArgumentException("Überlappende Abschnitte");}
+    String type=row.optString("surface","Unbekannt");
+    double cut=row.optDouble("cutWidth",bw);
+    if(!Double.isFinite(cut)||cut<bw)throw new IllegalArgumentException("Ungültige Nachschnittbreite");
+    report.append(String.format(java.util.Locale.GERMANY,"%.2f – %.2f m | %s\n",from,to,type));
+    boolean asphaltLayer=type.equals("Asphalt"),stoneLayer=type.toLowerCase(java.util.Locale.ROOT).matches(".*(pflaster|platten).*");
+    if(asphaltLayer||stoneLayer){
+     double thickness=optional(asphaltLayer?asphaltInput:stoneDepth)/(asphaltLayer?1:100);
+     if(Double.isFinite(thickness)&&thickness>0){
+      double volume=(to-from)*cut*thickness;
+      totals.put(type,totals.getOrDefault(type,0.0)+volume);
+      report.append(String.format(java.util.Locale.GERMANY,"Deckschicht: %.3f m³%s\n",volume,row.has("cutWidth")?"":" (nur Graben; Nachschnitt unbekannt)"));
+     }else report.append("Deckschichtstärke fehlt\n");
+    }else report.append("Deckschicht nicht berechnet\n");
+    double baseThickness=optional(baseInput);
+    if(Double.isFinite(baseThickness)&&baseThickness>0&&(asphaltLayer||stoneLayer)){
+     double volume=(to-from)*bw*baseThickness;totals.put("Tragschicht",totals.getOrDefault("Tragschicht",0.0)+volume);
+     report.append(String.format(java.util.Locale.GERMANY,"Tragschicht (Grabenbreite): %.3f m³\n",volume));
+    }else report.append("Tragschicht nicht berechnet\n");
+   }
+   report.append("\nTeilsummen (nur erfasste Schichten)\n");
+   for(java.util.Map.Entry<String,Double> entry:totals.entrySet())report.append(String.format(java.util.Locale.GERMANY,"%s: %.3f m³\n",entry.getKey(),entry.getValue()));
+   report.append("\nGemeinsame Stärken fachlich je Abschnitt prüfen. Bettung und Altbelag nicht berechnet. Nicht zusätzlich zum Bruttoaushub addieren.");
+   TextView resultText=new TextView(this);resultText.setPadding(dp(16),dp(12),dp(16),dp(12));resultText.setText(report.toString());ScrollView scroll=new ScrollView(this);scroll.addView(resultText);
+   new android.app.AlertDialog.Builder(this).setTitle("Oberflächenaufbau – Schichtvolumen").setView(scroll).setPositiveButton("Schließen",null).show();
+  }catch(Exception ex){notice("Schichtvolumen: "+ex.getMessage());}
+ });
  actionButtonSingle(planPage,"Oberflächenmengen nach Abschnitt",()->{
   try{
    java.util.TreeMap<String,double[]> totals=new java.util.TreeMap<>();
