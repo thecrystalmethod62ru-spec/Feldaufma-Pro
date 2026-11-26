@@ -1633,7 +1633,7 @@ public class MainActivity extends Activity {
   LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);
   TextView info=new TextView(this);info.setText("Gemessene Längen · Richtungen aus Skizze (nicht vermessen)");panel.addView(info);
   TextView widthHint=new TextView(this);widthHint.setText("Grabenbreite: "+(Double.isFinite(widths[0])?widths[0]+" m":"offen")+" · Nachschnitt links: "+(Double.isFinite(widths[1])?widths[1]+" m":"offen")+" · rechts: "+(Double.isFinite(widths[2])?widths[2]+" m":"offen")+"\nVerbundene Vorschaukonturen; Überschneidungen nicht bereinigt, keine Flächenberechnung.");panel.addView(widthHint);
-  TextView surfaceHint=new TextView(this);surfaceHint.setText("Oberflächen: "+surfaces.length()+" gespeicherte Abschnitte · Standardfarben; ungültige Stationen werden ausgelassen.");panel.addView(surfaceHint);
+  TextView surfaceHint=new TextView(this);surfaceHint.setText("Oberflächen: "+surfaces.length()+" gespeicherte Abschnitte · Standardfarben und Stationsmaße; ungültige Stationen werden ausgelassen.");panel.addView(surfaceHint);
   TextView montageHint=new TextView(this);montageHint.setText("Montage: "+montagePoints.size()+" darstellbare Stationspunkte. Fehlender Versatz = Achse (Vorschau); Eckversatz nicht dargestellt.");panel.addView(montageHint);
   android.view.View drawing=new android.view.View(this){
    final android.graphics.Paint pen=new android.graphics.Paint(3);
@@ -1697,6 +1697,28 @@ public class MainActivity extends Activity {
      pen.setColor(0xff398bda);pen.setStrokeWidth(dp(2));c.drawLine(ax,ay,bx,by,pen);
      pen.setTextSize(dp(12));pen.setColor(0xff777777);c.drawText(String.format(java.util.Locale.GERMANY,"%.2f m",route.vertices.get(i).metres),(ax+bx)/2,(ay+by)/2-dp(8),pen);
     }
+    // Surface dimensions use measured station intervals, not screen distances.
+    java.util.TreeSet<Double> boundaries=new java.util.TreeSet<>();
+    double total=route.measuredLength();
+    for(int j=0;j<surfaces.length();j++){
+     org.json.JSONObject section=surfaces.optJSONObject(j);if(section==null)continue;
+     double from=section.optDouble("from"),to=section.optDouble("to");
+     if(!Double.isFinite(from)||!Double.isFinite(to)||from<0||to>total||to<=from||section.optString("surface").trim().isEmpty())continue;
+     boundaries.add(from);boundaries.add(to);
+     double[] mid=model.station((from+to)/2);
+     if(mid!=null){pen.setColor(0xff555555);pen.setTextSize(dp(11));pen.setTextAlign(android.graphics.Paint.Align.CENTER);
+      c.drawText(String.format(java.util.Locale.GERMANY,"%.2f m",to-from),(float)(ox+mid[0]*scale),(float)(oy-mid[1]*scale-dp(23)),pen);}
+    }
+    int labelIndex=0;
+    for(double station:boundaries){
+     double[] q=model.station(station);if(q==null)continue;
+     float x=(float)(ox+q[0]*scale),y=(float)(oy-q[1]*scale);
+     pen.setColor(0xff555555);pen.setStrokeWidth(dp(1));c.drawCircle(x,y,dp(3),pen);
+     float labelY=y+dp(28+14*(labelIndex++%2));c.drawLine(x,y+dp(4),x,labelY-dp(12),pen);
+     pen.setTextSize(dp(10));pen.setTextAlign(android.graphics.Paint.Align.CENTER);
+     c.drawText(String.format(java.util.Locale.GERMANY,"St. %.2f",station),x,labelY,pen);
+    }
+    pen.setTextAlign(android.graphics.Paint.Align.LEFT);
     pen.setColor(0xffe6a23c);
     for(double[] p:montagePoints)c.drawCircle((float)(ox+p[0]*scale),(float)(oy-p[1]*scale),dp(5),pen);
     double bar=Math.pow(10,Math.floor(Math.log10((getWidth()/4.0)/scale)));
