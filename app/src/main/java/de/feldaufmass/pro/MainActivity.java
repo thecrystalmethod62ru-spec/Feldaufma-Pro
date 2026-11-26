@@ -2752,6 +2752,7 @@ public class MainActivity extends Activity {
    final java.util.List<String> branchHitIds=new java.util.ArrayList<>();
    double touchScale,touchOx,touchOy;
    double mainTapStation=Double.NaN;
+   final java.util.List<double[]> utilityWarningIntervals=new java.util.ArrayList<>();
    int downHit=-1;float downX,downY,previewX,previewY;boolean previewActive=false;
    @Override public boolean onTouchEvent(android.view.MotionEvent event){
     if(event.getAction()==android.view.MotionEvent.ACTION_DOWN){
@@ -2785,7 +2786,10 @@ public class MainActivity extends Activity {
     if(best<0&&Double.isFinite(mainTapStation)){
      double station=mainTapStation;mainTapStation=Double.NaN;
      if(Math.hypot(event.getX()-downX,event.getY()-downY)<=dp(8)){
-      new android.app.AlertDialog.Builder(MainActivity.this).setTitle(String.format(java.util.Locale.GERMANY,"Station %.3f m",station)).setItems(new String[]{"Abzweigung hinzufügen"},(dialog,which)->{requestedBranchStation[0]=station;branchEditor.performClick();}).setNegativeButton("Abbrechen",null).show();
+      boolean warning=false;for(double[] interval:utilityWarningIntervals)if(station>=interval[0]&&station<=interval[1]){warning=true;break;}
+      String[] actions=warning?new String[]{"Leitungen prüfen / bearbeiten","Abzweigung hinzufügen"}:new String[]{"Abzweigung hinzufügen"};
+      final boolean hasWarning=warning;
+      new android.app.AlertDialog.Builder(MainActivity.this).setTitle(String.format(java.util.Locale.GERMANY,"Station %.3f m",station)).setItems(actions,(dialog,which)->{if(hasWarning&&which==0){editUtilities();invalidate();return;}requestedBranchStation[0]=station;branchEditor.performClick();}).setNegativeButton("Abbrechen",null).show();
      }
      return true;
     }
@@ -3025,6 +3029,7 @@ public class MainActivity extends Activity {
      c.drawText(String.format(java.util.Locale.GERMANY,"St. %.2f",station),x,labelY,pen);
     }
     pen.setTextAlign(android.graphics.Paint.Align.LEFT);
+    utilityWarningIntervals.clear();
     java.util.TreeSet<Double> warningCuts=new java.util.TreeSet<>();
     double warningTotal=route.measuredLength(),warningStation=0;
     warningCuts.add(0.0);
@@ -3054,7 +3059,7 @@ public class MainActivity extends Activity {
      double warningDepth=warningDefaultDepth;for(double[] section:warningDepths)if(mid>=section[0]&&mid<section[1]){warningDepth=section[2];break;}
      boolean invalid=false;
      for(int k=0;k<warningUtilities.length();k++){org.json.JSONObject u=warningUtilities.optJSONObject(k);if(u!=null&&mid>=u.optDouble("routeFrom",0)&&mid<u.optDouble("routeTo",Double.POSITIVE_INFINITY)&&utilityOutsideProfile(u,widthAt(mid),warningDepth)){invalid=true;break;}}
-     if(invalid){double[] u=model.station(begin),v=model.station(stop);if(u!=null&&v!=null){pen.setColor(0xffb3261e);pen.setStrokeWidth(dp(4));c.drawLine((float)(ox+u[0]*scale),(float)(oy-u[1]*scale),(float)(ox+v[0]*scale),(float)(oy-v[1]*scale),pen);}}
+     if(invalid){utilityWarningIntervals.add(new double[]{begin,stop});double[] u=model.station(begin),v=model.station(stop);if(u!=null&&v!=null){pen.setColor(0xffb3261e);pen.setStrokeWidth(dp(4));c.drawLine((float)(ox+u[0]*scale),(float)(oy-u[1]*scale),(float)(ox+v[0]*scale),(float)(oy-v[1]*scale),pen);}}
     }
     pen.setColor(0xffe6a23c);
     for(double[] p:montagePoints)c.drawCircle((float)(ox+p[0]*scale),(float)(oy-p[1]*scale),dp(5),pen);
