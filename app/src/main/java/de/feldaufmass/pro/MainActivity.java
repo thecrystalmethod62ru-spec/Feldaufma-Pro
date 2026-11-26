@@ -793,6 +793,41 @@ public class MainActivity extends Activity {
   }
   return Double.isFinite(value)&&value>=0?value:Double.NaN;
  }
+ void requestGaebImport(){
+  android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);
+  i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.setType("*/*");startActivityForResult(i,419);
+ }
+ void importGaeb(android.net.Uri uri){
+  final String projectId=activeProject;
+  new Thread(()->{
+   try(java.io.InputStream in=getContentResolver().openInputStream(uri)){
+    if(in==null)throw new java.io.IOException("Datei nicht lesbar");
+    org.json.JSONArray imported=GaebImport.read(in);
+    runOnUiThread(()->{if(!isFinishing()&&!isDestroyed()&&projectId.equals(activeProject))previewGaeb(imported);});
+   }catch(Exception e){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())notice("GAEB-Import fehlgeschlagen: "+e.getMessage());});}
+  }).start();
+ }
+ void previewGaeb(org.json.JSONArray imported){
+  org.json.JSONArray existing=lvPositions();java.util.HashSet<String> known=new java.util.HashSet<>();
+  for(int j=0;j<existing.length();j++){org.json.JSONObject o=existing.optJSONObject(j);if(o!=null)known.add(o.optString("oz"));}
+  org.json.JSONArray merged=new org.json.JSONArray();for(int j=0;j<existing.length();j++)merged.put(existing.opt(j));
+  int added=0,duplicates=0,missing=0;
+  StringBuilder preview=new StringBuilder();
+  for(int j=0;j<imported.length();j++){
+   org.json.JSONObject o=imported.optJSONObject(j);if(o==null)continue;boolean duplicate=!known.add(o.optString("oz"));
+   if(duplicate)duplicates++;else{merged.put(o);added++;}
+   if(o.optString("unit").isEmpty()||!o.has("target"))missing++;
+   if(j<50)preview.append(lvLabel(o)).append(" · Soll: ").append(o.has("target")?csvNumber(o.optDouble("target")):"offen").append(duplicate?" · vorhanden, übersprungen":"").append("\n");
+  }
+  LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
+  form.addView(sheetText(imported.length()+" Positionen gelesen · "+added+" neu · "+duplicates+" bereits vorhanden · "+missing+" ohne vollständige Sollmenge/Einheit",16,true));
+  form.addView(sheetText("Vorhandene OZ bleiben unverändert. Keine automatische Mengenzuordnung. Sonderpositionen, OZ-Gliederung und Vertragstexte prüfen; keine GAEB-Schemaprüfung.",14,false));
+  form.addView(sheetText(preview.toString()+(imported.length()>50?"\nWeitere Positionen im LV nach Import.":""),13,false));
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("GAEB – Importvorschau").setView(scroll).setNegativeButton("Abbrechen",null).setPositiveButton("Neue Positionen übernehmen",(a,b)->{
+   if(!lvPositions().toString().equals(existing.toString())){notice("LV geändert. Import erneut starten.");return;}
+   if(saveLv(merged))showLv();
+  }).create();dialog.show();dialog.getButton(-1).setEnabled(added>0);
+ }
  void showLv(){
   org.json.JSONArray rows=lvPositions();LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
   form.addView(sheetText("Manuelles LV · Zuordnung durch Anwender. Geometrische Mengen vor Abrechnung prüfen.",14,false));
@@ -801,7 +836,7 @@ public class MainActivity extends Activity {
    Button button=new Button(this);button.setAllCaps(false);button.setText(lvLabel(o)+"\nIst: "+(Double.isFinite(qty)?csvNumber(qty):"offen")+(Double.isFinite(target)?" · Soll: "+csvNumber(target):""));
    button.setOnClickListener(v->editLv(index));form.addView(button);
   }
-  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Leistungsverzeichnis").setView(scroll).setNegativeButton("Schließen",null).setPositiveButton("Neue Position",(a,b)->editLv(-1)).create();dialog.show();
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Leistungsverzeichnis").setView(scroll).setNegativeButton("Schließen",null).setNeutralButton("GAEB importieren",(a,b)->requestGaebImport()).setPositiveButton("Neue Position",(a,b)->editLv(-1)).create();dialog.show();
  }
  void editLv(int index){
   org.json.JSONArray original=lvPositions();org.json.JSONObject old=index<0?null:original.optJSONObject(index);
@@ -813,6 +848,7 @@ public class MainActivity extends Activity {
   form.addView(sheetText("Mengenquelle",14,false));Spinner source=choices(form,sourceLabels);source.setSelection(Math.max(0,java.util.Arrays.asList(sources).indexOf(old==null?"manual":old.optString("source"))));
   form.addView(sheetText("Automatische Quellen verwenden die gespeicherten Haupttrassenmaße, keine LV-spezifischen Abzugsregeln.",13,false));
   android.app.AlertDialog.Builder builder=new android.app.AlertDialog.Builder(this).setTitle("LV-Position").setView(scroll).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null);
+  if(old!=null&&!old.optString("gaebLongText").isEmpty())form.addView(sheetText("GAEB-Langtext\n"+old.optString("gaebLongText"),13,false));
   if(old!=null)builder.setNeutralButton("Löschen",(a,b)->new android.app.AlertDialog.Builder(this).setTitle("LV-Position löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(x,y)->{org.json.JSONArray next=lvPositions();if(!next.toString().equals(original.toString())){notice("LV geändert. Neu öffnen.");return;}next.remove(index);if(saveLv(next))showLv();}).show());
   android.app.AlertDialog dialog=builder.create();dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(b->{
    try{
@@ -821,7 +857,7 @@ public class MainActivity extends Activity {
     String chosen=sources[source.getSelectedItemPosition()];
     String expected="length".equals(chosen)?"m":"volume".equals(chosen)?"m³":"manual".equals(chosen)?unit:"m²";
     if(!expected.equals(unit)){fields[2].setError("Einheit "+expected+" erforderlich");return;}
-    org.json.JSONObject item=new org.json.JSONObject().put("oz",oz).put("title",title).put("unit",unit).put("source",chosen);
+    org.json.JSONObject item=old==null?new org.json.JSONObject():new org.json.JSONObject(old.toString());item.remove("target");item.remove("quantity");item.put("oz",oz).put("title",title).put("unit",unit).put("source",chosen);
     for(int j=3;j<5;j++){if(j==4&&!"manual".equals(chosen))continue;if(fields[j].length()==0)continue;double value=number(fields[j]);if(!Double.isFinite(value)||value<0){fields[j].setError("Menge ab 0 erforderlich");return;}item.put(keys[j],value);}
     org.json.JSONArray next=lvPositions();if(!next.toString().equals(original.toString())){notice("LV geändert. Neu öffnen.");return;}
     for(int j=0;j<next.length();j++){org.json.JSONObject o=next.optJSONObject(j);if(j!=index&&o!=null&&oz.equals(o.optString("oz"))){fields[0].setError("Ordnungszahl bereits vorhanden");return;}}
@@ -1733,6 +1769,7 @@ public class MainActivity extends Activity {
  try{startActivityForResult(i,410);}catch(android.content.ActivityNotFoundException e){Toast.makeText(this,"Keine Spracherkennung verfügbar.",Toast.LENGTH_LONG).show();}
  }
  @Override protected void onActivityResult(int request,int result,android.content.Intent data){super.onActivityResult(request,result,data);
+ if(request==419&&result==RESULT_OK&&data!=null&&data.getData()!=null){importGaeb(data.getData());return;}
  if(request==418&&result==RESULT_OK&&data!=null&&data.getData()!=null){writeCsv(data.getData());return;}
  if((request==416||request==417)&&result==RESULT_OK&&data!=null&&data.getData()!=null){writeDxf(data.getData(),request==416);return;}
  if(request==415&&result==RESULT_OK&&data!=null&&data.getData()!=null){importProjectBackup(data.getData());return;}
