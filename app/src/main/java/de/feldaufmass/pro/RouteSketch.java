@@ -247,12 +247,28 @@ final class RouteSketch extends View {
   return Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy);
  }
  private void line(Canvas c,PointF a,PointF b){c.drawLine(left()+scale()*a.x,top()+scale()*a.y,left()+scale()*b.x,top()+scale()*b.y,paint);}
- @Override protected void onDraw(Canvas c){
+ @Override private android.graphics.Bitmap underlay;
+ private int underlayAlpha=150;
+ private boolean underlayVisible=true;
+ private final Paint underlayPaint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
+ void setUnderlay(android.graphics.Bitmap bitmap){underlay=bitmap;invalidate();}
+ void setUnderlayAlpha(int alpha){underlayAlpha=Math.max(0,Math.min(255,alpha));invalidate();}
+ void setUnderlayVisible(boolean visible){underlayVisible=visible;invalidate();}
+ void drawUnderlay(Canvas c){
+  if(underlay==null||underlay.isRecycled()||!underlayVisible)return;
+  float side=scale(),factor=side/Math.max(underlay.getWidth(),underlay.getHeight());
+  float w=underlay.getWidth()*factor,h=underlay.getHeight()*factor;
+  float x=left()+(side-w)/2,y=top()+(side-h)/2;
+  underlayPaint.setAlpha(underlayAlpha);
+  c.drawBitmap(underlay,null,new android.graphics.RectF(x,y,x+w,y+h),underlayPaint);
+ }
+ protected void onDraw(Canvas c){
   c.drawColor(Color.WHITE);
   paint.setStrokeWidth(1);paint.setColor(0xffe5eceb);
   for(int i=0;i<=10;i++){
    float f=i/10f;line(c,new PointF(f,0),new PointF(f,1));line(c,new PointF(0,f),new PointF(1,f));
   }
+  drawUnderlay(c);
   float density=getResources().getDisplayMetrics().density;
   paint.setTextSize(13*density);
   drawSurfaceSections(c,density);
