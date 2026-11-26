@@ -324,7 +324,7 @@ final class RouteSketch extends View {
       dimensionHits.add(new DimensionHit(dimensionKey,new android.graphics.RectF(bounds),nx,ny,offset/d));
       occupied.add(new android.graphics.RectF(bounds));
       float x1=ax+nx*offset,y1=ay+ny*offset,x2=bx+nx*offset,y2=by+ny*offset;
-      p.setColor(0xff263238);
+      p.setColor(darkEditor?0xffcbdad7:0xff263238);
       c.drawLine(ax+nx*7*d,ay+ny*7*d,x1+nx*4*d,y1+ny*4*d,p);
       c.drawLine(bx+nx*7*d,by+ny*7*d,x2+nx*4*d,y2+ny*4*d,p);
       c.drawLine(x1,y1,x2,y2,p);
@@ -332,8 +332,8 @@ final class RouteSketch extends View {
       float tx=(x1+x2)/2,ty=(y1+y2)/2;
       float angle=(float)Math.toDegrees(Math.atan2(uy,ux));if(angle>90)angle-=180;if(angle<-90)angle+=180;
       c.save();c.translate(tx,ty);c.rotate(angle);
-      p.setColor(Color.WHITE);c.drawRect(-w/2-2*d,-11*d,w/2+2*d,3*d,p);
-      p.setColor(0xff263238);c.drawText(label,-w/2,0,p);c.restore();
+      p.setColor(darkEditor?0xff202827:Color.WHITE);c.drawRect(-w/2-2*d,-11*d,w/2+2*d,3*d,p);
+      p.setColor(darkEditor?0xffcbdad7:0xff263238);c.drawText(label,-w/2,0,p);c.restore();
      }
     }
    }
@@ -559,21 +559,22 @@ final class RouteSketch extends View {
   int shown=Math.min(entries.size(),maxRows);
   float x=6*d,y=getHeight()-6*d-(shown+1)*row-8*d;
   p.setColor(0xF5FFFFFF);c.drawRoundRect(x,y,x+width,y+(shown+1)*row+8*d,4*d,4*d,p);
-  p.setColor(0xff173c42);c.drawText("Legende",x+5*d,y+12*d,p);
+  p.setColor(darkEditor?0xffe3f0ed:0xff173c42);c.drawText("Legende",x+5*d,y+12*d,p);
   int i=0;
   for(java.util.Map.Entry<String,Integer> e:entries.entrySet()){
    if(i>=shown)break;
    float yy=y+(i+2)*row;
    p.setColor(e.getValue());c.drawRect(x+5*d,yy-9*d,x+17*d,yy,p);
    Integer hatch=legendHatches.get(e.getKey());if(hatch!=null&&hatch>=0){c.save();c.clipRect(x+5*d,yy-9*d,x+17*d,yy);c.translate(x+5*d,yy-4.5f*d);drawHatchBand(c,12*d,d*.75f,hatch);c.restore();}
-   p.setColor(0xff173c42);
+   p.setColor(darkEditor?0xffe3f0ed:0xff173c42);
    String label=i==shown-1&&entries.size()>shown?"+"+(entries.size()-shown+1)+" weitere":e.getKey();
    c.save();c.clipRect(x+21*d,yy-row,x+width-3*d,yy+3*d);c.drawText(label,x+21*d,yy,p);c.restore();i++;
   }
  }
+ boolean darkEditor=false;
  @Override protected void onDraw(Canvas c){
-  c.drawColor(Color.WHITE);
-  paint.setStrokeWidth(1);paint.setColor(0xffe5eceb);
+  c.drawColor(darkEditor?Color.BLACK:Color.WHITE);
+  paint.setStrokeWidth(1);paint.setColor(darkEditor?0xff222b2b:0xffe5eceb);
   for(int i=0;i<=10;i++){
    float f=i/10f;line(c,new PointF(f,0),new PointF(f,1));line(c,new PointF(0,f),new PointF(1,f));
   }
@@ -584,7 +585,7 @@ final class RouteSketch extends View {
   drawSurfaceSections(c,density);
   for(int i=1;i<vertices.size();i++){
    PointF a=vertices.get(i-1).point,b=vertices.get(i).point;
-   if(layerVisible(LAYER_ROUTE)){paint.setColor(0xff13665f);paint.setStrokeWidth(4);line(c,a,b);}
+   if(layerVisible(LAYER_ROUTE)){paint.setColor(darkEditor?0xff55c7b5:0xff13665f);paint.setStrokeWidth(4);line(c,a,b);}
    if(!layerVisible(LAYER_DIMENSIONS))continue;
    double metres=vertices.get(i).metres;
    String label=Double.isFinite(metres)?String.format(Locale.GERMANY,"%.2f m",metres):"Maß fehlt";
@@ -595,9 +596,9 @@ final class RouteSketch extends View {
    android.graphics.Matrix transform=new android.graphics.Matrix();transform.setRotate(angle);transform.postTranslate(tx,ty);transform.mapRect(bounds);
    dimensionHits.add(new DimensionHit(key,bounds,0,0,0));
    c.save();c.translate(tx,ty);c.rotate(angle);
-   paint.setColor(Double.isFinite(metres)?Color.WHITE:0xffffcf73);
+   paint.setColor(Double.isFinite(metres)?(darkEditor?0xff202827:Color.WHITE):0xffffcf73);
    c.drawRoundRect(-2*density,-14*density,paint.measureText(label)+2*density,3*density,4,4,paint);
-   paint.setColor(0xff173c42);c.drawText(label,0,0,paint);c.restore();
+   paint.setColor(darkEditor?0xffe3f0ed:0xff173c42);c.drawText(label,0,0,paint);c.restore();
   }
   for(int i=0;i<vertices.size();i++){
    PointF p=vertices.get(i).point;
@@ -613,7 +614,7 @@ final class RouteSketch extends View {
    if(layerVisible(LAYER_PHOTOS)&&vertex.photos.length()>0){
     float x=px+8*density,y=py-15*density;paint.setColor(0xff536c80);c.drawRoundRect(x,y,x+22*density,y+12*density,3*density,3*density,paint);paint.setColor(Color.WHITE);paint.setTextSize(10*density);c.drawText("F"+vertex.photos.length(),x+3*density,y+10*density,paint);paint.setTextSize(13*density);
    }
-   String name=vertex.name;if(layerVisible(LAYER_NAMES)&&!name.isEmpty()){paint.setColor(0xff173c42);c.drawText(name,left()+scale()*p.x+8*density,top()+scale()*p.y+16*density,paint);}
+   String name=vertex.name;if(layerVisible(LAYER_NAMES)&&!name.isEmpty()){paint.setColor(darkEditor?0xffe3f0ed:0xff173c42);c.drawText(name,left()+scale()*p.x+8*density,top()+scale()*p.y+16*density,paint);}
   }
   drawSurfaceDimensions(c,density);
   drawStationObjects(c,density);
@@ -628,7 +629,7 @@ final class RouteSketch extends View {
    String status=liveFix.hasAccuracy()?String.format(Locale.GERMANY,"GPS ± %.2f m",liveFix.getAccuracy()):"GPS: Genauigkeit unbekannt";
    if(gps==null)status+=" · keine Planposition";
    paint.setColor(Color.WHITE);c.drawRect(0,0,getWidth(),25*density,paint);
-   paint.setColor(0xff173c42);c.drawText(status,8*density,18*density,paint);
+   paint.setColor(darkEditor?0xffe3f0ed:0xff173c42);c.drawText(status,8*density,18*density,paint);
   }
   paint.setColor(0xff42799e);paint.setStrokeWidth(3);
   for(int i=1;i<stroke.size();i++)line(c,stroke.get(i-1),stroke.get(i));
