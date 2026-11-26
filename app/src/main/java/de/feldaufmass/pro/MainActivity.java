@@ -504,6 +504,42 @@ public class MainActivity extends Activity {
    }catch(Exception e){distance.setError("Abstand prüfen");}
   }));dialog.show();
  }
+ java.util.function.Consumer<String> pendingEditorSpeech;
+ void startEditorDictation(java.util.function.Consumer<String> accept){
+  pendingEditorSpeech=accept;
+  android.content.Intent i=new android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+  i.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+  i.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE,voiceLanguage.getSelectedItemPosition()==0?"de-DE":"ru-RU");
+  i.putExtra(android.speech.RecognizerIntent.EXTRA_PREFER_OFFLINE,true);
+  try{startActivityForResult(i,428);}catch(Exception e){pendingEditorSpeech=null;notice("Keine Spracherkennung verfügbar.");}
+ }
+ void applyEditorSpeech(String speech,RouteSketch route,Spinner mode,LinearLayout historyBar,android.app.Dialog full){
+  if(!full.isShowing())return;
+  String command=speech.trim().toLowerCase(java.util.Locale.ROOT).replaceAll("[.!?]+$","");
+  if(command.matches("(?:рисовать|режим рисования|zeichnen|zeichenmodus)")){mode.setSelection(0);return;}
+  if(command.matches("(?:размеры|режим размеров|bemaßen|maß eintragen)")){mode.setSelection(1);return;}
+  if(command.matches("(?:перемещение точек|переместить точки|punkte verschieben)")){mode.setSelection(2);return;}
+  if(command.matches("(?:отмени|отмена|назад|rückgängig)")){historyBar.getChildAt(0).performClick();return;}
+  if(command.matches("(?:повтори|повторить|wiederholen)")){historyBar.getChildAt(1).performClick();return;}
+  java.util.regex.Matcher m=java.util.regex.Pattern.compile("(?iu)^(?:измени\\s+|установи\\s+|ändere\\s+|setze\\s+)?(?:длин[ау]\\s+участка|länge\\s+(?:von\\s+)?abschnitt|abschnitt|участок)\\s+(\\d+)\\s*(?:на\\s+|auf\\s+|ist\\s+|[:=–—-]\\s*)?(\\d+(?:[.,]\\d+)?)\\s*(мм|mm|см|cm|сантиметр[а-я]*|zentimeter|м|m|метр[а-я]*|meter)$").matcher(command);
+  if(!m.matches()){notice("Editor: Zeichnen, Bemaßen, Punkte verschieben, Rückgängig oder Abschnitt 2 auf 12,5 m.");return;}
+  try{
+   int index=Integer.parseInt(m.group(1));double value=Double.parseDouble(m.group(2).replace(',','.'));String unit=m.group(3);
+   if(unit.equals("мм")||unit.equals("mm"))value/=1000;else if(unit.equals("см")||unit.equals("cm")||unit.startsWith("сантиметр")||unit.equals("zentimeter"))value/=100;
+   if(index<1||index>=route.vertices.size()||!Double.isFinite(value)||value<=0){notice("Abschnitt oder Maß ungültig.");return;}
+   final double metres=value;final String before=route.encode();
+   new android.app.AlertDialog.Builder(this).setTitle("Sprachmaß prüfen").setMessage("Abschnitt "+index+": "+reportMeasure(metres)+"\n"+(Double.isFinite(route.vertices.get(index).metres)?"Bisher: "+reportMeasure(route.vertices.get(index).metres):"Bisher: Maß fehlt"))
+    .setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",(d,w)->{
+     if(!full.isShowing()||!before.equals(route.encode())){notice("Skizze geändert. Bitte erneut eingeben.");return;}
+     route.vertices.get(index).metres=metres;if(route.changed!=null)route.changed.run();route.invalidate();
+    }).show();
+  }catch(Exception e){notice("Sprachmaß nicht erkannt.");}
+ }
+ void showFullscreenMeasures(RouteSketch route){
+  if(route.vertices.size()<2){notice("Zuerst einen Abschnitt zeichnen.");return;}
+  String[] labels=route.measurements().split("\n");
+  new android.app.AlertDialog.Builder(this).setTitle("Abschnitte bemaßen").setItems(labels,(d,w)->{if(w+1<route.vertices.size())measureSegment(route,w+1);}).setNegativeButton("Schließen",null).show();
+ }
  void showFullscreenRoute(android.app.AlertDialog editor,LinearLayout form,RouteSketch route,Spinner mode,Spinner angles,LinearLayout historyBar){
   // Move the existing views, not a second sketch: unsaved data and undo history stay shared.
   View[] views={route,mode,angles,historyBar};
@@ -533,8 +569,16 @@ public class MainActivity extends Activity {
   controls.addView(mode,new LinearLayout.LayoutParams(0,-2,1));controls.addView(angles,new LinearLayout.LayoutParams(0,-2,1));
   root.addView(route,new LinearLayout.LayoutParams(-1,0,1));
   root.addView(historyBar,new LinearLayout.LayoutParams(-1,-2));
+  LinearLayout tools=new LinearLayout(this);root.addView(tools);
+  Button mic=new Button(this),measureList=new Button(this),resetZoom=new Button(this);
+  mic.setAllCaps(false);mic.setText("🎙 Assistent");measureList.setAllCaps(false);measureList.setText("Abschnitte");resetZoom.setAllCaps(false);resetZoom.setText("Ansicht");
+  tools.addView(mic,new LinearLayout.LayoutParams(0,-2,1));tools.addView(measureList,new LinearLayout.LayoutParams(0,-2,1));tools.addView(resetZoom,new LinearLayout.LayoutParams(0,-2,1));
+  mic.setOnClickListener(v->startEditorDictation(speech->applyEditorSpeech(speech,route,mode,historyBar,full)));
+  measureList.setOnClickListener(v->showFullscreenMeasures(route));
+  resetZoom.setOnClickListener(v->{route.zoom=1;route.centerX=.5f;route.centerY=.5f;route.invalidate();});
   full.setContentView(root);
   full.setOnDismissListener(d->{
+   pendingEditorSpeech=null;
    setRequestedOrientation(previousOrientation);
    for(View view:views){android.view.ViewParent parent=view.getParent();if(parent instanceof android.view.ViewGroup)((android.view.ViewGroup)parent).removeView(view);}
    // Original positions are ascending; restore before other controls.
@@ -2670,7 +2714,7 @@ public class MainActivity extends Activity {
    .addOnSuccessListener(this,german->{if(version==speechVersion){voiceText.setText(german);if(!offerVoiceSave(german)&&!offerVoiceNewPoint(german)&&!offerVoiceObjectDimensions(german)&&!offerVoiceSurface(german)&&!offerVoiceObject(german)&&!offerVoiceSegment(german))offerVoiceRename(german);}})
    .addOnFailureListener(this,error->{if(version==speechVersion)notice("Übersetzung fehlgeschlagen. Für den ersten Modellabruf wird Internet benötigt.");});
  }
- @Override protected void onDestroy(){if(bleMeasure!=null)bleMeasure.close();pendingBleConsumer=null;if(translator!=null)translator.close();super.onDestroy();}
+ @Override protected void onDestroy(){pendingEditorSpeech=null;if(bleMeasure!=null)bleMeasure.close();pendingBleConsumer=null;if(translator!=null)translator.close();super.onDestroy();}
  void startDictation(){
 
  android.content.Intent i=new android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
@@ -2680,6 +2724,7 @@ public class MainActivity extends Activity {
  try{startActivityForResult(i,410);}catch(android.content.ActivityNotFoundException e){Toast.makeText(this,"Keine Spracherkennung verfügbar.",Toast.LENGTH_LONG).show();}
  }
  @Override protected void onActivityResult(int request,int result,android.content.Intent data){super.onActivityResult(request,result,data);
+ if(request==428){java.util.function.Consumer<String> accept=pendingEditorSpeech;pendingEditorSpeech=null;if(accept!=null&&result==RESULT_OK&&data!=null){java.util.ArrayList<String> values=data.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS);if(values!=null&&!values.isEmpty())accept.accept(values.get(0));}return;}
  if(request==427&&result==RESULT_OK&&data!=null&&data.getData()!=null){importRouteUnderlay(data.getData());return;}
  if(request==426&&result==RESULT_OK&&data!=null&&data.getData()!=null){android.net.Uri uri=data.getData();String name=uri.getLastPathSegment();try(android.database.Cursor c=getContentResolver().query(uri,new String[]{android.provider.OpenableColumns.DISPLAY_NAME},null,null,null)){if(c!=null&&c.moveToFirst())name=c.getString(0);}catch(Exception ignored){}analyzeImageDocument(uri,name==null?"Bild":name);return;}
  if(request==425&&result==RESULT_OK&&data!=null&&data.getData()!=null){android.net.Uri uri=data.getData();String name=uri.getLastPathSegment();try(android.database.Cursor c=getContentResolver().query(uri,new String[]{android.provider.OpenableColumns.DISPLAY_NAME},null,null,null)){if(c!=null&&c.moveToFirst())name=c.getString(0);}catch(Exception ignored){}analyzePdfDocument(uri,name==null?"PDF":name);return;}
