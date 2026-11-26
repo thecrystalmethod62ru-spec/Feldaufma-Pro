@@ -5315,6 +5315,13 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
    }
   };
   form.addView(preview,0,new LinearLayout.LayoutParams(-1,dp(160)));
+  Button expandPreview=new Button(this);expandPreview.setText("Querschnitt vergrößern");form.addView(expandPreview,1);
+  expandPreview.setOnClickListener(v->{
+   android.view.ViewGroup.LayoutParams lp=preview.getLayoutParams();
+   boolean expanded=lp.height>dp(160);
+   lp.height=expanded?dp(160):Math.max(dp(240),getResources().getDisplayMetrics().heightPixels-dp(280));
+   preview.setLayoutParams(lp);expandPreview.setText(expanded?"Querschnitt vergrößern":"Querschnitt verkleinern");
+  });
   for(EditText field:fields)field.addTextChangedListener(new android.text.TextWatcher(){
    public void beforeTextChanged(CharSequence s,int start,int count,int after){}
    public void onTextChanged(CharSequence s,int start,int before,int count){preview.invalidate();}
