@@ -51,5 +51,11 @@ public final class PipeLayoutStore {
         JSONObject row=new JSONObject();row.put("from",from);row.put("to",to);row.put("width",width);row.put("depth",depth);row.put("pipes",encode(pipes));next.put(row);
         if(!prefs.edit().putString(SECTION_KEY,next.toString()).commit())throw new IllegalStateException("Abschnitt konnte nicht gespeichert werden");
     }
+    public void deleteSection(double from,double to) throws JSONException {
+        JSONArray rows=sections(),next=new JSONArray();boolean found=false;
+        for(int i=0;i<rows.length();i++){JSONObject row=rows.getJSONObject(i);if(row.getDouble("from")==from&&row.getDouble("to")==to){found=true;continue;}next.put(row);}
+        if(!found)throw new IllegalArgumentException("Abschnitt nicht gefunden");
+        if(!prefs.edit().putString(SECTION_KEY,next.toString()).commit())throw new IllegalStateException("Löschen fehlgeschlagen");
+    }
     public JSONArray sections() throws JSONException {return new JSONArray(prefs.getString(SECTION_KEY,"[]"));}
 }
