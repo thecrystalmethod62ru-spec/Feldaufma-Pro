@@ -1625,12 +1625,15 @@ public class MainActivity extends Activity {
     montagePoints.add(new double[]{pos.x,-pos.y});
    }catch(IllegalArgumentException ignored){}}
   }catch(Exception e){notice("Montage-Zuordnung konnte nicht vollständig gelesen werden.");}
+  final org.json.JSONArray surfaces;
+  org.json.JSONArray loadedSurfaces;try{loadedSurfaces=new org.json.JSONArray(getPreferences(0).getString("segments","[]"));}catch(Exception e){loadedSurfaces=new org.json.JSONArray();notice("Oberflächen konnten nicht gelesen werden.");}surfaces=loadedSurfaces;
   final double[] widths={Double.NaN,Double.NaN,Double.NaN};
   String[] widthKeys={"width","left","right"};
   for(int i=0;i<widthKeys.length;i++){try{double v=Double.parseDouble(getPreferences(0).getString(widthKeys[i],"").trim().replace(',','.'));if(Double.isFinite(v)&&v>=0&&(i!=0||v>0))widths[i]=v;}catch(Exception ignored){}}
   LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);
   TextView info=new TextView(this);info.setText("Gemessene Längen · Richtungen aus Skizze (nicht vermessen)");panel.addView(info);
   TextView widthHint=new TextView(this);widthHint.setText("Grabenbreite: "+(Double.isFinite(widths[0])?widths[0]+" m":"offen")+" · Nachschnitt links: "+(Double.isFinite(widths[1])?widths[1]+" m":"offen")+" · rechts: "+(Double.isFinite(widths[2])?widths[2]+" m":"offen")+"\nVerbundene Vorschaukonturen; Überschneidungen nicht bereinigt, keine Flächenberechnung.");panel.addView(widthHint);
+  TextView surfaceHint=new TextView(this);surfaceHint.setText("Oberflächen: "+surfaces.length()+" gespeicherte Abschnitte · Standardfarben; ungültige Stationen werden ausgelassen.");panel.addView(surfaceHint);
   TextView montageHint=new TextView(this);montageHint.setText("Montage: "+montagePoints.size()+" darstellbare Stationspunkte. Fehlender Versatz = Achse (Vorschau); Eckversatz nicht dargestellt.");panel.addView(montageHint);
   android.view.View drawing=new android.view.View(this){
    final android.graphics.Paint pen=new android.graphics.Paint(3);
@@ -1669,6 +1672,23 @@ public class MainActivity extends Activity {
       }
       for(int i=0;i<polygon.size();i++){double[] q=polygon.get(i);float x=(float)(ox+q[0]*scale),y=(float)(oy-q[1]*scale);if(i==0)shape.moveTo(x,y);else shape.lineTo(x,y);}
       shape.close();pen.setColor(j==0?0xff777e86:0xffb79b70);c.drawPath(shape,pen);
+     }
+    }
+    if(Double.isFinite(widths[0])){
+     double total=route.measuredLength();
+     for(int j=0;j<surfaces.length();j++){
+      org.json.JSONObject section=surfaces.optJSONObject(j);if(section==null)continue;
+      double from=section.optDouble("from"),to=section.optDouble("to");String name=section.optString("surface");
+      if(!Double.isFinite(from)||!Double.isFinite(to)||from<0||to>total||to<=from||name.trim().isEmpty())continue;
+      double start=0;
+      for(int i=1;i<model.vertices.size();i++){
+       double end=start+route.vertices.get(i).metres,lo=Math.max(start,from),hi=Math.min(end,to);
+       if(hi>lo){double[] u=model.station(lo),v=model.station(hi);if(u!=null&&v!=null){
+        pen.setColor(RouteSketch.surfaceColor(name));pen.setStrokeWidth((float)(widths[0]*scale));pen.setStrokeCap(android.graphics.Paint.Cap.BUTT);
+        c.drawLine((float)(ox+u[0]*scale),(float)(oy-u[1]*scale),(float)(ox+v[0]*scale),(float)(oy-v[1]*scale),pen);
+       }}start=end;
+      }
+      double[] mid=model.station((from+to)/2);if(mid!=null){pen.setColor(0xff777777);pen.setTextSize(dp(11));c.drawText(name,(float)(ox+mid[0]*scale),(float)(oy-mid[1]*scale+widths[0]*scale/2+dp(14)),pen);}
      }
     }
     for(int i=1;i<model.vertices.size();i++){
