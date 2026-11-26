@@ -3019,9 +3019,27 @@ public class MainActivity extends Activity {
  final java.util.ArrayList<android.graphics.RectF> utilityHits=new java.util.ArrayList<>();
  Profile(){super(MainActivity.this);setClickable(true);}
  @Override public boolean performClick(){super.performClick();return true;}
+ int dragUtility=-1;float downX,downY,profileLeft,profileTop,profileScale;boolean utilityMoved;org.json.JSONArray dragRows;
  @Override public boolean onTouchEvent(android.view.MotionEvent e){
-  if(e.getAction()==android.view.MotionEvent.ACTION_DOWN)return true;
-  if(e.getAction()==android.view.MotionEvent.ACTION_UP){performClick();float xx=e.getX()*360f/getWidth(),yy=e.getY()*300f/getHeight();for(int i=0;i<utilityHits.size();i++){android.graphics.RectF hit=utilityHits.get(i);if(hit!=null&&hit.contains(xx,yy)){utilityMenu(i);return true;}}return true;}return super.onTouchEvent(e);
+  float xx=e.getX()*360f/getWidth(),yy=e.getY()*300f/getHeight();
+  switch(e.getActionMasked()){
+   case android.view.MotionEvent.ACTION_DOWN:
+    dragUtility=-1;utilityMoved=false;downX=xx;downY=yy;
+    for(int i=utilityHits.size()-1;i>=0;i--){android.graphics.RectF hit=utilityHits.get(i);if(hit!=null&&hit.contains(xx,yy)){dragUtility=i;dragRows=extraUtilities();getParent().requestDisallowInterceptTouchEvent(true);break;}}
+    return true;
+   case android.view.MotionEvent.ACTION_MOVE:
+    if(dragUtility>=0&&profileScale>0){
+     if(Math.hypot(xx-downX,yy-downY)>3)utilityMoved=true;
+     if(utilityMoved){org.json.JSONObject o=dragRows.optJSONObject(dragUtility);double radius=o.optDouble("diameter")/2000;
+      if(radius*2<=w&&radius*2<=d)try{o.put("offset",Math.max(radius,Math.min(w-radius,(xx-profileLeft)/profileScale)));o.put("axisDepth",Math.max(radius,Math.min(d-radius,(yy-profileTop)/profileScale)));invalidate();}catch(Exception ignored){}
+     }
+    }return true;
+   case android.view.MotionEvent.ACTION_UP:
+    int selected=dragUtility;dragUtility=-1;getParent().requestDisallowInterceptTouchEvent(false);
+    if(selected>=0){if(utilityMoved){saveUtilities(dragRows);}else{performClick();utilityMenu(selected);}}dragRows=null;invalidate();return true;
+   case android.view.MotionEvent.ACTION_CANCEL:
+    dragUtility=-1;dragRows=null;getParent().requestDisallowInterceptTouchEvent(false);invalidate();return true;
+  }return true;
  }
  String m(double x){return String.format(java.util.Locale.GERMANY,"%.2f m",x);}
  void label(Canvas c,String s,float x,float y){p.setColor(Color.BLACK);p.setTextSize(12);c.drawText(s,x,y,p);}
@@ -3030,6 +3048,7 @@ public class MainActivity extends Activity {
  double nl=Double.isFinite(left)?left:0,nr=Double.isFinite(right)?right:0;
  float scale=(float)Math.min(190/(w+nl+nr),155/d);
  float x=180-(float)(w*scale/2),z=180+(float)(w*scale/2),top=55,bottom=top+(float)(d*scale);
+ profileLeft=x;profileTop=top;profileScale=scale;
  p.setColor(0xffb7a48a);c.drawRect(20,top,340,bottom,p);
  p.setColor(0xffeee2cc);c.drawRect(x,top,z,bottom,p);
  float layerTop=top;
@@ -3042,16 +3061,16 @@ public class MainActivity extends Activity {
  }
  if(Double.isFinite(base)){p.setColor(0xffa6a6a6);c.drawRect(20,layerTop,340,layerTop+(float)(base*scale),p);}
  if(!covering.equals("Asphalt")&&!covering.equals("Unbekannt")&&!covering.equals("Unbefestigt")&&!covering.equals("Sonstiges")){p.setColor(0xff777777);c.drawLine(20,top,340,top,p);for(int i=20;i<340;i+=covering.contains("platten")||covering.contains("Platten")?28:12)c.drawLine(i,top-4,i,top,p);}
- org.json.JSONArray utilities=extraUtilities();
+ org.json.JSONArray utilities=dragRows==null?extraUtilities():dragRows;
  if(utilities.length()==0){if(Double.isFinite(pipe)){float radius=(float)(pipe/2000*scale);p.setColor(0xff3686bc);c.drawCircle(180,bottom-radius,radius,p);}}
  else{
   double sum=Double.isFinite(pipe)?pipe/1000:0;for(int i=0;i<utilities.length();i++)sum+=utilities.optJSONObject(i).optDouble("diameter",0)/1000;
   int count=utilities.length()+(Double.isFinite(pipe)?1:0);
   float gap=(float)((w-sum)*scale/(count+1)),cursor=x+gap;
-  if(gap<0||sum<=0){label(c,"Leitungen: Grabenbreite prüfen",20,224);}
-  else{
+  if(gap<0){gap=0;cursor=x;label(c,"Leitungsanordnung prüfen",20,224);}
+  {
    if(Double.isFinite(pipe)){float radius=(float)(pipe/2000*scale);p.setColor(0xff3686bc);c.drawCircle(cursor+radius,bottom-radius,radius,p);cursor+=2*radius+gap;}
-   for(int i=0;i<utilities.length();i++){org.json.JSONObject o=utilities.optJSONObject(i);float radius=(float)(o.optDouble("diameter",0)/2000*scale);String type=o.optString("type");p.setColor(type.equals("Gas")?0xffe9b63c:type.equals("Trinkwasser")?0xff3686bc:0xffc66d56);if(radius*2<=bottom-top){c.drawCircle(cursor+radius,bottom-radius,radius,p);utilityHits.add(new android.graphics.RectF(cursor,bottom-2*radius,cursor+2*radius,bottom));}else{utilityHits.add(null);label(c,"Leitungstiefe prüfen",20,224);}cursor+=2*radius+gap;}
+   for(int i=0;i<utilities.length();i++){org.json.JSONObject o=utilities.optJSONObject(i);float radius=(float)(o.optDouble("diameter",0)/2000*scale);String type=o.optString("type");p.setColor(type.equals("Gas")?0xffe9b63c:type.equals("Trinkwasser")?0xff3686bc:0xffc66d56);if(radius*2<=bottom-top&&radius*2<=z-x){float cx=(float)(x+o.optDouble("offset",(cursor+radius-x)/scale)*scale),cy=(float)(top+o.optDouble("axisDepth",(bottom-radius-top)/scale)*scale);cx=Math.max(x+radius,Math.min(z-radius,cx));cy=Math.max(top+radius,Math.min(bottom-radius,cy));c.drawCircle(cx,cy,radius,p);utilityHits.add(new android.graphics.RectF(cx-radius,cy-radius,cx+radius,cy+radius));}else{utilityHits.add(null);label(c,"Leitungstiefe prüfen",20,224);}cursor+=2*radius+gap;}
   }
  }
 
