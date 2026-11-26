@@ -4218,6 +4218,21 @@ minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
      p.setColor(entry.getValue());c.drawRect(lx,ly-7,lx+12,ly+1,p);p.setColor(INK);c.drawText(label,lx+16,ly,p);lx+=space;
     }
    }
+   if(trenchWidth>0&&widths.length()==0){
+    org.json.JSONArray utilities=extraUtilities();
+    for(int j=0;j<utilities.length();j++){
+     org.json.JSONObject row=utilities.optJSONObject(j);if(row==null||!row.has("offset"))continue;
+     double diameter=row.optDouble("diameter")/1000,offset=row.optDouble("offset");
+     if(!Double.isFinite(diameter)||diameter<=0||!Double.isFinite(offset)||offset<diameter/2||offset+diameter/2>trenchWidth)continue;
+     String type=row.optString("type");p.setColor(type.equals("Gas")?0xffe9b63c:type.equals("Trinkwasser")?0xff3686bc:0xffc66d56);
+     p.setStrokeWidth((float)(diameter*unit/factor));
+     for(int i=1;i<route.vertices.size();i++){
+      RouteSketch.Vertex a=route.vertices.get(i-1),b=route.vertices.get(i);double dx=b.point.x-a.point.x,dy=b.point.y-a.point.y,n=Math.hypot(dx,dy);if(n<=0)continue;
+      double lateral=(trenchWidth/2-offset)/factor,nx=dy/n*lateral,ny=-dx/n*lateral;
+      c.drawLine((float)(40+(a.point.x+nx-minX)*unit),(float)(85+(a.point.y+ny-minY)*unit),(float)(40+(b.point.x+nx-minX)*unit),(float)(85+(b.point.y+ny-minY)*unit),p);
+     }
+    }
+   }
    if(trenchWidth>0||widths.length()>0)try{
     org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("metricVerbauSections","[]"));
     double station=0;
