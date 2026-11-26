@@ -95,7 +95,21 @@ public class MainActivity extends Activity {
  Button undo=new Button(this);undo.setText("Letztes Objekt entfernen");root.addView(undo);undo.setOnClickListener(v->{if(objects.length()>0){objects.remove(objects.length()-1);saveObjects();}});
  root=profilePage;
  profile=new Profile();root.addView(profile,new LinearLayout.LayoutParams(-1,(int)(300*getResources().getDisplayMetrics().density)));
+ profileSlider(profilePage,"Grabenbreite",width,10,600);
+ profileSlider(profilePage,"Grabentiefe",depth,10,800);
+ profileSlider(profilePage,"Nachschnitt links",leftInput,0,200);
+ profileSlider(profilePage,"Nachschnitt rechts",rightInput,0,200);
  save.setOnClickListener(v->{calculate();showPage(planPage);});if(length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);
+ }
+ void profileSlider(LinearLayout page,String name,EditText target,int min,int max){
+ TextView label=new TextView(this);page.addView(label);SeekBar bar=new SeekBar(this);bar.setMax(max-min);page.addView(bar);
+ EditText exact=new EditText(this);exact.setSingleLine(true);exact.setInputType(8194);exact.setText(target.getText());page.addView(exact);
+ final boolean[] busy={false};
+ Runnable sync=()->{if(busy[0])return;busy[0]=true;try{double val=number(target);label.setText(name+" · "+String.format(java.util.Locale.GERMANY,"%.2f m",val));bar.setProgress((int)Math.round(val*100)-min);exact.setText(target.getText());}catch(Exception e){label.setText(name+" (m)");}busy[0]=false;};
+ target.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){sync.run();}public void afterTextChanged(android.text.Editable e){}});
+ bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onStartTrackingTouch(SeekBar b){}public void onStopTrackingTouch(SeekBar b){}public void onProgressChanged(SeekBar b,int progress,boolean user){if(!user)return;target.setText(String.format(java.util.Locale.GERMANY,"%.2f",(progress+min)/100.0));calculate();}});
+ exact.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){if(busy[0])return;try{double v=number(exact);if(!Double.isFinite(v)||v<min/100.0||v>max/100.0)return;busy[0]=true;target.setText(s);label.setText(name+" · "+s+" m");bar.setProgress((int)Math.round(v*100)-min);busy[0]=false;calculate();}catch(Exception e){busy[0]=false;}}public void afterTextChanged(android.text.Editable e){}});
+ sync.run();
  }
  void calculate(){try{l=number(length);w=number(width);d=number(depth);if(!Double.isFinite(l*w*d)||l<=0||w<=0||d<=0)throw new Exception();
  optional(stoneLength);optional(stoneWidth);optional(stoneDepth);
