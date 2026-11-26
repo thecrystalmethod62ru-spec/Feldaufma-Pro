@@ -2223,7 +2223,7 @@ public class MainActivity extends Activity {
         previewUpdate.run();
         ScrollView editScroll=new ScrollView(this);editScroll.addView(fields);
         final android.widget.LinearLayout sheet=new android.widget.LinearLayout(this);sheet.setOrientation(1);sheet.setBackgroundColor(0xff202827);
-        TextView dragHandle=new TextView(this);dragHandle.setText("☰  Leitung bearbeiten");dragHandle.setTextColor(Color.WHITE);dragHandle.setPadding(dp(12),dp(8),dp(12),dp(8));dragHandle.setContentDescription("Einstellungsfenster verschieben");sheet.addView(dragHandle);
+        TextView dragHandle=new TextView(this);dragHandle.setText("☰  Leitung bearbeiten");dragHandle.setTextColor(Color.WHITE);dragHandle.setPadding(dp(12),dp(8),dp(12),dp(8));dragHandle.setContentDescription("Einstellungsfenster verschieben");android.widget.LinearLayout titleBar=new android.widget.LinearLayout(this);sheet.addView(titleBar);titleBar.addView(dragHandle,new android.widget.LinearLayout.LayoutParams(0,-2,1));Button collapse=new Button(this);collapse.setText("−");titleBar.addView(collapse,new android.widget.LinearLayout.LayoutParams(dp(48),dp(44)));
         sheet.addView(editScroll,new android.widget.LinearLayout.LayoutParams(-1,0,1));
         android.widget.LinearLayout actions=new android.widget.LinearLayout(this);sheet.addView(actions);
         Button cancel=new Button(this),apply=new Button(this);cancel.setText("Abbrechen");apply.setText("Speichern");actions.addView(cancel,new android.widget.LinearLayout.LayoutParams(0,-2,1));actions.addView(apply,new android.widget.LinearLayout.LayoutParams(0,-2,1));
@@ -2238,19 +2238,33 @@ public class MainActivity extends Activity {
           next.set(index,new PipeLayout.Pipe(pipe.name,o,number(diameterInput),number(wallInput),b,Double.parseDouble(gapInput.getText().toString().trim().replace(',','.')),Double.parseDouble(coverInput.getText().toString().trim().replace(',','.')),pipe.fixed));
           multiPipeStore.save(next);pipes.clear();pipes.addAll(next);refresh.run();edit.dismiss();
          }catch(Exception ex){bedding.setError("Ungültige Lage oder Speicherfehler: "+ex.getMessage());}
-        });edit.showAtLocation(cross,Gravity.TOP|Gravity.LEFT,Math.max(0,getResources().getDisplayMetrics().widthPixels-edit.getWidth()),Math.max(0,getResources().getDisplayMetrics().heightPixels-edit.getHeight()-dp(48)));
+        });android.graphics.Rect visible=new android.graphics.Rect();cross.getWindowVisibleDisplayFrame(visible);
+        final int[] panelPosition={Math.max(0,Math.min(Math.max(0,visible.width()-edit.getWidth()),overlapPrefs.getInt("pipePanelX",visible.width()-edit.getWidth()))),Math.max(0,Math.min(Math.max(0,visible.height()-edit.getHeight()),overlapPrefs.getInt("pipePanelY",visible.height()-edit.getHeight())))};
+        edit.showAtLocation(cross,Gravity.TOP|Gravity.LEFT,panelPosition[0],panelPosition[1]);
+        final int expandedHeight=edit.getHeight();
+        collapse.setContentDescription("Einstellungen einklappen");
+        collapse.setOnClickListener(button->{
+         boolean expanded=editScroll.getVisibility()==View.VISIBLE;
+         editScroll.setVisibility(expanded?View.GONE:View.VISIBLE);actions.setVisibility(expanded?View.GONE:View.VISIBLE);
+         collapse.setText(expanded?"+":"−");collapse.setContentDescription(expanded?"Einstellungen ausklappen":"Einstellungen einklappen");
+         int height=expanded?dp(48):expandedHeight;
+         android.graphics.Rect frame=new android.graphics.Rect();cross.getWindowVisibleDisplayFrame(frame);
+         panelPosition[1]=Math.max(0,Math.min(panelPosition[1],frame.height()-height));
+         edit.update(panelPosition[0],panelPosition[1],-1,height);
+        });
         dragHandle.setOnTouchListener(new View.OnTouchListener(){
          float downX,downY;int baseX,baseY;
          public boolean onTouch(View view,android.view.MotionEvent event){
           switch(event.getActionMasked()){
            case android.view.MotionEvent.ACTION_DOWN:
-            downX=event.getRawX();downY=event.getRawY();int[] location=new int[2];sheet.getLocationOnScreen(location);baseX=location[0];baseY=location[1];return true;
+            downX=event.getRawX();downY=event.getRawY();baseX=panelPosition[0];baseY=panelPosition[1];return true;
            case android.view.MotionEvent.ACTION_MOVE:
             android.graphics.Rect bounds=new android.graphics.Rect();cross.getWindowVisibleDisplayFrame(bounds);
-            int x=Math.max(bounds.left,Math.min(Math.max(bounds.left,bounds.right-edit.getWidth()),baseX+Math.round(event.getRawX()-downX)));
-            int y=Math.max(bounds.top,Math.min(Math.max(bounds.top,bounds.bottom-edit.getHeight()),baseY+Math.round(event.getRawY()-downY)));
-            edit.update(x,y,-1,-1);return true;
-           case android.view.MotionEvent.ACTION_UP:case android.view.MotionEvent.ACTION_CANCEL:return true;
+            int x=Math.max(0,Math.min(Math.max(0,bounds.width()-edit.getWidth()),baseX+Math.round(event.getRawX()-downX)));
+            int y=Math.max(0,Math.min(Math.max(0,bounds.height()-edit.getHeight()),baseY+Math.round(event.getRawY()-downY)));
+            panelPosition[0]=x;panelPosition[1]=y;edit.update(x,y,-1,-1);return true;
+           case android.view.MotionEvent.ACTION_UP:overlapPrefs.edit().putInt("pipePanelX",panelPosition[0]).putInt("pipePanelY",panelPosition[1]).apply();return true;
+           case android.view.MotionEvent.ACTION_CANCEL:return true;
            default:return true;
           }
          }
