@@ -307,6 +307,7 @@ public class MainActivity extends Activity {
  ImageButton assistant=new ImageButton(this);assistant.setImageResource(android.R.drawable.ic_btn_speak_now);
  assistant.setContentDescription("Sprachassistent starten");dock.addView(assistant,new LinearLayout.LayoutParams(dp(52),dp(48)));
  assistant.setOnClickListener(v->startDictation());
+ actionButtonSingle(dock,"Ассистент",()->showPage(voicePage));
  routePreviewBox=page();planPage.addView(routePreviewBox);
  routeSummary=sheetText("",15,false);planPage.addView(routeSummary);
  LinearLayout actions=new LinearLayout(this);planPage.addView(actions);
@@ -337,6 +338,8 @@ public class MainActivity extends Activity {
  voiceLanguage=new Spinner(this);voiceLanguage.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Deutsch","Russisch"}));root.addView(voiceLanguage);voiceLanguage.setSelection(getPreferences(0).getInt("dictationLanguage",1));onChoice(voiceLanguage,index->getPreferences(0).edit().putInt("dictationLanguage",index).apply());
  Button mic=new Button(this);mic.setText("Spracheingabe starten");root.addView(mic);
  voiceText=new EditText(this);voiceText.setHint("Diktat prüfen oder bearbeiten");root.addView(voiceText);
+ actionButtonSingle(root,"Каких данных не хватает?",()->showMissingAssistantData());
+ actionButtonSingle(root,"Отправить текст",()->{String message=voiceText.getText().toString().trim();if(!message.isEmpty())handleSpeech(message);});
  Button applyVoice=new Button(this);applyVoice.setText("Maße aus Diktat übernehmen");root.addView(applyVoice);
  mic.setOnClickListener(v->startDictation());applyVoice.setOnClickListener(v->applyDictation());
  actionButtonSingle(root,"Als Objektbemerkung verwenden",()->{
@@ -887,6 +890,24 @@ public class MainActivity extends Activity {
  if(request==412&&result==RESULT_OK&&data!=null&&data.getData()!=null){writePdf(data.getData());return;}
  if(request==411&&result==RESULT_OK&&data!=null){if(data.getClipData()!=null){for(int j=0;j<data.getClipData().getItemCount();j++)attachDocument(data.getClipData().getItemAt(j).getUri(),data.getFlags());}else attachDocument(data.getData(),data.getFlags());showDocuments();return;}
  if(request==410&&result==RESULT_OK&&data!=null){java.util.ArrayList<String> values=data.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS);if(values!=null&&!values.isEmpty())handleSpeech(values.get(0));}}
+ void showMissingAssistantData(){
+  StringBuilder b=new StringBuilder();
+  EditText[] fields={length,width,depth};String[] questions={"Какова общая длина трассы?","Какая ширина траншеи?","Какая глубина траншеи?"};
+  for(int i=0;i<fields.length;i++){double n=optional(fields[i]);if(!Double.isFinite(n)||n<=0)b.append("• ").append(questions[i]).append("\n");}
+  String covering=surface.getSelectedItem().toString();
+  if(covering.equals("Unbekannt"))b.append("• Какой тип поверхности?\n");
+  if(covering.equals("Asphalt")){
+   if(!Double.isFinite(optional(asphaltInput))||optional(asphaltInput)<=0)b.append("• Какая толщина асфальта?\n");
+   if(!Double.isFinite(optional(leftInput)))b.append("• Какой Nachschnitt слева?\n");
+   if(!Double.isFinite(optional(rightInput)))b.append("• Какой Nachschnitt справа?\n");
+  }
+  for(int i=0;i<objects.length();i++){org.json.JSONObject o=objects.optJSONObject(i);if(o==null||!o.optString("type").equals("Hindernis"))continue;
+   String[] keys={"detailLength","detailWidth","detailDepth"},labels={"длина","ширина","глубина"};StringBuilder missing=new StringBuilder();
+   for(int j=0;j<keys.length;j++){double n=detailNumber(o,keys[j]);if(!Double.isFinite(n)||n<=0){if(missing.length()>0)missing.append(", ");missing.append(labels[j]);}}
+   if(missing.length()>0)b.append("• Hindernis, Station ").append(o.optString("station")).append(" m: уточни ").append(missing).append(".\n");
+  }
+  new android.app.AlertDialog.Builder(this).setTitle("Ассистент — недостающие данные").setMessage(b.length()==0?"Основные проверяемые размеры заполнены.":b.toString()).setNegativeButton("Уточню позже",null).setPositiveButton("Ответить",(d,w)->{showPage(voicePage);voiceText.requestFocus();}).show();
+ }
  void applyDictation(){
  String t=voiceText.getText().toString().toLowerCase(java.util.Locale.ROOT);
  String[] names={"(?:grabenbreite|breite|ширина(?: траншеи)?)","(?:grabentiefe|tiefe|глубина(?: траншеи)?)","(?:trassenlänge|länge|длина(?: трассы)?)"};
