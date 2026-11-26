@@ -44,7 +44,7 @@ public class MainActivity extends Activity {
   java.security.MessageDigest md=java.security.MessageDigest.getInstance("SHA-256");
   org.json.JSONArray values=new org.json.JSONArray();
   for(String key:new java.util.TreeSet<>(snapshot.keySet())){
-   if(key.equals("lastAutosave"))continue;
+   if(key.equals("lastAutosave")||key.equals("routeUndo")||key.equals("routeRedo")||key.equals("routeHistoryHead"))continue;
    Object value=snapshot.get(key);values.put(new org.json.JSONArray().put(key).put(value.getClass().getSimpleName()).put(value));
   }
   StringBuilder hex=new StringBuilder();for(byte b:md.digest(values.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)))hex.append(String.format(java.util.Locale.ROOT,"%02x",b&255));return hex.toString();
@@ -181,6 +181,7 @@ public class MainActivity extends Activity {
  void writeProjectBackup(java.io.File target,java.util.Map<String,?> snapshot)throws Exception{
   org.json.JSONObject fields=new org.json.JSONObject();
   for(java.util.Map.Entry<String,?> e:snapshot.entrySet()){
+   if(e.getKey().equals("routeUndo")||e.getKey().equals("routeRedo")||e.getKey().equals("routeHistoryHead"))continue;
    Object v=e.getValue();
    if(!(v instanceof String||v instanceof Boolean||v instanceof Integer||v instanceof Long||v instanceof Float))throw new java.io.IOException("Nicht unterstützter Datentyp");
    fields.put(e.getKey(),new org.json.JSONObject().put("type",v.getClass().getSimpleName()).put("value",v));
@@ -327,7 +328,7 @@ public class MainActivity extends Activity {
   preview.selected=i->measureSegment(preview,i);
   preview.changed=()->{saveRoute(preview);refreshRoute();};
   preview.highlight=findPoint(preview,selectedPoint);
-  if(!preview.vertices.isEmpty() && !routeData().equals(preview.encode()))saveRoute(preview);
+  if(!preview.vertices.isEmpty() && !routeData().equals(preview.encode()))getPreferences(0).edit().putString("routeSketch",preview.encode()).remove("routeHistoryHead").remove("routeUndo").remove("routeRedo").commit();
   routePreviewBox.addView(preview,new LinearLayout.LayoutParams(-1,dp(300)));
   double total=preview.measuredLength();
   if(preview.vertices.size()<2){routeSummary.setText("Trasse mit dem Finger zeichnen");return;}
@@ -361,6 +362,33 @@ public class MainActivity extends Activity {
   void record(String next){if(current.equals(next))return;undo.push(current);while(undo.size()>50)undo.removeLast();current=next;redo.clear();}
   String step(boolean forward){java.util.ArrayDeque<String> from=forward?redo:undo,to=forward?undo:redo;if(from.isEmpty())return current;to.push(current);current=from.pop();return current;}
  }
+ RouteEditHistory loadRouteHistory(String current){
+  RouteEditHistory history=new RouteEditHistory(current);
+  try{
+   SharedPreferences prefs=getPreferences(0);
+   if(!current.equals(prefs.getString("routeHistoryHead","")))return history;
+   for(String key:new String[]{"routeUndo","routeRedo"}){
+    org.json.JSONArray rows=new org.json.JSONArray(prefs.getString(key,"[]"));
+    java.util.ArrayDeque<String> stack=key.equals("routeUndo")?history.undo:history.redo;
+    for(int j=0;j<Math.min(50,rows.length());j++)stack.addLast(rows.getString(j));
+   }
+  }catch(Exception e){history.undo.clear();history.redo.clear();}
+  return history;
+ }
+ boolean persistRouteHistory(RouteEditHistory history){
+  try{
+   String before=routeData();
+   SharedPreferences.Editor ed=getPreferences(0).edit().putString("routeSketch",history.current)
+    .putString("routeHistoryHead",history.current)
+    .putString("routeUndo",new org.json.JSONArray(history.undo).toString())
+    .putString("routeRedo",new org.json.JSONArray(history.redo).toString());
+   if(ed.commit()){
+    if(!before.equals(history.current))recordProjectEvent("Trasse geändert · "+new org.json.JSONArray(history.current).length()+" Punkte");
+    return true;
+   }
+  }catch(Exception ignored){}
+  notice("Trasse konnte nicht gespeichert werden. Bitte erneut versuchen.");return false;
+ }
  void editRoute(boolean measure){
   LinearLayout form=page();
   ScrollView scroll=new ScrollView(this);scroll.addView(form);
@@ -378,7 +406,8 @@ public class MainActivity extends Activity {
    hint.setText(new String[]{"Mit einem Finger zeichnen, mit zwei Fingern zoomen oder verschieben.","Abschnitt zum Bemaßen antippen.","Punkt ziehen. Der Winkel gilt zur Waagerechten am benachbarten Punkt."}[index]);
   });
   mode.setSelection(measure?1:0);
-  RouteEditHistory history=new RouteEditHistory(route.encode());
+  final String initialSaved=routeData();
+  RouteEditHistory history=loadRouteHistory(route.encode());
   LinearLayout historyBar=new LinearLayout(this);form.addView(historyBar);
   Button undo=new Button(this),redo=new Button(this);undo.setAllCaps(false);redo.setAllCaps(false);undo.setText("Rückgängig");redo.setText("Wiederholen");
   historyBar.addView(undo,new LinearLayout.LayoutParams(0,-2,1));historyBar.addView(redo,new LinearLayout.LayoutParams(0,-2,1));
@@ -411,12 +440,14 @@ public class MainActivity extends Activity {
   android.app.AlertDialog editor=new android.app.AlertDialog.Builder(this).setTitle("Trasse skizzieren").setView(scroll)
    .setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
   editor.setOnShowListener(ignored->editor.getButton(-1).setOnClickListener(v->{
-   if(saveRoute(route)){refreshRoute();editor.dismiss();notice("Trasse gespeichert.");}
+   if(!initialSaved.equals(routeData())){notice("Trasse wurde zwischenzeitlich geändert. Editor neu öffnen.");return;}
+   history.record(route.encode());
+   if(persistRouteHistory(history)){refreshRoute();editor.dismiss();notice("Trasse gespeichert.");}
   }));
   editor.show();
  }
 
- boolean saveRoute(RouteSketch route){try{String before=routeData(),after=route.encode();if(getPreferences(0).edit().putString("routeSketch",after).commit()){if(!before.equals(after))recordProjectEvent("Trasse geändert · "+route.vertices.size()+" Punkte");return true;}}catch(RuntimeException ignored){}notice("Trasse konnte nicht gespeichert werden. Bitte erneut versuchen.");return false;}
+ boolean saveRoute(RouteSketch route){try{RouteEditHistory history=loadRouteHistory(routeData());history.record(route.encode());return persistRouteHistory(history);}catch(RuntimeException e){notice("Trasse konnte nicht gespeichert werden.");return false;}}
  Spinner choices(LinearLayout parent,String[] labels){
   Spinner spinner=new Spinner(this);
   spinner.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,labels));
