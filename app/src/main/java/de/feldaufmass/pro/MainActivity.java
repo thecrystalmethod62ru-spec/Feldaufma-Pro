@@ -4134,6 +4134,23 @@ public class MainActivity extends Activity {
   result.setText(basic);
   if(shoringQuantities!=null)shoringQuantities.setText(shoringReport());
  }
+ int appendScaledRoutePdf(android.graphics.pdf.PdfDocument pdf,int pageNumber,RouteSketch route){
+  double factor=route.uniformMetresPerUnit();if(!Double.isFinite(factor))return pageNumber;
+  double minX=Double.POSITIVE_INFINITY,minY=minX,maxX=Double.NEGATIVE_INFINITY,maxY=maxX;
+  for(RouteSketch.Vertex v:route.vertices){minX=Math.min(minX,v.point.x);minY=Math.min(minY,v.point.y);maxX=Math.max(maxX,v.point.x);maxY=Math.max(maxY,v.point.y);}
+  int denominator=0;double unit=0;
+  for(int candidate:new int[]{100,200,500,1000,2000,5000}){double u=factor*1000*72/25.4/candidate;if((maxX-minX)*u<=515&&(maxY-minY)*u<=690){denominator=candidate;unit=u;break;}}
+  if(denominator==0)return pageNumber;
+  android.graphics.pdf.PdfDocument.Page page=pdf.startPage(new android.graphics.pdf.PdfDocument.PageInfo.Builder(595,842,pageNumber++).create());
+  try{
+   Canvas c=page.getCanvas();Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);p.setColor(INK);p.setTextSize(16);c.drawText("Trassenachse – Maßstab 1:"+denominator,36,40,p);
+   p.setTextSize(10);c.drawText("A4 · Druck in tatsächlicher Größe (100 %) · nur Trassenachse",36,58,p);
+   p.setColor(TEAL);p.setStrokeWidth(1.5f);
+   for(int i=1;i<route.vertices.size();i++){RouteSketch.Vertex a=route.vertices.get(i-1),b=route.vertices.get(i);c.drawLine((float)(40+(a.point.x-minX)*unit),(float)(85+(a.point.y-minY)*unit),(float)(40+(b.point.x-minX)*unit),(float)(85+(b.point.y-minY)*unit),p);}
+   p.setColor(INK);p.setStrokeWidth(1);float bar=(float)(50*72/25.4);c.drawLine(40,795,40+bar,795,p);c.drawLine(40,791,40,799,p);c.drawLine(40+bar,791,40+bar,799,p);c.drawText("50 mm Kontrollmaß",40,812,p);
+  }finally{pdf.finishPage(page);}
+  return pageNumber;
+ }
  void writePdf(android.net.Uri uri) {
   android.graphics.pdf.PdfDocument pdf=new android.graphics.pdf.PdfDocument();
   try(java.io.OutputStream out=getContentResolver().openOutputStream(uri,"wt")) {
@@ -4188,6 +4205,7 @@ public class MainActivity extends Activity {
 
     }finally{pdf.finishPage(page);}
    }
+   pageNumber=appendScaledRoutePdf(pdf,pageNumber,route);
    pageNumber=appendLongitudinalPdf(pdf,pageNumber,route);
    appendPhotoPdf(pdf,pageNumber,route,projectHeader.getText().toString());
    pdf.writeTo(out);
