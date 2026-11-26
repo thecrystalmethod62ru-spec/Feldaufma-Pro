@@ -3508,7 +3508,7 @@ public class MainActivity extends Activity {
   androidx.core.view.ViewCompat.requestApplyInsets(root);
  }
 
- public void onCreate(Bundle b){super.onCreate(b);activeProject=projectRegistry().getString("active",LEGACY_PROJECT);
+ public void onCreate(Bundle savedInstanceState){super.onCreate(savedInstanceState);activeProject=projectRegistry().getString("active",LEGACY_PROJECT);
  if(b!=null){selectedPoint=b.getString("selectedPoint");pendingPoint=b.getString("pendingPoint");pendingPhoto=b.getString("pendingPhoto");pendingMaterialProject=b.getString("pendingMaterialProject");pendingConnectionsProject=b.getString("pendingConnectionsProject");pendingPlanProject=b.getString("pendingPlanProject");pendingProtocolsProject=b.getString("pendingProtocolsProject");}
  shell=page();shell.setPadding(0,0,0,0);shell.setBackgroundColor(0xfff4f6f8);setContentView(shell);fitSystemPanels(shell);
  planPage=page();measurePage=page();voicePage=page();profilePage=page();segmentPage=page();objectPage=page();quantityPage=page();
@@ -3850,7 +3850,7 @@ public class MainActivity extends Activity {
      LinearLayout body=new LinearLayout(this);body.setOrientation(1);
      PipeLayoutView view=new PipeLayoutView(this);view.setLayoutData(pipes,bw,bd);
      body.addView(view,new LinearLayout.LayoutParams(-1,dp(300)));
-     TextView info=new TextView(this);info.setText(android.text.TextUtils.join("\n",PipeLayout.dimensions(pipes,bw,bd)));body.addView(info);
+     TextView dimensionsText=new TextView(this);dimensionsText.setText(android.text.TextUtils.join("\n",PipeLayout.dimensions(pipes,bw,bd)));body.addView(dimensionsText);
      ScrollView scroll=new ScrollView(this);scroll.addView(body);
      new android.app.AlertDialog.Builder(this).setTitle(labels[index]).setView(scroll).setPositiveButton("Schließen",null).setNeutralButton("Löschen",(preview,which)->{
       new android.app.AlertDialog.Builder(this).setTitle("Abschnittsprofil löschen?").setMessage(labels[index]).setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(confirm,choice)->{
@@ -3870,7 +3870,7 @@ public class MainActivity extends Activity {
       android.text.TextWatcher draftWatcher=new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){updateDraft.run();}public void afterTextChanged(android.text.Editable e){}};
       newWidth.addTextChangedListener(draftWatcher);newDepth.addTextChangedListener(draftWatcher);updateDraft.run();
       android.app.AlertDialog editor=new android.app.AlertDialog.Builder(this).setTitle(labels[index]).setView(fields).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
-      editor.setOnShowListener(open->editor.getButton(-1).setOnClickListener(save->{
+      editor.setOnShowListener(open->editor.getButton(-1).setOnClickListener(saveButton->{
        try{new PipeLayoutStore(getPreferences(0)).saveSection(p.getDouble("from"),p.getDouble("to"),number(newWidth),number(newDepth),pipes);if(sketch!=null)sketch.invalidate();editor.dismiss();notice("Abschnittsprofil aktualisiert.");}
        catch(Exception ex){newDepth.setError(ex.getMessage());}
       }));editor.show();
