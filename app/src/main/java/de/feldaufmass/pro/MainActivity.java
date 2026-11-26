@@ -8,7 +8,7 @@ import android.content.SharedPreferences;
 
 public class MainActivity extends Activity {
  EditText project,length,width,depth; TextView result; Sketch sketch;
- double l,w,d,asphalt,left,right; EditText asphaltInput,leftInput,rightInput; Profile profile; Spinner surface; EditText stoneLength,stoneWidth,stoneDepth,stoneColor,pattern,bedding,underlying; Spinner handling; TextView legend; EditText baseInput,pipeInput; double base=Double.NaN,pipe=Double.NaN; String covering="Unbekannt";
+ double l,w,d,asphalt,left,right; EditText asphaltInput,leftInput,rightInput; Profile profile; Spinner surface; EditText stoneLength,stoneWidth,stoneDepth,stoneColor,pattern,bedding,underlying; Spinner handling; TextView legend; EditText stationFrom,stationTo; TextView segmentsView; org.json.JSONArray segments=new org.json.JSONArray(); EditText baseInput,pipeInput; double base=Double.NaN,pipe=Double.NaN; String covering="Unbekannt";
  EditText field(LinearLayout root,String label,String key,boolean numeric){
  TextView t=new TextView(this);t.setText(label);root.addView(t);
  EditText e=new EditText(this);e.setSingleLine(true);
@@ -47,6 +47,16 @@ public class MainActivity extends Activity {
  sketch=new Sketch();root.addView(sketch,new LinearLayout.LayoutParams(-1,300));
  TextView heading=new TextView(this);heading.setText("Regelprofil – Grabenquerschnitt");heading.setTextSize(20);root.addView(heading);
  legend=new TextView(this);legend.setTextSize(14);root.addView(legend);
+ TextView segmentHeading=new TextView(this);segmentHeading.setText("Oberflächenabschnitte");segmentHeading.setTextSize(20);root.addView(segmentHeading);
+ stationFrom=field(root,"Station von (m)","stationFrom",true);
+ stationTo=field(root,"Station bis (m)","stationTo",true);
+ try{segments=new org.json.JSONArray(getPreferences(0).getString("segments","[]"));}catch(Exception ignored){}
+ Button addSegment=new Button(this);addSegment.setText("Abschnitt hinzufügen");root.addView(addSegment);
+ segmentsView=new TextView(this);root.addView(segmentsView);
+ Button removeSegment=new Button(this);removeSegment.setText("Letzten Abschnitt entfernen");root.addView(removeSegment);
+ addSegment.setOnClickListener(v->addSegment());
+ removeSegment.setOnClickListener(v->{if(segments.length()>0){segments.remove(segments.length()-1);persistSegments();}});
+ showSegments();
  profile=new Profile();root.addView(profile,new LinearLayout.LayoutParams(-1,(int)(300*getResources().getDisplayMetrics().density)));
  save.setOnClickListener(v->calculate());if(length.length()>0&&width.length()>0&&depth.length()>0)calculate();
  }
@@ -66,6 +76,23 @@ public class MainActivity extends Activity {
  if(handling.getSelectedItemPosition()>0)details.append("\n"+handling.getSelectedItem());
  legend.setText(details.toString());sketch.invalidate();profile.invalidate();
  }catch(Exception e){result.setText("Bitte gültige positive Maße eingeben.");}}
+ void addSegment(){try{
+ double start=number(stationFrom),end=number(stationTo),total=number(length),gw=number(width);
+ if(!Double.isFinite(start+end+total+gw)||start<0||end<=start||end>total||gw<=0)throw new Exception();
+ double a=optional(leftInput),b=optional(rightInput);
+ for(int i=0;i<segments.length();i++){org.json.JSONObject old=segments.getJSONObject(i);if(start<old.getDouble("to")&&end>old.getDouble("from")){Toast.makeText(this,"Abschnitte dürfen sich nicht überschneiden.",Toast.LENGTH_LONG).show();return;}}
+ org.json.JSONObject item=new org.json.JSONObject();item.put("from",start);item.put("to",end);item.put("surface",surface.getSelectedItem().toString());item.put("width",gw);
+ if(Double.isFinite(a)&&Double.isFinite(b))item.put("cutWidth",gw+a+b);
+ segments.put(item);persistSegments();
+ }catch(Exception e){Toast.makeText(this,"Bitte gültige Stationsgrenzen und Breite eingeben.",Toast.LENGTH_LONG).show();}}
+ void persistSegments(){getPreferences(0).edit().putString("segments",segments.toString()).apply();showSegments();}
+ void showSegments(){StringBuilder out=new StringBuilder();java.util.TreeMap<String,Double> totals=new java.util.TreeMap<>();
+ for(int i=0;i<segments.length();i++){org.json.JSONObject o=segments.optJSONObject(i);if(o==null)continue;double a=o.optDouble("from"),b=o.optDouble("to"),area=(b-a)*o.optDouble("width");String type=o.optString("surface");
+ out.append(String.format(java.util.Locale.GERMANY,"RP %02d | %.2f–%.2f m | %s | %.2f m² (Graben)\n",i+1,a,b,type,area));
+ if(o.has("cutWidth"))out.append(String.format(java.util.Locale.GERMANY,"Mit Nachschnitt: %.2f m²\n",(b-a)*o.optDouble("cutWidth")));
+ totals.put(type,totals.getOrDefault(type,0.0)+area);}
+ for(java.util.Map.Entry<String,Double> e:totals.entrySet())out.append(String.format(java.util.Locale.GERMANY,"%s gesamt: %.2f m² (Graben)\n",e.getKey(),e.getValue()));
+ segmentsView.setText(out.toString());}
  double optional(EditText e)throws Exception{if(e.length()==0)return Double.NaN;double v=number(e);if(!Double.isFinite(v)||v<0)throw new Exception();return v;}
  class Profile extends View{
  Paint p=new Paint(3);Profile(){super(MainActivity.this);}
