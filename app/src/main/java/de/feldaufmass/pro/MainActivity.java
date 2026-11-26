@@ -5320,7 +5320,8 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
    public void onTextChanged(CharSequence s,int start,int before,int count){preview.invalidate();}
    public void afterTextChanged(android.text.Editable e){}
   });
-  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(source.optString("name",source.optString("type"))+" – Lage").setView(form).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
+  ScrollView positionScroll=new ScrollView(this);positionScroll.setFillViewport(false);positionScroll.addView(form);
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(source.optString("name",source.optString("type"))+" – Lage").setView(positionScroll).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
   dialog.setOnShowListener(x->dialog.getButton(-1).setOnClickListener(y->{
    if(!projectId.equals(activeProject)||!before.equals(extraUtilities().toString())){notice("Projektdaten geändert. Leitung erneut öffnen.");return;}
    try{
