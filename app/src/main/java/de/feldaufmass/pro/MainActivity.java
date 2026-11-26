@@ -1799,6 +1799,42 @@ public class MainActivity extends Activity {
   final Button multiPipeButton=new Button(this);
   multiPipeButton.setText("Mehrfachbelegung bearbeiten");
   panel.addView(multiPipeButton);
+  final Button crossSectionButton=new Button(this);
+  crossSectionButton.setText("Rohrquerschnitt öffnen");panel.addView(crossSectionButton);
+  crossSectionButton.setOnClickListener(v->{
+   final EditText dimensions=new EditText(this);
+   dimensions.setHint("Grabenbreite;Grabentiefe (m)");
+   new android.app.AlertDialog.Builder(this).setTitle("Querschnitt – Bezugsmaße").setView(dimensions).setNegativeButton("Abbrechen",null).setPositiveButton("Öffnen",(d,w)->{
+    try{
+     String[] parts=dimensions.getText().toString().split(";",-1);
+     if(parts.length!=2)throw new IllegalArgumentException("Breite und Tiefe erforderlich");
+     double bw=Double.parseDouble(parts[0].trim().replace(',','.')),bd=Double.parseDouble(parts[1].trim().replace(',','.'));
+     final java.util.List<PipeLayout.Pipe> pipes=multiPipeStore.load();
+     final PipeLayoutView cross=new PipeLayoutView(this);
+     cross.setLayoutData(pipes,bw,bd);
+     android.widget.LinearLayout content=new android.widget.LinearLayout(this);content.setOrientation(1);
+     content.addView(cross,new android.widget.LinearLayout.LayoutParams(-1,dp(300)));
+     final TextView warnings=new TextView(this);content.addView(warnings);
+     Runnable refresh=()->{cross.setLayoutData(pipes,bw,bd);warnings.setText(android.text.TextUtils.join("\n",PipeLayout.warnings(pipes,bw,bd,0)));};
+     refresh.run();
+     cross.setSelection(index->{
+      PipeLayout.Pipe pipe=pipes.get(index);
+      new android.app.AlertDialog.Builder(this).setTitle(pipe.name).setItems(new String[]{"Bearbeiten","Duplizieren","Löschen"},(menu,action)->{
+       if(action==0){multiPipeButton.performClick();return;}
+       Runnable change=()->{
+        java.util.List<PipeLayout.Pipe> next=new java.util.ArrayList<>(pipes);
+        if(action==1)next.add(new PipeLayout.Pipe(pipe.name+" (Kopie)",pipe.offset,pipe.diameter,pipe.wall,pipe.bedding));else next.remove(index);
+        try{multiPipeStore.save(next);pipes.clear();pipes.addAll(next);refresh.run();multiPipeButton.setText("Mehrfachbelegung ("+pipes.size()+") bearbeiten");}
+        catch(Exception ex){warnings.setText(ex.getMessage());}
+       };
+       if(action==2)new android.app.AlertDialog.Builder(this).setMessage("Leitung löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(x,y)->change.run()).show();else change.run();
+      }).show();
+     });
+     new android.app.AlertDialog.Builder(this).setTitle("Rohrquerschnitt").setView(content).setPositiveButton("Schließen",null).show();
+    }catch(Exception ex){new android.app.AlertDialog.Builder(this).setMessage("Querschnitt: "+ex.getMessage()).setPositiveButton("OK",null).show();}
+   }).show();
+  });
+
   multiPipeButton.setOnClickListener(v->{
    try{
     final java.util.List<PipeLayout.Pipe> pipes=multiPipeStore.load();
