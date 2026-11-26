@@ -1720,7 +1720,7 @@ public class MainActivity extends Activity {
       RouteBranch branch=branches.get(index-1);
       new android.app.AlertDialog.Builder(this).setTitle(branch.name).setMessage("Länge: "+branch.length()+" m · Fläche (brutto nominal): "+branch.nominalArea()+" m²")
        .setNegativeButton("Schließen",null).setPositiveButton("Löschen",(d,w)->{
-        try{branches.remove(index-1);branchStore.save(branches);notice("Abzweigung gelöscht");}catch(Exception ex){notice("Speichern fehlgeschlagen: "+ex.getMessage());}
+        try{branches.remove(index-1);branchStore.save(branches);notice("Abzweigung gelöscht");for(int k=0;k<panel.getChildCount();k++)panel.getChildAt(k).invalidate();}catch(Exception ex){notice("Speichern fehlgeschlagen: "+ex.getMessage());}
        }).show();return;
      }
      android.widget.LinearLayout fields=new android.widget.LinearLayout(this);fields.setOrientation(android.widget.LinearLayout.VERTICAL);
@@ -1734,7 +1734,7 @@ public class MainActivity extends Activity {
        double[] n=new double[5];for(int j=0;j<5;j++)n[j]=Double.parseDouble(inputs[j+1].getText().toString().trim().replace(',','.'));
        if(n[0]>route.measuredLength())throw new IllegalArgumentException("Station außerhalb der Haupttrasse");
        RouteBranch branch=new RouteBranch(java.util.UUID.randomUUID().toString(),inputs[0].getText().toString(),n[0],n[3],n[4],inputs[6].getText().toString(),new double[]{n[1]},new double[]{n[2]});
-       java.util.List<RouteBranch> updated=branchStore.load();updated.add(branch);branchStore.save(updated);entry.dismiss();notice("Abzweigung gespeichert");
+       java.util.List<RouteBranch> updated=branchStore.load();updated.add(branch);branchStore.save(updated);entry.dismiss();notice("Abzweigung gespeichert");for(int k=0;k<panel.getChildCount();k++)panel.getChildAt(k).invalidate();
       }catch(Exception ex){notice("Eingaben prüfen: "+ex.getMessage());}
      }));entry.show();
     }).setNegativeButton("Schließen",null).show();
@@ -1898,6 +1898,18 @@ public class MainActivity extends Activity {
     for(double[] p:montagePoints){minX=Math.min(minX,p[0]);maxX=Math.max(maxX,p[0]);minY=Math.min(minY,p[1]);maxY=Math.max(maxY,p[1]);}
     double margin=Double.isFinite(widths[0])?widths[0]/2+Math.max(Double.isFinite(widths[1])?widths[1]:0,Double.isFinite(widths[2])?widths[2]:0):0;
     for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o!=null){double w=o.optDouble("width");if(Double.isFinite(w)&&w>0){double left=o.has("left")?o.optDouble("left",0):(Double.isFinite(widths[1])?widths[1]:0),right=o.has("right")?o.optDouble("right",0):(Double.isFinite(widths[2])?widths[2]:0);margin=Math.max(margin,w/2+Math.max(left,right));}}}
+    java.util.List<RouteBranch> visibleBranches=new java.util.ArrayList<>();
+    java.util.List<java.util.List<double[]>> branchPoints=new java.util.ArrayList<>();
+    int branchErrors=0;
+    try{
+     for(RouteBranch branch:branchStore.load()){
+      try{
+       java.util.List<double[]> points=branch.vertices(model.vertices);
+       visibleBranches.add(branch);branchPoints.add(points);
+       for(double[] p:points){minX=Math.min(minX,p[0]-branch.width/2);maxX=Math.max(maxX,p[0]+branch.width/2);minY=Math.min(minY,p[1]-branch.width/2);maxY=Math.max(maxY,p[1]+branch.width/2);}
+      }catch(IllegalArgumentException ex){branchErrors++;}
+     }
+    }catch(Exception ex){branchErrors++;}
     margin*=2;minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
     double scale=Math.min((getWidth()-dp(48))/Math.max(.001,maxX-minX),(getHeight()-dp(64))/Math.max(.001,maxY-minY));if(!Double.isFinite(scale)||scale<=0)return;
     double ox=(getWidth()-(maxX-minX)*scale)/2-minX*scale,oy=(getHeight()-(maxY-minY)*scale)/2+maxY*scale;
@@ -1988,6 +2000,19 @@ public class MainActivity extends Activity {
      }
      for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o==null)continue;double from=o.optDouble("from"),to=o.optDouble("to"),w=o.optDouble("width");if(!(from>=0&&to<=total&&to>from&&Double.isFinite(w)&&w>0))continue;double[] q=model.station((from+to)/2);if(q==null)continue;pen.setColor(0xff555555);pen.setTextSize(dp(11));c.drawText(String.format(java.util.Locale.GERMANY,"B %.2f m",w),(float)(ox+q[0]*scale),(float)(oy-q[1]*scale-dp(38)),pen);}
     }
+    for(int j=0;j<visibleBranches.size();j++){
+     RouteBranch branch=visibleBranches.get(j);java.util.List<double[]> points=branchPoints.get(j);
+     for(int k=1;k<points.size();k++){
+      double[] a=points.get(k-1),b=points.get(k);
+      float ax=(float)(ox+a[0]*scale),ay=(float)(oy-a[1]*scale),bx=(float)(ox+b[0]*scale),by=(float)(oy-b[1]*scale);
+      pen.setStrokeCap(android.graphics.Paint.Cap.BUTT);pen.setColor(route.configuredSurfaceColor(branch.surface,route.legendSettings()));pen.setStrokeWidth((float)(branch.width*scale));c.drawLine(ax,ay,bx,by,pen);
+      pen.setColor(0xff398bda);pen.setStrokeWidth(dp(2));c.drawLine(ax,ay,bx,by,pen);
+      pen.setColor(0xff555555);pen.setTextSize(dp(11));c.drawText(String.format(java.util.Locale.GERMANY,"%.2f m",Math.hypot(b[0]-a[0],b[1]-a[1])),(ax+bx)/2,(ay+by)/2-dp(8),pen);
+     }
+     double[] p=points.get(0);pen.setColor(0xff398bda);c.drawCircle((float)(ox+p[0]*scale),(float)(oy-p[1]*scale),dp(4),pen);
+     p=points.get(points.size()-1);pen.setColor(0xff555555);pen.setTextSize(dp(11));c.drawText(branch.name,(float)(ox+p[0]*scale),(float)(oy-p[1]*scale-dp(14)),pen);
+    }
+    if(branchErrors>0){pen.setColor(0xffcc4444);pen.setTextSize(dp(11));c.drawText("Abzweigungen prüfen: "+branchErrors,dp(8),dp(14),pen);}
     // Highlight overlap of measured flat-ended strips, independent of billing mode.
     android.graphics.Path covered=new android.graphics.Path(), repeated=new android.graphics.Path();
     java.util.TreeSet<Double> overlapCuts=new java.util.TreeSet<>();overlapCuts.add(0.0);
