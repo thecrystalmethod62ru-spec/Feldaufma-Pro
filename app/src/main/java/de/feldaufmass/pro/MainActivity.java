@@ -1730,11 +1730,12 @@ public class MainActivity extends Activity {
      float startX,startY;int dragged=-1;
      public boolean onTouch(View v,android.view.MotionEvent e){
       if(e.getActionMasked()==android.view.MotionEvent.ACTION_DOWN){startX=e.getX();startY=e.getY();dragged=map.fittingAt(startX,startY);if(dragged>=0)v.getParent().requestDisallowInterceptTouchEvent(true);return true;}
-      if(e.getActionMasked()==android.view.MotionEvent.ACTION_CANCEL){dragged=-1;v.getParent().requestDisallowInterceptTouchEvent(false);return true;}
+      if(e.getActionMasked()==android.view.MotionEvent.ACTION_MOVE&&dragged>=0){org.json.JSONObject row=rows.optJSONObject(dragged);if(row!=null)map.previewStation(dragged,map.stationAt(e.getX(),e.getY()),row.optDouble("offset",0));return true;}
+      if(e.getActionMasked()==android.view.MotionEvent.ACTION_CANCEL){map.clearPreview();dragged=-1;v.getParent().requestDisallowInterceptTouchEvent(false);return true;}
       if(e.getActionMasked()!=android.view.MotionEvent.ACTION_UP)return true;
       v.getParent().requestDisallowInterceptTouchEvent(false);
       if(dragged<0&&Math.hypot(e.getX()-startX,e.getY()-startY)>dp(12))return true;
-      double pos=map.stationAt(e.getX(),e.getY());if(!Double.isFinite(pos))return true;
+      map.clearPreview();double pos=map.stationAt(e.getX(),e.getY());if(!Double.isFinite(pos)){dragged=-1;return true;}
       final double chosen=Math.min(total,Math.round(pos*1000)/1000.0);
       if(rows.length()==0){notice("Zuerst Formstück hinzufügen.");return true;}
       String[] labels=new String[rows.length()];
