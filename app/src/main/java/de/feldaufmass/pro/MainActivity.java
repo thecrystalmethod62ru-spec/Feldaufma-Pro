@@ -641,24 +641,24 @@ public class MainActivity extends Activity {
   android.graphics.drawable.GradientDrawable shape=new android.graphics.drawable.GradientDrawable();shape.setColor(color);shape.setCornerRadius(dp(radius));return shape;
  }
  void styleEditorButton(Button b,boolean primary){
-  b.setAllCaps(false);b.setTextSize(primary?15:12);b.setTextColor(primary?Color.WHITE:TEAL);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(dp(4),dp(4),dp(4),dp(4));b.setBackgroundTintList(null);
-  b.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x3312665f),editorShape(primary?TEAL:0xfff0f6f5,12),null));
+  b.setAllCaps(false);b.setTextSize(primary?15:12);b.setTextColor(primary?Color.WHITE:0xff9edbd2);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(dp(4),dp(4),dp(4),dp(4));b.setBackgroundTintList(null);
+  b.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x3312665f),editorShape(primary?TEAL:0xff202827,12),null));
  }
  void showFullscreenRoute(android.app.AlertDialog editor,LinearLayout form,RouteSketch route,Spinner mode,Spinner angles,LinearLayout historyBar,Runnable openObjects){
   // Move the existing views, not a second sketch: unsaved data and undo history stay shared.
   View[] views={route,mode,angles,historyBar};
   int[] positions=new int[views.length];android.view.ViewGroup.LayoutParams[] params=new android.view.ViewGroup.LayoutParams[views.length];
   for(int j=0;j<views.length;j++){if(views[j].getParent()!=form)return;positions[j]=form.indexOfChild(views[j]);params[j]=views[j].getLayoutParams();}
-  android.app.Dialog full=new android.app.Dialog(this,android.R.style.Theme_Material_Light_NoActionBar){
+  android.app.Dialog full=new android.app.Dialog(this,android.R.style.Theme_Material_NoActionBar){
    @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused&&getWindow()!=null){androidx.core.view.WindowInsetsControllerCompat c=androidx.core.view.WindowCompat.getInsetsController(getWindow(),getWindow().getDecorView());c.setSystemBarsBehavior(androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);c.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars());}}
   };
   full.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
   final int previousOrientation=getRequestedOrientation();
-  LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setBackgroundColor(Color.WHITE);
+  LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setBackgroundColor(Color.BLACK);
   LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);root.addView(header);
   Button back=new Button(this),save=new Button(this);back.setAllCaps(false);save.setAllCaps(false);back.setText("‹");back.setContentDescription("Vollbild beenden");save.setText("Speichern");
   header.addView(back,new LinearLayout.LayoutParams(dp(48),dp(48)));
-  LinearLayout heading=new LinearLayout(this);heading.setOrientation(1);heading.addView(sheetText("Feldaufmaß Pro",19,true));heading.addView(sheetText("Tiefbau · Zeichnungseditor",12,false));header.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
+  LinearLayout heading=new LinearLayout(this);heading.setOrientation(1);heading.addView(sheetText("Feldaufmaß Pro",19,true));heading.addView(sheetText("Tiefbau · Zeichnungseditor",12,false));for(int k=0;k<heading.getChildCount();k++)if(heading.getChildAt(k) instanceof TextView)((TextView)heading.getChildAt(k)).setTextColor(0xffe9f2f1);header.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
   Spinner orientation=new Spinner(this);
   orientation.setAdapter(new android.widget.ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Automatisch drehen","Querformat","Hochformat"}));
   header.addView(orientation,new LinearLayout.LayoutParams(dp(100),dp(48)));
@@ -670,9 +670,9 @@ public class MainActivity extends Activity {
    public void onNothingSelected(android.widget.AdapterView<?> parent){}
   });
   for(View view:views)form.removeView(view);
-  LinearLayout controls=new LinearLayout(this);controls.setPadding(dp(8),dp(4),dp(8),dp(4));controls.setBackground(editorShape(0xffe6f2ef,12));root.addView(controls);
+  LinearLayout controls=new LinearLayout(this);controls.setPadding(dp(8),dp(4),dp(8),dp(4));controls.setBackground(editorShape(0xff202b2a,12));root.addView(controls);
   controls.addView(mode,new LinearLayout.LayoutParams(0,-2,1));controls.addView(angles,new LinearLayout.LayoutParams(0,-2,1));
-  root.addView(route,new LinearLayout.LayoutParams(-1,0,1));
+  route.darkEditor=true;route.invalidate();root.addView(route,new LinearLayout.LayoutParams(-1,0,1));
   root.addView(historyBar,new LinearLayout.LayoutParams(-1,-2));
   for(int k=0;k<historyBar.getChildCount();k++)if(historyBar.getChildAt(k) instanceof Button)styleEditorButton((Button)historyBar.getChildAt(k),false);
   LinearLayout tools=new LinearLayout(this);root.addView(tools);
@@ -688,7 +688,7 @@ public class MainActivity extends Activity {
   styleEditorButton(save,true);LinearLayout.LayoutParams saveParams=new LinearLayout.LayoutParams(-1,dp(48));saveParams.setMargins(dp(10),dp(4),dp(10),dp(8));root.addView(save,saveParams);
   full.setContentView(root);
   full.setOnDismissListener(d->{
-   pendingEditorSpeech=null;
+   pendingEditorSpeech=null;route.darkEditor=false;
    setRequestedOrientation(previousOrientation);
    for(View view:views){android.view.ViewParent parent=view.getParent();if(parent instanceof android.view.ViewGroup)((android.view.ViewGroup)parent).removeView(view);}
    // Original positions are ascending; restore before other controls.
