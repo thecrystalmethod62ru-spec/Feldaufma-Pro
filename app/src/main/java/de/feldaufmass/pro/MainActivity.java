@@ -137,7 +137,7 @@ public class MainActivity extends Activity {
   }
   if(manifest==null||!"FeldaufmassPro".equals(manifest.optString("format"))||manifest.optInt("version")!=1)throw new java.io.IOException("Unbekanntes Sicherungsformat");
   org.json.JSONObject fields=manifest.getJSONObject("preferences");
-  java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","objectUndo","objectRedo"));
+  java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","objectUndo","objectRedo","elevationPoints"));
   java.util.Set<String> ints=new java.util.HashSet<>(java.util.Arrays.asList("surface","handling","dictationLanguage","gpsDurationSeconds"));
   SharedPreferences.Editor ed=projectStorage(id).edit();
   java.util.Iterator<String> keys=fields.keys();String name="Importiertes Projekt";java.util.Set<String> used=new java.util.HashSet<>();
@@ -155,7 +155,7 @@ public class MainActivity extends Activity {
      }v=rows.toString();
     }else if(key.equals("documents")){
      org.json.JSONArray docs=new org.json.JSONArray(v);for(int j=0;j<docs.length();j++){org.json.JSONObject doc=docs.getJSONObject(j);doc.remove("uri");doc.put("name",doc.optString("name")+" (neu verknüpfen)");}v=docs.toString();
-    }else if(key.equals("objects")||key.equals("segments")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)rows.getJSONObject(j);}
+    }else if(key.equals("objects")||key.equals("segments")||key.equals("elevationPoints")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)rows.getJSONObject(j);}
     else if(key.equals("objectUndo")||key.equals("objectRedo")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)new org.json.JSONArray(rows.getString(j));}
     if(key.equals("project")&&!v.trim().isEmpty())name=v.trim();
     ed.putString(key,v);
@@ -602,6 +602,65 @@ public class MainActivity extends Activity {
   tab.setOnClickListener(v->showPage(sheet));
  }
 
+ org.json.JSONArray elevationPoints(){
+  try{return new org.json.JSONArray(getPreferences(0).getString("elevationPoints","[]"));}catch(Exception e){return new org.json.JSONArray();}
+ }
+ static double pipeSlope(org.json.JSONObject a,org.json.JSONObject b){
+  double length=b.optDouble("station")-a.optDouble("station"),rise=b.optDouble("invert")-a.optDouble("invert");
+  return length>0&&Double.isFinite(rise)?100*rise/length:Double.NaN;
+ }
+ String elevationText(org.json.JSONObject o){
+  StringBuilder b=new StringBuilder();String[] keys={"ground","depth","invert"},names={"OK Gelände","Grabentiefe","Rohrsohle"};
+  for(int j=0;j<keys.length;j++){double v=o.optDouble(keys[j]);if(Double.isFinite(v)){if(b.length()>0)b.append(" · ");b.append(names[j]).append(String.format(java.util.Locale.GERMANY," %.3f m",v));}}
+  double ground=o.optDouble("ground"),depth=o.optDouble("depth");
+  if(Double.isFinite(ground-depth)&&depth>0)b.append(String.format(java.util.Locale.GERMANY," · Grabensohle %.3f m",ground-depth));
+  return b.toString();
+ }
+ boolean saveElevationPoints(org.json.JSONArray points){
+  if(!getPreferences(0).edit().putString("elevationPoints",points.toString()).commit()){notice("Höhenpunkte konnten nicht gespeichert werden.");return false;}
+  recordProjectEvent("Höhenpunkte geändert");return true;
+ }
+ void editElevationPoints(){
+  org.json.JSONArray points=elevationPoints();String[] labels=new String[points.length()];
+  for(int j=0;j<points.length();j++){org.json.JSONObject o=points.optJSONObject(j);labels[j]=o==null?"Ungültiger Eintrag":String.format(java.util.Locale.GERMANY,"Station %.3f m · %s",o.optDouble("station"),elevationText(o));}
+  android.app.AlertDialog.Builder dialog=new android.app.AlertDialog.Builder(this).setTitle("Höhenpunkte").setNegativeButton("Schließen",null).setPositiveButton("Neuer Höhenpunkt",(d,w)->editElevationPoint(-1));
+  if(labels.length>0)dialog.setItems(labels,(d,w)->editElevationPoint(w));else dialog.setMessage("Noch keine Höhenpunkte. Höhen im selben Bezugssystem eingeben.");
+  dialog.show();
+ }
+ void editElevationPoint(int index){
+  org.json.JSONArray original=elevationPoints();org.json.JSONObject old=index<0?null:original.optJSONObject(index);
+  LinearLayout form=page();form.addView(sheetText("Station und mindestens einen Messwert eingeben. Alle Höhen im gleichen Bezugssystem.",14,false));
+  String[] keys={"station","ground","depth","invert"},names={"Station (m)","OK Gelände (m)","Grabentiefe (m)","Rohrsohle (m)"};
+  EditText[] fields=new EditText[4];
+  for(int j=0;j<4;j++){form.addView(sheetText(names[j],14,false));fields[j]=new EditText(this);fields[j].setSingleLine(true);fields[j].setInputType(8194|4096);if(old!=null)fields[j].setText(old.optString(keys[j],""));form.addView(fields[j]);}
+  android.app.AlertDialog.Builder builder=new android.app.AlertDialog.Builder(this).setTitle("Höhenpunkt").setView(form).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null);
+  if(old!=null)builder.setNeutralButton("Löschen",(a,b)->new android.app.AlertDialog.Builder(this).setTitle("Höhenpunkt löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(x,y)->{org.json.JSONArray next=elevationPoints();if(!next.toString().equals(original.toString())){notice("Höhenpunkte geändert. Neu öffnen.");return;}next.remove(index);if(saveElevationPoints(next))editElevationPoints();}).show());
+  android.app.AlertDialog dialog=builder.create();
+  dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(vv->{
+   try{
+    double measured=new RouteSketch(this,routeData()).measuredLength(),total=Double.isFinite(measured)&&measured>0?measured:l,station=number(fields[0]);
+    if(!Double.isFinite(station)||!Double.isFinite(total)||total<=0||station<0||station>total){fields[0].setError("Station innerhalb der Trasse erforderlich");return;}
+    org.json.JSONObject entry=new org.json.JSONObject().put("station",station);int values=0;
+    for(int j=1;j<4;j++){if(fields[j].length()==0)continue;double n=number(fields[j]);if(!Double.isFinite(n)||(j==2&&n<=0)){fields[j].setError("Gültiges Maß erforderlich");return;}entry.put(keys[j],n);values++;}
+    if(values==0){notice("Mindestens einen Höhen- oder Tiefenwert eingeben.");return;}
+    if(!elevationPoints().toString().equals(original.toString())){notice("Höhenpunkte geändert. Neu öffnen.");return;}
+    java.util.ArrayList<org.json.JSONObject> rows=new java.util.ArrayList<>();
+    for(int j=0;j<original.length();j++){if(j==index)continue;org.json.JSONObject o=original.getJSONObject(j);if(Math.abs(o.optDouble("station")-station)<.000001){fields[0].setError("Station bereits vorhanden");return;}rows.add(o);}
+    rows.add(entry);rows.sort((a,b)->Double.compare(a.optDouble("station"),b.optDouble("station")));
+    if(saveElevationPoints(new org.json.JSONArray(rows))){dialog.dismiss();editElevationPoints();}
+   }catch(Exception e){notice("Bitte gültige Zahlen eingeben.");}
+  }));dialog.show();
+ }
+ String elevationReport(){
+  org.json.JSONArray points=elevationPoints();StringBuilder b=new StringBuilder("Höhenpunkte · gemessene Werte\n");
+  if(points.length()==0)return b.append("Noch keine Messwerte.").toString();
+  for(int j=0;j<points.length();j++){
+   org.json.JSONObject o=points.optJSONObject(j);if(o==null)continue;b.append(String.format(java.util.Locale.GERMANY,"%.3f m: %s\n",o.optDouble("station"),elevationText(o)));
+   if(j>0){org.json.JSONObject a=points.optJSONObject(j-1);double slope=a==null?Double.NaN:pipeSlope(a,o);
+    if(Double.isFinite(slope))b.append(String.format(java.util.Locale.GERMANY,"Rohrsohle Δ: %+.3f %% / %+.2f ‰ (in Stationsrichtung)\n",slope,slope*10));}
+  }
+  return b.toString();
+ }
  void showLongitudinalProfile(){
   LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
   RouteSketch route=new RouteSketch(this,routeData());
@@ -610,7 +669,9 @@ public class MainActivity extends Activity {
   final double total=complete?measured:l,depth=d;
   String caption=complete?"Stationierung aus bemaßter Skizze":"Stationierung aus gespeicherter Gesamttrassenlänge; Skizzenmaße unvollständig";
   form.addView(sheetText(caption,14,false));
-  form.addView(sheetText("Relatives Tiefenprofil · keine Geländehöhen erfasst · keine Aussage zum Gefälle.",14,false));
+  actionButtonSingle(form,"Höhenpunkte bearbeiten",()->editElevationPoints());
+  form.addView(sheetText(elevationReport(),14,false));
+  form.addView(sheetText("Grafik: relatives Tiefenprofil mit einheitlicher Grabentiefe. Höhenpunkte und Gefälle separat oben.",14,false));
   if(!Double.isFinite(total)||total<=0||!Double.isFinite(depth)||depth<=0){
    form.addView(sheetText("Zuerst gültige Trassenlänge und Grabentiefe speichern.",16,true));
   }else{
