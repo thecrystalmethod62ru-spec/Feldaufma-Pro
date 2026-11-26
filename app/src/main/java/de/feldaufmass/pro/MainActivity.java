@@ -1718,14 +1718,15 @@ public class MainActivity extends Activity {
     new android.app.AlertDialog.Builder(this).setTitle("Trassenverzweigungen").setItems(labels,(dialog,index)->{
      final RouteBranch existing=index>0?branches.get(index-1):null;
      android.widget.LinearLayout fields=new android.widget.LinearLayout(this);fields.setOrientation(android.widget.LinearLayout.VERTICAL);
-     String[] hints={"Bezeichnung","Anschlussstation (m)","Länge (m)","Richtung (Grad, +X = 0°)","Grabenbreite (m)","Grabentiefe (m)","Oberfläche"};
+     String[] hints={"Bezeichnung","Anschlussstation (m)","Abschnittslängen (m; mit ; trennen)","Richtungen (Grad; mit ; trennen; +X = 0°)","Grabenbreite (m)","Grabentiefe (m)","Oberfläche"};
      EditText[] inputs=new EditText[hints.length];
      for(int j=0;j<hints.length;j++){inputs[j]=new EditText(this);inputs[j].setSingleLine(true);inputs[j].setHint(hints[j]);fields.addView(inputs[j]);}
      if(existing!=null){
       try{
        org.json.JSONObject data=existing.toJson();
-       if(data.getJSONArray("lengths").length()!=1){notice("Mehrteilige Abzweigung noch nicht bearbeitbar");return;}
-       String[] values={existing.name,Double.toString(existing.station),Double.toString(existing.length()),Double.toString(data.getJSONArray("directions").getDouble(0)),Double.toString(existing.width),Double.toString(existing.depth),existing.surface};
+       StringBuilder ls=new StringBuilder(),ds=new StringBuilder();
+       for(int j=0;j<data.getJSONArray("lengths").length();j++){if(j>0){ls.append("; ");ds.append("; ");}ls.append(data.getJSONArray("lengths").getDouble(j));ds.append(data.getJSONArray("directions").getDouble(j));}
+       String[] values={existing.name,Double.toString(existing.station),ls.toString(),ds.toString(),Double.toString(existing.width),Double.toString(existing.depth),existing.surface};
        for(int j=0;j<values.length;j++)inputs[j].setText(values[j]);
       }catch(Exception ex){notice("Abzweigung konnte nicht geöffnet werden");return;}
      }
@@ -1737,9 +1738,13 @@ public class MainActivity extends Activity {
      android.app.AlertDialog entry=builder.create();
      entry.setOnShowListener(d->entry.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(b->{
       try{
-       double[] n=new double[5];for(int j=0;j<5;j++)n[j]=Double.parseDouble(inputs[j+1].getText().toString().trim().replace(',','.'));
+       double[] n=new double[5];for(int j:new int[]{0,3,4})n[j]=Double.parseDouble(inputs[j+1].getText().toString().trim().replace(',','.'));
+       String[] l=inputs[2].getText().toString().split(";",-1),d=inputs[3].getText().toString().split(";",-1);
+       if(l.length!=d.length)throw new IllegalArgumentException("Für jeden Abschnitt eine Richtung eingeben");
+       double[] lengths=new double[l.length],directions=new double[d.length];
+       for(int j=0;j<l.length;j++){lengths[j]=Double.parseDouble(l[j].trim().replace(',','.'));directions[j]=Double.parseDouble(d[j].trim().replace(',','.'));}
        if(n[0]>route.measuredLength())throw new IllegalArgumentException("Station außerhalb der Haupttrasse");
-       RouteBranch branch=new RouteBranch(existing==null?java.util.UUID.randomUUID().toString():existing.id,inputs[0].getText().toString(),n[0],n[3],n[4],inputs[6].getText().toString(),new double[]{n[1]},new double[]{n[2]});
+       RouteBranch branch=new RouteBranch(existing==null?java.util.UUID.randomUUID().toString():existing.id,inputs[0].getText().toString(),n[0],n[3],n[4],inputs[6].getText().toString(),lengths,directions);
        java.util.List<RouteBranch> updated=branchStore.load();if(existing==null)updated.add(branch);else{int found=-1;for(int j=0;j<updated.size();j++)if(updated.get(j).id.equals(existing.id)){found=j;break;}if(found<0)throw new IllegalStateException("Abzweigung nicht gefunden");updated.set(found,branch);}branchStore.save(updated);entry.dismiss();notice("Abzweigung gespeichert");for(int k=0;k<panel.getChildCount();k++)panel.getChildAt(k).invalidate();
       }catch(Exception ex){notice("Eingaben prüfen: "+ex.getMessage());}
      }));entry.show();
