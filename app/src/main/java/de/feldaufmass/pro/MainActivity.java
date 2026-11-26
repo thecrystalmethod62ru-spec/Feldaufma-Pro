@@ -1705,6 +1705,11 @@ public class MainActivity extends Activity {
   String[] overlapModes={"Nur Kontrollwerte","Überlappung beibehalten (Brutto)","Überlappung abziehen (Netto)"};
   overlapMode.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,overlapModes));
   panel.addView(overlapMode);
+  final SharedPreferences overlapPrefs=projectStorage(activeProject);
+  int storedOverlapMode=0;
+  try{storedOverlapMode=overlapPrefs.getInt("metricOverlapMode",0);}catch(ClassCastException ignored){}
+  final int[] savedOverlapMode={Math.max(0,Math.min(2,storedOverlapMode))};
+  overlapMode.setSelection(savedOverlapMode[0]);
   TextView nominalArea=new TextView(this);panel.addView(nominalArea);
   Runnable refreshNominalArea=()->{
    double total=route.measuredLength();
@@ -1778,7 +1783,16 @@ public class MainActivity extends Activity {
    nominalArea.setText(result.toString());
   };
   overlapMode.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
-   @Override public void onItemSelected(android.widget.AdapterView<?> parent,android.view.View view,int position,long id){refreshNominalArea.run();}
+   @Override public void onItemSelected(android.widget.AdapterView<?> parent,android.view.View view,int position,long id){
+    if(position<0||position>2)return;
+    if(position!=savedOverlapMode[0]){
+     if(!overlapPrefs.edit().putInt("metricOverlapMode",position).commit()){
+      overlapMode.setSelection(savedOverlapMode[0]);notice("Berechnungsart konnte nicht gespeichert werden.");return;
+     }
+     savedOverlapMode[0]=position;
+    }
+    refreshNominalArea.run();
+   }
    @Override public void onNothingSelected(android.widget.AdapterView<?> parent){refreshNominalArea.run();}
   });
   refreshNominalArea.run();
