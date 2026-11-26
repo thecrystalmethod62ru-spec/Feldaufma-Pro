@@ -4078,6 +4078,22 @@ public class MainActivity extends Activity {
   }
   return pageNumber;
  }
+ String shoringReport(){
+  StringBuilder report=new StringBuilder();double leftArea=0,rightArea=0;
+  try{
+   org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("metricVerbauSections","[]"));
+   if(rows.length()==0)return "";
+   report.append("Verbau – Flächenvorberechnung\n");
+   for(int i=0;i<rows.length();i++){
+    org.json.JSONArray row=rows.getJSONArray(i);double from=row.getDouble(0),to=row.getDouble(1),lh=row.getDouble(2),rh=row.getDouble(3);
+    if(!Double.isFinite(from)||!Double.isFinite(to)||!Double.isFinite(lh)||!Double.isFinite(rh)||from<0||to<=from||lh<0||rh<0||(l>0&&to>l)){report.append("Abschnitt "+(i+1)+": Stationsgrenzen / Maße prüfen\n");continue;}
+    double la=(to-from)*lh,ra=(to-from)*rh;leftArea+=la;rightArea+=ra;
+    report.append(String.format(java.util.Locale.GERMANY,"%.2f – %.2f m | Höhe L/R %.2f / %.2f m | Fläche L/R %.2f / %.2f m²\n",from,to,lh,rh,la,ra));
+   }
+   report.append(String.format(java.util.Locale.GERMANY,"Verbau links: %.2f m² | rechts: %.2f m² | gesamt: %.2f m²\n\n",leftArea,rightArea,leftArea+rightArea));
+  }catch(Exception ex){return "Verbaudaten konnten nicht vollständig ausgewertet werden.\n\n";}
+  return report.toString();
+ }
  void writePdf(android.net.Uri uri) {
   android.graphics.pdf.PdfDocument pdf=new android.graphics.pdf.PdfDocument();
   try(java.io.OutputStream out=getContentResolver().openOutputStream(uri,"wt")) {
@@ -4100,7 +4116,7 @@ public class MainActivity extends Activity {
    String report=(route.vertices.size()>1?"Trassenskizze – Abschnittsmaße\n"+route.measurements()+"\n\n":"")+"Oberflächenaufbau\n"+surfaceLayers.getText()+"\n\n"+result.getText()+"\n"+legend.getText()+"\n"+
     "Nachschnitt links: "+reportMeasure(left)+" | rechts: "+reportMeasure(right)+"\n"+
     "Asphaltstärke: "+reportMeasure(asphalt)+"\nTragschicht: "+reportMeasure(base)+"\n\n"+
-    "Trassenobjekte\n"+objectList.getText()+detailQuantities.getText()+"\n\n"+segmentsView.getText();
+    "Trassenobjekte\n"+objectList.getText()+detailQuantities.getText()+"\n\n"+segmentsView.getText()+"\n\n"+shoringReport();
    android.text.TextPaint textPaint=new android.text.TextPaint(Paint.ANTI_ALIAS_FLAG);
    textPaint.setTextSize(12);
    android.text.StaticLayout layout=android.text.StaticLayout.Builder.obtain(report,0,report.length(),textPaint,523).build();
