@@ -160,11 +160,22 @@ final class RouteSketch extends View {
  }
  static int surfaceColor(String name){
   String n=name.toLowerCase(Locale.ROOT);
-  if(n.contains("asphalt"))return 0xff68737a;
-  if(n.contains("platten"))return 0xffd1ab79;
-  if(n.contains("pflaster"))return 0xffa99887;
-  if(n.contains("unbefestigt")||n.contains("rasen"))return 0xff81a574;
-  return 0xffc7b5d7;
+  if(n.contains("asphalt"))return 0xff646B73;
+  if(n.contains("1 × 1")||n.contains("1 x 1"))return 0xff76B5E5;
+  if(n.contains("großpflaster"))return 0xff9670AC;
+  if(n.contains("kleinpflaster"))return 0xffC5A3D9;
+  if(n.contains("platten"))return 0xffE7D5B0;
+  if(n.contains("verbund")||n.contains("doppel-t"))return 0xffC66D56;
+  if(n.contains("pflaster"))return 0xffD39B60;
+  if(n.contains("beton"))return 0xffBFC5CB;
+  if(n.contains("schotter"))return 0xffA49B89;
+  if(n.contains("kies"))return 0xffE3C96A;
+  if(n.contains("sand"))return 0xffF5E9A8;
+  if(n.contains("unbefestigt"))return 0xff916B49;
+  if(n.contains("rasen"))return 0xff79BC65;
+  if(n.contains("grünfläche"))return 0xff367D46;
+  if(n.contains("wassergebunden"))return 0xffC7B49B;
+  return 0xffD58AB4;
  }
  void drawSurfaceSections(Canvas c,float density){
   if(!layerVisible(LAYER_SURFACES))return;
