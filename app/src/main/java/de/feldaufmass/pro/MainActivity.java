@@ -1514,13 +1514,26 @@ public class MainActivity extends Activity {
    .setNegativeButton("Schließen",null).show();
  }
  void showMontageCatalog(){
-  new android.app.AlertDialog.Builder(this).setTitle("Formstückkatalog")
-   .setItems(MontageCatalog.labels(),(d,w)->{
-    MontageCatalog.Fitting fitting=MontageCatalog.Fitting.values()[w];
-    new android.app.AlertDialog.Builder(this).setTitle(fitting.label)
-     .setMessage("Anschlüsse: "+fitting.ports+(fitting.bendAngle>0?"\nWinkel: "+fitting.bendAngle+"°":"")+"\nKatalogvorschau – noch keine Platzierung im Montageplan.")
-     .setPositiveButton("Zurück",(x,y)->showMontageCatalog()).show();
-   }).setNegativeButton("Zurück",(d,w)->showMontage()).show();
+  android.widget.ScrollView scroll=new android.widget.ScrollView(this);
+  LinearLayout grid=new LinearLayout(this);grid.setOrientation(1);grid.setPadding(dp(8),dp(8),dp(8),dp(8));scroll.addView(grid);
+  TextView hint=new TextView(this);hint.setText("Schematische Symbole – DIN-Prüfung ausstehend");grid.addView(hint);
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Formstückkatalog").setView(scroll).setNegativeButton("Zurück",(d,w)->showMontage()).create();
+  LinearLayout row=null;int index=0;
+  for(MontageCatalog.Fitting fitting:MontageCatalog.Fitting.values()){
+   if(index++%3==0){row=new LinearLayout(this);row.setOrientation(0);grid.addView(row);}
+   LinearLayout tile=new LinearLayout(this);tile.setOrientation(1);tile.setGravity(android.view.Gravity.CENTER);tile.setPadding(dp(4),dp(6),dp(4),dp(6));
+   row.addView(tile,new LinearLayout.LayoutParams(0,-2,1));
+   MontageSymbolView symbol=new MontageSymbolView(this,fitting);tile.addView(symbol,new LinearLayout.LayoutParams(-1,dp(72)));
+   TextView label=new TextView(this);label.setText(fitting.label);label.setGravity(android.view.Gravity.CENTER);tile.addView(label,new LinearLayout.LayoutParams(-1,dp(48)));
+   tile.setContentDescription(fitting.label);tile.setFocusable(true);tile.setOnClickListener(v->{dialog.dismiss();showMontageFitting(fitting);});
+  }
+  dialog.show();
+ }
+ void showMontageFitting(MontageCatalog.Fitting fitting){
+  LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);
+  panel.addView(new MontageSymbolView(this,fitting),new LinearLayout.LayoutParams(-1,dp(150)));
+  TextView details=new TextView(this);details.setText("Anschlüsse: "+fitting.ports+(fitting.bendAngle>0?"\nWinkel: "+fitting.bendAngle+"°":"")+"\nSchematische Vorschau – noch keine Platzierung.");panel.addView(details);
+  new android.app.AlertDialog.Builder(this).setTitle(fitting.label).setView(panel).setPositiveButton("Zurück",(d,w)->showMontageCatalog()).show();
  }
  void showTools(){
   String[] names={"Maße","Beläge","Objekte","Unterlagen / PDF","Sprachassistent"};
