@@ -5323,12 +5323,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   };
   form.addView(preview,0,new LinearLayout.LayoutParams(-1,dp(160)));
   Button expandPreview=new Button(this);expandPreview.setText("Querschnitt vergrößern");form.addView(expandPreview,1);
-  expandPreview.setOnClickListener(v->{
-   android.view.ViewGroup.LayoutParams lp=preview.getLayoutParams();
-   boolean expanded=lp.height>dp(160);
-   lp.height=expanded?dp(160):Math.max(dp(240),getResources().getDisplayMetrics().heightPixels-dp(280));
-   preview.setLayoutParams(lp);expandPreview.setText(expanded?"Querschnitt vergrößern":"Querschnitt verkleinern");
-  });
+
   for(EditText field:fields)field.addTextChangedListener(new android.text.TextWatcher(){
    public void beforeTextChanged(CharSequence s,int start,int count,int after){}
    public void onTextChanged(CharSequence s,int start,int before,int count){preview.invalidate();}
@@ -5340,22 +5335,45 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   Button toggleControls=new Button(this);toggleControls.setText("Maße ausblenden");form.addView(toggleControls,3);form.addView(undoPosition,4);form.addView(redoPosition,5);
   toggleControls.setOnClickListener(v->{
    boolean hide=toggleControls.getText().toString().equals("Maße ausblenden");
-   for(int k=3;k<form.getChildCount();k++)form.getChildAt(k).setVisibility(hide?View.GONE:View.VISIBLE);
+   for(int k=2;k<form.getChildCount();k++)form.getChildAt(k).setVisibility(hide?View.GONE:View.VISIBLE);
    toggleControls.setText(hide?"Maße einblenden":"Maße ausblenden");
   });
   LinearLayout toolbar=new LinearLayout(this);toolbar.setOrientation(0);
   for(Button b:new Button[]{undoPosition,redoPosition,fullscreen,toggleControls}){form.removeView(b);toolbar.addView(b,new LinearLayout.LayoutParams(0,-2,1));b.setMinWidth(0);b.setMinimumWidth(0);b.setTextSize(11);}
-  form.addView(toolbar,1);
+  form.removeView(preview);
+  android.widget.FrameLayout workspace=new android.widget.FrameLayout(this);
+  workspace.addView(preview,new android.widget.FrameLayout.LayoutParams(-1,-1));
+  form.addView(workspace,0,new LinearLayout.LayoutParams(-1,dp(210)));
+  android.widget.FrameLayout.LayoutParams barParams=new android.widget.FrameLayout.LayoutParams(-1,-2,android.view.Gravity.TOP);
+  workspace.addView(toolbar,barParams);
+  TextView handle=new TextView(this);handle.setText("⠿");handle.setTextSize(22);handle.setPadding(dp(8),dp(6),dp(8),dp(6));handle.setContentDescription("Werkzeugleiste verschieben");toolbar.addView(handle,0);
+  handle.setOnTouchListener(new View.OnTouchListener(){
+   float startY,baseY;
+   public boolean onTouch(View v,android.view.MotionEvent e){
+    switch(e.getActionMasked()){
+     case android.view.MotionEvent.ACTION_DOWN:startY=e.getRawY();baseY=toolbar.getTranslationY();v.getParent().requestDisallowInterceptTouchEvent(true);return true;
+     case android.view.MotionEvent.ACTION_MOVE:toolbar.setTranslationY(Math.max(0,Math.min(workspace.getHeight()-toolbar.getHeight(),baseY+e.getRawY()-startY)));return true;
+     case android.view.MotionEvent.ACTION_UP:case android.view.MotionEvent.ACTION_CANCEL:v.getParent().requestDisallowInterceptTouchEvent(false);return true;
+     default:return true;
+    }
+   }
+  });
   undoPosition.setText("↶");undoPosition.setContentDescription("Verschieben rückgängig");
   redoPosition.setText("↷");redoPosition.setContentDescription("Wiederholen");
+  expandPreview.setOnClickListener(v->{
+   android.view.ViewGroup.LayoutParams lp=workspace.getLayoutParams();
+   boolean expanded=lp.height>dp(160);
+   lp.height=expanded?dp(160):Math.max(dp(240),getResources().getDisplayMetrics().heightPixels-dp(280));
+   workspace.setLayoutParams(lp);toolbar.setTranslationY(0);expandPreview.setText(expanded?"Querschnitt vergrößern":"Querschnitt verkleinern");
+  });
   fullscreen.setOnClickListener(v->{
    android.view.Window window=dialog.getWindow();if(window==null)return;
    boolean full=fullscreen.getText().toString().equals("Vollbild");
    window.setLayout(full?-1:-2,full?-1:-2);
    window.getDecorView().setSystemUiVisibility(full?5894:0);
-   android.view.ViewGroup.LayoutParams lp=preview.getLayoutParams();
+   android.view.ViewGroup.LayoutParams lp=workspace.getLayoutParams();
    lp.height=full?Math.max(dp(160),getResources().getDisplayMetrics().heightPixels-dp(200)):dp(160);
-   preview.setLayoutParams(lp);fullscreen.setText(full?"Vollbild beenden":"Vollbild");
+   workspace.setLayoutParams(lp);toolbar.setTranslationY(0);fullscreen.setText(full?"Vollbild beenden":"Vollbild");
    expandPreview.setText(full?"Querschnitt verkleinern":"Querschnitt vergrößern");
   });
   dialog.setOnShowListener(x->dialog.getButton(-1).setOnClickListener(y->{
