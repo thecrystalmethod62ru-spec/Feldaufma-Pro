@@ -6,8 +6,13 @@ import java.util.List;
 public final class PipeLayout {
     public static final class Pipe {
         public final String name;
-        public final double offset, diameter, wall, bedding;
+        public final double offset, diameter, wall, bedding, minGap, minCover;
         public Pipe(String name,double offset,double diameter,double wall,double bedding){
+            this(name,offset,diameter,wall,bedding,0,0);
+        }
+        public Pipe(String name,double offset,double diameter,double wall,double bedding,double minGap,double minCover){
+            if(!Double.isFinite(minGap)||minGap<0||!Double.isFinite(minCover)||minCover<0)throw new IllegalArgumentException("Ungültige Rohrgrenzwerte");
+            this.minGap=minGap;this.minCover=minCover;
             if(name==null||name.trim().isEmpty()||!Double.isFinite(offset))
                 throw new IllegalArgumentException("Ungültige Rohrbezeichnung oder Lage");
             new PipeSection(0,1,bedding,diameter,wall);
@@ -49,12 +54,12 @@ public final class PipeLayout {
             Pipe a=pipes.get(i);
             if(Math.abs(a.offset)+a.diameter/2>width/2)result.add(a.name+": außerhalb der Grabenbreite");
             if(!a.section(0,depth).fits())result.add(a.name+": oberhalb GOK");
-            else if(depth-a.bedding-a.diameter<minCover)result.add(a.name+": Mindestüberdeckung unterschritten");
+            else if(depth-a.bedding-a.diameter<Math.max(minCover,a.minCover))result.add(a.name+": Mindestüberdeckung unterschritten");
             for(int j=0;j<i;j++){
                 Pipe b=pipes.get(j);
                 double gap=Math.hypot(a.offset-b.offset,a.centerHeight()-b.centerHeight())-(a.diameter+b.diameter)/2;
                 if(gap<0)result.add(a.name+" / "+b.name+": Rohrüberschneidung");
-                else if(gap<clearance)result.add(a.name+" / "+b.name+": Mindestabstand unterschritten");
+                else if(gap<Math.max(clearance,Math.max(a.minGap,b.minGap)))result.add(a.name+" / "+b.name+": Mindestabstand unterschritten");
             }
         }
         return result;
