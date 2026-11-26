@@ -25,9 +25,30 @@ public class MainActivity extends Activity {
  LinearLayout routePreviewBox;
  String routeData(){return getPreferences(0).getString("routeSketch","[]");}
 
+ RouteSketch livePreview;
+ android.location.Location liveFix;
+ android.location.LocationManager liveManager;
+ final android.location.LocationListener liveListener=new android.location.LocationListener(){
+  public void onLocationChanged(android.location.Location fix){liveFix=fix;if(livePreview!=null)livePreview.setLiveFix(fix);}
+  public void onProviderDisabled(String provider){liveFix=null;if(livePreview!=null)livePreview.setLiveFix(null);}
+  public void onProviderEnabled(String provider){}
+  public void onStatusChanged(String provider,int status,android.os.Bundle extras){}
+ };
+ void startLiveGps(){
+  if(liveManager!=null||checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=android.content.pm.PackageManager.PERMISSION_GRANTED)return;
+  try{android.location.LocationManager m=(android.location.LocationManager)getSystemService(LOCATION_SERVICE);
+   m.requestLocationUpdates(android.location.LocationManager.GPS_PROVIDER,1000L,0f,liveListener);liveManager=m;
+  }catch(RuntimeException ignored){}
+ }
+ @Override protected void onResume(){super.onResume();startLiveGps();}
+ @Override protected void onPause(){
+  if(liveManager!=null){liveManager.removeUpdates(liveListener);liveManager=null;}
+  liveFix=null;if(livePreview!=null)livePreview.setLiveFix(null);super.onPause();
+ }
  void refreshRoute(){
   routePreviewBox.removeAllViews();
   RouteSketch preview=new RouteSketch(this,routeData());
+  livePreview=preview;preview.setLiveFix(liveFix);
   preview.pointSelected=i->{selectedPoint=preview.vertices.get(i).id;refreshRoute();pointMenu();};
   preview.selected=i->measureSegment(preview,i);
   preview.changed=()->{saveRoute(preview);refreshRoute();};
@@ -613,7 +634,7 @@ public class MainActivity extends Activity {
  }
  @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] results){
   super.onRequestPermissionsResult(requestCode,permissions,results);
-  if(requestCode==702){if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==android.content.pm.PackageManager.PERMISSION_GRANTED)assignGps(selectedPoint);else notice("Für GPS-Punkte ist der genaue Standort erforderlich.");}
+  if(requestCode==702){if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==android.content.pm.PackageManager.PERMISSION_GRANTED){startLiveGps();assignGps(selectedPoint);}else notice("Für GPS-Punkte ist der genaue Standort erforderlich.");}
  }
  void pointMenu(){
   RouteSketch route=new RouteSketch(this,routeData());int index=findPoint(route,selectedPoint);
