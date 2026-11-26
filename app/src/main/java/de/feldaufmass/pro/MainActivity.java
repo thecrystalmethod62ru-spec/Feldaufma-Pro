@@ -3569,6 +3569,12 @@ public class MainActivity extends Activity {
  Button undo=new Button(this);undo.setText("Letztes Objekt entfernen");root.addView(undo);undo.setOnClickListener(v->{if(objects.length()>0){objects.remove(objects.length()-1);saveObjects();}});
  root=profilePage;
  profile=new Profile();root.addView(profile,1,new LinearLayout.LayoutParams(-1,(int)(300*getResources().getDisplayMetrics().density)));
+ actionButtonSingle(profilePage,"Verbau – Profilstation wählen",()->{
+  EditText station=new EditText(this);station.setInputType(8194);station.setText(String.valueOf(profileShoringStation));
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Profilstation (m)").setView(station).setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",null).create();
+  dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(btn->{try{double value=number(station);if(!Double.isFinite(value)||value<0||l<=0||value>l){station.setError("Station innerhalb der Trasse eingeben");return;}profileShoringStation=value;profile.invalidate();dialog.dismiss();}catch(Exception ex){station.setError("Ungültige Station");}}));dialog.show();
+ });
+
  LinearLayout sizes=fold(profilePage,"Grabenmaße",false);
  profileSlider(sizes,"Grabenbreite",width,10,600);
  profileSlider(sizes,"Grabentiefe",depth,10,800);
