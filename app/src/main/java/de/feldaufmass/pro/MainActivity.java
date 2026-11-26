@@ -5269,8 +5269,19 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth(dp(1));pen.setColor(0xffaaaaaa);c.drawRect(left,top,(float)(left+width*scale),(float)(top+height*scale),pen);pen.setStyle(Paint.Style.FILL);
     if(!Double.isFinite(x)||!Double.isFinite(y)||!Double.isFinite(radius)||radius<=0)return;
     boolean outside=x-radius<0||x+radius>width||y-radius<0||y+radius>height;
-    c.save();c.clipRect(0,0,getWidth(),getHeight());pen.setColor(outside?0xffef5350:0xff42a5f5);c.drawCircle((float)(left+x*scale),(float)(top+y*scale),(float)(radius*scale),pen);c.restore();
-    if(outside){pen.setColor(0xffff7777);pen.setTextSize(dp(11));c.drawText("Außerhalb des Grabenprofils",dp(8),getHeight()-dp(4),pen);}
+    boolean collision=false;
+    for(int k=0;k<rows.length();k++){
+     if(k==index)continue;org.json.JSONObject neighbor=rows.optJSONObject(k);if(neighbor==null)continue;
+     double from=Math.max(source.optDouble("routeFrom",0),neighbor.optDouble("routeFrom",0)),to=Math.min(source.optDouble("routeTo",Double.POSITIVE_INFINITY),neighbor.optDouble("routeTo",Double.POSITIVE_INFINITY));
+     if(to<=from)continue;
+     double nx=neighbor.optDouble("offset"),ny=neighbor.optDouble("axisDepth"),nr=neighbor.optDouble("diameter")/2000;
+     if(!Double.isFinite(nx)||!Double.isFinite(ny)||!Double.isFinite(nr)||nr<=0)continue;
+     boolean overlap=Math.hypot(x-nx,y-ny)<radius+nr;collision|=overlap;
+     pen.setColor(overlap?0xffef5350:0xff9e9e9e);
+     c.drawCircle((float)(left+nx*scale),(float)(top+ny*scale),(float)(nr*scale),pen);
+    }
+    c.save();c.clipRect(0,0,getWidth(),getHeight());pen.setColor(outside||collision?0xffef5350:0xff42a5f5);c.drawCircle((float)(left+x*scale),(float)(top+y*scale),(float)(radius*scale),pen);c.restore();
+    if(outside||collision){pen.setColor(0xffff7777);pen.setTextSize(dp(11));c.drawText(outside&&collision?"Profilgrenze und Leitungskollision":outside?"Außerhalb des Grabenprofils":"Leitungskollision",dp(8),getHeight()-dp(4),pen);}
    }
   };
   form.addView(preview,0,new LinearLayout.LayoutParams(-1,dp(160)));
