@@ -1689,17 +1689,37 @@ public class MainActivity extends Activity {
   final java.util.ArrayList<String> states=new java.util.ArrayList<>();
   int cursor=0;
  }
- final java.util.Map<String,MontageHistory> montageStationHistory=new java.util.HashMap<>();
+ MontageHistory loadMontageHistory(String project){
+  try{
+   org.json.JSONObject data=new org.json.JSONObject(getSharedPreferences("montage_history",0).getString(project,"{}"));
+   org.json.JSONArray states=data.getJSONArray("states");
+   MontageHistory h=new MontageHistory();
+   if(states.length()==0||states.length()>51)return null;
+   for(int i=0;i<states.length();i++)h.states.add(states.getString(i));
+   h.cursor=data.getInt("cursor");
+   if(h.cursor<0||h.cursor>=h.states.size())return null;
+   return h;
+  }catch(Exception ex){return null;}
+ }
+ boolean persistMontageHistory(String project,MontageHistory h){
+  try{
+   org.json.JSONArray states=new org.json.JSONArray();
+   for(String state:h.states)states.put(state);
+   return getSharedPreferences("montage_history",0).edit().putString(project,new org.json.JSONObject().put("states",states).put("cursor",h.cursor).toString()).commit();
+  }catch(Exception ex){return false;}
+ }
+
  void rememberMontageStation(String project,String before,String after){
   if(before.equals(after))return;
-  MontageHistory h=montageStationHistory.get(project);
-  if(h==null||!h.states.get(h.cursor).equals(before)){h=new MontageHistory();h.states.add(before);montageStationHistory.put(project,h);}
+  MontageHistory h=loadMontageHistory(project);
+  if(h==null||!h.states.get(h.cursor).equals(before)){h=new MontageHistory();h.states.add(before);}
   while(h.states.size()>h.cursor+1)h.states.remove(h.states.size()-1);
   h.states.add(after);h.cursor++;
   if(h.states.size()>51){h.states.remove(0);h.cursor--;}
+  if(!persistMontageHistory(project,h))notice("Montage gespeichert, Verlauf konnte nicht gespeichert werden.");
  }
  void restoreMontageStation(android.app.AlertDialog dialog,String project,boolean redo){
-  MontageHistory h=montageStationHistory.get(project);
+  MontageHistory h=loadMontageHistory(project);
   if(h==null||!project.equals(activeProject)){notice("Keine Änderung verfügbar.");return;}
   int next=h.cursor+(redo?1:-1);
   if(next<0||next>=h.states.size())return;
@@ -1707,6 +1727,7 @@ public class MainActivity extends Activity {
   if(!current.equals(h.states.get(h.cursor))){notice("Montagedaten wurden inzwischen geändert.");return;}
   if(!getPreferences(0).edit().putString("montageFittings",h.states.get(next)).commit()){notice("Speichern fehlgeschlagen.");return;}
   h.cursor=next;
+  if(!persistMontageHistory(project,h))notice("Position gespeichert, Verlauf konnte nicht gespeichert werden.");
   recordProjectEvent(redo?"Montageposition wiederholt":"Montageposition rückgängig");if(sketch!=null)sketch.invalidate();if(livePreview!=null)livePreview.invalidate();dialog.dismiss();showMontageStationPlan();
  }
  void showMontageStationPlan(){
@@ -1749,7 +1770,7 @@ public class MainActivity extends Activity {
     intent.putExtra(android.content.Intent.EXTRA_TITLE,"Montageplan.pdf");pendingPlanProject=activeProject;startActivityForResult(intent,431);
    });
    android.app.AlertDialog dialog=builder.create();
-   MontageHistory history=montageStationHistory.get(stationProject);
+   MontageHistory history=loadMontageHistory(stationProject);
    if(history!=null){
     String current=getPreferences(0).getString("montageFittings","[]");
     LinearLayout actions=new LinearLayout(this);
