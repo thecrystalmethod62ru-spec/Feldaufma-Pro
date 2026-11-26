@@ -5250,7 +5250,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  }
  void editUtilityPosition(int index,double station,Runnable refresh){
   org.json.JSONArray rows=extraUtilities();org.json.JSONObject source=rows.optJSONObject(index);if(source==null)return;
-  String before=rows.toString(),projectId=activeProject;
+  final String[] savedPosition={rows.toString()};String projectId=activeProject;
   final int[] selected={index};
   final org.json.JSONObject[] current={source};
   LinearLayout form=new LinearLayout(this);form.setOrientation(1);
@@ -5471,7 +5471,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   preview.setContentDescription("Leitungsquerschnitt. Ausgewählte Leitung zum Verschieben ziehen.");
 
   android.widget.FrameLayout.LayoutParams barParams=new android.widget.FrameLayout.LayoutParams(Math.min(dp(280),Math.max(dp(160),getResources().getDisplayMetrics().widthPixels-dp(96))),-2,android.view.Gravity.TOP|android.view.Gravity.LEFT);
-  workspace.addView(toolbar,barParams);android.widget.FrameLayout.LayoutParams zoomParams=new android.widget.FrameLayout.LayoutParams(dp(72),-2,android.view.Gravity.BOTTOM|android.view.Gravity.RIGHT);workspace.addView(resetProfileZoom,zoomParams);resetProfileZoom.setTextSize(11);resetProfileZoom.setMinWidth(0);resetProfileZoom.setMinimumWidth(0);toolbar.addView(groupButton,new LinearLayout.LayoutParams(0,-2,1));groupButton.setMinWidth(0);groupButton.setMinimumWidth(0);groupButton.setPadding(0,0,0,0);groupButton.setTextSize(10);toolbar.setBackgroundColor(0xff303030);
+  workspace.addView(toolbar,barParams);android.widget.FrameLayout.LayoutParams zoomParams=new android.widget.FrameLayout.LayoutParams(dp(72),-2,android.view.Gravity.BOTTOM|android.view.Gravity.RIGHT);workspace.addView(resetProfileZoom,zoomParams);Button saveProfile=new Button(this);saveProfile.setText("Speichern");android.widget.FrameLayout.LayoutParams saveParams=new android.widget.FrameLayout.LayoutParams(-2,-2,android.view.Gravity.BOTTOM|android.view.Gravity.LEFT);workspace.addView(saveProfile,saveParams);resetProfileZoom.setTextSize(11);resetProfileZoom.setMinWidth(0);resetProfileZoom.setMinimumWidth(0);toolbar.addView(groupButton,new LinearLayout.LayoutParams(0,-2,1));groupButton.setMinWidth(0);groupButton.setMinimumWidth(0);groupButton.setPadding(0,0,0,0);groupButton.setTextSize(10);toolbar.setBackgroundColor(0xff303030);
   fullscreen.setTextSize(10);toggleControls.setTextSize(10);
   fullscreen.setPadding(dp(2),0,dp(2),0);toggleControls.setPadding(dp(2),0,dp(2),0);
   undoPosition.setPadding(0,0,0,0);redoPosition.setPadding(0,0,0,0);
@@ -5507,15 +5507,15 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
    workspace.setLayoutParams(lp);toolbar.setTranslationY(0);toolbar.setTranslationX(0);fullscreen.setText(full?"Normal":"Vollbild");
    expandPreview.setText(full?"Querschnitt verkleinern":"Querschnitt vergrößern");
   });
-  dialog.setOnShowListener(x->dialog.getButton(-1).setOnClickListener(y->{
-   if(!projectId.equals(activeProject)||!before.equals(extraUtilities().toString())){notice("Projektdaten geändert. Leitung erneut öffnen.");return;}
+  java.util.function.Consumer<Boolean> persistPosition=close->{
+   if(!projectId.equals(activeProject)||!savedPosition[0].equals(extraUtilities().toString())){notice("Projektdaten geändert. Leitung erneut öffnen.");return;}
    try{
     org.json.JSONObject updated=new org.json.JSONObject(current[0].toString());
     for(int i=0;i<2;i++){double value;try{value=Double.parseDouble(fields[i].getText().toString().trim().replace(',','.'));if(!Double.isFinite(value)||value<0)throw new NumberFormatException();}catch(Exception ex){fields[i].setError("Gültiges Maß eingeben");return;}updated.put(keys[i],value);}
     org.json.JSONArray next=new org.json.JSONArray(rows.toString());next.put(selected[0],updated);
-    if(saveUtilities(next)){recordProjectEvent("Leitungslage geändert");dialog.dismiss();if(refresh!=null)refresh.run();}
+    if(saveUtilities(next)){rows.put(selected[0],updated);current[0]=updated;savedPosition[0]=extraUtilities().toString();recordProjectEvent("Leitungslage geändert");if(close){dialog.dismiss();if(refresh!=null)refresh.run();}else{notice("Leitungslage gespeichert");preview.invalidate();}}
    }catch(Exception ex){notice("Leitungslage konnte nicht gespeichert werden.");}
-  }));dialog.show();
+  };saveProfile.setOnClickListener(v->persistPosition.accept(false));dialog.setOnShowListener(x->dialog.getButton(-1).setOnClickListener(y->persistPosition.accept(true)));dialog.show();
  }
  void utilityMenu(int index){
   org.json.JSONArray rows=extraUtilities();org.json.JSONObject o=rows.optJSONObject(index);if(o==null)return;
