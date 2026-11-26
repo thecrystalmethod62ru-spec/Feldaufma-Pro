@@ -2979,11 +2979,14 @@ public class MainActivity extends Activity {
  addSheetTab(tabs,"Mengen",quantityPage);
  body=new LinearLayout(this);shell.addView(body,new LinearLayout.LayoutParams(-1,0,1));
  LinearLayout dock=new LinearLayout(this);dock.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);
- dock.setBackgroundColor(Color.WHITE);shell.addView(dock);
+ dock.setBackgroundColor(Color.WHITE);dock.setPadding(dp(8),dp(4),dp(8),dp(4));shell.addView(dock);
  ImageButton assistant=new ImageButton(this);assistant.setImageResource(android.R.drawable.ic_btn_speak_now);
- assistant.setContentDescription("Sprachassistent starten");dock.addView(assistant,new LinearLayout.LayoutParams(dp(52),dp(48)));
+ assistant.setContentDescription("Sprachassistent starten; lange drücken für Assistent");
+ header.addView(assistant,header.indexOfChild(toolsMenu),new LinearLayout.LayoutParams(dp(48),dp(48)));
  assistant.setOnClickListener(v->startDictation());
- actionButtonSingle(dock,"Assistent",()->showPage(voicePage));
+ assistant.setOnLongClickListener(v->{showPage(voicePage);return true;});
+ Button persistentSave=actionButtonSingle(dock,"Speichern",()->{if(calculate())Toast.makeText(this,"Gespeichert",Toast.LENGTH_SHORT).show();});
+ persistentSave.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(52)));
  actionButtonSingle(planPage,"Zeichnungsebenen",()->showDrawingLayers());
  routePreviewBox=page();planPage.addView(routePreviewBox);
  routeSummary=sheetText("",15,false);planPage.addView(routeSummary);
@@ -3138,7 +3141,7 @@ public class MainActivity extends Activity {
  pipeInput.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){if(profile!=null)profile.invalidate();}public void afterTextChanged(android.text.Editable e){}});
  actionButtonSingle(pipeDetails,"Weitere Leitungen / Kabel",()->editUtilities());
  profilePage.removeView(legend);pipeDetails.addView(legend);
- actionButtonSingle(profilePage,"Speichern",()->calculate());
+
  save.setOnClickListener(v->{if(calculate())showPage(planPage);});if(length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);
  }
  void actionButton(LinearLayout bar,String label,Runnable action){
