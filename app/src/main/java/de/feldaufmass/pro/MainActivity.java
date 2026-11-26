@@ -1700,6 +1700,11 @@ public class MainActivity extends Activity {
    overlapStatus.setText(possibleOverlaps==0&&uncheckedPairs==0?"Außenkontur: keine Nähe-Konflikte zwischen getrennten Abschnitten erkannt (keine Flächenfreigabe).":"Außenkontur: "+possibleOverlaps+" mögliche Überlappung(en); "+uncheckedPairs+" Paar(e) wegen fehlender Maße nicht geprüft. Flächen manuell prüfen.");
   };
   refreshGeometry.run();
+  TextView overlapModeLabel=new TextView(this);overlapModeLabel.setText("Überlappungen – Kontrollberechnung");panel.addView(overlapModeLabel);
+  Spinner overlapMode=new Spinner(this);
+  String[] overlapModes={"Nur Kontrollwerte","Überlappung beibehalten (Brutto)","Überlappung abziehen (Netto)"};
+  overlapMode.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,overlapModes));
+  panel.addView(overlapMode);
   TextView nominalArea=new TextView(this);panel.addView(nominalArea);
   Runnable refreshNominalArea=()->{
    double total=route.measuredLength();
@@ -1766,10 +1771,16 @@ public class MainActivity extends Activity {
      StripOverlap.Result geometric=StripOverlap.calculate(strips);
      result.append(String.format(java.util.Locale.GERMANY,"\nGeometrische Kontrollwerte (inkl. Nachschnitt):\nBruttofläche: %.2f m²\nÜberlappungsfläche: %.2f m²\nNettofläche: %.2f m²",geometric.gross,geometric.overlap,geometric.net));
      result.append("\nGerade Abschnittsstreifen ohne Eckergänzungen; keine automatische Abrechnung.");
+     int mode=overlapMode.getSelectedItemPosition();
+     if(mode==1||mode==2)result.append(String.format(java.util.Locale.GERMANY,"\nGewählter Kontrollwert: %.2f m²",mode==1?geometric.gross:geometric.net));
     }catch(RuntimeException e){result.append("\nGeometrische Flächenprüfung nicht verfügbar.");}
    }
    nominalArea.setText(result.toString());
   };
+  overlapMode.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
+   @Override public void onItemSelected(android.widget.AdapterView<?> parent,android.view.View view,int position,long id){refreshNominalArea.run();}
+   @Override public void onNothingSelected(android.widget.AdapterView<?> parent){refreshNominalArea.run();}
+  });
   refreshNominalArea.run();
   TextView info=new TextView(this);info.setText("Gemessene Längen · Richtungen aus Skizze (nicht vermessen)");panel.addView(info);
   TextView widthHint=new TextView(this);widthHint.setText("Grabenbreite: "+(Double.isFinite(widths[0])?widths[0]+" m":"offen")+" · Nachschnitt links: "+(Double.isFinite(widths[1])?widths[1]+" m":"offen")+" · rechts: "+(Double.isFinite(widths[2])?widths[2]+" m":"offen")+"\nVariable Breiten: Abschnittskonturen an Knicken schematisch; keine Flächenberechnung.");panel.addView(widthHint);
