@@ -4255,7 +4255,7 @@ minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
      double diameter=row.optDouble("diameter")/1000,offset=row.optDouble("offset");
      if(!Double.isFinite(diameter)||diameter<=0||!Double.isFinite(offset)||offset<diameter/2){omitted=true;continue;}
      String type=row.optString("type");p.setColor(type.equals("Gas")?0xffe9b63c:type.equals("Trinkwasser")?0xff3686bc:0xffc66d56);p.setStrokeWidth((float)(diameter*unit/factor));
-     double station=0;
+     double station=0,lastStation=Double.NaN;float lastX=0,lastY=0;
      for(int i=1;i<route.vertices.size();i++){
       RouteSketch.Vertex a=route.vertices.get(i-1),b=route.vertices.get(i);double len=b.metres,dx=b.point.x-a.point.x,dy=b.point.y-a.point.y,n=Math.hypot(dx,dy);if(n<=0||len<=0)continue;
       java.util.TreeSet<Double> cuts=new java.util.TreeSet<>();cuts.add(station);cuts.add(station+len);
@@ -4268,7 +4268,9 @@ minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
        if(!Double.isFinite(bw)||offset+diameter/2>bw){omitted=true;continue;}
        double shift=(bw/2-offset)/factor,nx=dy/n*shift,ny=-dx/n*shift,t1=(begin-station)/len,t2=(stop-station)/len;
        utilityLegend.put(type+" · "+String.format(java.util.Locale.GERMANY,"%.0f mm",diameter*1000),p.getColor());
-       c.drawLine((float)(40+(a.point.x+dx*t1+nx-minX)*unit),(float)(85+(a.point.y+dy*t1+ny-minY)*unit),(float)(40+(a.point.x+dx*t2+nx-minX)*unit),(float)(85+(a.point.y+dy*t2+ny-minY)*unit),p);
+       float x1=(float)(40+(a.point.x+dx*t1+nx-minX)*unit),y1=(float)(85+(a.point.y+dy*t1+ny-minY)*unit),x2=(float)(40+(a.point.x+dx*t2+nx-minX)*unit),y2=(float)(85+(a.point.y+dy*t2+ny-minY)*unit);
+       if(Double.isFinite(lastStation)&&Math.abs(lastStation-begin)<1e-7)c.drawLine(lastX,lastY,x1,y1,p);
+       c.drawLine(x1,y1,x2,y2,p);lastStation=stop;lastX=x2;lastY=y2;
       }station+=len;
      }
     }
@@ -4281,7 +4283,7 @@ minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
      }
      if(truncated){p.setColor(INK);c.drawText("…",width-55,ly,p);}
     }
-    if(utilities.length()>0){p.setColor(INK);p.setTextSize(9);c.drawText(omitted?"Zusatzleitungen: ungültige Profilversätze teilweise ausgelassen":"Zusatzleitungen: Profilversatz ab linker Kante; Stationsbereich sofern erfasst",36,height-110,p);}
+    if(utilities.length()>0){p.setColor(INK);p.setTextSize(9);c.drawText(omitted?"Zusatzleitungen: ungültige Profilversätze teilweise ausgelassen":"Zusatzleitungen: Profilversatz ab linker Kante; Verbindungen schematisch",36,height-110,p);}
    }
    p.setColor(INK);p.setStrokeWidth(1);float bar=(float)(50*72/25.4);float by=height-47;c.drawLine(40,by,40+bar,by,p);c.drawLine(40,by-4,40,by+4,p);c.drawLine(40+bar,by-4,40+bar,by+4,p);c.drawText("50 mm Kontrollmaß",40,by+17,p);
   }finally{pdf.finishPage(page);}
