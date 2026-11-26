@@ -1814,8 +1814,22 @@ public class MainActivity extends Activity {
      cross.setLayoutData(pipes,bw,bd);
      android.widget.LinearLayout content=new android.widget.LinearLayout(this);content.setOrientation(1);
      content.addView(cross,new android.widget.LinearLayout.LayoutParams(-1,dp(300)));
+     final EditText limits=new EditText(this);
+     limits.setHint("Mindestabstand;Mindestüberdeckung (m)");
+     limits.setText("0;0");content.addView(limits);
+     final double[] requirements={0,0};
+     final Button applyLimits=new Button(this);applyLimits.setText("Grenzwerte übernehmen");content.addView(applyLimits);
      final TextView warnings=new TextView(this);content.addView(warnings);
-     Runnable refresh=()->{cross.setLayoutData(pipes,bw,bd);warnings.setText(android.text.TextUtils.join("\n",PipeLayout.dimensions(pipes,bw,bd))+"\n"+android.text.TextUtils.join("\n",PipeLayout.warnings(pipes,bw,bd,0)));};
+     Runnable refresh=()->{cross.setLayoutData(pipes,bw,bd);warnings.setText(android.text.TextUtils.join("\n",PipeLayout.dimensions(pipes,bw,bd))+"\n"+android.text.TextUtils.join("\n",PipeLayout.warnings(pipes,bw,bd,requirements[0],requirements[1])));};
+     applyLimits.setOnClickListener(button->{
+      try{
+       String[] values=limits.getText().toString().split(";",-1);
+       if(values.length!=2)throw new IllegalArgumentException("Zwei Werte erforderlich");
+       double gap=Double.parseDouble(values[0].trim().replace(',','.')),cover=Double.parseDouble(values[1].trim().replace(',','.'));
+       PipeLayout.warnings(pipes,bw,bd,gap,cover);
+       requirements[0]=gap;requirements[1]=cover;limits.setError(null);refresh.run();
+      }catch(Exception ex){limits.setError(ex.getMessage());}
+     });
      refresh.run();
      cross.setMove((index,offset,bedding)->{
       try{
