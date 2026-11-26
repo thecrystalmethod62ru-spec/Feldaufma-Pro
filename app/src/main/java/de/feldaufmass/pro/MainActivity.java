@@ -7,6 +7,39 @@ import android.graphics.*;
 import android.content.SharedPreferences;
 
 public class MainActivity extends Activity {
+ static final String LEGACY_PROJECT="legacy";
+ String activeProject=LEGACY_PROJECT;
+ SharedPreferences projectRegistry(){return getSharedPreferences("project_registry",MODE_PRIVATE);}
+ SharedPreferences projectStorage(String id){return LEGACY_PROJECT.equals(id)?super.getPreferences(MODE_PRIVATE):getSharedPreferences("project_"+id,MODE_PRIVATE);}
+ @Override public SharedPreferences getPreferences(int mode){return projectStorage(activeProject);}
+ void showProjects(){
+  java.util.ArrayList<String> ids=new java.util.ArrayList<>(projectRegistry().getStringSet("ids",java.util.Collections.emptySet()));
+  java.util.Collections.sort(ids);ids.remove(LEGACY_PROJECT);ids.add(0,LEGACY_PROJECT);
+  String[] labels=new String[ids.size()];
+  for(int j=0;j<ids.size();j++){String id=ids.get(j);String name=projectStorage(id).getString("project","");labels[j]=(id.equals(activeProject)?"● ":"")+ (name.trim().isEmpty()?"Bestandsprojekt":name);}
+  new android.app.AlertDialog.Builder(this).setTitle("Projekte").setItems(labels,(d,w)->{String id=ids.get(w);if(!id.equals(activeProject))confirmProjectSwitch(id);}).setNeutralButton("Neues Projekt",(d,w)->newProjectDialog()).setNegativeButton("Schließen",null).show();
+ }
+ void newProjectDialog(){
+  EditText name=new EditText(this);name.setSingleLine(true);name.setHint("Projektname");
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Neues Projekt").setMessage("Nur gespeicherte Änderungen des aktuellen Projekts bleiben erhalten.").setView(name).setNegativeButton("Abbrechen",null).setPositiveButton("Erstellen",null).create();
+  dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(b->{
+   String title=name.getText().toString().trim();if(title.isEmpty()){name.setError("Projektname erforderlich");return;}
+   String id=java.util.UUID.randomUUID().toString();
+   if(!projectStorage(id).edit().putString("project",title).putInt("dictationLanguage",getPreferences(0).getInt("dictationLanguage",1)).commit()){notice("Projekt konnte nicht erstellt werden.");return;}
+   java.util.Set<String> ids=new java.util.HashSet<>(projectRegistry().getStringSet("ids",java.util.Collections.emptySet()));ids.add(id);
+   if(!projectRegistry().edit().putStringSet("ids",ids).putString("active",id).commit()){notice("Projekt konnte nicht aktiviert werden.");return;}
+   dialog.dismiss();restartForProject();
+  }));dialog.show();
+ }
+ void confirmProjectSwitch(String id){
+  new android.app.AlertDialog.Builder(this).setTitle("Projekt wechseln").setMessage("Nur gespeicherte Änderungen bleiben erhalten. Nicht gespeicherte Eingaben werden verworfen.").setNegativeButton("Abbrechen",null).setPositiveButton("Wechseln",(d,w)->{
+   if(projectRegistry().edit().putString("active",id).commit())restartForProject();else notice("Projektwechsel fehlgeschlagen.");
+  }).show();
+ }
+ void restartForProject(){
+  selectedPoint=null;pendingPoint=null;pendingPhoto=null;speechVersion++;
+  recreate();
+ }
  EditText project,length,width,depth; TextView result; Sketch sketch;
  EditText objectStation,objectNote; Spinner objectType,objectSide; TextView objectList; org.json.JSONArray objects=new org.json.JSONArray(); EditText voiceText; Spinner voiceLanguage;
  double l,w,d,asphalt,left,right; EditText asphaltInput,leftInput,rightInput; Profile profile; Spinner surface; EditText stoneLength,stoneWidth,stoneDepth,stoneColor,pattern,bedding,underlying; Spinner handling; TextView legend; EditText stationFrom,stationTo; TextView segmentsView; org.json.JSONArray segments=new org.json.JSONArray(); EditText baseInput,pipeInput; double base=Double.NaN,pipe=Double.NaN; String covering="Unbekannt";
@@ -242,7 +275,8 @@ public class MainActivity extends Activity {
   LinearLayout[] pages={measurePage,segmentPage,objectPage,documentsPage,voicePage};
   PopupMenu menu=new PopupMenu(this,toolsMenu);
   for(int i=0;i<names.length;i++)menu.getMenu().add(0,i,Menu.NONE,names[i]);
-  menu.setOnMenuItemClickListener(item->{showPage(pages[item.getItemId()]);return true;});
+  menu.getMenu().add(0,100,Menu.NONE,"Projekte");
+  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
   menu.show();
  }
  LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(dp(12),dp(8),dp(12),dp(8));return p;}
@@ -278,7 +312,7 @@ public class MainActivity extends Activity {
   androidx.core.view.ViewCompat.requestApplyInsets(root);
  }
 
- public void onCreate(Bundle b){super.onCreate(b);
+ public void onCreate(Bundle b){super.onCreate(b);activeProject=projectRegistry().getString("active",LEGACY_PROJECT);
  if(b!=null){selectedPoint=b.getString("selectedPoint");pendingPoint=b.getString("pendingPoint");pendingPhoto=b.getString("pendingPhoto");}
  shell=page();shell.setPadding(0,0,0,0);shell.setBackgroundColor(0xfff4f6f8);setContentView(shell);fitSystemPanels(shell);
  planPage=page();measurePage=page();voicePage=page();profilePage=page();segmentPage=page();objectPage=page();quantityPage=page();
@@ -287,7 +321,7 @@ public class MainActivity extends Activity {
  header.setPadding(dp(16),dp(4),dp(8),dp(4));
  header.setBackgroundColor(Color.WHITE);
  shell.addView(header);
- projectHeader=sheetText("Feldaufmaß Pro",22,true);
+ projectHeader=sheetText(getPreferences(0).getString("project","Feldaufmaß Pro"),22,true);
  projectHeader.setTextColor(INK);
  projectHeader.setMaxLines(2);
  projectHeader.setEllipsize(android.text.TextUtils.TruncateAt.END);
