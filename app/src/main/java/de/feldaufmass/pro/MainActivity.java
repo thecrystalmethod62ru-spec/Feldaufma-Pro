@@ -784,7 +784,8 @@ public class MainActivity extends Activity {
   menu.getMenu().add(0,103,Menu.NONE,"Projektverlauf");
   menu.getMenu().add(0,104,Menu.NONE,"Sicherungsversionen");
   menu.getMenu().add(0,105,Menu.NONE,"Längsschnitt");
-  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
+  menu.getMenu().add(0,106,Menu.NONE,"DXF exportieren");
+  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
   menu.show();
  }
  LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(dp(12),dp(8),dp(12),dp(8));return p;}
@@ -1164,6 +1165,27 @@ public class MainActivity extends Activity {
  void showObjects(){refreshOverview();StringBuilder b=new StringBuilder();for(int i=0;i<objects.length();i++){org.json.JSONObject o=objects.optJSONObject(i);if(o!=null)b.append(String.format(java.util.Locale.GERMANY,"%.2f m | %s | %s | %s\n",o.optDouble("station"),o.optString("type"),o.optString("side"),o.optString("note")+detailSummary(o)+overlapStatus(i)));}objectList.setText(b.toString());}
  void saveSoll(){try{EditText[] fields={sollLength,sollWidth,sollDepth,sollAsphalt};String[] keys={"sollLength","sollWidth","sollDepth","sollAsphalt"};for(EditText e:fields){if(e.length()>0){double n=number(e);if(!Double.isFinite(n)||n<=0)throw new Exception();}}android.content.SharedPreferences.Editor ed=getPreferences(0).edit();for(int i=0;i<fields.length;i++)ed.putString(keys[i],fields[i].getText().toString());ed.putString("sollSource",sollSource.getText().toString()).apply();compareSoll();}catch(Exception e){Toast.makeText(this,"Bitte gültige positive Soll-Maße eingeben.",Toast.LENGTH_LONG).show();}}
  void compareSoll(){if(sollComparison==null||length==null||asphaltInput==null)return;EditText[] actual={length,width,depth,asphaltInput};String[] keys={"sollLength","sollWidth","sollDepth","sollAsphalt"};String[] names={"Trassenlänge","Grabenbreite","Grabentiefe","Asphaltstärke"};StringBuilder b=new StringBuilder("Soll / Ist – Abweichungen (Ist minus Soll)\n");for(int i=0;i<keys.length;i++){b.append(names[i]).append(": ");try{double p=Double.parseDouble(getPreferences(0).getString(keys[i],"").replace(',','.'));double a=number(actual[i]);if(!Double.isFinite(a)||a<=0)throw new Exception();b.append(String.format(java.util.Locale.GERMANY,"Soll %.2f m | Ist %.2f m | Δ %+.2f m",p,a,a-p));}catch(Exception e){b.append("Nicht vollständig erfasst");}b.append("\n");}sollComparison.setText(b.toString());}
+ void exportDxf(){
+  RouteSketch route=new RouteSketch(this,routeData());
+  if(route.vertices.size()<2){notice("Zuerst eine Trasse zeichnen.");return;}
+  boolean metric=DxfExport.metricAvailable(route);
+  new android.app.AlertDialog.Builder(this).setTitle("DXF exportieren")
+   .setMessage(metric?"Die eingegebenen Abschnittslängen werden in Metern übernommen. Richtungen stammen aus der Skizze, nicht aus einer Vermessung. Lokales Koordinatensystem.":"Abschnittslängen fehlen oder sind ungültig. Export nur als nicht maßstäbliche Skizze möglich.")
+   .setNegativeButton("Abbrechen",null).setPositiveButton(metric?"DXF in Metern":"Skizze als DXF",(d,w)->{
+    android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);
+    i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.setType("application/octet-stream");i.putExtra(android.content.Intent.EXTRA_TITLE,"Feldaufmass.dxf");startActivityForResult(i,metric?416:417);
+   }).show();
+ }
+ void writeDxf(android.net.Uri uri,boolean metric){
+  RouteSketch route=new RouteSketch(this,routeData());
+  if(route.vertices.size()<2||metric&&!DxfExport.metricAvailable(route)){notice("Trasse geändert oder Maße unvollständig. Export erneut starten.");return;}
+  try(java.io.OutputStream stream=getContentResolver().openOutputStream(uri,"wt")){
+   if(stream==null)throw new java.io.IOException();
+   java.io.Writer writer=new java.io.BufferedWriter(new java.io.OutputStreamWriter(stream,java.nio.charset.StandardCharsets.US_ASCII));
+   new DxfExport(writer,route,metric).write(projectHeader.getText().toString(),objects,segments);
+   writer.flush();notice("DXF gespeichert.");
+  }catch(Exception e){notice("DXF konnte nicht gespeichert werden.");}
+ }
  void exportPdf(){if(!calculate()){showPage(measurePage);return;}android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.setType("application/pdf");i.putExtra(android.content.Intent.EXTRA_TITLE,"Feldaufmass.pdf");startActivityForResult(i,412);}
  void drawReportView(Canvas canvas, View view, int top, int width, int height) {
   canvas.save();
@@ -1599,6 +1621,7 @@ public class MainActivity extends Activity {
  try{startActivityForResult(i,410);}catch(android.content.ActivityNotFoundException e){Toast.makeText(this,"Keine Spracherkennung verfügbar.",Toast.LENGTH_LONG).show();}
  }
  @Override protected void onActivityResult(int request,int result,android.content.Intent data){super.onActivityResult(request,result,data);
+ if((request==416||request==417)&&result==RESULT_OK&&data!=null&&data.getData()!=null){writeDxf(data.getData(),request==416);return;}
  if(request==415&&result==RESULT_OK&&data!=null&&data.getData()!=null){importProjectBackup(data.getData());return;}
  if(request==414&&result==RESULT_OK&&data!=null&&data.getData()!=null){exportProjectBackup(data.getData());return;}
  if(request==413){finishPhoto(result==RESULT_OK);return;}
