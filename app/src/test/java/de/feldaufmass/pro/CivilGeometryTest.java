@@ -21,6 +21,21 @@ public class CivilGeometryTest {
         assertTrue(Double.isNaN(CivilGeometry.overlapArea(Double.NaN, 2, 2, 2, a, a)));
         assertTrue(Double.isNaN(CivilGeometry.overlapArea(2, 2, 2, 2, null, a)));
     }
+    @Test public void malformedBoundsLeaveOverlapUnknownInEitherOrder() {
+        double[][] invalid = {{}, {1}, {2, 1}, {Double.NaN, 2}, {0, Double.POSITIVE_INFINITY}};
+        for (double[] bounds : invalid) {
+            assertTrue(Double.isNaN(CivilGeometry.overlapArea(2, 2, 2, 2, bounds, a)));
+            assertTrue(Double.isNaN(CivilGeometry.overlapArea(2, 2, 2, 2, a, bounds)));
+        }
+    }
+
+    @Test public void negativeLengthIsInvalidAndZeroLengthHasZeroArea() {
+        assertTrue(Double.isNaN(CivilGeometry.overlapArea(2, 2, -1, 2, a, a)));
+        assertTrue(Double.isNaN(CivilGeometry.overlapArea(2, 2, 2, -1, a, a)));
+        assertEquals(0, CivilGeometry.overlapArea(2, 2, 0, 2, a, a), 0);
+        assertEquals(0, CivilGeometry.overlapArea(2, 2, 2, 2, new double[]{1, 1}, a), 0);
+    }
+
     @Test public void rectangularQuantities() {
         assertEquals(92.0, CivilGeometry.rectangularArea(100, 0.92), 1e-9);
         assertEquals(136.16, CivilGeometry.rectangularVolume(100, 0.92, 1.48), 1e-9);
