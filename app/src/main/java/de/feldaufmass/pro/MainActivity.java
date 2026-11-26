@@ -1686,12 +1686,13 @@ public class MainActivity extends Activity {
    }
    java.util.ArrayList<Double> stations=new java.util.ArrayList<>(cuts);
    java.util.TreeMap<String,Double> bySurface=new java.util.TreeMap<>();
-   double area=0,unmeasured=0,unknownSurface=0;int surfaceConflicts=0;
+   double area=0,unmeasured=0,unknownSurface=0,nachschnittArea=0;int surfaceConflicts=0;
    for(int i=1;i<stations.size();i++){
     double from=stations.get(i-1),to=stations.get(i),mid=(from+to)/2,w=widths[0];
     for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o!=null&&mid>=o.optDouble("from",Double.NaN)&&mid<o.optDouble("to",Double.NaN))w=o.optDouble("width",Double.NaN);}
     if(!Double.isFinite(w)||w<=0){unmeasured+=to-from;continue;}
     double part=(to-from)*w;area+=part;
+    if(Double.isFinite(widths[1])&&Double.isFinite(widths[2]))nachschnittArea+=(to-from)*(widths[1]+widths[2]);
     String surface=null;int matches=0;
     for(int j=0;j<surfaces.length();j++){org.json.JSONObject o=surfaces.optJSONObject(j);if(o==null)continue;
      double lo=o.optDouble("from",Double.NaN),hi=o.optDouble("to",Double.NaN);String name=o.optString("surface","").trim();
@@ -1701,6 +1702,9 @@ public class MainActivity extends Activity {
     else{unknownSurface+=part;if(matches>1)surfaceConflicts++;}
    }
    StringBuilder result=new StringBuilder(String.format(java.util.Locale.GERMANY,"Rechnerische Grabenfläche (Länge × Breite): %.2f m²",area));
+   if(Double.isFinite(widths[1])&&Double.isFinite(widths[2]))result.append(String.format(java.util.Locale.GERMANY,"\\nNachschnitt-Zusatzfläche links + rechts: %.2f m²",nachschnittArea));
+   else result.append("\\nNachschnitt-Zusatzfläche: unvollständig bemaßt (links/rechts).");
+   if(Double.isFinite(widths[1])&&Double.isFinite(widths[2]))result.append(String.format(java.util.Locale.GERMANY,"\\nRechnerische Gesamtfläche inkl. Nachschnitt: %.2f m²",area+nachschnittArea));
    for(java.util.Map.Entry<String,Double> item:bySurface.entrySet())result.append(String.format(java.util.Locale.GERMANY,"\\n%s: %.2f m²",item.getKey(),item.getValue()));
    if(unknownSurface>0)result.append(String.format(java.util.Locale.GERMANY,"\\nOberfläche unklar / nicht zugeordnet: %.2f m²",unknownSurface));
    if(unmeasured>0)result.append(String.format(java.util.Locale.GERMANY,"\\nNicht bemaßte Länge: %.2f m",unmeasured));
