@@ -1783,6 +1783,14 @@ public class MainActivity extends Activity {
   depthSectionsInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
   depthSectionsInput.setText(overlapPrefs.getString("metricDepthSections",""));
   panel.addView(depthSectionsInput);
+  final EditText elevationInput=new EditText(this);
+  elevationInput.setHint("GOK-Höhenpunkte: Station;Höhe (m), je Zeile");
+  elevationInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+  elevationInput.setText(overlapPrefs.getString("metricElevationPoints",""));
+  panel.addView(elevationInput);
+  final TextView elevationStatus=new TextView(this);panel.addView(elevationStatus);
+  final ElevationProfile[] surveyedProfile={null};
+
   final java.util.List<double[]> profileData=new java.util.ArrayList<>();
   final android.view.View longitudinalProfile=new android.view.View(this){
    @Override protected void onDraw(android.graphics.Canvas c){
@@ -1858,6 +1866,25 @@ public class MainActivity extends Activity {
     }
     station=end;
    }
+   surveyedProfile[0]=null;
+   if(elevationInput.getText().toString().trim().isEmpty())elevationStatus.setText("GOK: relative Darstellung");
+   else try{
+    java.util.List<double[]> elevations=new java.util.ArrayList<>();
+    for(String line:elevationInput.getText().toString().split("\\n")){
+     if(line.trim().isEmpty())continue;
+     String[] parts=line.split(";",-1);if(parts.length!=2)throw new IllegalArgumentException("Format Station;Höhe");
+     elevations.add(new double[]{Double.parseDouble(parts[0].trim().replace(',','.')),Double.parseDouble(parts[1].trim().replace(',','.'))});
+    }
+    surveyedProfile[0]=new ElevationProfile(elevations,total);
+    StringBuilder slopes=new StringBuilder("GOK – Gefälle (+ abwärts):");
+    java.util.List<double[]> points=surveyedProfile[0].stations();
+    for(int k=1;k<points.size();k++){
+     double from=points.get(k-1)[0],to=points.get(k)[0];
+     slopes.append(String.format(java.util.Locale.GERMANY,"\n%.2f–%.2f m: %+.2f %%",from,to,surveyedProfile[0].fallPercent(from,to)));
+    }
+    if(points.get(0)[0]>0||points.get(points.size()-1)[0]<total)slopes.append("\nGOK nur im vermessenen Bereich bekannt.");
+    elevationStatus.setText(slopes.toString());
+   }catch(Exception ex){elevationStatus.setText("GOK: ungültige Höhenpunkte – "+ex.getMessage());}
    profileData.clear();
    if(depthSectionsValid){
     double fallback=Double.NaN;
@@ -1986,6 +2013,11 @@ public class MainActivity extends Activity {
    }
    nominalArea.setText(result.toString());
   };
+  elevationInput.addTextChangedListener(new android.text.TextWatcher(){
+   public void beforeTextChanged(CharSequence s,int start,int count,int after){}
+   public void onTextChanged(CharSequence s,int start,int before,int count){}
+   public void afterTextChanged(android.text.Editable e){overlapPrefs.edit().putString("metricElevationPoints",e.toString()).apply();refreshNominalArea.run();}
+  });
   depthSectionsInput.addTextChangedListener(new android.text.TextWatcher(){
    public void beforeTextChanged(CharSequence s,int start,int count,int after){}
    public void onTextChanged(CharSequence s,int start,int before,int count){}
