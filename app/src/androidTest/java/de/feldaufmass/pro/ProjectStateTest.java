@@ -12,6 +12,22 @@ import static org.junit.Assert.*;
 
 @RunWith(AndroidJUnit4.class)
 public class ProjectStateTest {
+ @Test public void materialListCountsOnlyConfirmedInstallations(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->{
+    try{
+     org.json.JSONObject fitting=new org.json.JSONObject().put("type","TEE").put("dn","80").put("material","PE");
+     org.json.JSONArray rows=new org.json.JSONArray().put(fitting);
+     assertEquals("",activity.montageMaterialText(rows));
+     fitting.put("installed",true);
+     rows.put(new org.json.JSONObject(fitting.toString())).put(new org.json.JSONObject(fitting.toString()).put("dn","100"));
+     assertEquals("1 Stk.  T-Stück · DN 100 · PE\n2 Stk.  T-Stück · DN 80 · PE",activity.montageMaterialText(rows));
+     fitting.put("installed",false);
+     assertEquals("1 Stk.  T-Stück · DN 100 · PE\n1 Stk.  T-Stück · DN 80 · PE",activity.montageMaterialText(rows));
+    }catch(org.json.JSONException e){throw new AssertionError(e);}
+   });
+  }
+ }
  @Test public void routeEditorUndoRedoPreservesMetadata(){
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    scenario.onActivity(activity->{

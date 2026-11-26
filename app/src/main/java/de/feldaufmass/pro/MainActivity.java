@@ -1673,22 +1673,50 @@ public class MainActivity extends Activity {
    dialog.show();
   }catch(Exception e){notice("Formstücke konnten nicht gelesen werden.");}
  }
+ String montageMaterialText(org.json.JSONArray rows) throws org.json.JSONException {
+  java.util.SortedMap<String,Integer> quantities=new java.util.TreeMap<>();
+  for(int i=0;i<rows.length();i++){
+   org.json.JSONObject row=rows.getJSONObject(i);
+   if(row.optBoolean("installed",false))quantities.merge(montageDescription(row),1,Integer::sum);
+  }
+  StringBuilder list=new StringBuilder();
+  for(java.util.Map.Entry<String,Integer> entry:quantities.entrySet()){
+   list.append(entry.getValue()).append(" Stk.  ").append(entry.getKey()).append('\n');
+  }
+  return list.toString().trim();
+ }
+ String pendingMaterialProject;
  void showMontageMaterials(){
   try{
-   org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));
-   java.util.SortedMap<String,Integer> quantities=new java.util.TreeMap<>();
-   for(int i=0;i<rows.length();i++){
-    org.json.JSONObject row=rows.getJSONObject(i);
-    if(row.optBoolean("installed",false))quantities.merge(montageDescription(row),1,Integer::sum);
-   }
-   StringBuilder list=new StringBuilder();
-   for(java.util.Map.Entry<String,Integer> entry:quantities.entrySet()){
-    list.append(entry.getValue()).append(" Stk.  ").append(entry.getKey()).append('\n');
-   }
-   new android.app.AlertDialog.Builder(this).setTitle("Materialliste · bestätigter Einbau")
-       .setMessage(list.length()==0?"Noch kein Einbau bestätigt.":list.toString().trim())
-       .setPositiveButton("Zurück",(d,w)->showMontage()).show();
+   String list=montageMaterialText(new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]")));
+   android.app.AlertDialog.Builder dialog=new android.app.AlertDialog.Builder(this).setTitle("Materialliste · bestätigter Einbau")
+       .setMessage(list.isEmpty()?"Noch kein Einbau bestätigt.":list)
+       .setNegativeButton("Zurück",(d,w)->showMontage());
+   if(!list.isEmpty())dialog.setPositiveButton("Als PDF speichern",(d,w)->{
+    android.content.Intent intent=new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);
+    intent.addCategory(android.content.Intent.CATEGORY_OPENABLE);intent.setType("application/pdf");
+    intent.putExtra(android.content.Intent.EXTRA_TITLE,"Montage_Materialliste.pdf");
+    pendingMaterialProject=activeProject;startActivityForResult(intent,429);
+   });
+   dialog.show();
   }catch(Exception e){notice("Materialliste konnte nicht gelesen werden.");}
+ }
+ void writeMaterialPdf(android.net.Uri uri,String projectId){
+  if(projectId==null){notice("Materialliste erneut öffnen.");return;}
+  android.graphics.pdf.PdfDocument pdf=new android.graphics.pdf.PdfDocument();
+  try{
+   SharedPreferences prefs=projectStorage(projectId);
+   String list=montageMaterialText(new org.json.JSONArray(prefs.getString("montageFittings","[]")));
+   if(list.isEmpty()){notice("Noch kein Einbau bestätigt.");return;}
+   String body="Projekt: "+prefs.getString("project","Projekt")+"\n\nBestätigter Einbau · Formstücke\n\n"+list;
+   dailyTextPdf(pdf,1,"Montage – Materialliste",body,null);
+   try(java.io.OutputStream out=getContentResolver().openOutputStream(uri,"wt")){
+    if(out==null)throw new java.io.IOException();
+    pdf.writeTo(out);
+   }
+   notice("Materialliste gespeichert.");
+  }catch(Exception e){notice("Materialliste konnte nicht gespeichert werden.");}
+  finally{pdf.close();}
  }
  void showMetricRoute(){
   RouteSketch route=new RouteSketch(this,routeData());
@@ -2820,7 +2848,7 @@ public class MainActivity extends Activity {
  }
 
  public void onCreate(Bundle b){super.onCreate(b);activeProject=projectRegistry().getString("active",LEGACY_PROJECT);
- if(b!=null){selectedPoint=b.getString("selectedPoint");pendingPoint=b.getString("pendingPoint");pendingPhoto=b.getString("pendingPhoto");}
+ if(b!=null){selectedPoint=b.getString("selectedPoint");pendingPoint=b.getString("pendingPoint");pendingPhoto=b.getString("pendingPhoto");pendingMaterialProject=b.getString("pendingMaterialProject");}
  shell=page();shell.setPadding(0,0,0,0);shell.setBackgroundColor(0xfff4f6f8);setContentView(shell);fitSystemPanels(shell);
  planPage=page();measurePage=page();voicePage=page();profilePage=page();segmentPage=page();objectPage=page();quantityPage=page();
  LinearLayout header=new LinearLayout(this);
@@ -3998,7 +4026,7 @@ public class MainActivity extends Activity {
  }
  @Override protected void onSaveInstanceState(Bundle out){
   super.onSaveInstanceState(out);out.putString("selectedPoint",selectedPoint);
-  out.putString("pendingPoint",pendingPoint);out.putString("pendingPhoto",pendingPhoto);
+  out.putString("pendingPoint",pendingPoint);out.putString("pendingPhoto",pendingPhoto);out.putString("pendingMaterialProject",pendingMaterialProject);
  }
  com.google.mlkit.nl.translate.Translator translator;
  int speechVersion;
@@ -4206,6 +4234,7 @@ public class MainActivity extends Activity {
  try{startActivityForResult(i,410);}catch(android.content.ActivityNotFoundException e){Toast.makeText(this,"Keine Spracherkennung verfügbar.",Toast.LENGTH_LONG).show();}
  }
  @Override protected void onActivityResult(int request,int result,android.content.Intent data){super.onActivityResult(request,result,data);
+ if(request==429){String id=pendingMaterialProject;pendingMaterialProject=null;if(result==RESULT_OK&&data!=null&&data.getData()!=null)writeMaterialPdf(data.getData(),id);return;}
  if(request==428){java.util.function.Consumer<String> accept=pendingEditorSpeech;pendingEditorSpeech=null;if(accept!=null&&result==RESULT_OK&&data!=null){java.util.ArrayList<String> values=data.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS);if(values!=null&&!values.isEmpty())accept.accept(values.get(0));}return;}
  if(request==427&&result==RESULT_OK&&data!=null&&data.getData()!=null){importRouteUnderlay(data.getData());return;}
  if(request==426&&result==RESULT_OK&&data!=null&&data.getData()!=null){android.net.Uri uri=data.getData();String name=uri.getLastPathSegment();try(android.database.Cursor c=getContentResolver().query(uri,new String[]{android.provider.OpenableColumns.DISPLAY_NAME},null,null,null)){if(c!=null&&c.moveToFirst())name=c.getString(0);}catch(Exception ignored){}analyzeImageDocument(uri,name==null?"Bild":name);return;}
