@@ -137,7 +137,7 @@ public class MainActivity extends Activity {
   }
   if(manifest==null||!"FeldaufmassPro".equals(manifest.optString("format"))||manifest.optInt("version")!=1)throw new java.io.IOException("Unbekanntes Sicherungsformat");
   org.json.JSONObject fields=manifest.getJSONObject("preferences");
-  java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","sollUtilities","objectUndo","objectRedo","elevationPoints","lvPositions","dailyReports","nachtraege","routeUnderlay","sketchCalibration"));
+  java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","sollUtilities","montageFittings","objectUndo","objectRedo","elevationPoints","lvPositions","dailyReports","nachtraege","routeUnderlay","sketchCalibration"));
   java.util.Set<String> ints=new java.util.HashSet<>(java.util.Arrays.asList("surface","handling","dictationLanguage","gpsDurationSeconds"));
   SharedPreferences.Editor ed=projectStorage(id).edit();
   java.util.Iterator<String> keys=fields.keys();String name="Importiertes Projekt";java.util.Set<String> used=new java.util.HashSet<>();
@@ -157,7 +157,7 @@ public class MainActivity extends Activity {
     else if(key.equals("documents")){
      org.json.JSONArray docs=new org.json.JSONArray(v);for(int j=0;j<docs.length();j++){org.json.JSONObject doc=docs.getJSONObject(j);doc.remove("uri");doc.put("name",doc.optString("name")+" (neu verknüpfen)");}v=docs.toString();
     }else if(key.equals("dailyReports")||key.equals("nachtraege")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++){org.json.JSONArray items=dailyPhotos(rows.getJSONObject(j));for(int k=0;k<items.length();k++){org.json.JSONObject photo=items.getJSONObject(k);String old=photo.getString("file"),replacement=photos.get(old);if(replacement==null)throw new java.io.IOException("Berichtsfoto fehlt");used.add(old);photo.put("file",replacement);}}v=rows.toString();
-    }else if(key.equals("objects")||key.equals("segments")||key.equals("elevationPoints")||key.equals("lvPositions")||key.equals("sollUtilities")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)rows.getJSONObject(j);}
+    }else if(key.equals("objects")||key.equals("segments")||key.equals("elevationPoints")||key.equals("lvPositions")||key.equals("sollUtilities")||key.equals("montageFittings")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)rows.getJSONObject(j);}
     else if(key.equals("objectUndo")||key.equals("objectRedo")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)new org.json.JSONArray(rows.getString(j));}
     if(key.equals("project")&&!v.trim().isEmpty())name=v.trim();
     ed.putString(key,v);
@@ -1510,7 +1510,7 @@ public class MainActivity extends Activity {
  }
  void showMontage(){
   new android.app.AlertDialog.Builder(this).setTitle("Rohrleitungsbau – Montage")
-   .setItems(new String[]{"Formstückkatalog"},(d,w)->showMontageCatalog())
+   .setItems(new String[]{"Formstückkatalog","Projekt-Formstücke"},(d,w)->{if(w==0)showMontageCatalog();else showMontageInventory();})
    .setNegativeButton("Schließen",null).show();
  }
  void showMontageCatalog(){
@@ -1530,10 +1530,30 @@ public class MainActivity extends Activity {
   dialog.show();
  }
  void showMontageFitting(MontageCatalog.Fitting fitting){
+  final String projectId=activeProject;
   LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);
-  panel.addView(new MontageSymbolView(this,fitting),new LinearLayout.LayoutParams(-1,dp(150)));
-  TextView details=new TextView(this);details.setText("Anschlüsse: "+fitting.ports+(fitting.bendAngle>0?"\nWinkel: "+fitting.bendAngle+"°":"")+"\nSchematische Vorschau – noch keine Platzierung.");panel.addView(details);
-  new android.app.AlertDialog.Builder(this).setTitle(fitting.label).setView(panel).setPositiveButton("Zurück",(d,w)->showMontageCatalog()).show();
+  panel.addView(new MontageSymbolView(this,fitting),new LinearLayout.LayoutParams(-1,dp(100)));
+  EditText dn=new EditText(this);dn.setHint("DN (optional)");dn.setInputType(2);panel.addView(dn);
+  EditText material=new EditText(this);material.setHint("Werkstoff (optional)");panel.addView(material);
+  EditText rotation=new EditText(this);rotation.setHint("Drehwinkel (°)");rotation.setInputType(8194|4096);rotation.setText("0");panel.addView(rotation);
+  android.widget.CheckBox mirror=new android.widget.CheckBox(this);mirror.setText("Spiegeln");panel.addView(mirror);
+  android.widget.ScrollView scroll=new android.widget.ScrollView(this);scroll.addView(panel);
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(fitting.label).setView(scroll).setNegativeButton("Zurück",(d,w)->showMontageCatalog()).setPositiveButton("Zum Projekt hinzufügen",null).create();
+  dialog.setOnShowListener(x->dialog.getButton(-1).setOnClickListener(v->{
+   if(!projectId.equals(activeProject)){notice("Projekt wurde gewechselt.");return;}
+   String diameter=dn.getText().toString().trim();
+   if(!diameter.isEmpty()&&!diameter.matches("[1-9][0-9]{0,3}")){dn.setError("Ungültige Nennweite");return;}
+   double angle;try{angle=MontageCatalog.normalizeRotation(Double.parseDouble(rotation.getText().toString().trim().replace(',','.')));}catch(Exception e){rotation.setError("Ungültiger Winkel");return;}
+   try{
+    org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));
+    rows.put(new org.json.JSONObject().put("id",java.util.UUID.randomUUID().toString()).put("type",fitting.name()).put("dn",diameter).put("material",material.getText().toString().trim()).put("rotation",angle).put("mirrored",mirror.isChecked()).put("placed",false));
+    if(!getPreferences(0).edit().putString("montageFittings",rows.toString()).commit()){notice("Speichern fehlgeschlagen.");return;}
+    dialog.dismiss();notice("Formstück gespeichert – noch nicht platziert.");showMontageCatalog();
+   }catch(Exception e){notice("Formstück konnte nicht gespeichert werden.");}
+  }));dialog.show();
+ }
+ void showMontageInventory(){
+  try{org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));StringBuilder out=new StringBuilder();for(int i=0;i<rows.length();i++){org.json.JSONObject row=rows.getJSONObject(i);out.append(MontageCatalog.Fitting.valueOf(row.getString("type")).label).append(" · DN ").append(row.optString("dn").isEmpty()?"unbekannt":row.optString("dn")).append(" · ").append(row.optString("material")).append(" · nicht platziert\n");}new android.app.AlertDialog.Builder(this).setTitle("Projekt-Formstücke").setMessage(out.length()==0?"Keine Formstücke gespeichert.":out.toString()).setPositiveButton("Zurück",(d,w)->showMontage()).show();}catch(Exception e){notice("Formstücke konnten nicht gelesen werden.");}
  }
  void showTools(){
   String[] names={"Maße","Beläge","Objekte","Unterlagen / PDF","Sprachassistent"};
