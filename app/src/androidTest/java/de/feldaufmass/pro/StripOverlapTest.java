@@ -56,4 +56,16 @@ public class StripOverlapTest {
             new double[]{0,0,10,0,1,1},new double[]{10,0,10,-10,1,1}));
         assertEquals(39.5,result.net,0.01);
     }
+    @Test public void teeJunction() {
+        check(30,28,new double[]{-5,0,5,0,1,1},new double[]{0,0,0,5,1,1});
+    }
+    @Test public void threeCoincidentStrips() {
+        check(60,20,new double[]{0,0,10,0,1,1},new double[]{0,0,10,0,1,1},new double[]{0,0,10,0,1,1});
+    }
+    @Test public void miterRightAngle() {
+        StripOverlap.Result result=StripOverlap.calculateWithMiter(Arrays.asList(
+            new double[]{0,0,10,0,1,1},new double[]{10,0,10,10,1,1}));
+        assertEquals(41,result.gross,0.01);
+        assertEquals(40,result.net,0.01);
+    }
 }
