@@ -3281,6 +3281,38 @@ public class MainActivity extends Activity {
  root=planPage;
  sketch=new Sketch();sketch.setBackgroundColor(Color.WHITE);root.addView(sketch,new LinearLayout.LayoutParams(-1,dp(280))); LinearLayout historyBar=new LinearLayout(this);root.addView(historyBar);undoObjectsButton=new Button(this);undoObjectsButton.setText("Rückgängig");historyBar.addView(undoObjectsButton,new LinearLayout.LayoutParams(0,-2,1));redoObjectsButton=new Button(this);redoObjectsButton.setText("Wiederholen");historyBar.addView(redoObjectsButton,new LinearLayout.LayoutParams(0,-2,1));undoObjectsButton.setOnClickListener(v->restoreObjectHistory(false));redoObjectsButton.setOnClickListener(v->restoreObjectHistory(true));updateHistoryButtons();
  Button edit=new Button(this);edit.setText("Trassenmaße bearbeiten");root.addView(edit);edit.setOnClickListener(v->showPage(measurePage));
+ actionButtonSingle(planPage,"Leitungszone und Verfüllung",()->{
+  try{
+   org.json.JSONArray rows=new PipeLayoutStore(getPreferences(0)).sections();
+   if(rows.length()==0){notice("Keine Abschnittsprofile vorhanden.");return;}
+   EditText coverZone=new EditText(this);coverZone.setInputType(8194);coverZone.setHint("Leitungszone über Rohrscheitel (m)");
+   android.app.AlertDialog inputDialog=new android.app.AlertDialog.Builder(this).setTitle("Leitungszone – Überdeckung").setView(coverZone).setNegativeButton("Abbrechen",null).setPositiveButton("Berechnen",null).create();
+   inputDialog.setOnShowListener(open->inputDialog.getButton(-1).setOnClickListener(button->{
+    try{
+     double cover=number(coverZone);if(!Double.isFinite(cover)||cover<0)throw new IllegalArgumentException("Ungültige Überdeckung");
+     double[] totals=new double[4];StringBuilder report=new StringBuilder();double covered=0;
+     for(int i=0;i<rows.length();i++){
+      org.json.JSONObject row=rows.getJSONObject(i);
+      double from=row.getDouble("from"),to=row.getDouble("to"),bw=row.getDouble("width"),bd=row.getDouble("depth"),len=to-from;
+      if(!Double.isFinite(from+to+bw+bd)||from<0||len<=0||bw<=0||bd<=0||(l>0&&to>l))throw new IllegalArgumentException("Ungültiger Abschnitt");
+      for(int j=0;j<i;j++){org.json.JSONObject prev=rows.getJSONObject(j);if(from<prev.getDouble("to")&&to>prev.getDouble("from"))throw new IllegalArgumentException("Überlappende Abschnitte");}
+      java.util.List<PipeLayout.Pipe> pipes=PipeLayoutStore.decode(row.getJSONArray("pipes").toString());
+      if(pipes.isEmpty()||!PipeLayout.warnings(pipes,bw,bd,0,0).isEmpty())throw new IllegalArgumentException("Rohrlage prüfen: Station "+from);
+      double bottom=bd,top=0,displacement=0;
+      for(PipeLayout.Pipe pipe:pipes){bottom=Math.min(bottom,pipe.bedding);top=Math.max(top,pipe.bedding+pipe.diameter);displacement+=Math.PI*pipe.diameter*pipe.diameter/4*len;}
+      double zoneTop=top+cover;if(zoneTop>bd)throw new IllegalArgumentException("Leitungszone über GOK: Station "+from);
+      double bed=bottom*bw*len,zone=(zoneTop-bottom)*bw*len-displacement,fill=(bd-zoneTop)*bw*len;
+      totals[0]+=bed;totals[1]+=zone;totals[2]+=fill;totals[3]+=displacement;covered+=len;
+      report.append(String.format(java.util.Locale.GERMANY,"Station %.2f – %.2f m\nUntere Bettung: %.3f m³\nLeitungszone ohne untere Bettung: %.3f m³\nRestverfüllung brutto: %.3f m³\nRohrverdrängung: %.3f m³\n\n",from,to,bed,zone,fill,displacement));
+     }
+     report.append(String.format(java.util.Locale.GERMANY,"Summen (%.2f m)\nBettung: %.3f m³\nLeitungszone: %.3f m³\nRestverfüllung: %.3f m³\nRohrverdrängung: %.3f m³",covered,totals[0],totals[1],totals[2],totals[3]));
+     report.append("\n\nRechteckiger Querschnitt. Restverfüllung einschließlich Oberflächenaufbau; Schichten noch abzuziehen. Nur gespeicherte Profile. Keine Verdichtungszuschläge.");
+     TextView resultText=new TextView(this);resultText.setPadding(dp(16),dp(12),dp(16),dp(12));resultText.setText(report.toString());ScrollView scroll=new ScrollView(this);scroll.addView(resultText);
+     inputDialog.dismiss();new android.app.AlertDialog.Builder(this).setTitle("Leitungszone – Mengen").setView(scroll).setPositiveButton("Schließen",null).show();
+    }catch(Exception ex){coverZone.setError(ex.getMessage());}
+   }));inputDialog.show();
+  }catch(Exception ex){notice(ex.getMessage());}
+ });
  actionButtonSingle(planPage,"Schichtvolumen berechnen",()->{
   try{
    if(segments.length()==0){notice("Keine Oberflächenabschnitte vorhanden.");return;}
