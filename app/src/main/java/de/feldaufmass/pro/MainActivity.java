@@ -1628,6 +1628,8 @@ public class MainActivity extends Activity {
   final org.json.JSONArray surfaces;
   org.json.JSONArray loadedSurfaces;try{loadedSurfaces=new org.json.JSONArray(getPreferences(0).getString("segments","[]"));}catch(Exception e){loadedSurfaces=new org.json.JSONArray();notice("Oberflächen konnten nicht gelesen werden.");}surfaces=loadedSurfaces;
   route.bindDimensionProject(activeProject);route.setStationLayers(new org.json.JSONArray(),surfaces);
+  final org.json.JSONArray widthSections;
+  org.json.JSONArray loadedWidths;try{loadedWidths=new org.json.JSONArray(getPreferences(0).getString("metricWidthSections","[]"));}catch(Exception e){notice("Breitenabschnitte konnten nicht gelesen werden.");return;}widthSections=loadedWidths;
   final double[] widths={Double.NaN,Double.NaN,Double.NaN};
   String[] widthKeys={"width","left","right"};
   for(int i=0;i<widthKeys.length;i++){try{double v=Double.parseDouble(getPreferences(0).getString(widthKeys[i],"").trim().replace(',','.'));if(Double.isFinite(v)&&v>=0&&(i!=0||v>0))widths[i]=v;}catch(Exception ignored){}}
@@ -1743,6 +1745,31 @@ public class MainActivity extends Activity {
    drawing.invalidate();
   };
   refreshLegend.run();
+  Button addWidth=new Button(this);addWidth.setText("Grabenbreite abschnittsweise");panel.addView(addWidth);
+  addWidth.setOnClickListener(v->{
+   LinearLayout fields=new LinearLayout(this);fields.setOrientation(1);
+   EditText[] inputs=new EditText[3];String[] hints={"Station von (m)","Station bis (m)","Grabenbreite (m)"};
+   for(int i=0;i<3;i++){inputs[i]=new EditText(this);inputs[i].setHint(hints[i]);inputs[i].setInputType(8194);fields.addView(inputs[i]);}
+   android.app.AlertDialog edit=new android.app.AlertDialog.Builder(this).setTitle("Breitenabschnitt hinzufügen").setView(fields).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
+   edit.setOnShowListener(vv->edit.getButton(-1).setOnClickListener(vvv->{
+    try{double[] values=new double[3];for(int i=0;i<3;i++)values[i]=Double.parseDouble(inputs[i].getText().toString().trim().replace(',','.'));
+     double from=values[0],to=values[1],width=values[2];
+     if(!Double.isFinite(from)||!Double.isFinite(to)||!Double.isFinite(width)||from<0||to<=from||to>route.measuredLength()||width<=0){notice("Ungültige Stationen oder Breite.");return;}
+     for(int i=0;i<widthSections.length();i++){org.json.JSONObject o=widthSections.optJSONObject(i);if(o!=null&&from<o.optDouble("to")&&to>o.optDouble("from")){notice("Breitenabschnitte dürfen sich nicht überschneiden.");return;}}
+     org.json.JSONArray next=new org.json.JSONArray(widthSections.toString());next.put(new org.json.JSONObject().put("from",from).put("to",to).put("width",width));
+     if(!getPreferences(0).edit().putString("metricWidthSections",next.toString()).commit()){notice("Speichern fehlgeschlagen.");return;}
+     widthSections.put(next.getJSONObject(next.length()-1));drawing.invalidate();edit.dismiss();notice("Breitenabschnitt gespeichert.");
+    }catch(Exception e){notice("Bitte gültige Maße eingeben.");}
+   }));edit.show();
+  });
+  Button listWidths=new Button(this);listWidths.setText("Breitenabschnitte verwalten");panel.addView(listWidths);
+  listWidths.setOnClickListener(v->{
+   String[] labels=new String[widthSections.length()];for(int i=0;i<labels.length;i++){org.json.JSONObject o=widthSections.optJSONObject(i);labels[i]=o==null?"Ungültig":String.format(java.util.Locale.GERMANY,"%.2f – %.2f m · B %.2f m",o.optDouble("from"),o.optDouble("to"),o.optDouble("width"));}
+   if(labels.length==0){notice("Keine Breitenabschnitte.");return;}
+   new android.app.AlertDialog.Builder(this).setTitle("Abschnitt zum Löschen wählen").setItems(labels,(d,i)->new android.app.AlertDialog.Builder(this).setMessage(labels[i]+" löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(dd,ww)->{
+    try{org.json.JSONArray next=new org.json.JSONArray(widthSections.toString());next.remove(i);if(getPreferences(0).edit().putString("metricWidthSections",next.toString()).commit()){widthSections.remove(i);drawing.invalidate();}else notice("Speichern fehlgeschlagen.");}catch(Exception e){notice("Löschen fehlgeschlagen.");}
+   }).show()).setNegativeButton("Schließen",null).show();
+  });
   Button editLegend=new Button(this);editLegend.setText("Legende bearbeiten");panel.addView(editLegend);editLegend.setOnClickListener(v->route.editLegend());
   Button reloadLegend=new Button(this);reloadLegend.setText("Legende aktualisieren");panel.addView(reloadLegend);reloadLegend.setOnClickListener(v->refreshLegend.run());
   ScrollView scroll=new ScrollView(this);scroll.addView(panel);
