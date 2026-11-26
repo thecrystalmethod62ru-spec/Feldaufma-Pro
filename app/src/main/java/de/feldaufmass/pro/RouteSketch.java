@@ -447,7 +447,7 @@ final class RouteSketch extends View {
   if(zoom==1){centerX=.5f;centerY=.5f;}
   invalidate();
  }
- private float scale(){return Math.max(1,Math.min(getWidth(),getHeight())*.88f)*zoom;}
+ private float scale(){return Math.max(1,(darkEditor?Math.max(getWidth(),getHeight()):Math.min(getWidth(),getHeight())*.88f))*zoom;}
  private float left(){return getWidth()/2f-centerX*scale();}
  private float top(){return getHeight()/2f-centerY*scale();}
  private static float clamp(float n){return Math.max(0,Math.min(1,n));}
