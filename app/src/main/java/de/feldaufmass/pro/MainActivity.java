@@ -4249,7 +4249,7 @@ minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
     if(rows.length()>0){p.setTextSize(10);c.drawText("Braun: Verbau an Grabenkante (symbolisch)",36,height-65,p);}
    }catch(Exception ignored){}
    if(trenchWidth>0||widths.length()>0){
-    org.json.JSONArray utilities=extraUtilities();boolean omitted=false;
+    org.json.JSONArray utilities=extraUtilities();boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new java.util.LinkedHashMap<>();
     for(int j=0;j<utilities.length();j++){
      org.json.JSONObject row=utilities.optJSONObject(j);if(row==null)continue;
      double diameter=row.optDouble("diameter")/1000,offset=row.optDouble("offset");
@@ -4267,9 +4267,19 @@ minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
        for(int k=0;k<widths.length();k++){org.json.JSONObject section=widths.optJSONObject(k);if(section!=null&&mid>=section.optDouble("from")&&mid<section.optDouble("to")&&section.optDouble("width")>0){bw=section.optDouble("width");break;}}
        if(!Double.isFinite(bw)||offset+diameter/2>bw){omitted=true;continue;}
        double shift=(bw/2-offset)/factor,nx=dy/n*shift,ny=-dx/n*shift,t1=(begin-station)/len,t2=(stop-station)/len;
+       utilityLegend.put(type+" · "+String.format(java.util.Locale.GERMANY,"%.0f mm",diameter*1000),p.getColor());
        c.drawLine((float)(40+(a.point.x+dx*t1+nx-minX)*unit),(float)(85+(a.point.y+dy*t1+ny-minY)*unit),(float)(40+(a.point.x+dx*t2+nx-minX)*unit),(float)(85+(a.point.y+dy*t2+ny-minY)*unit),p);
       }station+=len;
      }
+    }
+    if(!utilityLegend.isEmpty()){
+     p.setTextSize(9);float lx=40,ly=height-124;boolean truncated=false;
+     for(java.util.Map.Entry<String,Integer> entry:utilityLegend.entrySet()){
+      float space=p.measureText(entry.getKey())+26;
+      if(lx+space>width-75){truncated=true;break;}
+      p.setColor(entry.getValue());p.setStrokeWidth(3);c.drawLine(lx,ly-3,lx+12,ly-3,p);p.setColor(INK);c.drawText(entry.getKey(),lx+16,ly,p);lx+=space;
+     }
+     if(truncated){p.setColor(INK);c.drawText("…",width-55,ly,p);}
     }
     if(utilities.length()>0){p.setColor(INK);p.setTextSize(9);c.drawText(omitted?"Zusatzleitungen: ungültige Profilversätze teilweise ausgelassen":"Zusatzleitungen: Profilversatz ab linker Kante; Stationsbereich sofern erfasst",36,height-110,p);}
    }
