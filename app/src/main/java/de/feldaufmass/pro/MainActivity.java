@@ -140,7 +140,7 @@ public class MainActivity extends Activity {
   java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","sollUtilities","montageFittings","metricWidthSections","objectUndo","objectRedo","elevationPoints","lvPositions","dailyReports","nachtraege","routeUnderlay","sketchCalibration"));
   strings.addAll(java.util.Arrays.asList("metricAreaCorrection","metricAreaCorrectionReason","metricCrossSectionDimensions",
       "metricDepthSections","metricElevationPoints","metricMainExcavationDepth","metricMinimumCover","metricPipeMinGap",
-      "metricPipeMinCover","metricPipeProfile","extraUtilities",MontageProtocols.KEY,MontageConnections.KEY,PipeLayoutStore.KEY,RouteBranchStore.KEY));
+      "metricPipeMinCover","metricPipeProfile","extraUtilities",MontageProtocols.KEY,MontageConnections.KEY,PipeLayoutStore.KEY,PipeLayoutStore.SECTION_KEY,RouteBranchStore.KEY));
   java.util.Set<String> ints=new java.util.HashSet<>(java.util.Arrays.asList("surface","handling","dictationLanguage","gpsDurationSeconds","metricCornerMode","metricOverlapMode"));
   SharedPreferences.Editor ed=projectStorage(id).edit();
   java.util.Iterator<String> keys=fields.keys();String name="Importiertes Projekt";java.util.Set<String> used=new java.util.HashSet<>();
@@ -163,6 +163,7 @@ public class MainActivity extends Activity {
     }else if(key.equals("objects")||key.equals("segments")||key.equals("elevationPoints")||key.equals("lvPositions")||key.equals("sollUtilities")||key.equals("montageFittings")||key.equals("metricWidthSections")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++){org.json.JSONObject o=rows.getJSONObject(j);if(key.equals("metricWidthSections")){double from=o.getDouble("from"),to=o.getDouble("to"),width=o.getDouble("width");for(String side:new String[]{"left","right"})if(o.has(side)){double cut=o.getDouble(side);if(!Double.isFinite(cut)||cut<0)throw new org.json.JSONException("Ungültiger Nachschnitt");}if(!Double.isFinite(from)||!Double.isFinite(to)||!Double.isFinite(width)||from<0||to<=from||width<=0)throw new org.json.JSONException("Ungültiger Breitenabschnitt");for(int k=0;k<j;k++){org.json.JSONObject previous=rows.getJSONObject(k);if(from<previous.getDouble("to")&&to>previous.getDouble("from"))throw new org.json.JSONException("Überlappende Breitenabschnitte");}}}}
     else if(key.equals("objectUndo")||key.equals("objectRedo")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)new org.json.JSONArray(rows.getString(j));}
     if(key.equals(PipeLayoutStore.KEY))PipeLayoutStore.decode(v);
+    if(key.equals(PipeLayoutStore.SECTION_KEY))new org.json.JSONArray(v);
     if(key.equals(RouteBranchStore.KEY))RouteBranchStore.decode(v);
     if(key.equals("extraUtilities")||key.equals(MontageProtocols.KEY))new org.json.JSONArray(v);
     if(key.equals("project")&&!v.trim().isEmpty())name=v.trim();
@@ -2174,6 +2175,17 @@ public class MainActivity extends Activity {
       }catch(Exception ex){limits.setError(ex.getMessage());}
      });
      if(!overlapPrefs.edit().putString("metricCrossSectionDimensions",bw+";"+bd).commit())throw new IllegalStateException("Bezugsmaße konnten nicht gespeichert werden");
+     final Button saveSectionProfile=new Button(this);saveSectionProfile.setText("Als Abschnittsprofil speichern");content.addView(saveSectionProfile);
+     saveSectionProfile.setOnClickListener(button->{
+      LinearLayout interval=new LinearLayout(this);interval.setOrientation(1);
+      EditText from=new EditText(this),to=new EditText(this);
+      from.setHint("Station von (m)");to.setHint("Station bis (m)");from.setInputType(8194);to.setInputType(8194);interval.addView(from);interval.addView(to);
+      android.app.AlertDialog sectionDialog=new android.app.AlertDialog.Builder(this).setTitle("Regelprofil – Stationierung").setView(interval).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
+      sectionDialog.setOnShowListener(dialog->sectionDialog.getButton(-1).setOnClickListener(save->{
+       try{multiPipeStore.saveSection(number(from),number(to),bw,bd,pipes);sectionDialog.dismiss();android.widget.Toast.makeText(this,"Abschnittsprofil gespeichert",android.widget.Toast.LENGTH_SHORT).show();}
+       catch(Exception ex){to.setError(ex.getMessage());}
+      }));sectionDialog.show();
+     });
      final Button syncTrench=new Button(this);syncTrench.setAllCaps(false);syncTrench.setText("Grabenmaße in Tiefbau übernehmen");content.addView(syncTrench,1);
      syncTrench.setOnClickListener(button->new android.app.AlertDialog.Builder(this).setTitle("Grabenmaße übernehmen?").setMessage("Breite "+bw+" m und Tiefe "+bd+" m werden als allgemeine Grabenmaße des Projekts übernommen. Abschnittsbezogene Maße bleiben unverändert.").setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",(dialog,which)->{
       if(!overlapPrefs.edit().putString("width",String.valueOf(bw)).putString("depth",String.valueOf(bd)).commit()){warnings.setText("Grabenmaße konnten nicht gespeichert werden.");return;}
