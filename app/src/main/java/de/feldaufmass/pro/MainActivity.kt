@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -30,6 +32,7 @@ class MainActivity : ComponentActivity() {
                 var depth by remember { mutableStateOf("") }
                 var surface by remember { mutableStateOf("") }
                 var asphalt by remember { mutableStateOf("") }
+                var points by remember { mutableStateOf(listOf<Offset>()) }
                 var extras by remember { mutableStateOf(listOf<Extra>()) }
                 var kind by remember { mutableStateOf("Suchschachtung") }
                 var station by remember { mutableStateOf("") }
@@ -59,11 +62,45 @@ class MainActivity : ComponentActivity() {
                         OutlinedTextField(surface, { surface = it }, label = { Text("Aufbruchbreite inkl. Nachschnitt (m)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(asphalt, { asphalt = it }, label = { Text("Asphaltstärke (m)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                         Text("Trassenskizze · nicht maßstäblich")
-                        Canvas(Modifier.fillMaxWidth().height(100.dp)) {
-                            drawRect(Color(0xFFD6DCE0), Offset(12f, size.height * .2f), Size(size.width - 24f, size.height * .6f))
-                            drawRect(Color(0xFFB78C60), Offset(12f, size.height * .35f), Size(size.width - 24f, size.height * .3f))
-                            drawLine(Color(0xFF174C65), Offset(12f, size.height / 2), Offset(size.width - 12f, size.height / 2), 3f)
+                        Text("Auf die Zeichenfläche tippen, um Trassenpunkte zu setzen.")
+                        Canvas(Modifier.fillMaxWidth().height(240.dp).pointerInput(Unit) {
+                            detectTapGestures { tap ->
+                                points = points + Offset((tap.x / size.width).coerceIn(0f, 1f), (tap.y / size.height).coerceIn(0f, 1f))
+                            }
+                        }) {
+                            drawRect(Color(0xFFF0F2F3))
+                            for (i in 1..9) {
+                                drawLine(Color.LightGray, Offset(size.width*i/10, 0f), Offset(size.width*i/10, size.height), 1f)
+                                drawLine(Color.LightGray, Offset(0f, size.height*i/10), Offset(size.width, size.height*i/10), 1f)
+                            }
+                            val route = points.map { Offset(it.x * size.width, it.y * size.height) }
+                            route.zipWithNext().forEach { (a,b) ->
+                                drawLine(Color(0xFFB78C60), a, b, 16f)
+                                drawLine(Color(0xFF174C65), a, b, 3f)
+                            }
+                            route.forEach { drawCircle(Color(0xFF174C65), 6f, it) }
+                            val segments = route.zipWithNext()
+                            val total = segments.sumOf { (a,b) -> (b-a).getDistance().toDouble() }
+                            if (total > 0 && l != null && l > 0) {
+                                extras.filter { it.station <= l }.forEach { item ->
+                                    var remaining = item.station / l * total
+                                    for ((a,b) in segments) {
+                                        val dist = (b-a).getDistance().toDouble()
+                                        if (dist > 0 && remaining <= dist) {
+                                            val pos = a + (b-a) * (remaining/dist).toFloat()
+                                            drawCircle(Color(0xFFB84B35), 9f, pos)
+                                            break
+                                        }
+                                        remaining -= dist
+                                    }
+                                }
+                            }
                         }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(enabled = points.isNotEmpty(), onClick = { points = points.dropLast(1) }) { Text("Zurück") }
+                            OutlinedButton(onClick = { points = emptyList() }) { Text("Skizze löschen") }
+                        }
+                        Text("Rote Punkte: Zusatzpositionen. Stationen werden proportional auf die Skizze verteilt.")
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("0,00 m"); Text(fmt(l ?: 0.0) + " m") }
                         Text("Zusatzleistungen / Abschnitte", style = MaterialTheme.typography.titleLarge)
                         val types = listOf("Suchschachtung", "Hausanschluss", "Startgrube", "Zielgrube", "Handschachtung", "Verbau", "Großpflaster", "Gehwegplatten", "KVS", "Kernbohrung", "Hindernis")
@@ -105,18 +142,18 @@ class MainActivity : ComponentActivity() {
                             Text("Geometrische Richtwerte, keine geprüfte Abrechnung.")
                         } else Text("Bitte gültige Maße eingeben. Aufbruchbreite ≥ Grabenbreite; Asphaltstärke ≤ Grabentiefe.")
                         Button(enabled = valid && name.isNotBlank(), onClick = {
-                            val data = JSONObject().put("l", length).put("w", width).put("d", depth).put("s", surface).put("a", asphalt).put("extras", JSONArray().apply { extras.forEach { put(it.json()) } })
+                            val data = JSONObject().put("l", length).put("w", width).put("d", depth).put("s", surface).put("a", asphalt).put("points", JSONArray().apply { points.forEach { put(JSONObject().put("x", it.x.toDouble()).put("y", it.y.toDouble())) } }).put("extras", JSONArray().apply { extras.forEach { put(it.json()) } })
                             prefs.edit().putString(name.trim(), data.toString()).apply()
                             projects = prefs.all.keys.sorted()
                             message = "Projekt gespeichert"
                         }, modifier = Modifier.fillMaxWidth()) { Text("Projekt speichern") }
-                        OutlinedButton(onClick = { name = ""; length = ""; width = ""; depth = ""; surface = ""; asphalt = ""; extras = emptyList(); message = "" }) { Text("Neues Projekt") }
+                        OutlinedButton(onClick = { name = ""; length = ""; width = ""; depth = ""; surface = ""; asphalt = ""; extras = emptyList(); points = emptyList(); message = "" }) { Text("Neues Projekt") }
                         Text(message)
                         Text("Gespeicherte Projekte", style = MaterialTheme.typography.titleLarge)
                         projects.forEach { key ->
                             OutlinedButton(onClick = {
                                 val obj = JSONObject(prefs.getString(key, "{}") ?: "{}")
-                                name = key; length = obj.optString("l"); width = obj.optString("w"); depth = obj.optString("d"); surface = obj.optString("s"); asphalt = obj.optString("a"); extras = obj.optJSONArray("extras")?.let { arr -> (0 until arr.length()).map { Extra.read(arr.getJSONObject(it)) } } ?: emptyList(); message = "Projekt geladen"
+                                name = key; length = obj.optString("l"); width = obj.optString("w"); depth = obj.optString("d"); surface = obj.optString("s"); asphalt = obj.optString("a"); points = obj.optJSONArray("points")?.let { arr -> (0 until arr.length()).map { i -> arr.getJSONObject(i).let { Offset(it.getDouble("x").toFloat(), it.getDouble("y").toFloat()) } } } ?: emptyList(); extras = obj.optJSONArray("extras")?.let { arr -> (0 until arr.length()).map { Extra.read(arr.getJSONObject(it)) } } ?: emptyList(); message = "Projekt geladen"
                             }, modifier = Modifier.fillMaxWidth()) { Text(key) }
                         }
                     }
