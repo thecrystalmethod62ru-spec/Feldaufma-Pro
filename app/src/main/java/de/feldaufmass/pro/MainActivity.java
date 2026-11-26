@@ -5065,7 +5065,7 @@ public class MainActivity extends Activity {
  double profileShoringStation=0;
  double[] shoringAtStation(double station){
   double[] heights={0,0};
-  try{org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("metricVerbauSections","[]"));for(int i=0;i<rows.length();i++){org.json.JSONArray row=rows.getJSONArray(i);if(station>=row.getDouble(0)&&station<row.getDouble(1)){for(int side=0;side<2;side++){double h=row.getDouble(side+2);if(Double.isFinite(h)&&h>0)heights[side]=Math.max(heights[side],h);}}}}catch(Exception ignored){}
+  try{org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("metricVerbauSections","[]"));for(int i=0;i<rows.length();i++){org.json.JSONArray row=rows.getJSONArray(i);if(station>=row.getDouble(0)&&(station<row.getDouble(1)||(station==l&&station==row.getDouble(1)))){for(int side=0;side<2;side++){double h=row.getDouble(side+2);if(Double.isFinite(h)&&h>0)heights[side]=Math.max(heights[side],h);}}}}catch(Exception ignored){}
   return heights;
  }
  class Profile extends View{
@@ -5138,12 +5138,12 @@ public class MainActivity extends Activity {
  label(c,"Oberfläche: "+covering,20,238);
  label(c,Double.isFinite(topThickness)?"Belagsstärke: "+m(topThickness):"Belagsstärke: nicht erfasst",20,252);
  label(c,utilities.length()>0?"Leitungen: "+(utilities.length()+(Double.isFinite(previewPipe)?1:0))+" (Lage symbolisch)":Double.isFinite(previewPipe)?"Rohr Ø "+previewPipe+" mm (Lage symbolisch)":"Rohrmaße: unbekannt",20,266);
- double[] shoring=shoringAtStation(profileShoringStation);
+ double station=Math.max(0,Math.min(l,profileShoringStation));double[] shoring=shoringAtStation(station);
  if(shoring[0]>0||shoring[1]>0){
   p.setColor(0xffa65e19);p.setStrokeWidth(3);
   if(shoring[0]>0)c.drawLine(x-3,top,x-3,top+(float)(Math.min(d,shoring[0])*scale),p);
   if(shoring[1]>0)c.drawLine(z+3,top,z+3,top+(float)(Math.min(d,shoring[1])*scale),p);
-  label(c,"Verbau @ "+m(profileShoringStation)+": L "+m(shoring[0])+" / R "+m(shoring[1]),20,295);
+  label(c,"Verbau @ "+m(station)+": L "+m(shoring[0])+" / R "+m(shoring[1]),20,295);
  }
  label(c,"Schematisch – keine Ausführungsplanung",20,282);c.restore();
  }}
