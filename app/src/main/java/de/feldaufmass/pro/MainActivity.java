@@ -21,7 +21,7 @@ public class MainActivity extends Activity {
  }
  void newProjectDialog(){
   EditText name=new EditText(this);name.setSingleLine(true);name.setHint("Projektname");
-  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Neues Projekt").setMessage("Nur gespeicherte Änderungen des aktuellen Projekts bleiben erhalten.").setView(name).setNegativeButton("Abbrechen",null).setPositiveButton("Erstellen",null).create();
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Neues Projekt").setMessage("Aktuelle Eingaben werden automatisch als Entwurf gespeichert.").setView(name).setNegativeButton("Abbrechen",null).setPositiveButton("Erstellen",null).create();
   dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(b->{
    String title=name.getText().toString().trim();if(title.isEmpty()){name.setError("Projektname erforderlich");return;}
    String id=java.util.UUID.randomUUID().toString();
@@ -32,13 +32,25 @@ public class MainActivity extends Activity {
   }));dialog.show();
  }
  void confirmProjectSwitch(String id){
-  new android.app.AlertDialog.Builder(this).setTitle("Projekt wechseln").setMessage("Nur gespeicherte Änderungen bleiben erhalten. Nicht gespeicherte Eingaben werden verworfen.").setNegativeButton("Abbrechen",null).setPositiveButton("Wechseln",(d,w)->{
+  new android.app.AlertDialog.Builder(this).setTitle("Projekt wechseln").setMessage("Aktuelle Eingaben werden automatisch als Entwurf gespeichert.").setNegativeButton("Abbrechen",null).setPositiveButton("Wechseln",(d,w)->{
    if(projectRegistry().edit().putString("active",id).commit())restartForProject();else notice("Projektwechsel fehlgeschlagen.");
   }).show();
  }
  void restartForProject(){
+  saveDraft();
   selectedPoint=null;pendingPoint=null;pendingPhoto=null;speechVersion++;
   recreate();
+ }
+ static final long AUTOSAVE_INTERVAL_MS=300000L;
+ final java.util.LinkedHashMap<String,EditText> autosaveFields=new java.util.LinkedHashMap<>();
+ final android.os.Handler autosaveHandler=new android.os.Handler(android.os.Looper.getMainLooper());
+ final Runnable autosaveTick=new Runnable(){public void run(){saveDraft();autosaveHandler.postDelayed(this,AUTOSAVE_INTERVAL_MS);}};
+ boolean saveDraft(){
+  if(project==null||surface==null||handling==null)return false;
+  SharedPreferences.Editor ed=getPreferences(0).edit();
+  for(java.util.Map.Entry<String,EditText> entry:autosaveFields.entrySet())ed.putString(entry.getKey(),entry.getValue().getText().toString());
+  ed.putInt("surface",surface.getSelectedItemPosition()).putInt("handling",handling.getSelectedItemPosition()).putLong("lastAutosave",System.currentTimeMillis());
+  boolean ok=ed.commit();if(!ok)notice("Automatische Speicherung fehlgeschlagen.");return ok;
  }
  EditText project,length,width,depth; TextView result; Sketch sketch;
  EditText objectStation,objectNote; Spinner objectType,objectSide; TextView objectList; org.json.JSONArray objects=new org.json.JSONArray(); EditText voiceText; Spinner voiceLanguage;
@@ -47,7 +59,7 @@ public class MainActivity extends Activity {
  TextView t=new TextView(this);t.setText(label);root.addView(t);
  EditText e=new EditText(this);e.setSingleLine(true);
  if(numeric)e.setInputType(8194);
- e.setText(getPreferences(0).getString(key,""));root.addView(e);return e;
+ e.setText(getPreferences(0).getString(key,""));autosaveFields.put(key,e);root.addView(e);return e;
  }
  double number(EditText e){return Double.parseDouble(e.getText().toString().replace(',','.'));}
  EditText sollLength,sollWidth,sollDepth,sollAsphalt,sollSource; TextView sollComparison;
@@ -73,8 +85,9 @@ public class MainActivity extends Activity {
    m.requestLocationUpdates(android.location.LocationManager.GPS_PROVIDER,1000L,0f,liveListener);liveManager=m;
   }catch(RuntimeException ignored){}
  }
- @Override protected void onResume(){super.onResume();startLiveGps();}
+ @Override protected void onResume(){super.onResume();startLiveGps();autosaveHandler.removeCallbacks(autosaveTick);autosaveHandler.postDelayed(autosaveTick,AUTOSAVE_INTERVAL_MS);}
  @Override protected void onPause(){
+  autosaveHandler.removeCallbacks(autosaveTick);saveDraft();
   if(liveManager!=null){liveManager.removeUpdates(liveListener);liveManager=null;}
   liveFix=null;if(livePreview!=null)livePreview.setLiveFix(null);super.onPause();
  }
