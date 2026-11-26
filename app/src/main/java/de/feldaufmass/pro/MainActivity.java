@@ -392,6 +392,31 @@ public class MainActivity extends Activity {
  void testBleMeasure(){
   openBleMeasure(value->new android.app.AlertDialog.Builder(this).setTitle("Bluetooth-Messwert").setMessage(reportMeasure(value)+"\nTestmessung, keine Projektdaten geändert. Im Trasseneditor kann ein Messwert direkt übernommen werden.").setPositiveButton("OK",null).show());
  }
+ void offerNewRouteMeasurements(RouteSketch route,int first){
+  LinearLayout fields=page();
+  fields.addView(sheetText("Neue Abschnitte bemaßen. Leere Felder können später ergänzt werden.",14,false));
+  java.util.ArrayList<EditText> inputs=new java.util.ArrayList<>();
+  java.util.ArrayList<RouteSketch.Vertex> targets=new java.util.ArrayList<>();
+  for(int i=first;i<route.vertices.size();i++){
+   RouteSketch.Vertex vertex=route.vertices.get(i);if(Double.isFinite(vertex.metres))continue;
+   fields.addView(sheetText("Abschnitt "+i+" · Länge (m)",14,true));
+   EditText input=new EditText(this);input.setSingleLine(true);input.setKeyListener(android.text.method.DigitsKeyListener.getInstance("0123456789,."));input.setHint("z. B. 12,50");fields.addView(input);inputs.add(input);targets.add(vertex);
+  }
+  if(inputs.isEmpty())return;
+  ScrollView scroll=new ScrollView(this);scroll.addView(fields);
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Trasse bemaßen").setView(scroll).setNegativeButton("Später",null).setPositiveButton("Übernehmen",null).create();
+  dialog.setOnShowListener(d->dialog.getButton(-1).setOnClickListener(v->{
+   double[] values=new double[inputs.size()];
+   for(int j=0;j<inputs.size();j++){
+    EditText input=inputs.get(j);values[j]=Double.NaN;if(input.length()==0)continue;
+    try{double value=number(input);if(!Double.isFinite(value)||value<=0)throw new NumberFormatException();values[j]=value;}
+    catch(NumberFormatException e){input.setError("Positive Länge in Metern eingeben");return;}
+   }
+   for(int j=0;j<targets.size();j++)if(Double.isFinite(values[j])&&route.vertices.contains(targets.get(j))&&!Double.isFinite(targets.get(j).metres))targets.get(j).metres=values[j];
+   if(route.changed!=null)route.changed.run();route.invalidate();dialog.dismiss();
+  }));
+  dialog.show();
+ }
  void measureSegment(RouteSketch route,int i){
   EditText metres=new EditText(this);
   metres.setSingleLine(true);metres.setKeyListener(android.text.method.DigitsKeyListener.getInstance("0123456789,."));
@@ -667,6 +692,7 @@ public class MainActivity extends Activity {
   Button clearScale=new Button(this);clearScale.setAllCaps(false);clearScale.setText("Kalibrierung entfernen");form.addView(clearScale);
   LinearLayout list=page();form.addView(list);
   route.selected=i->measureSegment(route,i);
+  route.strokeAdded=first->offerNewRouteMeasurements(route,first);
   route.pointSelected=i->{
    if(i<0||i>=route.vertices.size())return;
    route.highlight=i;route.invalidate();
