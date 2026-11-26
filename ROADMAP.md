@@ -38,3 +38,7 @@ Jede Funktion benötigt Build, Tests und Geräteprüfung. Geometrische Mengen si
 - [ ] Materialliste aus bestätigten Montageobjekten, getrennt von Erdbaumengen und Soll-Planung.
 - [ ] Prüfprotokolle für Druckprüfung, Spülung und Desinfektion als Dokumentation, keine automatische technische Freigabe.
 - [ ] Projektbezogene Offline-Speicherung, Bearbeitung, Sicherung und PDF-Export.
+
+### Umfang Formstückkatalog
+- [ ] Nur Standardformstücke: Bögen 11,25°/22,5°/30°/45°/90°, T-Stücke, Kreuzstücke, Reduzierungen, Muffen, Flansche, Endkappen und Schieber. Keine Herstellerkataloge oder Sonderformstücke.
+- [ ] Normgerechte Symbole anhand zugänglicher Normvorlagen prüfen; DN und Werkstoff editierbar, Drehung und Spiegelung möglich.
