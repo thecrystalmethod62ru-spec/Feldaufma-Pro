@@ -1791,6 +1791,12 @@ public class MainActivity extends Activity {
   final TextView elevationStatus=new TextView(this);panel.addView(elevationStatus);
   final ElevationProfile[] surveyedProfile={null};
 
+  final EditText pipeProfileInput=new EditText(this);
+  pipeProfileInput.setHint("Rohrprofil: Außendurchmesser;Wandstärke;Bettung (m)");
+  pipeProfileInput.setText(overlapPrefs.getString("metricPipeProfile",""));
+  panel.addView(pipeProfileInput);
+  final TextView pipeProfileStatus=new TextView(this);panel.addView(pipeProfileStatus);
+  final double[][] pipeDimensions={null};
   final java.util.List<double[]> profileData=new java.util.ArrayList<>();
   final android.view.View longitudinalProfile=new android.view.View(this){
    @Override protected void onDraw(android.graphics.Canvas c){
@@ -1828,6 +1834,11 @@ public class MainActivity extends Activity {
           p.setColor(0xffb79b70);c.drawPath(shape,p);
           p.setColor(0xff68945d);p.setStrokeWidth(dp(2));c.drawLine(x1,y1,x2,y2,p);
           p.setColor(0xff555555);c.drawLine(x1,y1+h,x2,y2+h,p);
+          if(pipeDimensions[0]!=null){
+           double[] dims=pipeDimensions[0];float bottom=h-(float)(dims[2]/range*height),upper=bottom-(float)(dims[0]/range*height);
+           p.setColor(0xff397db5);c.drawLine(x1,y1+bottom,x2,y2+bottom,p);c.drawLine(x1,y1+upper,x2,y2+upper,p);
+          }
+
          }
         }
         prev=st;
@@ -1936,6 +1947,18 @@ public class MainActivity extends Activity {
     }
     if(!complete)profileData.clear();
    }
+   pipeDimensions[0]=null;
+   pipeProfileStatus.setText("");
+   if(!pipeProfileInput.getText().toString().trim().isEmpty())try{
+    String[] parts=pipeProfileInput.getText().toString().split(";",-1);
+    if(parts.length!=3)throw new IllegalArgumentException("Drei Maße erforderlich");
+    double[] dims=new double[3];for(int k=0;k<3;k++)dims[k]=Double.parseDouble(parts[k].trim().replace(',','.'));
+    new PipeSection(0,1,dims[2],dims[0],dims[1]);
+    pipeDimensions[0]=dims;
+    double minCover=Double.POSITIVE_INFINITY;
+    for(double[] v:profileData)minCover=Math.min(minCover,new PipeSection(0,v[1],dims[2],dims[0],dims[1]).cover);
+    pipeProfileStatus.setText(Double.isFinite(minCover)?String.format(java.util.Locale.GERMANY,"Kleinste Rohrüberdeckung: %.2f m%s",minCover,minCover<0?" – Rohr ragt über GOK":""):"Rohrprofil: Grabentiefe fehlt");
+   }catch(Exception ex){pipeProfileStatus.setText("Rohrprofil: "+ex.getMessage());}
    longitudinalProfile.invalidate();
    java.util.TreeSet<Double> cuts=new java.util.TreeSet<>();cuts.add(0.0);cuts.add(total);
    for(org.json.JSONArray sections:new org.json.JSONArray[]{widthSections,surfaces})for(int j=0;j<sections.length();j++){
@@ -2051,6 +2074,11 @@ public class MainActivity extends Activity {
    }
    nominalArea.setText(result.toString());
   };
+  pipeProfileInput.addTextChangedListener(new android.text.TextWatcher(){
+   public void beforeTextChanged(CharSequence s,int start,int count,int after){}
+   public void onTextChanged(CharSequence s,int start,int before,int count){}
+   public void afterTextChanged(android.text.Editable e){overlapPrefs.edit().putString("metricPipeProfile",e.toString()).apply();refreshNominalArea.run();}
+  });
   elevationInput.addTextChangedListener(new android.text.TextWatcher(){
    public void beforeTextChanged(CharSequence s,int start,int count,int after){}
    public void onTextChanged(CharSequence s,int start,int before,int count){}
