@@ -40,6 +40,19 @@ public class ProjectStateTest {
    reopened.onActivity(activity -> {
     assertFalse(activity.redoObjectsButton.isEnabled());
     assertEquals(9, activity.objects.optJSONObject(1).optDouble("station"), 0);
+    activity.objectStation.setText("2");
+    activity.addObject();
+    assertEquals("3",activity.overviewValues[3].getText().toString());
+    android.widget.Button first=(android.widget.Button)activity.stationRows.getChildAt(0);
+    assertTrue(first.getText().toString().startsWith("2,00 m"));
+    activity.sheetTabs.get(activity.quantityPage).performClick();
+    assertTrue(activity.quantityPage.isShown());
+    assertTrue(activity.sheetTabs.get(activity.quantityPage).isSelected());
+    activity.sheetTabs.get(activity.planPage).performClick();
+    assertTrue(activity.planPage.isShown());
+    activity.undoObjectsButton.performClick();
+    assertEquals("2",activity.overviewValues[3].getText().toString());
+    assertTrue(((android.widget.Button)activity.stationRows.getChildAt(0)).getText().toString().startsWith("5,00 m"));
    });
   }
  }
