@@ -408,7 +408,8 @@ final class RouteSketch extends View {
  float zoom=1,centerX=.5f,centerY=.5f;
  boolean moving,gesture;
  private int tappedPoint=-1;
- private float touchStartX,touchStartY;
+ private float touchStartX,touchStartY,lastTouchX,lastTouchY;
+ private long touchStartTime;
  private boolean touchMoved;
  int dragged=-1,angle=-1,highlight=-1;
  float span,focusX,focusY;
@@ -677,7 +678,7 @@ final class RouteSketch extends View {
    if(gesture && action==MotionEvent.ACTION_MOVE && span>0)zoomAt(next/span,focusX,focusY,x,y);
    gesture=true;span=next;focusX=x;focusY=y;stroke.clear();dragged=-1;invalidate();return true;
   }
-  if(action==MotionEvent.ACTION_DOWN){gesture=false;touchMoved=false;touchStartX=event.getX();touchStartY=event.getY();tappedPoint=editable&&pointSelected!=null&&layerVisible(LAYER_ROUTE)?nearestPoint(touchStartX,touchStartY):-1;}
+  if(action==MotionEvent.ACTION_DOWN){gesture=false;touchMoved=false;touchStartX=event.getX();touchStartY=event.getY();lastTouchX=touchStartX;lastTouchY=touchStartY;touchStartTime=event.getEventTime();tappedPoint=editable&&pointSelected!=null&&layerVisible(LAYER_ROUTE)?nearestPoint(touchStartX,touchStartY):-1;}
   if(gesture){
    if(action==MotionEvent.ACTION_UP || action==MotionEvent.ACTION_CANCEL)getParent().requestDisallowInterceptTouchEvent(false);
    return true;
@@ -693,25 +694,27 @@ final class RouteSketch extends View {
     return true;
    case MotionEvent.ACTION_MOVE:
     if(Math.hypot(event.getX()-touchStartX,event.getY()-touchStartY)>android.view.ViewConfiguration.get(getContext()).getScaledTouchSlop())touchMoved=true;
+    if(touchMoved&&(placingObject||editingObjects||(moving&&dragged<0)||dimensioning||!editable)){centerX=clamp(centerX-(event.getX()-lastTouchX)/scale());centerY=clamp(centerY-(event.getY()-lastTouchY)/scale());invalidate();}
+    lastTouchX=event.getX();lastTouchY=event.getY();
     if(placingObject||editingObjects)return true;
     if(moving && dragged>=0&&touchMoved)movePoint(dragged,p);
     if(!dimensioning && !stroke.isEmpty() && distance(stroke.get(stroke.size()-1),p)>.008){stroke.add(p);invalidate();}
     return true;
    case MotionEvent.ACTION_UP:
     getParent().requestDisallowInterceptTouchEvent(false);
-    if(editingObjects){if(!touchMoved&&objectSelected!=null){double tolerance=20*getResources().getDisplayMetrics().density/scale();objectSelected.accept(objectCandidates((event.getX()-left())/scale(),(event.getY()-top())/scale(),tolerance));}performClick();invalidate();return true;}
+    if(editingObjects){if(!touchMoved&&objectSelected!=null&&event.getEventTime()-touchStartTime>=android.view.ViewConfiguration.getLongPressTimeout()){double tolerance=20*getResources().getDisplayMetrics().density/scale();objectSelected.accept(objectCandidates((event.getX()-left())/scale(),(event.getY()-top())/scale(),tolerance));}performClick();invalidate();return true;}
     if(placingObject){if(!touchMoved&&stationSelected!=null){double tolerance=24*getResources().getDisplayMetrics().density/scale();stationSelected.accept(stationCandidates((event.getX()-left())/scale(),(event.getY()-top())/scale(),tolerance));}performClick();invalidate();return true;}
     if(editable&&tappedPoint>=0&&!touchMoved&&pointSelected!=null){
-     stroke.clear();dragged=-1;pointSelected.select(tappedPoint);tappedPoint=-1;performClick();invalidate();return true;
+     stroke.clear();dragged=-1;highlight=tappedPoint;if(event.getEventTime()-touchStartTime>=android.view.ViewConfiguration.getLongPressTimeout())pointSelected.select(tappedPoint);tappedPoint=-1;performClick();invalidate();return true;
     }
     if(moving || !editable){
      if(dragged>=0){
       if(moving&&touchMoved){movePoint(dragged,p);if(changed!=null)changed.run();}
       if(!editable&&pointSelected!=null)pointSelected.select(dragged);
-     }else if(!editable && selected!=null&&layerVisible(LAYER_ROUTE))selectSegment(p);
+     }else if(!editable && !touchMoved&&selected!=null&&layerVisible(LAYER_ROUTE))selectSegment(p);
      dragged=-1;
     }else if(dimensioning){
-     selectSegment(p);
+     if(!touchMoved&&event.getEventTime()-touchStartTime>=android.view.ViewConfiguration.getLongPressTimeout())selectSegment(p);
     }else if(!stroke.isEmpty()){
      stroke.add(p);finishStroke();
     }
