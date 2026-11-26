@@ -1760,7 +1760,7 @@ public class MainActivity extends Activity {
    LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(dp(12),dp(8),dp(12),dp(8));
    TextView hint=new TextView(this);hint.setText("Lineare Stationsübersicht – keine maßstäbliche Montagegeometrie. Ohne gültige Station: "+missing);panel.addView(hint);
    if(outside>0)panel.addView(sheetText("Hinweis: "+outside+" Formstück-Mittelpunkte außerhalb der örtlichen Grabenbreite. Bauteilabmessungen prüfen.",14,true));
-   int possibleConflicts=0;
+   int possibleConflicts=0, verticallySeparated=0;
    for(int i=0;i<linked.size();i++){
     org.json.JSONObject first=linked.get(i);
     double st=first.optDouble("station"),w=first.optDouble("lateralEnvelope"),off=first.optDouble("offset",0);
@@ -1773,9 +1773,15 @@ public class MainActivity extends Activity {
      if(lengthsKnown?delta>=(l1+l2)/2:delta>0.001)continue;
      double w2=second.optDouble("lateralEnvelope"),off2=second.optDouble("offset",0);
      if(!Double.isFinite(w2)||w2<=0||!Double.isFinite(off2))continue;
-     if(Math.abs(off-off2)<(w+w2)/2)possibleConflicts++;
+     if(Math.abs(off-off2)<(w+w2)/2){
+      double c1=first.optDouble("cover"),c2=second.optDouble("cover"),h1=first.optDouble("verticalEnvelope"),h2=second.optDouble("verticalEnvelope");
+      // Cover is measured from the local surface; different stations may have different surface elevations.
+      boolean comparable=delta<=0.001&&Double.isFinite(c1)&&c1>=0&&Double.isFinite(c2)&&c2>=0&&Double.isFinite(h1)&&h1>0&&Double.isFinite(h2)&&h2>0;
+      if(comparable&&(c1+h1<=c2||c2+h2<=c1))verticallySeparated++;else possibleConflicts++;
+     }
     }
    }
+   if(verticallySeparated>0)panel.addView(sheetText("Bei "+verticallySeparated+" Überlappungen an gleicher Station sind die angegebenen Tiefenintervalle getrennt. Mindestabstand und Bezugshöhe prüfen.",14,false));
    if(possibleConflicts>0)panel.addView(sheetText("Hinweis: "+possibleConflicts+" mögliche Formstück-Überlappungen in der Draufsicht. Höhenlage, fehlende Längsmaße und Anschluss prüfen.",14,true));
    if(envelopeOutside>0)panel.addView(sheetText("Hinweis: "+envelopeOutside+" Formstücke überschreiten mit ihrer angegebenen Querabmessung die Grabenbreite.",14,true));
    if(envelopeUnknown>0)panel.addView(sheetText("Querabmessung fehlt bei "+envelopeUnknown+" Formstücken – vollständige Breitenprüfung offen.",14,false));
@@ -1933,6 +1939,7 @@ public class MainActivity extends Activity {
   offset.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void afterTextChanged(android.text.Editable s){}public void onTextChanged(CharSequence s,int start,int before,int count){try{double m=Double.parseDouble(s.toString().trim().replace(',','.'));if(Double.isFinite(m))offsetSlider.setProgress((int)Math.round(500+100*Math.max(-5,Math.min(5,m))));}catch(NumberFormatException ex){if(s.length()==0)offsetSlider.setProgress(500);}}});
   Button resetOffset=new Button(this);resetOffset.setText("Versatz auf 0 setzen");panel.addView(resetOffset);resetOffset.setOnClickListener(v->offset.setText("0"));
 
+  EditText vertical=new EditText(this);vertical.setHint("Tatsächliche Bauhöhe (m, optional)");vertical.setInputType(8194);panel.addView(vertical);
   EditText longitudinal=new EditText(this);longitudinal.setHint("Tatsächliche Längsabmessung zur Trasse (m, optional)");longitudinal.setInputType(8194);panel.addView(longitudinal);
   EditText envelope=new EditText(this);envelope.setHint("Tatsächliche Querabmessung zur Trasse (m, optional)");envelope.setInputType(8194);panel.addView(envelope);
   EditText cover=new EditText(this);cover.setHint("Überdeckung bis Rohroberkante (m, optional)");cover.setInputType(8194);panel.addView(cover);
@@ -1942,6 +1949,7 @@ public class MainActivity extends Activity {
    dn.setText(original.optString("dn"));material.setText(original.optString("material"));
    rotation.setText(original.optString("rotation","0"));mirror.setChecked(original.optBoolean("mirrored"));
    station.setText(original.optString("station"));offset.setText(original.optString("offset"));cover.setText(original.optString("cover"));
+   vertical.setText(original.optString("verticalEnvelope"));
    longitudinal.setText(original.optString("longitudinalEnvelope"));
    envelope.setText(original.optString("lateralEnvelope"));
    installed.setChecked(original.optBoolean("installed",false));
@@ -2000,6 +2008,7 @@ public class MainActivity extends Activity {
      item.put(keys[i],value);
     }
     if(suggestion!=null)item.put("sourceName",source).put("sourceLine",suggestion.evidence).put("sourceLineNumber",suggestion.line);
+    String rawVertical=vertical.getText().toString().trim();if(rawVertical.isEmpty())item.remove("verticalEnvelope");else{try{double value=Double.parseDouble(rawVertical.replace(',','.'));if(!Double.isFinite(value)||value<=0)throw new IllegalArgumentException();item.put("verticalEnvelope",value);}catch(Exception ex){vertical.setError("Positive Bauhöhe erforderlich");return;}}
     String rawLong=longitudinal.getText().toString().trim();if(rawLong.isEmpty())item.remove("longitudinalEnvelope");else{try{double value=Double.parseDouble(rawLong.replace(',','.'));if(!Double.isFinite(value)||value<=0)throw new IllegalArgumentException();item.put("longitudinalEnvelope",value);}catch(Exception ex){longitudinal.setError("Positive Längsabmessung erforderlich");return;}}
     String rawEnvelope=envelope.getText().toString().trim();if(rawEnvelope.isEmpty())item.remove("lateralEnvelope");else{try{double value=Double.parseDouble(rawEnvelope.replace(',','.'));if(!Double.isFinite(value)||value<=0)throw new IllegalArgumentException();item.put("lateralEnvelope",value);}catch(Exception ex){envelope.setError("Positive Querabmessung erforderlich");return;}}
     item.put("stationLinked",item.has("station"));if(index<0)rows.put(item);else rows.put(index,item);
