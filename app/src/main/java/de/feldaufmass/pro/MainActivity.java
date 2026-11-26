@@ -1897,16 +1897,22 @@ public class MainActivity extends Activity {
    final java.util.List<float[]> branchHits=new java.util.ArrayList<>();
    final java.util.List<String> branchHitIds=new java.util.ArrayList<>();
    double touchScale,touchOx,touchOy;
-   int downHit=-1;float downX,downY;
+   int downHit=-1;float downX,downY,previewX,previewY;boolean previewActive=false;
    @Override public boolean onTouchEvent(android.view.MotionEvent event){
     if(event.getAction()==android.view.MotionEvent.ACTION_DOWN){
-     downX=event.getX();downY=event.getY();downHit=-1;double distance=dp(18);
+     previewActive=false;downX=event.getX();downY=event.getY();downHit=-1;double distance=dp(18);
      for(int i=0;i<branchHits.size();i++){float[] p=branchHits.get(i);double d=Math.hypot(downX-p[0],downY-p[1]);if(d<distance){distance=d;downHit=i;}}
      if(downHit<0)return false;
      getParent().requestDisallowInterceptTouchEvent(true);return true;
     }
-    if(event.getAction()==android.view.MotionEvent.ACTION_CANCEL){downHit=-1;getParent().requestDisallowInterceptTouchEvent(false);return true;}
+    if(event.getAction()==android.view.MotionEvent.ACTION_CANCEL){downHit=-1;previewActive=false;invalidate();getParent().requestDisallowInterceptTouchEvent(false);return true;}
+    if(event.getAction()==android.view.MotionEvent.ACTION_MOVE&&downHit>=0){
+     previewX=event.getX();previewY=event.getY();
+     previewActive=downHit<branchHits.size()&&branchHits.get(downHit)[2]>0&&Math.hypot(previewX-downX,previewY-downY)>dp(8);
+     invalidate();return true;
+    }
     if(event.getAction()!=android.view.MotionEvent.ACTION_UP)return downHit>=0;
+    previewActive=false;invalidate();
     getParent().requestDisallowInterceptTouchEvent(false);
     int best=downHit;downHit=-1;
     if(best>=0&&best<branchHits.size()&&Math.hypot(event.getX()-downX,event.getY()-downY)>dp(8)){
@@ -2133,6 +2139,17 @@ public class MainActivity extends Activity {
     pen.setTextAlign(android.graphics.Paint.Align.LEFT);
     pen.setColor(0xffe6a23c);
     for(double[] p:montagePoints)c.drawCircle((float)(ox+p[0]*scale),(float)(oy-p[1]*scale),dp(5),pen);
+    if(previewActive&&downHit>=0&&downHit<branchHits.size()){
+     String id=branchHitIds.get(downHit);int index=(int)branchHits.get(downHit)[2];
+     pen.setColor(0xffe6a23c);pen.setStrokeWidth(dp(2));pen.setTextSize(dp(12));
+     for(int j=0;j<branchHits.size();j++){
+      float[] p=branchHits.get(j);
+      if(!id.equals(branchHitIds.get(j))||Math.abs(p[2]-index)!=1)continue;
+      c.drawLine(p[0],p[1],previewX,previewY,pen);
+      c.drawText(String.format(java.util.Locale.GERMANY,"%.2f m",Math.hypot(previewX-p[0],previewY-p[1])/scale),(p[0]+previewX)/2,(p[1]+previewY)/2-dp(8),pen);
+     }
+     c.drawCircle(previewX,previewY,dp(6),pen);
+    }
     double bar=Math.pow(10,Math.floor(Math.log10((getWidth()/4.0)/scale)));
     if(Double.isFinite(bar)&&bar>0){float end=dp(12)+(float)(bar*scale);pen.setColor(0xff777777);pen.setStrokeWidth(dp(2));c.drawLine(dp(12),getHeight()-dp(12),end,getHeight()-dp(12),pen);pen.setTextSize(dp(11));c.drawText(String.format(java.util.Locale.GERMANY,"%.3g m",bar),dp(12),getHeight()-dp(18),pen);}
    }
