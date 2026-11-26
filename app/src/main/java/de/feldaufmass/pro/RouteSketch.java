@@ -122,7 +122,7 @@ final class RouteSketch extends View {
  JSONArray stationObjects=new JSONArray(),surfaceSections=new JSONArray();
  void setStationLayers(JSONArray objects,JSONArray sections){stationObjects=objects;surfaceSections=sections;invalidate();}
  int draggedObject=-1; String objectBefore; float objectGrabX,objectGrabY;
- void cancelObjectDrag(){if(draggedObject>=0&&objectBefore!=null)try{stationObjects.put(draggedObject,new org.json.JSONObject(objectBefore));}catch(Exception ignored){}draggedObject=-1;objectBefore=null;invalidate();}
+ void cancelObjectDrag(){if(draggedObject>=0&&objectBefore!=null)try{stationObjects.put(draggedObject,new org.json.JSONObject(objectBefore));}catch(Exception ignored){}draggedObject=-1;resizeAxis=0;objectBefore=null;invalidate();}
  void moveStationObject(float x,float y){
   org.json.JSONObject o=stationObjects.optJSONObject(draggedObject);if(o==null)return;
   java.util.ArrayList<StationHit> hits=stationCandidates(x,y,Double.POSITIVE_INFINITY);if(hits.isEmpty())return;
@@ -416,6 +416,24 @@ final class RouteSketch extends View {
   }
   return null;
  }
+ int selectedResizeObject=-1,resizeAxis=0;
+ void resizeStationObject(float x,float y){
+  org.json.JSONObject o=stationObjects.optJSONObject(draggedObject);if(o==null)return;
+  try{org.json.JSONObject original=new org.json.JSONObject(objectBefore);ObjectFootprint f=objectFootprint(original);if(f==null||!f.measured)return;
+   double angle=Math.toRadians(f.angle),dx=x-f.center.x,dy=y-f.center.y;
+   double span=resizeAxis==1?f.length:f.width,metres=positiveDimension(original,resizeAxis==1?"detailLength":"detailWidth");
+   if(span<=0||!Double.isFinite(metres))return;
+   double projected=resizeAxis==1?dx*Math.cos(angle)+dy*Math.sin(angle):-dx*Math.sin(angle)+dy*Math.cos(angle);
+   double value=Math.max(.01,Math.round(2*Math.abs(projected)*metres/span*100)/100.0);
+   o.put(resizeAxis==1?"detailLength":"detailWidth",value);o.remove("acceptedOverlap");invalidate();
+  }catch(Exception ignored){}
+ }
+ int resizeHandle(ObjectFootprint f,float x,float y){
+  if(f==null||!f.measured)return 0;double angle=Math.toRadians(f.angle),dx=x-f.center.x,dy=y-f.center.y;
+  double u=dx*Math.cos(angle)+dy*Math.sin(angle),v=-dx*Math.sin(angle)+dy*Math.cos(angle),tol=12*getResources().getDisplayMetrics().density/scale();
+  if(Math.hypot(Math.abs(u)-f.length/2,v)<tol)return 1;
+  if(Math.hypot(u,Math.abs(v)-f.width/2)<tol)return 2;return 0;
+ }
  void drawStationObjects(Canvas c,float density){
   if(!layerVisible(LAYER_OBJECTS))return;
   paint.setTextSize(11*density);
@@ -430,7 +448,7 @@ final class RouteSketch extends View {
     if(Float.isFinite(hw)&&Float.isFinite(hh)){
      c.save();c.translate(x,y);c.rotate(f.angle);
      paint.setColor(0x66d38a35);c.drawRect(-hw,-hh,hw,hh,paint);
-     paint.setColor(0xffa65e19);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(density);c.drawRect(-hw,-hh,hw,hh,paint);paint.setStyle(Paint.Style.FILL);c.restore();
+     paint.setColor(0xffa65e19);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(density);c.drawRect(-hw,-hh,hw,hh,paint);paint.setStyle(Paint.Style.FILL);if(j==selectedResizeObject&&(moving||editingObjects)){paint.setColor(0xff69cdbb);for(int sign:new int[]{-1,1}){c.drawCircle(sign*hw,0,4*density,paint);c.drawCircle(0,sign*hh,4*density,paint);}}c.restore();
     }
    }
    paint.setColor(0xffa65e19);c.drawCircle(x,y,3*density,paint);
@@ -737,6 +755,7 @@ final class RouteSketch extends View {
    case MotionEvent.ACTION_DOWN:
     getParent().requestDisallowInterceptTouchEvent(true);
     stroke.clear();
+    resizeAxis=0;if((editingObjects||moving)&&selectedResizeObject>=0&&layerVisible(LAYER_OBJECTS)){org.json.JSONObject o=stationObjects.optJSONObject(selectedResizeObject);if(o!=null){resizeAxis=resizeHandle(objectFootprint(o),(event.getX()-left())/scale(),(event.getY()-top())/scale());if(resizeAxis!=0){draggedObject=selectedResizeObject;objectBefore=o.toString();dragged=-1;return true;}}}
     if(editingObjects||moving){java.util.ArrayList<Integer> hits=objectCandidates((event.getX()-left())/scale(),(event.getY()-top())/scale(),12*getResources().getDisplayMetrics().density/scale());if(hits.size()==1){draggedObject=hits.get(0);org.json.JSONObject o=stationObjects.optJSONObject(draggedObject);ObjectFootprint f=objectFootprint(o);objectBefore=o.toString();objectGrabX=(event.getX()-left())/scale()-f.center.x;objectGrabY=(event.getY()-top())/scale()-f.center.y;dragged=-1;return true;}}
     if(placingObject||editingObjects){dragged=-1;return true;}
     if(moving || !editable)dragged=layerVisible(LAYER_ROUTE)?nearestPoint(event.getX(),event.getY()):-1;
@@ -744,7 +763,7 @@ final class RouteSketch extends View {
     return true;
    case MotionEvent.ACTION_MOVE:
     if(Math.hypot(event.getX()-touchStartX,event.getY()-touchStartY)>android.view.ViewConfiguration.get(getContext()).getScaledTouchSlop())touchMoved=true;
-    if(draggedObject>=0&&touchMoved){moveStationObject((event.getX()-left())/scale()-objectGrabX,(event.getY()-top())/scale()-objectGrabY);return true;}
+    if(draggedObject>=0&&touchMoved){if(resizeAxis!=0){resizeStationObject((event.getX()-left())/scale(),(event.getY()-top())/scale());return true;}moveStationObject((event.getX()-left())/scale()-objectGrabX,(event.getY()-top())/scale()-objectGrabY);return true;}
     if(touchMoved&&(placingObject||editingObjects||(moving&&dragged<0)||dimensioning||!editable)){centerX=clamp(centerX-(event.getX()-lastTouchX)/scale());centerY=clamp(centerY-(event.getY()-lastTouchY)/scale());invalidate();}
     lastTouchX=event.getX();lastTouchY=event.getY();
     if(placingObject||editingObjects)return true;
@@ -753,7 +772,7 @@ final class RouteSketch extends View {
     return true;
    case MotionEvent.ACTION_UP:
     getParent().requestDisallowInterceptTouchEvent(false);
-    if(draggedObject>=0){int index=draggedObject;draggedObject=-1;objectBefore=null;if(!touchMoved&&objectSelected!=null&&event.getEventTime()-touchStartTime>=android.view.ViewConfiguration.getLongPressTimeout()){java.util.ArrayList<Integer> hits=new java.util.ArrayList<>();hits.add(index);objectSelected.accept(hits);}invalidate();return true;}
+    if(draggedObject>=0){int index=draggedObject;selectedResizeObject=index;resizeAxis=0;draggedObject=-1;objectBefore=null;if(!touchMoved&&objectSelected!=null&&event.getEventTime()-touchStartTime>=android.view.ViewConfiguration.getLongPressTimeout()){java.util.ArrayList<Integer> hits=new java.util.ArrayList<>();hits.add(index);objectSelected.accept(hits);}invalidate();return true;}
     if(editingObjects){if(!touchMoved&&objectSelected!=null&&event.getEventTime()-touchStartTime>=android.view.ViewConfiguration.getLongPressTimeout()){double tolerance=20*getResources().getDisplayMetrics().density/scale();objectSelected.accept(objectCandidates((event.getX()-left())/scale(),(event.getY()-top())/scale(),tolerance));}performClick();invalidate();return true;}
     if(placingObject){if(!touchMoved&&stationSelected!=null){double tolerance=24*getResources().getDisplayMetrics().density/scale();stationSelected.accept(stationCandidates((event.getX()-left())/scale(),(event.getY()-top())/scale(),tolerance));}performClick();invalidate();return true;}
     if(editable&&tappedPoint>=0&&!touchMoved&&pointSelected!=null){
