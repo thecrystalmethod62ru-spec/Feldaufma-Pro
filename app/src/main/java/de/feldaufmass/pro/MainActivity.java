@@ -3320,16 +3320,25 @@ public class MainActivity extends Activity {
    String[] labels=new String[entries.size()];for(int i=0;i<entries.size();i++){double[] e=entries.get(i);labels[i]=String.format(java.util.Locale.GERMANY,"%.2f – %.2f m | L %.2f / R %.2f m",e[0],e[1],e[2],e[3]);}
    new android.app.AlertDialog.Builder(this).setTitle("Verbauabschnitt auswählen").setItems(labels,(dialog,index)->new android.app.AlertDialog.Builder(this).setMessage(labels[index]+" löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(confirm,which)->{entries.remove(index);saveVerbau.run();}).show()).show();
   });
-  Button add=new Button(this);add.setText("Abschnitt hinzufügen");fields.addView(add);
+  final int[] editing={-1};
+  Button editSection=new Button(this);editSection.setText("Abschnitt bearbeiten");fields.addView(editSection);
+  Button add=new Button(this);add.setText("Abschnitt hinzufügen");
+  editSection.setOnClickListener(button->{
+   if(entries.isEmpty()){notice("Keine Verbauabschnitte vorhanden.");return;}
+   String[] labels=new String[entries.size()];for(int i=0;i<entries.size();i++){double[] e=entries.get(i);labels[i]=String.format(java.util.Locale.GERMANY,"%.2f – %.2f m | L %.2f / R %.2f m",e[0],e[1],e[2],e[3]);}
+   new android.app.AlertDialog.Builder(this).setTitle("Abschnitt bearbeiten").setItems(labels,(dialog,index)->{editing[0]=index;for(int i=0;i<4;i++)inputs[i].setText(String.valueOf(entries.get(index)[i]));add.setText("Änderungen speichern");remove.setEnabled(false);}).show();
+  });
+  Button cancelEdit=new Button(this);cancelEdit.setText("Bearbeitung abbrechen");fields.addView(cancelEdit);cancelEdit.setOnClickListener(button->{editing[0]=-1;add.setText("Abschnitt hinzufügen");remove.setEnabled(true);for(EditText field:inputs)field.setText("");});
+  fields.addView(add);
   add.setOnClickListener(button->{
    try{
     double[] v=new double[4];for(int i=0;i<4;i++){if(inputs[i].length()==0)throw new IllegalArgumentException("Alle Maße eingeben");v[i]=number(inputs[i]);if(!Double.isFinite(v[i])||v[i]<0)throw new IllegalArgumentException("Ungültiges Maß");}
     if(v[1]<=v[0]||(l>0&&v[1]>l)||v[2]+v[3]<=0)throw new IllegalArgumentException("Stationsgrenzen oder Verbauhöhe prüfen");
-    for(double[] e:entries)if(v[0]<e[1]&&v[1]>e[0]&&((v[2]>0&&e[2]>0)||(v[3]>0&&e[3]>0)))throw new IllegalArgumentException("Überlappender Verbau auf derselben Seite");
-    entries.add(v);saveVerbau.run();
+    for(double[] e:entries)if((editing[0]<0||e!=entries.get(editing[0]))&&v[0]<e[1]&&v[1]>e[0]&&((v[2]>0&&e[2]>0)||(v[3]>0&&e[3]>0)))throw new IllegalArgumentException("Überlappender Verbau auf derselben Seite");
+    if(editing[0]>=0)entries.set(editing[0],v);else entries.add(v);editing[0]=-1;add.setText("Abschnitt hinzufügen");remove.setEnabled(true);saveVerbau.run();
    }catch(Exception ex){notice(ex.getMessage());}
   });
-  Button reset=new Button(this);reset.setText("Berechnung zurücksetzen");fields.addView(reset);reset.setOnClickListener(button->{new android.app.AlertDialog.Builder(this).setMessage("Alle Verbauabschnitte löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(dialog,which)->{entries.clear();saveVerbau.run();}).show();});
+  Button reset=new Button(this);reset.setText("Berechnung zurücksetzen");fields.addView(reset);reset.setOnClickListener(button->{new android.app.AlertDialog.Builder(this).setMessage("Alle Verbauabschnitte löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(dialog,which)->{entries.clear();editing[0]=-1;add.setText("Abschnitt hinzufügen");remove.setEnabled(true);saveVerbau.run();}).show();});
   ScrollView scroll=new ScrollView(this);scroll.addView(fields);
   new android.app.AlertDialog.Builder(this).setTitle("Verbau – Flächenvorberechnung").setView(scroll).setPositiveButton("Schließen",null).show();
  });
