@@ -55,17 +55,21 @@ class MainActivity : ComponentActivity() {
                 var photoStation by remember { mutableStateOf("") }
                 var photoNote by remember { mutableStateOf("") }
                 var photoStatus by remember { mutableStateOf("") }
-                val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
-                    if (bitmap != null) {
-                        try {
-                            val file = File(filesDir, UUID.randomUUID().toString() + ".jpg")
-                            file.outputStream().use { stream ->
-                                check(bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream))
-                            }
-                            photos = photos + SitePhoto(file.name, photoStation, photoNote)
-                            photoStatus = "Foto hinzugefügt. Bitte Projekt speichern."
-                        } catch (e: Exception) { photoStatus = "Foto konnte nicht gespeichert werden." }
+                var pendingPhoto by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
+                var pendingStation by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
+                var pendingNote by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
+                val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+                    val file = File(filesDir, pendingPhoto)
+                    if (pendingPhoto.isNotBlank()) {
+                        if (success && file.isFile && file.length() > 0) {
+                            photos = photos + SitePhoto(pendingPhoto, pendingStation, pendingNote)
+                            photoStatus = "Originalfoto hinzugefügt. Bitte Projekt speichern."
+                        } else {
+                            file.delete()
+                            photoStatus = "Aufnahme abgebrochen."
+                        }
                     }
+                    pendingPhoto = ""
                 }
                 var gps by remember { mutableStateOf(listOf<GpsPoint>()) }
                 var gpsStatus by remember { mutableStateOf("") }
@@ -270,20 +274,32 @@ class MainActivity : ComponentActivity() {
                         OutlinedTextField(photoStation, { photoStation = it }, label = { Text("Fotostation (m)") }, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(photoNote, { photoNote = it }, label = { Text("Fotobeschreibung") }, modifier = Modifier.fillMaxWidth())
                         Button(enabled = name.isNotBlank() && l != null && number(photoStation)?.let { it <= l } == true, onClick = {
-                            try { camera.launch(null) } catch (e: Exception) { photoStatus = "Keine Kamera verfügbar." }
+                            try {
+                                val dir = File(filesDir, "photos").apply { mkdirs() }
+                                val file = File(dir, UUID.randomUUID().toString() + ".jpg")
+                                pendingPhoto = "photos/" + file.name
+                                pendingStation = photoStation
+                                pendingNote = photoNote
+                                val uri = androidx.core.content.FileProvider.getUriForFile(this@MainActivity, packageName + ".photos", file)
+                                camera.launch(uri)
+                            } catch (e: Exception) {
+                                if (pendingPhoto.isNotBlank()) File(filesDir,pendingPhoto).delete()
+                                pendingPhoto = ""
+                                photoStatus = "Kamera nicht verfügbar."
+                            }
                         }) { Text("Foto aufnehmen") }
                         Text(photoStatus)
                         photos.forEachIndexed { index, photo ->
                             Card(Modifier.fillMaxWidth()) {
                                 Column(Modifier.padding(12.dp)) {
-                                    val bitmap = remember(photo.file) { BitmapFactory.decodeFile(File(filesDir, photo.file).absolutePath)?.asImageBitmap() }
+                                    val bitmap = remember(photo.file) { decodeSampledPhoto(File(filesDir, photo.file), 1000)?.asImageBitmap() }
                                     if (bitmap != null) Image(bitmap, contentDescription = photo.note, modifier = Modifier.fillMaxWidth().height(160.dp))
                                     Text("Station " + photo.station + " m · " + photo.note)
                                     TextButton(onClick = { photos = photos.filterIndexed { i, _ -> i != index } }) { Text("Aus Projekt entfernen") }
                                 }
                             }
                         }
-                        Text("Vorschaufotos; Originalauflösung folgt.")
+                        Text("Originalfotos lokal gespeichert; Vorschau und PDF verkleinert.")
                         Text("Mengenberechnung", style = MaterialTheme.typography.titleLarge)
                         if (valid) {
                             val ll = l!!; val ww = w!!; val dd = d!!; val ss = s!!; val aa = a!!
@@ -438,7 +454,7 @@ private fun buildReport(lines: List<String>, points: List<Offset>, photos: List<
         }
         lines.drop(6).forEach { line(it) }
         photos.forEach { photo ->
-            val bitmap = BitmapFactory.decodeFile(File(folder,photo.file).absolutePath)
+            val bitmap = decodeSampledPhoto(File(folder,photo.file), 1600)
             if (bitmap != null) {
                 ensure(220f)
                 line("Foto | Station " + photo.station + " m")
@@ -455,4 +471,13 @@ private fun buildReport(lines: List<String>, points: List<Offset>, photos: List<
         doc.writeTo(output)
         return output.toByteArray()
     } finally { doc.close() }
+}
+
+private fun decodeSampledPhoto(file: File, maxSide: Int): Bitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(file.absolutePath, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+    var sample = 1
+    while (maxOf(bounds.outWidth,bounds.outHeight) / sample > maxSide) sample *= 2
+    return BitmapFactory.decodeFile(file.absolutePath, BitmapFactory.Options().apply { inSampleSize = sample })
 }
