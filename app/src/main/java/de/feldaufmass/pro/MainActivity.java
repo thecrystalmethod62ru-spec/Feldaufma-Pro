@@ -5251,6 +5251,8 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  void editUtilityPosition(int index,double station,Runnable refresh){
   org.json.JSONArray rows=extraUtilities();org.json.JSONObject source=rows.optJSONObject(index);if(source==null)return;
   String before=rows.toString(),projectId=activeProject;
+  final int[] selected={index};
+  final org.json.JSONObject[] current={source};
   LinearLayout form=new LinearLayout(this);form.setOrientation(1);
   EditText offset=new EditText(this),depth=new EditText(this);
   EditText[] fields={offset,depth};String[] keys={"offset","axisDepth"},labels={"Abstand vom linken Grabenrand (m)","Achstiefe (m)"};
@@ -5270,8 +5272,21 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     double x=read(offset),y=read(depth);
     switch(e.getActionMasked()){
      case android.view.MotionEvent.ACTION_DOWN:
-      double radius=source.optDouble("diameter")/2000;
-      if(!Double.isFinite(x)||!Double.isFinite(y)||!Double.isFinite(radius)||Math.hypot(e.getX()-dragLeft-x*dragScale,e.getY()-dragTop-y*dragScale)>Math.max(dp(20),radius*dragScale))return false;
+      double radius=current[0].optDouble("diameter")/2000;
+      if(!Double.isFinite(x)||!Double.isFinite(y)||!Double.isFinite(radius)||Math.hypot(e.getX()-dragLeft-x*dragScale,e.getY()-dragTop-y*dragScale)>Math.max(dp(20),radius*dragScale)){
+       int hit=-1;double best=Double.POSITIVE_INFINITY;
+       for(int k=0;k<rows.length();k++){if(k==selected[0])continue;org.json.JSONObject n=rows.optJSONObject(k);if(n==null||station<n.optDouble("routeFrom",0)||station>=n.optDouble("routeTo",Double.POSITIVE_INFINITY))continue;
+        double nx=n.optDouble("offset"),ny=n.optDouble("axisDepth"),nr=n.optDouble("diameter")/2000;
+        double distance=Math.hypot(e.getX()-dragLeft-nx*dragScale,e.getY()-dragTop-ny*dragScale);
+        if(Double.isFinite(nr)&&nr>0&&distance<=Math.max(dp(20),nr*dragScale)&&distance<best){hit=k;best=distance;}
+       }
+       if(hit<0)return false;
+       if(!Double.isFinite(x)||!Double.isFinite(y)||x<0||y<0){notice("Zuerst gültige Maße eingeben");return true;}
+       try{current[0].put("offset",x);current[0].put("axisDepth",y);}catch(Exception ex){return true;}
+       selected[0]=hit;current[0]=rows.optJSONObject(hit);offset.setText(current[0].optString("offset",""));depth.setText(current[0].optString("axisDepth",""));
+       positionHistory.clear();redoHistory.clear();undoPosition.setEnabled(false);redoPosition.setEnabled(false);
+       notice(current[0].optString("name",current[0].optString("type")));invalidate();return true;
+      }
       redoHistory.clear();redoPosition.setEnabled(false);positionHistory.push(new String[]{offset.getText().toString(),depth.getText().toString()});if(positionHistory.size()>50)positionHistory.removeLast();undoPosition.setEnabled(true);
       grabX=e.getX()-dragLeft-x*dragScale;grabY=e.getY()-dragTop-y*dragScale;dragging=true;getParent().requestDisallowInterceptTouchEvent(true);return true;
      case android.view.MotionEvent.ACTION_MOVE:
@@ -5288,7 +5303,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
 
    @Override protected void onDraw(Canvas c){
     super.onDraw(c);
-    double width=w, height=d, x=read(offset), y=read(depth),radius=source.optDouble("diameter")/2000;
+    double width=w, height=d, x=read(offset), y=read(depth),radius=current[0].optDouble("diameter")/2000;
     android.content.SharedPreferences prefs=getPreferences(0);
     try{org.json.JSONArray sections=new org.json.JSONArray(prefs.getString("metricWidthSections","[]"));for(int k=0;k<sections.length();k++){org.json.JSONObject section=sections.getJSONObject(k);if(station>=section.optDouble("from")&&station<section.optDouble("to")){width=section.optDouble("width");break;}}}catch(Exception ignored){}
     try{String raw=prefs.getString("metricMainExcavationDepth","").trim();if(!raw.isEmpty())height=Double.parseDouble(raw.replace(',','.'));for(String line:prefs.getString("metricDepthSections","").split("\\n")){if(line.trim().isEmpty())continue;String[] parts=line.split(";",-1);if(parts.length!=3)throw new IllegalArgumentException();double from=Double.parseDouble(parts[0].trim().replace(',','.')),to=Double.parseDouble(parts[1].trim().replace(',','.'));if(station>=from&&station<to){height=Double.parseDouble(parts[2].trim().replace(',','.'));break;}}}catch(Exception ex){height=Double.NaN;}
@@ -5307,8 +5322,8 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     boolean outside=x-radius<0||x+radius>width||y-radius<0||y+radius>height;
     boolean collision=false,clearance=false,coverWarning=y-radius<cover;
     for(int k=0;k<rows.length();k++){
-     if(k==index)continue;org.json.JSONObject neighbor=rows.optJSONObject(k);if(neighbor==null)continue;
-     double from=Math.max(source.optDouble("routeFrom",0),neighbor.optDouble("routeFrom",0)),to=Math.min(source.optDouble("routeTo",Double.POSITIVE_INFINITY),neighbor.optDouble("routeTo",Double.POSITIVE_INFINITY));
+     if(k==selected[0])continue;org.json.JSONObject neighbor=rows.optJSONObject(k);if(neighbor==null)continue;
+     double from=Math.max(current[0].optDouble("routeFrom",0),neighbor.optDouble("routeFrom",0)),to=Math.min(current[0].optDouble("routeTo",Double.POSITIVE_INFINITY),neighbor.optDouble("routeTo",Double.POSITIVE_INFINITY));
      if(to<=from||station<from||station>=to)continue;
      double nx=neighbor.optDouble("offset"),ny=neighbor.optDouble("axisDepth"),nr=neighbor.optDouble("diameter")/2000;
      if(!Double.isFinite(nx)||!Double.isFinite(ny)||!Double.isFinite(nr)||nr<=0)continue;
@@ -5330,7 +5345,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
    public void afterTextChanged(android.text.Editable e){}
   });
   ScrollView positionScroll=new ScrollView(this);positionScroll.setFillViewport(false);positionScroll.addView(form);
-  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(source.optString("name",source.optString("type"))+" – Lage").setView(positionScroll).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Leitungslage – Querschnitt").setView(positionScroll).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
   Button fullscreen=new Button(this);fullscreen.setText("Vollbild");form.addView(fullscreen,2);
   Button toggleControls=new Button(this);toggleControls.setText("Maße −");form.addView(toggleControls,3);form.addView(undoPosition,4);form.addView(redoPosition,5);
   toggleControls.setOnClickListener(v->{
@@ -5386,9 +5401,9 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   dialog.setOnShowListener(x->dialog.getButton(-1).setOnClickListener(y->{
    if(!projectId.equals(activeProject)||!before.equals(extraUtilities().toString())){notice("Projektdaten geändert. Leitung erneut öffnen.");return;}
    try{
-    org.json.JSONObject updated=new org.json.JSONObject(source.toString());
+    org.json.JSONObject updated=new org.json.JSONObject(current[0].toString());
     for(int i=0;i<2;i++){double value;try{value=Double.parseDouble(fields[i].getText().toString().trim().replace(',','.'));if(!Double.isFinite(value)||value<0)throw new NumberFormatException();}catch(Exception ex){fields[i].setError("Gültiges Maß eingeben");return;}updated.put(keys[i],value);}
-    org.json.JSONArray next=new org.json.JSONArray(before);next.put(index,updated);
+    org.json.JSONArray next=new org.json.JSONArray(rows.toString());next.put(selected[0],updated);
     if(saveUtilities(next)){recordProjectEvent("Leitungslage geändert");dialog.dismiss();if(refresh!=null)refresh.run();}
    }catch(Exception ex){notice("Leitungslage konnte nicht gespeichert werden.");}
   }));dialog.show();
