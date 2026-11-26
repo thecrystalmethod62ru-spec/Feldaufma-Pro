@@ -333,6 +333,39 @@ final class RouteSketch extends View {
   underlayPaint.setAlpha(underlayAlpha);
   c.drawBitmap(underlay,null,new android.graphics.RectF(x,y,x+w,y+h),underlayPaint);
  }
+ private void drawAutomaticLegend(Canvas c,float d){
+  java.util.LinkedHashMap<String,Integer> entries=new java.util.LinkedHashMap<>();
+  if(layerVisible(LAYER_ROUTE)&&vertices.size()>1)entries.put("Trasse",0xff13665f);
+  if(layerVisible(LAYER_SURFACES))for(int j=0;j<surfaceSections.length();j++){
+   org.json.JSONObject o=surfaceSections.optJSONObject(j);if(o==null)continue;
+   String name=o.optString("surface").trim();if(!name.isEmpty())entries.put(name,surfaceColor(name));
+  }
+  if(layerVisible(LAYER_OBJECTS))for(int j=0;j<stationObjects.length();j++){
+   org.json.JSONObject o=stationObjects.optJSONObject(j);if(o!=null)entries.put(o.optString("type","Objekt"),0xffa65e19);
+  }
+  for(Vertex v:vertices){
+   if(layerVisible(LAYER_GPS)&&Double.isFinite(v.latitude)&&Double.isFinite(v.longitude))entries.put("GPS-Punkt",0xff4285ef);
+   if(layerVisible(LAYER_PHOTOS)&&v.photos.length()>0)entries.put("Foto",0xff536c80);
+  }
+  if(entries.isEmpty())return;
+  Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);p.setTextSize(10*d);
+  float row=15*d, width=0;for(String name:entries.keySet())width=Math.max(width,p.measureText(name)+30*d);
+  width=Math.min(width,getWidth()-12*d);
+  int maxRows=Math.max(1,(int)((getHeight()*.42f-24*d)/row));
+  int shown=Math.min(entries.size(),maxRows);
+  float x=6*d,y=getHeight()-6*d-(shown+1)*row-8*d;
+  p.setColor(0xF5FFFFFF);c.drawRoundRect(x,y,x+width,y+(shown+1)*row+8*d,4*d,4*d,p);
+  p.setColor(0xff173c42);c.drawText("Legende",x+5*d,y+12*d,p);
+  int i=0;
+  for(java.util.Map.Entry<String,Integer> e:entries.entrySet()){
+   if(i>=shown)break;
+   float yy=y+(i+2)*row;
+   p.setColor(e.getValue());c.drawRect(x+5*d,yy-9*d,x+17*d,yy,p);
+   p.setColor(0xff173c42);
+   String label=i==shown-1&&entries.size()>shown?"+"+(entries.size()-shown+1)+" weitere":e.getKey();
+   c.save();c.clipRect(x+21*d,yy-row,x+width-3*d,yy+3*d);c.drawText(label,x+21*d,yy,p);c.restore();i++;
+  }
+ }
  @Override protected void onDraw(Canvas c){
   c.drawColor(Color.WHITE);
   paint.setStrokeWidth(1);paint.setColor(0xffe5eceb);
@@ -386,6 +419,7 @@ final class RouteSketch extends View {
   }
   paint.setColor(0xff42799e);paint.setStrokeWidth(3);
   for(int i=1;i<stroke.size();i++)line(c,stroke.get(i-1),stroke.get(i));
+  drawAutomaticLegend(c,density);
  }
  private ArrayList<PointF> simplifiedStroke(ArrayList<PointF> points,double tolerance){
   boolean[] keep=new boolean[points.size()];
