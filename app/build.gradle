@@ -5,7 +5,8 @@ android { namespace 'de.feldaufmass.pro'; compileSdk 35
 }
 
 dependencies { implementation "com.google.mlkit:translate:17.0.3"
- implementation 'androidx.core:core:1.13.1' }
+ implementation 'androidx.core:core:1.13.1'
+ implementation 'com.google.mlkit:text-recognition:16.0.1' }
 
 dependencies {
  androidTestImplementation 'androidx.test.ext:junit:1.2.1'
