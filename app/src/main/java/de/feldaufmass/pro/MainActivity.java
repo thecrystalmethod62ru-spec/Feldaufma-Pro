@@ -577,16 +577,44 @@ public class MainActivity extends Activity {
   for(int i=0;i<route.vertices.size();i++)if(route.vertices.get(i).id.equals(id))return i;
   return -1;
  }
+ void assignGps(String id){
+  if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=android.content.pm.PackageManager.PERMISSION_GRANTED){
+   requestPermissions(new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION,android.Manifest.permission.ACCESS_COARSE_LOCATION},702);return;
+  }
+  android.location.LocationManager manager=(android.location.LocationManager)getSystemService(LOCATION_SERVICE);
+  if(!manager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)){notice("Bitte GPS aktivieren.");return;}
+  if(android.os.Build.VERSION.SDK_INT<30){notice("GPS-Zuordnung benötigt Android 11 oder neuer.");return;}
+  notice("GPS-Position wird ermittelt …");
+  try{manager.getCurrentLocation(android.location.LocationManager.GPS_PROVIDER,null,getMainExecutor(),fix->{
+   if(isFinishing()||isDestroyed())return;
+   if(fix==null){notice("Keine GPS-Position verfügbar. Bitte erneut versuchen.");return;}
+   RouteSketch route=new RouteSketch(this,routeData());int index=findPoint(route,id);if(index<0)return;
+   RouteSketch.Vertex point=route.vertices.get(index);
+   // Der schematische Plan besitzt noch keine georeferenzierte Transformation.
+   String info=String.format(java.util.Locale.GERMANY,"GPS-Genauigkeit: ± %.1f m",fix.getAccuracy());
+   new android.app.AlertDialog.Builder(this).setTitle("GPS-Punkt zuordnen")
+    .setMessage(info+(fix.getAccuracy()>5?"\nGPS-Genauigkeit gering.":"")+"\nDie Zeichnung ist noch nicht georeferenziert. Verschieben auf GPS ist erst nach Kalibrierung möglich.")
+    .setNegativeButton("Abbrechen",null).setPositiveButton("Manuellen Punkt beibehalten",(d,w)->{
+     RouteSketch latest=new RouteSketch(this,routeData());int i=findPoint(latest,id);if(i<0)return;
+     RouteSketch.Vertex v=latest.vertices.get(i);v.latitude=fix.getLatitude();v.longitude=fix.getLongitude();v.accuracy=fix.getAccuracy();
+     if(saveRoute(latest)){refreshRoute();notice("GPS-Koordinaten gespeichert.");}
+    }).show();
+  });}catch(RuntimeException e){notice("GPS konnte nicht gestartet werden.");}
+ }
+ @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] results){
+  super.onRequestPermissionsResult(requestCode,permissions,results);
+  if(requestCode==702){if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==android.content.pm.PackageManager.PERMISSION_GRANTED)assignGps(selectedPoint);else notice("Für GPS-Punkte ist der genaue Standort erforderlich.");}
+ }
  void pointMenu(){
   RouteSketch route=new RouteSketch(this,routeData());int index=findPoint(route,selectedPoint);
   if(index<0)return;
   org.json.JSONArray photos=route.vertices.get(index).photos;
-  String[] labels=new String[1+photos.length()];labels[0]="Foto aufnehmen";
-  for(int i=0;i<photos.length();i++)labels[i+1]="Foto "+(i+1)+" öffnen";
+  String[] labels=new String[2+photos.length()];labels[0]="Foto aufnehmen";labels[1]="GPS-Punkt zuordnen";
+  for(int i=0;i<photos.length();i++)labels[i+2]="Foto "+(i+1)+" öffnen";
   new android.app.AlertDialog.Builder(this).setTitle("Trassenpunkt "+(index+1)).setItems(labels,(dialog,i)->{
-   if(i==0)capturePhoto();else {
+   if(i==0)capturePhoto();else if(i==1)assignGps(route.vertices.get(index).id);else {
     android.content.Intent view=new android.content.Intent(android.content.Intent.ACTION_VIEW);
-    view.setDataAndType(photoUri(photos.optString(i-1)),"image/jpeg");
+    view.setDataAndType(photoUri(photos.optString(i-2)),"image/jpeg");
     view.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
     try{startActivity(view);}catch(android.content.ActivityNotFoundException e){notice("Keine Bildanzeige verfügbar.");}
    }
