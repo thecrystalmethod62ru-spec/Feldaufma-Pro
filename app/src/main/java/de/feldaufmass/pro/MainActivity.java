@@ -140,7 +140,7 @@ public class MainActivity extends Activity {
   java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","sollUtilities","montageFittings","metricWidthSections","objectUndo","objectRedo","elevationPoints","lvPositions","dailyReports","nachtraege","routeUnderlay","sketchCalibration"));
   strings.addAll(java.util.Arrays.asList("metricAreaCorrection","metricAreaCorrectionReason","metricCrossSectionDimensions",
       "metricDepthSections","metricElevationPoints","metricMainExcavationDepth","metricMinimumCover","metricPipeMinGap",
-      "metricPipeMinCover","metricPipeProfile","extraUtilities",MontageProtocols.KEY,MontageConnections.KEY,PipeLayoutStore.KEY,PipeLayoutStore.SECTION_KEY,RouteBranchStore.KEY));
+      "metricPipeMinCover","metricPipeProfile","extraUtilities",MontageProtocols.KEY,MontageConnections.KEY,PipeLayoutStore.KEY,PipeLayoutStore.SECTION_KEY,"metricVerbauSections",RouteBranchStore.KEY));
   java.util.Set<String> ints=new java.util.HashSet<>(java.util.Arrays.asList("surface","handling","dictationLanguage","gpsDurationSeconds","metricCornerMode","metricOverlapMode"));
   SharedPreferences.Editor ed=projectStorage(id).edit();
   java.util.Iterator<String> keys=fields.keys();String name="Importiertes Projekt";java.util.Set<String> used=new java.util.HashSet<>();
@@ -3287,18 +3287,24 @@ public class MainActivity extends Activity {
   EditText[] inputs=new EditText[4];for(int i=0;i<4;i++){inputs[i]=new EditText(this);inputs[i].setHint(hints[i]);inputs[i].setInputType(8194);fields.addView(inputs[i]);}
   TextView resultText=new TextView(this);fields.addView(resultText);
   java.util.ArrayList<double[]> entries=new java.util.ArrayList<>();
+  Runnable refreshVerbau=()->{
+   StringBuilder report=new StringBuilder();double left=0,right=0;
+   for(double[] e:entries){double a=(e[1]-e[0])*e[2],b=(e[1]-e[0])*e[3];left+=a;right+=b;report.append(String.format(java.util.Locale.GERMANY,"%.2f – %.2f m: L %.2f / R %.2f m²\n",e[0],e[1],a,b));}
+   report.append(String.format(java.util.Locale.GERMANY,"\nLinks: %.2f m²\nRechts: %.2f m²\nGesamt: %.2f m²",left,right,left+right));resultText.setText(report.toString());
+  };
+  Runnable saveVerbau=()->{org.json.JSONArray data=new org.json.JSONArray();for(double[] e:entries){org.json.JSONArray row=new org.json.JSONArray();for(double v:e)try{row.put(v);}catch(Exception ex){throw new IllegalArgumentException(ex);}data.put(row);}getPreferences(0).edit().putString("metricVerbauSections",data.toString()).apply();refreshVerbau.run();};
+  try{org.json.JSONArray data=new org.json.JSONArray(getPreferences(0).getString("metricVerbauSections","[]"));for(int i=0;i<data.length();i++){org.json.JSONArray row=data.getJSONArray(i);entries.add(new double[]{row.getDouble(0),row.getDouble(1),row.getDouble(2),row.getDouble(3)});}}catch(Exception ex){notice("Verbaudaten konnten nicht geladen werden.");return;}
+  refreshVerbau.run();
   Button add=new Button(this);add.setText("Abschnitt hinzufügen");fields.addView(add);
   add.setOnClickListener(button->{
    try{
     double[] v=new double[4];for(int i=0;i<4;i++){if(inputs[i].length()==0)throw new IllegalArgumentException("Alle Maße eingeben");v[i]=number(inputs[i]);if(!Double.isFinite(v[i])||v[i]<0)throw new IllegalArgumentException("Ungültiges Maß");}
     if(v[1]<=v[0]||(l>0&&v[1]>l)||v[2]+v[3]<=0)throw new IllegalArgumentException("Stationsgrenzen oder Verbauhöhe prüfen");
     for(double[] e:entries)if(v[0]<e[1]&&v[1]>e[0]&&((v[2]>0&&e[2]>0)||(v[3]>0&&e[3]>0)))throw new IllegalArgumentException("Überlappender Verbau auf derselben Seite");
-    entries.add(v);StringBuilder report=new StringBuilder();double left=0,right=0;
-    for(double[] e:entries){double a=(e[1]-e[0])*e[2],b=(e[1]-e[0])*e[3];left+=a;right+=b;report.append(String.format(java.util.Locale.GERMANY,"%.2f – %.2f m: L %.2f / R %.2f m²\n",e[0],e[1],a,b));}
-    report.append(String.format(java.util.Locale.GERMANY,"\nLinks: %.2f m²\nRechts: %.2f m²\nGesamt: %.2f m²",left,right,left+right));resultText.setText(report.toString());
+    entries.add(v);saveVerbau.run();
    }catch(Exception ex){notice(ex.getMessage());}
   });
-  Button reset=new Button(this);reset.setText("Berechnung zurücksetzen");fields.addView(reset);reset.setOnClickListener(button->{entries.clear();resultText.setText("");});
+  Button reset=new Button(this);reset.setText("Berechnung zurücksetzen");fields.addView(reset);reset.setOnClickListener(button->{new android.app.AlertDialog.Builder(this).setMessage("Alle Verbauabschnitte löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(dialog,which)->{entries.clear();saveVerbau.run();}).show();});
   ScrollView scroll=new ScrollView(this);scroll.addView(fields);
   new android.app.AlertDialog.Builder(this).setTitle("Verbau – Flächenvorberechnung").setView(scroll).setPositiveButton("Schließen",null).show();
  });
