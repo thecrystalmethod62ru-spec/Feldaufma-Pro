@@ -38,6 +38,10 @@ public final class PipeLayout {
         return String.format(java.util.Locale.GERMANY,"%.3f m",value);
     }
     public static List<String> warnings(List<Pipe> pipes,double width,double depth,double clearance){
+        return warnings(pipes,width,depth,clearance,0);
+    }
+    public static List<String> warnings(List<Pipe> pipes,double width,double depth,double clearance,double minCover){
+        if(!Double.isFinite(minCover)||minCover<0)throw new IllegalArgumentException("Ungültige Mindestüberdeckung");
         if(!Double.isFinite(width)||width<=0||!Double.isFinite(depth)||depth<=0||!Double.isFinite(clearance)||clearance<0)
             throw new IllegalArgumentException("Ungültige Grabenmaße");
         List<String> result=new ArrayList<>();
@@ -45,6 +49,7 @@ public final class PipeLayout {
             Pipe a=pipes.get(i);
             if(Math.abs(a.offset)+a.diameter/2>width/2)result.add(a.name+": außerhalb der Grabenbreite");
             if(!a.section(0,depth).fits())result.add(a.name+": oberhalb GOK");
+            else if(depth-a.bedding-a.diameter<minCover)result.add(a.name+": Mindestüberdeckung unterschritten");
             for(int j=0;j<i;j++){
                 Pipe b=pipes.get(j);
                 double gap=Math.hypot(a.offset-b.offset,a.centerHeight()-b.centerHeight())-(a.diameter+b.diameter)/2;
