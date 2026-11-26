@@ -885,6 +885,31 @@ public class MainActivity extends Activity {
   if(("links".equals(sideA)&&"rechts".equals(sideB))||("rechts".equals(sideA)&&"links".equals(sideB)))return false;
   return true;
  }
+ static double overlapArea(org.json.JSONObject a,org.json.JSONObject b,double trenchWidth){
+  double x=a.optDouble("station"),y=b.optDouble("station");
+  double la=RouteSketch.positiveDimension(a,"detailLength"),lb=RouteSketch.positiveDimension(b,"detailLength");
+  double[] u=lateralInterval(a,trenchWidth),v=lateralInterval(b,trenchWidth);
+  if(!Double.isFinite(x)||!Double.isFinite(y)||!Double.isFinite(la)||!Double.isFinite(lb)||u==null||v==null)return Double.NaN;
+  double along=Math.max(0,Math.min(x+la/2,y+lb/2)-Math.max(x-la/2,y-lb/2));
+  double across=Math.max(0,Math.min(u[1],v[1])-Math.max(u[0],v[0]));
+  double area=along*across;return Double.isFinite(area)?area:Double.NaN;
+ }
+ String overlapReport(){
+  StringBuilder out=new StringBuilder();int count=0;
+  for(int i=0;i<objects.length();i++){
+   org.json.JSONObject a=objects.optJSONObject(i);if(a==null)continue;
+   for(int j=i+1;j<objects.length();j++){
+    org.json.JSONObject b=objects.optJSONObject(j);if(b==null||!potentialObjectOverlap(a,b,w))continue;
+    count++;
+    out.append("\n").append(i+1).append(" / ").append(j+1).append(": ").append(a.optString("type")).append(" / ").append(b.optString("type")).append(" – ");
+    double area=overlapArea(a,b,w);
+    if(Double.isFinite(area))out.append(String.format(java.util.Locale.GERMANY,"%.2f m²",area));else out.append("Fläche offen (Maße / Abstand fehlen)");
+    out.append(overlapAccepted(i)&&overlapAccepted(j)?" · bestätigt":" · prüfen");
+   }
+  }
+  if(count==0)return "\n\nKeine möglichen Objektüberlappungen erkannt.";
+  return "\n\nÜberlappungsprüfung – paarweise, entlang der Stationierung (schematisch):"+out+"\nKeine Summierung der Schnittflächen, kein Mengenabzug. An Knicken und bei unterschiedlichen Tiefen separat prüfen.";
+ }
  boolean objectOutsideRoute(org.json.JSONObject o){
   double x=o.optDouble("station"),a=detailExtent(o)/2;return !Double.isFinite(x)||x-a<0||x+a>l;
  }
@@ -961,7 +986,7 @@ public class MainActivity extends Activity {
  void saveObjects(){String old=getPreferences(0).getString("objects","[]");if(!old.equals(objects.toString())){recordProjectEvent("Objekte geändert");undoObjects.push(old);while(undoObjects.size()>HISTORY_LIMIT)undoObjects.removeLast();redoObjects.clear();}persistObjects();}
  void restoreObjectHistory(boolean redo){java.util.ArrayDeque<String> from=redo?redoObjects:undoObjects,to=redo?undoObjects:redoObjects;if(from.isEmpty())return;try{org.json.JSONArray restored=new org.json.JSONArray(from.peek());to.push(objects.toString());from.pop();objects=restored;persistObjects();}catch(org.json.JSONException e){Toast.makeText(this,"Änderung konnte nicht wiederhergestellt werden",Toast.LENGTH_SHORT).show();}}
 
- void refreshDetailQuantities(){if(detailQuantities==null)return;StringBuilder b=new StringBuilder("\nDetailmengen – geometrisch, nicht addiert\n");for(int i=0;i<objects.length();i++){org.json.JSONObject o=objects.optJSONObject(i);if(o==null)continue;double a=detailNumber(o,"detailLength"),w=detailNumber(o,"detailWidth"),h=detailNumber(o,"detailDepth");b.append(o.optString("type")).append(" / ").append(o.optString("station")).append(" m\n");if(Double.isFinite(a*w)&&a>0&&w>0){b.append(String.format(java.util.Locale.GERMANY,"Fläche: %.2f m²",a*w));if(Double.isFinite(a*w*h)&&h>0)b.append(String.format(java.util.Locale.GERMANY," | Körpervolumen: %.2f m³",a*w*h));else b.append(" | Tiefe fehlt");}else b.append("Detailmaße fehlen");b.append(overlapStatus(i));b.append("\n");}b.append("\nNicht zur Haupttrasse addieren: Überschneidungen und LV-Regeln prüfen.");detailQuantities.setText(b.toString());}
+ void refreshDetailQuantities(){if(detailQuantities==null)return;StringBuilder b=new StringBuilder("\nDetailmengen – geometrisch, nicht addiert\n");for(int i=0;i<objects.length();i++){org.json.JSONObject o=objects.optJSONObject(i);if(o==null)continue;double a=detailNumber(o,"detailLength"),w=detailNumber(o,"detailWidth"),h=detailNumber(o,"detailDepth");b.append(o.optString("type")).append(" / ").append(o.optString("station")).append(" m\n");if(Double.isFinite(a*w)&&a>0&&w>0){b.append(String.format(java.util.Locale.GERMANY,"Fläche: %.2f m²",a*w));if(Double.isFinite(a*w*h)&&h>0)b.append(String.format(java.util.Locale.GERMANY," | Körpervolumen: %.2f m³",a*w*h));else b.append(" | Tiefe fehlt");}else b.append("Detailmaße fehlen");b.append(overlapStatus(i));b.append("\n");}b.append("\nNicht zur Haupttrasse addieren: Überschneidungen und LV-Regeln prüfen.");b.append(overlapReport());detailQuantities.setText(b.toString());}
  String detailSummary(org.json.JSONObject o){StringBuilder b=new StringBuilder();String[] keys={"detailLength","detailWidth","detailDepth"},names={"L","B","T"};for(int j=0;j<3;j++){String v=o.optString(keys[j],"");if(!v.isEmpty())b.append(" | ").append(names[j]).append("=").append(v).append(" m");}return b.toString();}
  void showObjects(){refreshOverview();StringBuilder b=new StringBuilder();for(int i=0;i<objects.length();i++){org.json.JSONObject o=objects.optJSONObject(i);if(o!=null)b.append(String.format(java.util.Locale.GERMANY,"%.2f m | %s | %s | %s\n",o.optDouble("station"),o.optString("type"),o.optString("side"),o.optString("note")+detailSummary(o)+overlapStatus(i)));}objectList.setText(b.toString());}
  void saveSoll(){try{EditText[] fields={sollLength,sollWidth,sollDepth,sollAsphalt};String[] keys={"sollLength","sollWidth","sollDepth","sollAsphalt"};for(EditText e:fields){if(e.length()>0){double n=number(e);if(!Double.isFinite(n)||n<=0)throw new Exception();}}android.content.SharedPreferences.Editor ed=getPreferences(0).edit();for(int i=0;i<fields.length;i++)ed.putString(keys[i],fields[i].getText().toString());ed.putString("sollSource",sollSource.getText().toString()).apply();compareSoll();}catch(Exception e){Toast.makeText(this,"Bitte gültige positive Soll-Maße eingeben.",Toast.LENGTH_LONG).show();}}
