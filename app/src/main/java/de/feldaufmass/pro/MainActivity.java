@@ -2174,6 +2174,13 @@ public class MainActivity extends Activity {
       }catch(Exception ex){limits.setError(ex.getMessage());}
      });
      if(!overlapPrefs.edit().putString("metricCrossSectionDimensions",bw+";"+bd).commit())throw new IllegalStateException("Bezugsmaße konnten nicht gespeichert werden");
+     final Button syncTrench=new Button(this);syncTrench.setAllCaps(false);syncTrench.setText("Grabenmaße in Tiefbau übernehmen");content.addView(syncTrench,1);
+     syncTrench.setOnClickListener(button->new android.app.AlertDialog.Builder(this).setTitle("Grabenmaße übernehmen?").setMessage("Breite "+bw+" m und Tiefe "+bd+" m werden als allgemeine Grabenmaße des Projekts übernommen. Abschnittsbezogene Maße bleiben unverändert.").setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",(dialog,which)->{
+      if(!overlapPrefs.edit().putString("width",String.valueOf(bw)).putString("depth",String.valueOf(bd)).commit()){warnings.setText("Grabenmaße konnten nicht gespeichert werden.");return;}
+      width.setText(String.valueOf(bw));depth.setText(String.valueOf(bd));
+      if(profile!=null)profile.invalidate();if(sketch!=null)sketch.invalidate();
+      android.widget.Toast.makeText(this,"Grabenmaße übernommen",android.widget.Toast.LENGTH_SHORT).show();
+     }).show());
      refresh.run();
      final android.widget.PopupWindow[] activePipePanel={null};
      final PipeLayoutView.Move[] draftMove={null};
