@@ -2869,7 +2869,7 @@ public class MainActivity extends Activity {
      double lo=o.optDouble("from",Double.NaN),hi=o.optDouble("to",Double.NaN);String name=o.optString("surface","").trim();
      if(Double.isFinite(lo)&&Double.isFinite(hi)&&lo>=0&&hi<=total&&lo<=mid&&mid<hi&&!name.isEmpty()){surface=name;matches++;}
     }
-    if(matches==1){bySurface.put(surface,bySurface.containsKey(surface)?bySurface.get(surface)+part:part);if(Double.isFinite(cutLeft)&&cutLeft>=0&&Double.isFinite(cutRight)&&cutRight>=0){double extra=(to-from)*(cutLeft+cutRight);cutsBySurface.put(surface,cutsBySurface.containsKey(surface)?cutsBySurface.get(surface)+extra:extra);}}
+    if(matches==1){bySurface.put(surface,bySurface.containsKey(surface)?bySurface.get(surface)+part:part);if(Double.isFinite(cutLeft)&&cutLeft>=0&&Double.isFinite(cutRight)&&cutRight>=0){double extra=CivilGeometry.rectangularArea(to-from,cutLeft+cutRight);cutsBySurface.put(surface,cutsBySurface.containsKey(surface)?cutsBySurface.get(surface)+extra:extra);}}
     else{unknownSurface+=part;if(matches>1)surfaceConflicts++;}
    }
    StringBuilder result=new StringBuilder(String.format(java.util.Locale.GERMANY,unmeasured>0?"Rechnerische Grabenfläche (nur bemaßte Abschnitte): %.2f m²":"Rechnerische Grabenfläche (Länge × Breite): %.2f m²",area));
@@ -3756,14 +3756,14 @@ public class MainActivity extends Activity {
     if(asphaltLayer||stoneLayer){
      double thickness=optional(asphaltLayer?asphaltInput:stoneDepth)/(asphaltLayer?1:100);
      if(Double.isFinite(thickness)&&thickness>0){
-      double volume=(to-from)*cut*thickness;
+      double volume=CivilGeometry.rectangularVolume(to-from,cut,thickness);
       totals.put(type,totals.getOrDefault(type,0.0)+volume);
       report.append(String.format(java.util.Locale.GERMANY,"Deckschicht: %.3f m³%s\n",volume,row.has("cutWidth")?"":" (nur Graben; Nachschnitt unbekannt)"));
      }else report.append("Deckschichtstärke fehlt\n");
     }else report.append("Deckschicht nicht berechnet\n");
     double baseThickness=optional(baseInput);
     if(Double.isFinite(baseThickness)&&baseThickness>0&&(asphaltLayer||stoneLayer)){
-     double volume=(to-from)*bw*baseThickness;totals.put("Tragschicht",totals.getOrDefault("Tragschicht",0.0)+volume);
+     double volume=CivilGeometry.rectangularVolume(to-from,bw,baseThickness);totals.put("Tragschicht",totals.getOrDefault("Tragschicht",0.0)+volume);
      report.append(String.format(java.util.Locale.GERMANY,"Tragschicht (Grabenbreite): %.3f m³\n",volume));
     }else report.append("Tragschicht nicht berechnet\n");
    }
