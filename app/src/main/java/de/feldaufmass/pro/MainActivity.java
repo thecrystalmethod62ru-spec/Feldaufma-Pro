@@ -1795,6 +1795,38 @@ public class MainActivity extends Activity {
   pipeProfileInput.setHint("Rohrprofil: Außendurchmesser;Wandstärke;Bettung (m)");
   pipeProfileInput.setText(overlapPrefs.getString("metricPipeProfile",""));
   panel.addView(pipeProfileInput);
+  final PipeLayoutStore multiPipeStore=new PipeLayoutStore(overlapPrefs);
+  final Button multiPipeButton=new Button(this);
+  multiPipeButton.setText("Mehrfachbelegung bearbeiten");
+  panel.addView(multiPipeButton);
+  multiPipeButton.setOnClickListener(v->{
+   try{
+    final java.util.List<PipeLayout.Pipe> pipes=multiPipeStore.load();
+    final EditText editor=new EditText(this);
+    editor.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+    editor.setHint("Name;Versatz;Außendurchmesser;Wandstärke;Bettung (m)");
+    StringBuilder rows=new StringBuilder();
+    for(PipeLayout.Pipe pipe:pipes)rows.append(pipe.name).append(';').append(pipe.offset).append(';').append(pipe.diameter).append(';').append(pipe.wall).append(';').append(pipe.bedding).append('\n');
+    editor.setText(rows.toString());
+    android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Mehrfachbelegung – Maße in m").setMessage("Eine Leitung je Zeile. Versatz negativ links, positiv rechts.").setView(editor).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
+    dialog.setOnShowListener(ignored->dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(save->{
+     try{
+      java.util.List<PipeLayout.Pipe> updated=new java.util.ArrayList<>();
+      for(String line:editor.getText().toString().split("\\n")){
+       if(line.trim().isEmpty())continue;
+       String[] fields=line.split(";",-1);
+       if(fields.length!=5)throw new IllegalArgumentException("Fünf Felder je Leitung erforderlich");
+       double[] d=new double[4];
+       for(int k=0;k<4;k++)d[k]=Double.parseDouble(fields[k+1].trim().replace(',','.'));
+       updated.add(new PipeLayout.Pipe(fields[0].trim(),d[0],d[1],d[2],d[3]));
+      }
+      multiPipeStore.save(updated);multiPipeButton.setText("Mehrfachbelegung ("+updated.size()+") bearbeiten");dialog.dismiss();
+     }catch(Exception ex){editor.setError(ex.getMessage());}
+    }));
+    dialog.show();
+   }catch(Exception ex){new android.app.AlertDialog.Builder(this).setMessage("Rohrprofil konnte nicht geladen werden: "+ex.getMessage()).setPositiveButton("OK",null).show();}
+  });
+
   final EditText minimumCoverInput=new EditText(this);
   minimumCoverInput.setHint("Mindestüberdeckung (m), optional");
   minimumCoverInput.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
