@@ -155,7 +155,8 @@ public class MainActivity extends Activity {
      }v=rows.toString();
     }else if(key.equals("documents")){
      org.json.JSONArray docs=new org.json.JSONArray(v);for(int j=0;j<docs.length();j++){org.json.JSONObject doc=docs.getJSONObject(j);doc.remove("uri");doc.put("name",doc.optString("name")+" (neu verknüpfen)");}v=docs.toString();
-    }else if(key.equals("objects")||key.equals("segments")||key.equals("elevationPoints")||key.equals("lvPositions")||key.equals("dailyReports")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)rows.getJSONObject(j);}
+    }else if(key.equals("dailyReports")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++){org.json.JSONArray items=dailyPhotos(rows.getJSONObject(j));for(int k=0;k<items.length();k++){org.json.JSONObject photo=items.getJSONObject(k);String old=photo.getString("file"),replacement=photos.get(old);if(replacement==null)throw new java.io.IOException("Berichtsfoto fehlt");used.add(old);photo.put("file",replacement);}}v=rows.toString();
+    }else if(key.equals("objects")||key.equals("segments")||key.equals("elevationPoints")||key.equals("lvPositions")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)rows.getJSONObject(j);}
     else if(key.equals("objectUndo")||key.equals("objectRedo")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)new org.json.JSONArray(rows.getString(j));}
     if(key.equals("project")&&!v.trim().isEmpty())name=v.trim();
     ed.putString(key,v);
@@ -197,6 +198,8 @@ public class MainActivity extends Activity {
     photos.add(name);
    }
   }
+  Object reportsData=snapshot.get("dailyReports");
+  if(reportsData instanceof String){org.json.JSONArray reports=new org.json.JSONArray((String)reportsData);for(int j=0;j<reports.length();j++){org.json.JSONArray items=dailyPhotos(reports.getJSONObject(j));for(int k=0;k<items.length();k++){String name=items.getJSONObject(k).getString("file");if(!name.matches("[A-Za-z0-9._-]+")||name.equals(".")||name.equals(".."))throw new java.io.IOException("Ungültiger Fotodateiname");photos.add(name);}}}
   try(java.util.zip.ZipOutputStream zip=new java.util.zip.ZipOutputStream(new java.io.FileOutputStream(target))){
    zip.putNextEntry(new java.util.zip.ZipEntry("project.json"));zip.write(manifest.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));zip.closeEntry();
    for(String name:photos){
@@ -953,12 +956,82 @@ public class MainActivity extends Activity {
  }
  static final String[] DAILY_KEYS={"date","weather","crew","equipment","work","materials","incidents","notes"};
  static final String[] DAILY_LABELS={"Datum (JJJJ-MM-TT)","Wetter / Temperatur","Personal / Arbeitszeiten","Geräte / Maschinen","Ausgeführte Arbeiten / Stationen","Material / Lieferungen","Behinderungen / Besonderheiten","Bemerkungen"};
+ org.json.JSONArray dailyPhotos(org.json.JSONObject report){
+  org.json.JSONArray a=report==null?null:report.optJSONArray("photos");return a==null?new org.json.JSONArray():a;
+ }
+ void chooseDailyPhotos(int index){
+  org.json.JSONArray original=dailyReports();org.json.JSONObject report=original.optJSONObject(index);if(report==null)return;
+  java.util.LinkedHashMap<String,org.json.JSONObject> entries=new java.util.LinkedHashMap<>();java.util.HashSet<String> selected=new java.util.HashSet<>();
+  org.json.JSONArray prior=dailyPhotos(report);
+  for(int j=0;j<prior.length();j++){org.json.JSONObject o=prior.optJSONObject(j);if(o!=null){entries.put(o.optString("file"),o);selected.add(o.optString("file"));}}
+  RouteSketch route=new RouteSketch(this,routeData());
+  try{
+   for(int j=0;j<route.vertices.size();j++){RouteSketch.Vertex v=route.vertices.get(j);
+    for(int k=0;k<v.photos.length();k++){
+     String file=v.photos.optString(k);org.json.JSONObject meta=v.photoMetadata.optJSONObject(file);
+     String info="Trassenpunkt "+(j+1)+(v.name.isEmpty()?"":" – "+v.name)+"\nStation bei Auswahl: "+reportMeasure(photoStation(route,j))+"\n"+photoInfo(meta);
+     if(meta!=null&&!meta.optString("description").isEmpty())info+="\nBeschreibung: "+meta.optString("description");
+     if(!entries.containsKey(file))entries.put(file,new org.json.JSONObject().put("file",file).put("label","Punkt "+(j+1)+" · Foto "+(k+1)+" · "+v.name).put("info",info));
+    }
+   }
+  }catch(Exception e){notice("Fotoliste konnte nicht geladen werden.");return;}
+  if(entries.isEmpty()){notice("Zuerst Fotos an Trassenpunkte anhängen.");return;}
+  java.util.ArrayList<org.json.JSONObject> list=new java.util.ArrayList<>(entries.values());String[] labels=new String[list.size()];boolean[] checked=new boolean[list.size()];
+  for(int j=0;j<list.size();j++){org.json.JSONObject o=list.get(j);labels[j]=o.optString("label");checked[j]=selected.contains(o.optString("file"));}
+  new android.app.AlertDialog.Builder(this).setTitle("Fotos zum Bautagesbericht").setMultiChoiceItems(labels,checked,(d,j,c)->checked[j]=c)
+   .setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",(d,w)->{
+    if(!dailyReports().toString().equals(original.toString())){notice("Bericht geändert. Neu öffnen.");return;}
+    org.json.JSONArray photos=new org.json.JSONArray();for(int j=0;j<list.size();j++)if(checked[j])photos.put(list.get(j));
+    try{report.put("photos",photos).put("modifiedAt",System.currentTimeMillis());if(saveDailyReports(original))showDailyReports();}catch(Exception e){notice("Fotos konnten nicht zugeordnet werden.");}
+   }).show();
+ }
+ String pendingDailyPdfId;
+ void exportDailyPdf(int index){
+  org.json.JSONObject report=dailyReports().optJSONObject(index);if(report==null)return;
+  pendingDailyPdfId=report.optString("id");if(pendingDailyPdfId.isEmpty()){notice("Bericht erneut speichern.");return;}
+  android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.setType("application/pdf");i.putExtra(android.content.Intent.EXTRA_TITLE,"Bautagesbericht_"+report.optString("date")+".pdf");startActivityForResult(i,423);
+ }
+ int dailyTextPdf(android.graphics.pdf.PdfDocument pdf,int number,String title,String content,android.graphics.Bitmap bitmap){
+  android.text.TextPaint tp=new android.text.TextPaint(Paint.ANTI_ALIAS_FLAG);tp.setTextSize(13);tp.setColor(INK);
+  android.text.StaticLayout layout=android.text.StaticLayout.Builder.obtain(content,0,content.length(),tp,523).build();
+  Paint pen=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
+  int line=0;boolean first=true;
+  do{
+   android.graphics.pdf.PdfDocument.Page page=pdf.startPage(new android.graphics.pdf.PdfDocument.PageInfo.Builder(595,842,number++).create());
+   int y=first&&bitmap!=null?450:70,top=layout.getLineTop(line),end=line+1;
+   while(end<layout.getLineCount()&&layout.getLineBottom(end)-top<=780-y)end++;
+   try{Canvas c=page.getCanvas();pen.setColor(INK);pen.setTextSize(18);c.drawText(title,36,40,pen);pen.setTextSize(11);c.drawText("Seite "+(number-1),500,808,pen);
+    if(first&&bitmap!=null){float scale=Math.min(523f/bitmap.getWidth(),370f/bitmap.getHeight()),bw=bitmap.getWidth()*scale,bh=bitmap.getHeight()*scale,x=36+(523-bw)/2,by=63+(370-bh)/2;c.drawBitmap(bitmap,null,new android.graphics.RectF(x,by,x+bw,by+bh),pen);}
+    c.save();c.translate(36,y);c.clipRect(0,0,523,layout.getLineTop(end)-top);c.translate(0,-top);layout.draw(c);c.restore();
+   }finally{pdf.finishPage(page);}line=end;first=false;
+  }while(line<layout.getLineCount());
+  return number;
+ }
+ void writeDailyPdf(android.net.Uri uri){
+  String id=pendingDailyPdfId;pendingDailyPdfId=null;org.json.JSONObject report=null;org.json.JSONArray rows=dailyReports();
+  for(int j=0;j<rows.length();j++){org.json.JSONObject o=rows.optJSONObject(j);if(o!=null&&id!=null&&id.equals(o.optString("id")))report=o;}
+  if(report==null){notice("Bericht nicht gefunden. Export erneut starten.");return;}
+  android.graphics.pdf.PdfDocument pdf=new android.graphics.pdf.PdfDocument();
+  try(java.io.OutputStream out=getContentResolver().openOutputStream(uri,"wt")){
+   if(out==null)throw new java.io.IOException();
+   String projectName=projectHeader.getText().toString();StringBuilder text=new StringBuilder("Projekt: "+projectName+"\nDatum: "+report.optString("date")+"\n");
+   for(int j=1;j<DAILY_KEYS.length;j++){String value=report.optString(DAILY_KEYS[j]);text.append("\n").append(DAILY_LABELS[j]).append("\n").append(value.isEmpty()?"Nicht erfasst":value).append("\n");}
+   org.json.JSONArray photos=dailyPhotos(report);text.append("\nZugeordnete Fotos: ").append(photos.length());
+   int page=dailyTextPdf(pdf,1,"Bautagesbericht",text.toString(),null);
+   for(int j=0;j<photos.length();j++){org.json.JSONObject o=photos.optJSONObject(j);if(o==null)continue;android.graphics.Bitmap bitmap=reportPhoto(o.optString("file"));String info=projectName+"\nBerichtsdatum: "+report.optString("date")+"\n"+o.optString("info");if(bitmap==null)info+="\nBilddatei fehlt oder ist nicht lesbar.";
+    page=dailyTextPdf(pdf,page,"Foto "+(j+1)+" / "+photos.length(),info,bitmap);
+   }
+   pdf.writeTo(out);notice("Bautagesbericht gespeichert.");
+  }catch(Exception e){notice("PDF konnte nicht gespeichert werden.");}finally{pdf.close();}
+ }
  void showDailyReports(){
   org.json.JSONArray rows=dailyReports();LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
   if(rows.length()==0)form.addView(sheetText("Noch keine Bautagesberichte vorhanden.",15,false));
   for(int j=rows.length()-1;j>=0;j--){
    final int index=j;org.json.JSONObject o=rows.optJSONObject(j);if(o==null)continue;Button b=new Button(this);b.setAllCaps(false);
    String work=o.optString("work");b.setText(o.optString("date")+"\n"+work.substring(0,Math.min(100,work.length())));b.setOnClickListener(v->editDailyReport(index));form.addView(b);
+   Button photos=new Button(this);photos.setAllCaps(false);photos.setText("Fotos zuordnen ("+dailyPhotos(o).length()+")");photos.setOnClickListener(v->chooseDailyPhotos(index));form.addView(photos);
+   Button pdf=new Button(this);pdf.setAllCaps(false);pdf.setText("Bautagesbericht als PDF");pdf.setOnClickListener(v->exportDailyPdf(index));form.addView(pdf);
   }
   new android.app.AlertDialog.Builder(this).setTitle("Bautagesberichte").setView(scroll).setNegativeButton("Schließen",null).setPositiveButton("Neuer Bericht",(a,b)->editDailyReport(-1)).show();
  }
@@ -2158,6 +2231,7 @@ public class MainActivity extends Activity {
  try{startActivityForResult(i,410);}catch(android.content.ActivityNotFoundException e){Toast.makeText(this,"Keine Spracherkennung verfügbar.",Toast.LENGTH_LONG).show();}
  }
  @Override protected void onActivityResult(int request,int result,android.content.Intent data){super.onActivityResult(request,result,data);
+ if(request==423){if(result==RESULT_OK&&data!=null&&data.getData()!=null)writeDailyPdf(data.getData());else pendingDailyPdfId=null;return;}
  if(request==422&&result==RESULT_OK&&data!=null&&data.getData()!=null){writePhotoReport(data.getData());return;}
  if(request==421){if(result==RESULT_OK&&data!=null&&data.getData()!=null)writeX31(data.getData());else pendingX31Data=null;return;}
  if(request==420){if(result==RESULT_OK&&data!=null&&data.getData()!=null)writeReb(data.getData());else pendingRebData=null;return;}
