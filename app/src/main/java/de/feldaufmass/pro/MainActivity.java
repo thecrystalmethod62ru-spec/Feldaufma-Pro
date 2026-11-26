@@ -1641,6 +1641,10 @@ public class MainActivity extends Activity {
    double qx=b1[0]-a1[0],qy=b1[1]-a1[1],t=(qx*sy-qy*sx)/den,u=(qx*ry-qy*rx)/den;
    if(t>1e-8&&t<1-1e-8&&u>1e-8&&u<1-1e-8)crossings++;
   }
+  LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);
+  TextView geometryStatus=new TextView(this);panel.addView(geometryStatus);
+  TextView overlapStatus=new TextView(this);panel.addView(overlapStatus);
+  Runnable refreshGeometry=()->{
   int missingWidths=0;double totalLength=route.measuredLength();
   java.util.TreeSet<Double> widthCuts=new java.util.TreeSet<>();widthCuts.add(0.0);widthCuts.add(totalLength);
   for(int i=0;i<widthSections.length();i++){org.json.JSONObject o=widthSections.optJSONObject(i);if(o==null)continue;double from=o.optDouble("from"),to=o.optDouble("to");if(Double.isFinite(from)&&Double.isFinite(to)&&from>=0&&to<=totalLength&&to>from){widthCuts.add(from);widthCuts.add(to);}}
@@ -1692,9 +1696,10 @@ public class MainActivity extends Activity {
    }
    if(dist<=reachA+reachB+1e-8)possibleOverlaps++;
   }
-  LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);
-  TextView geometryStatus=new TextView(this);geometryStatus.setText(crossings==0&&missingWidths==0?"Geometrie: keine Achsen-Selbstkreuzung erkannt; Flächenprüfung noch offen.":"Prüfung: "+crossings+" Achsen-Selbstkreuzung(en), "+missingWidths+" Abschnitt(e) ohne Grabenbreite. Keine automatische Abrechnung.");panel.addView(geometryStatus);
-  TextView overlapStatus=new TextView(this);overlapStatus.setText(possibleOverlaps==0&&uncheckedPairs==0?"Außenkontur: keine Nähe-Konflikte zwischen getrennten Abschnitten erkannt (keine Flächenfreigabe).":"Außenkontur: "+possibleOverlaps+" mögliche Überlappung(en); "+uncheckedPairs+" Paar(e) wegen fehlender Maße nicht geprüft. Flächen manuell prüfen.");panel.addView(overlapStatus);
+   geometryStatus.setText(crossings==0&&missingWidths==0?"Geometrie: keine Achsen-Selbstkreuzung erkannt; Flächenprüfung noch offen.":"Prüfung: "+crossings+" Achsen-Selbstkreuzung(en), "+missingWidths+" Abschnitt(e) ohne Grabenbreite. Keine automatische Abrechnung.");
+   overlapStatus.setText(possibleOverlaps==0&&uncheckedPairs==0?"Außenkontur: keine Nähe-Konflikte zwischen getrennten Abschnitten erkannt (keine Flächenfreigabe).":"Außenkontur: "+possibleOverlaps+" mögliche Überlappung(en); "+uncheckedPairs+" Paar(e) wegen fehlender Maße nicht geprüft. Flächen manuell prüfen.");
+  };
+  refreshGeometry.run();
   TextView nominalArea=new TextView(this);panel.addView(nominalArea);
   Runnable refreshNominalArea=()->{
    double total=route.measuredLength();
@@ -1911,7 +1916,7 @@ public class MainActivity extends Activity {
      org.json.JSONArray next=new org.json.JSONArray(widthSections.toString());org.json.JSONObject entry=new org.json.JSONObject().put("from",from).put("to",to).put("width",width);
      if(Double.isFinite(values[3]))entry.put("left",values[3]);if(Double.isFinite(values[4]))entry.put("right",values[4]);next.put(entry);
      if(!getPreferences(0).edit().putString("metricWidthSections",next.toString()).commit()){notice("Speichern fehlgeschlagen.");return;}
-     widthSections.put(next.getJSONObject(next.length()-1));refreshNominalArea.run();drawing.invalidate();edit.dismiss();notice("Breitenabschnitt gespeichert.");
+     widthSections.put(next.getJSONObject(next.length()-1));refreshNominalArea.run();refreshGeometry.run();drawing.invalidate();edit.dismiss();notice("Breitenabschnitt gespeichert.");
     }catch(Exception e){notice("Bitte gültige Maße eingeben.");}
    }));edit.show();
   });
@@ -1920,7 +1925,7 @@ public class MainActivity extends Activity {
    String[] labels=new String[widthSections.length()];for(int i=0;i<labels.length;i++){org.json.JSONObject o=widthSections.optJSONObject(i);labels[i]=o==null?"Ungültig":String.format(java.util.Locale.GERMANY,"%.2f – %.2f m · B %.2f m · L %s · R %s",o.optDouble("from"),o.optDouble("to"),o.optDouble("width"),o.has("left")?String.format(java.util.Locale.GERMANY,"%.2f",o.optDouble("left")):"Standard",o.has("right")?String.format(java.util.Locale.GERMANY,"%.2f",o.optDouble("right")):"Standard");}
    if(labels.length==0){notice("Keine Breitenabschnitte.");return;}
    new android.app.AlertDialog.Builder(this).setTitle("Abschnitt zum Löschen wählen").setItems(labels,(d,i)->new android.app.AlertDialog.Builder(this).setMessage(labels[i]+" löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(dd,ww)->{
-    try{org.json.JSONArray next=new org.json.JSONArray(widthSections.toString());next.remove(i);if(getPreferences(0).edit().putString("metricWidthSections",next.toString()).commit()){widthSections.remove(i);refreshNominalArea.run();drawing.invalidate();}else notice("Speichern fehlgeschlagen.");}catch(Exception e){notice("Löschen fehlgeschlagen.");}
+    try{org.json.JSONArray next=new org.json.JSONArray(widthSections.toString());next.remove(i);if(getPreferences(0).edit().putString("metricWidthSections",next.toString()).commit()){widthSections.remove(i);refreshNominalArea.run();refreshGeometry.run();drawing.invalidate();}else notice("Speichern fehlgeschlagen.");}catch(Exception e){notice("Löschen fehlgeschlagen.");}
    }).show()).setNegativeButton("Schließen",null).show();
   });
   Button editWidth=new Button(this);editWidth.setText("Breitenabschnitt bearbeiten");panel.addView(editWidth);
@@ -1948,7 +1953,7 @@ public class MainActivity extends Activity {
       if(Double.isFinite(vals[3]))updated.put("left",vals[3]);if(Double.isFinite(vals[4]))updated.put("right",vals[4]);
       org.json.JSONArray next=new org.json.JSONArray(widthSections.toString());next.put(index,updated);
       if(!getPreferences(0).edit().putString("metricWidthSections",next.toString()).commit()){notice("Speichern fehlgeschlagen.");return;}
-      widthSections.put(index,updated);refreshNominalArea.run();drawing.invalidate();dialog.dismiss();notice("Breitenabschnitt aktualisiert. Für neue Geometrieprüfung Vorschau erneut öffnen.");
+      widthSections.put(index,updated);refreshNominalArea.run();refreshGeometry.run();drawing.invalidate();dialog.dismiss();notice("Breitenabschnitt aktualisiert; Geometrieprüfung erneuert.");
      }catch(Exception e){notice("Bitte gültige Maße eingeben.");}
     }));dialog.show();
    }).setNegativeButton("Schließen",null).show();
