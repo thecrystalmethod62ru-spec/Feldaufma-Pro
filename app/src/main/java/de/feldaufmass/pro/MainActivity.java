@@ -571,12 +571,20 @@ public class MainActivity extends Activity {
   for(int j=0;j<draft.length();j++){final int index=j;org.json.JSONObject o=draft.optJSONObject(j);if(o==null)continue;Button b=new Button(this);b.setAllCaps(false);b.setText(o.optString("type")+" · "+o.optString("station")+" m"+detailSummary(o));b.setOnClickListener(v->new android.app.AlertDialog.Builder(this).setTitle("Neues Objekt entfernen?").setNegativeButton("Abbrechen",null).setPositiveButton("Entfernen",(d,w)->{draft.remove(index);refresh.run();}).show());form.addView(b);}
   new android.app.AlertDialog.Builder(this).setTitle("Trassenobjekte – Entwurf").setView(scroll).setNegativeButton("Schließen",null).setPositiveButton("Objekt hinzufügen",(d,w)->addEditorObject(route,draft,refresh)).show();
  }
- void addEditorObject(RouteSketch route,org.json.JSONArray draft,Runnable refresh){
+ void pickEditorObjectStation(RouteSketch route,org.json.JSONArray draft,Runnable refresh,java.util.ArrayList<RouteSketch.StationHit> hits){
+  if(hits.isEmpty()){notice("Bitte nahe an einer vollständig bemaßten Trasse antippen.");return;}
+  if(hits.size()==1){addEditorObject(route,draft,refresh,hits.get(0).station);return;}
+  String[] labels=new String[hits.size()];
+  for(int j=0;j<hits.size();j++){RouteSketch.StationHit hit=hits.get(j);labels[j]="Abschnitt "+hit.segment+" · Station "+csvNumber(hit.station)+" m";}
+  new android.app.AlertDialog.Builder(this).setTitle("Mehrere mögliche Stationen").setItems(labels,(d,w)->addEditorObject(route,draft,refresh,hits.get(w).station)).setNegativeButton("Abbrechen",null).show();
+ }
+ void addEditorObject(RouteSketch route,org.json.JSONArray draft,Runnable refresh){addEditorObject(route,draft,refresh,Double.NaN);}
+ void addEditorObject(RouteSketch route,org.json.JSONArray draft,Runnable refresh,double suggestedStation){
   double total=route.measuredLength();
   if(!Double.isFinite(total)||total<=0){notice("Zuerst die Trasse vollständig bemaßen, damit Stationen eindeutig sind.");return;}
   LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
   Spinner type=choices(form,new String[]{"Hausanschluss","Suchschachtung","Hindernis","Startgrube","Zielgrube","KVS","Knickpunkt"});
-  EditText station=new EditText(this);station.setInputType(8194);station.setHint("Station in m (0 – "+csvNumber(total)+")");form.addView(station);
+  EditText station=new EditText(this);station.setInputType(8194);station.setHint("Station in m (0 – "+csvNumber(total)+")");if(Double.isFinite(suggestedStation)){station.setText(java.math.BigDecimal.valueOf(suggestedStation).stripTrailingZeros().toPlainString().replace('.',','));}form.addView(station);
   Spinner side=choices(form,new String[]{"Unbekannt","links","rechts","mittig"});
   String[] keys={"detailLength","detailWidth","detailDepth","detailOffset"},labels={"Länge (m)","Breite (m)","Tiefe (m)","Abstand zum Grabenrand (m)"};
   EditText[] fields=new EditText[keys.length];for(int j=0;j<fields.length;j++){fields[j]=new EditText(this);fields[j].setInputType(8194);fields[j].setHint(labels[j]+" – optional");form.addView(fields[j]);}
@@ -697,20 +705,21 @@ public class MainActivity extends Activity {
    }else form.addView(sheetText("Zeichenvorlage fehlt oder ist nicht lesbar.",13,false));
   }
 
-  Spinner mode=choices(form,new String[]{"Zeichnen","Maß eintragen","Punkte verschieben"});
+  Spinner mode=choices(form,new String[]{"Zeichnen","Maß eintragen","Punkte verschieben","Objekt platzieren"});
   Spinner angles=choices(form,new String[]{"Freier Winkel","0°","15°","30°","45°","60°","75°","90°"});
   angles.setVisibility(View.GONE);
   onChoice(angles,index->route.angle=index==0?-1:(index-1)*15);
   onChoice(mode,index->{
-   route.dimensioning=index==1;route.moving=index==2;
+   route.dimensioning=index==1;route.moving=index==2;route.placingObject=index==3;
    angles.setVisibility(route.moving?View.VISIBLE:View.GONE);
-   hint.setText(new String[]{"Mit einem Finger zeichnen, mit zwei Fingern zoomen oder verschieben.","Abschnitt zum Bemaßen antippen.","Punkt ziehen. Der Winkel gilt zur Waagerechten am benachbarten Punkt."}[index]);
+   hint.setText(new String[]{"Mit einem Finger zeichnen, mit zwei Fingern zoomen oder verschieben.","Abschnitt zum Bemaßen antippen.","Punkt ziehen. Der Winkel gilt zur Waagerechten am benachbarten Punkt.","Trasse antippen, um ein Objekt an einer Station zu platzieren."}[index]);
   });
   mode.setSelection(measure?1:0);
   final String initialSaved=routeData();
   final String initialObjects=objects.toString();final org.json.JSONArray draftObjects=new org.json.JSONArray();
   Runnable refreshObjects=()->{org.json.JSONArray merged=new org.json.JSONArray();for(int j=0;j<objects.length();j++)merged.put(objects.optJSONObject(j));for(int j=0;j<draftObjects.length();j++)merged.put(draftObjects.optJSONObject(j));route.setTrenchWidth(w);route.setStationLayers(merged,segments);route.invalidate();};
   Runnable openObjects=()->showEditorObjects(route,draftObjects,refreshObjects);
+  route.stationSelected=hits->pickEditorObjectStation(route,draftObjects,refreshObjects,hits);
   Button objectTools=new Button(this);objectTools.setAllCaps(false);objectTools.setText("Objekte hinzufügen");form.addView(objectTools);objectTools.setOnClickListener(v->openObjects.run());refreshObjects.run();
   RouteEditHistory history=loadRouteHistory(route.encode());
   LinearLayout historyBar=new LinearLayout(this);form.addView(historyBar);
