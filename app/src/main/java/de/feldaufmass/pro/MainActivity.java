@@ -838,6 +838,25 @@ public class MainActivity extends Activity {
    try{for(int j=0;j<3;j++)if(values[j]!=null)o.put(keys[j],values[j]);saveObjects();notice("Detailmaße gespeichert.");}catch(Exception e){notice("Detailmaße konnten nicht gespeichert werden.");}
   }).show();return true;
  }
+ boolean offerVoiceSurface(String text){
+  String[] patterns={"(?:толщина\\s+асфальта|асфальт|asphaltstärke|asphalt)","(?:толщина\\s+брусчатки|брусчатка|pflasterstärke|pflaster)","(?:щебень|несущий слой|tragschichtstärke|schottertragschicht)","(?:песчаная подушка|песок|sandbettung)"};
+  String[] labels={"Asphaltstärke","Belagsstärke","Tragschichtstärke","Sandbettung"};
+  EditText[] fields={asphaltInput,stoneDepth,baseInput,bedding};
+  String[] values=new String[4];StringBuilder preview=new StringBuilder();
+  for(int j=0;j<patterns.length;j++){
+   java.util.regex.Matcher m=java.util.regex.Pattern.compile("(?iu)"+patterns[j]+"\\s*[:=]?\\s*(\\d+(?:[.,]\\d+)?)\\s*(zentimeter|cm|сантиметр[а-я]*|см|meter|метр[а-я]*|m|м)(?![\\p{L}])").matcher(text);
+   if(m.find()){double n=Double.parseDouble(m.group(1).replace(',','.'));String u=m.group(2).toLowerCase(java.util.Locale.ROOT);if(u.equals("cm")||u.equals("см")||u.startsWith("сантиметр")||u.equals("zentimeter"))n/=100;
+    if(!Double.isFinite(n)||n<=0){notice("Positive Schichtstärke erforderlich.");return true;}
+    values[j]=j==3?String.format(java.util.Locale.GERMANY,"Sand, %.3f m",n):String.format(java.util.Locale.GERMANY,"%.3f",j==1?n*100:n);
+    preview.append(labels[j]).append(": ").append(String.format(java.util.Locale.GERMANY,"%.3f m",n)).append("\n");
+   }
+  }
+  if(preview.length()==0)return false;
+  new android.app.AlertDialog.Builder(this).setTitle("Oberflächenaufbau prüfen").setMessage(preview.toString()).setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",(d,w)->{
+   for(int j=0;j<4;j++)if(values[j]!=null)fields[j].setText(values[j]);
+   android.content.SharedPreferences.Editor ed=getPreferences(0).edit();String[] keys={"asphalt","stoneDepth","base","bedding"};for(int j=0;j<4;j++)if(values[j]!=null)ed.putString(keys[j],values[j]);if(ed.commit())notice("Schichtangaben gespeichert. Belagsart im Regelprofil prüfen.");else notice("Speichern fehlgeschlagen.");
+  }).show();return true;
+ }
  void handleSpeech(String text){
   int version=++speechVersion;
   String normalized=text.toLowerCase(java.util.Locale.ROOT);
@@ -845,14 +864,14 @@ public class MainActivity extends Activity {
      normalized.matches(".*(?:сфотографируй|fotografier|foto aufnehmen|foto machen|foto erstellen|foto anhängen|foto hinzufügen|foto aufnehmen).*")){
    if(selectVoicePoint(text))capturePhoto();return;
   }
-  if(offerVoiceObjectDimensions(text)||offerVoiceObject(text)||offerVoiceSegment(text)||offerVoicePointAction(text))return;
+  if(offerVoiceObjectDimensions(text)||offerVoiceSurface(text)||offerVoiceObject(text)||offerVoiceSegment(text)||offerVoicePointAction(text))return;
   showPage(voicePage);
   if(voiceLanguage.getSelectedItemPosition()==0){voiceText.setText(text);offerVoiceRename(text);return;}
   if(translator==null)translator=com.google.mlkit.nl.translate.Translation.getClient(
    new com.google.mlkit.nl.translate.TranslatorOptions.Builder().setSourceLanguage("ru").setTargetLanguage("de").build());
   voiceText.setText("");notice("Diktat wird ins Deutsche übersetzt …");
   translator.downloadModelIfNeeded().onSuccessTask(ignored->translator.translate(text))
-   .addOnSuccessListener(this,german->{if(version==speechVersion){voiceText.setText(german);if(!offerVoiceObjectDimensions(german)&&!offerVoiceObject(german)&&!offerVoiceSegment(german))offerVoiceRename(german);}})
+   .addOnSuccessListener(this,german->{if(version==speechVersion){voiceText.setText(german);if(!offerVoiceObjectDimensions(german)&&!offerVoiceSurface(german)&&!offerVoiceObject(german)&&!offerVoiceSegment(german))offerVoiceRename(german);}})
    .addOnFailureListener(this,error->{if(version==speechVersion)notice("Übersetzung fehlgeschlagen. Für den ersten Modellabruf wird Internet benötigt.");});
  }
  @Override protected void onDestroy(){if(translator!=null)translator.close();super.onDestroy();}
