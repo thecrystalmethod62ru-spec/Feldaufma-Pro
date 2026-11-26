@@ -140,7 +140,7 @@ public class MainActivity extends Activity {
   java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","sollUtilities","montageFittings","metricWidthSections","objectUndo","objectRedo","elevationPoints","lvPositions","dailyReports","nachtraege","routeUnderlay","sketchCalibration"));
   strings.addAll(java.util.Arrays.asList("metricAreaCorrection","metricAreaCorrectionReason","metricCrossSectionDimensions",
       "metricDepthSections","metricElevationPoints","metricMainExcavationDepth","metricMinimumCover","metricPipeMinGap",
-      "metricPipeMinCover","metricPipeProfile","extraUtilities",PipeLayoutStore.KEY,RouteBranchStore.KEY));
+      "metricPipeMinCover","metricPipeProfile","extraUtilities",MontageConnections.KEY,PipeLayoutStore.KEY,RouteBranchStore.KEY));
   java.util.Set<String> ints=new java.util.HashSet<>(java.util.Arrays.asList("surface","handling","dictationLanguage","gpsDurationSeconds","metricCornerMode","metricOverlapMode"));
   SharedPreferences.Editor ed=projectStorage(id).edit();
   java.util.Iterator<String> keys=fields.keys();String name="Importiertes Projekt";java.util.Set<String> used=new java.util.HashSet<>();
@@ -159,7 +159,7 @@ public class MainActivity extends Activity {
     }else if(key.equals("routeUnderlay")){if(!v.isEmpty()){String replacement=photos.get(v);if(replacement==null)throw new java.io.IOException("Zeichenvorlage fehlt");used.add(v);v=replacement;}}
     else if(key.equals("documents")){
      org.json.JSONArray docs=new org.json.JSONArray(v);for(int j=0;j<docs.length();j++){org.json.JSONObject doc=docs.getJSONObject(j);doc.remove("uri");doc.put("name",doc.optString("name")+" (neu verknüpfen)");}v=docs.toString();
-    }else if(key.equals("dailyReports")||key.equals("nachtraege")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++){org.json.JSONArray items=dailyPhotos(rows.getJSONObject(j));for(int k=0;k<items.length();k++){org.json.JSONObject photo=items.getJSONObject(k);String old=photo.getString("file"),replacement=photos.get(old);if(replacement==null)throw new java.io.IOException("Berichtsfoto fehlt");used.add(old);photo.put("file",replacement);}}v=rows.toString();
+    }else if(key.equals("dailyReports")||key.equals("nachtraege")||key.equals(MontageConnections.KEY)){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++){org.json.JSONArray items=dailyPhotos(rows.getJSONObject(j));for(int k=0;k<items.length();k++){org.json.JSONObject photo=items.getJSONObject(k);String old=photo.getString("file"),replacement=photos.get(old);if(replacement==null)throw new java.io.IOException("Berichtsfoto fehlt");used.add(old);photo.put("file",replacement);}}v=rows.toString();
     }else if(key.equals("objects")||key.equals("segments")||key.equals("elevationPoints")||key.equals("lvPositions")||key.equals("sollUtilities")||key.equals("montageFittings")||key.equals("metricWidthSections")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++){org.json.JSONObject o=rows.getJSONObject(j);if(key.equals("metricWidthSections")){double from=o.getDouble("from"),to=o.getDouble("to"),width=o.getDouble("width");for(String side:new String[]{"left","right"})if(o.has(side)){double cut=o.getDouble(side);if(!Double.isFinite(cut)||cut<0)throw new org.json.JSONException("Ungültiger Nachschnitt");}if(!Double.isFinite(from)||!Double.isFinite(to)||!Double.isFinite(width)||from<0||to<=from||width<=0)throw new org.json.JSONException("Ungültiger Breitenabschnitt");for(int k=0;k<j;k++){org.json.JSONObject previous=rows.getJSONObject(k);if(from<previous.getDouble("to")&&to>previous.getDouble("from"))throw new org.json.JSONException("Überlappende Breitenabschnitte");}}}}
     else if(key.equals("objectUndo")||key.equals("objectRedo")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)new org.json.JSONArray(rows.getString(j));}
     if(key.equals(PipeLayoutStore.KEY))PipeLayoutStore.decode(v);
@@ -207,7 +207,7 @@ public class MainActivity extends Activity {
    }
   }
   Object template=snapshot.get("routeUnderlay");if(template instanceof String&&!((String)template).isEmpty()){String filename=(String)template;if(!filename.matches("[A-Za-z0-9._-]+")||filename.equals(".")||filename.equals(".."))throw new java.io.IOException("Ungültige Vorlage");photos.add(filename);}
-  for(String reportKey:new String[]{"dailyReports","nachtraege"}){
+  for(String reportKey:new String[]{"dailyReports","nachtraege",MontageConnections.KEY}){
   Object reportsData=snapshot.get(reportKey);
   if(reportsData instanceof String){org.json.JSONArray reports=new org.json.JSONArray((String)reportsData);for(int j=0;j<reports.length();j++){org.json.JSONArray items=dailyPhotos(reports.getJSONObject(j));for(int k=0;k<items.length();k++){String name=items.getJSONObject(k).getString("file");if(!name.matches("[A-Za-z0-9._-]+")||name.equals(".")||name.equals(".."))throw new java.io.IOException("Ungültiger Fotodateiname");photos.add(name);}}}
   }
@@ -1310,6 +1310,13 @@ public class MainActivity extends Activity {
  void chooseDailyPhotos(int index){chooseRecordPhotos(index,false);}
  void chooseRecordPhotos(int index,boolean changeOrder){
   org.json.JSONArray original=changeOrder?nachtraege():dailyReports();org.json.JSONObject report=original.optJSONObject(index);if(report==null)return;
+  chooseProjectPhotos(report,changeOrder?"Fotos zum Nachtrag":"Fotos zum Bautagesbericht",photos->{
+   if(!(changeOrder?nachtraege():dailyReports()).toString().equals(original.toString())){notice("Bericht geändert. Neu öffnen.");return;}
+   try{report.put("photos",photos).put("modifiedAt",System.currentTimeMillis());if(changeOrder){if(saveNachtraege(original))showNachtraege();}else if(saveDailyReports(original))showDailyReports();}catch(Exception e){notice("Fotos konnten nicht zugeordnet werden.");}
+  });
+ }
+ void chooseProjectPhotos(org.json.JSONObject report,String title,java.util.function.Consumer<org.json.JSONArray> save){
+  String projectId=activeProject;
   java.util.LinkedHashMap<String,org.json.JSONObject> entries=new java.util.LinkedHashMap<>();java.util.HashSet<String> selected=new java.util.HashSet<>();
   org.json.JSONArray prior=dailyPhotos(report);
   for(int j=0;j<prior.length();j++){org.json.JSONObject o=prior.optJSONObject(j);if(o!=null){entries.put(o.optString("file"),o);selected.add(o.optString("file"));}}
@@ -1327,11 +1334,11 @@ public class MainActivity extends Activity {
   if(entries.isEmpty()){notice("Zuerst Fotos an Trassenpunkte anhängen.");return;}
   java.util.ArrayList<org.json.JSONObject> list=new java.util.ArrayList<>(entries.values());String[] labels=new String[list.size()];boolean[] checked=new boolean[list.size()];
   for(int j=0;j<list.size();j++){org.json.JSONObject o=list.get(j);labels[j]=o.optString("label");checked[j]=selected.contains(o.optString("file"));}
-  new android.app.AlertDialog.Builder(this).setTitle(changeOrder?"Fotos zum Nachtrag":"Fotos zum Bautagesbericht").setMultiChoiceItems(labels,checked,(d,j,c)->checked[j]=c)
+  new android.app.AlertDialog.Builder(this).setTitle(title).setMultiChoiceItems(labels,checked,(d,j,c)->checked[j]=c)
    .setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",(d,w)->{
-    if(!(changeOrder?nachtraege():dailyReports()).toString().equals(original.toString())){notice("Bericht geändert. Neu öffnen.");return;}
+    if(!projectId.equals(activeProject)){notice("Projekt wurde gewechselt.");return;}
     org.json.JSONArray photos=new org.json.JSONArray();for(int j=0;j<list.size();j++)if(checked[j])photos.put(list.get(j));
-    try{report.put("photos",photos).put("modifiedAt",System.currentTimeMillis());if(changeOrder){if(saveNachtraege(original))showNachtraege();}else if(saveDailyReports(original))showDailyReports();}catch(Exception e){notice("Fotos konnten nicht zugeordnet werden.");}
+    save.accept(photos);
    }).show();
  }
  String pendingDailyPdfId;
@@ -1517,7 +1524,7 @@ public class MainActivity extends Activity {
  }
  void showMontage(){
   new android.app.AlertDialog.Builder(this).setTitle("Rohrleitungsbau – Montage")
-   .setItems(new String[]{"Formstückkatalog","Projekt-Formstücke","Gesamtplan – Stationierung","Materialliste (eingebaut)"},(d,w)->{if(w==0)showMontageCatalog();else if(w==1)showMontageInventory();else if(w==2)showMontageStationPlan();else showMontageMaterials();})
+   .setItems(new String[]{"Formstückkatalog","Projekt-Formstücke","Gesamtplan – Stationierung","Materialliste (eingebaut)","Verbindungsregister"},(d,w)->{if(w==0)showMontageCatalog();else if(w==1)showMontageInventory();else if(w==2)showMontageStationPlan();else if(w==3)showMontageMaterials();else new MontageConnections(this).show();})
    .setNegativeButton("Schließen",null).show();
  }
  void showMontageStationPlan(){
