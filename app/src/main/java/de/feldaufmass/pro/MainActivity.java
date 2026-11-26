@@ -1630,7 +1630,7 @@ public class MainActivity extends Activity {
   for(int i=0;i<widthKeys.length;i++){try{double v=Double.parseDouble(getPreferences(0).getString(widthKeys[i],"").trim().replace(',','.'));if(Double.isFinite(v)&&v>=0&&(i!=0||v>0))widths[i]=v;}catch(Exception ignored){}}
   LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);
   TextView info=new TextView(this);info.setText("Gemessene Längen · Richtungen aus Skizze (nicht vermessen)");panel.addView(info);
-  TextView widthHint=new TextView(this);widthHint.setText("Grabenbreite: "+(Double.isFinite(widths[0])?widths[0]+" m":"offen")+" · Nachschnitt links: "+(Double.isFinite(widths[1])?widths[1]+" m":"offen")+" · rechts: "+(Double.isFinite(widths[2])?widths[2]+" m":"offen")+"\nAbschnittsbänder schematisch an Knicken; keine Flächenberechnung.");panel.addView(widthHint);
+  TextView widthHint=new TextView(this);widthHint.setText("Grabenbreite: "+(Double.isFinite(widths[0])?widths[0]+" m":"offen")+" · Nachschnitt links: "+(Double.isFinite(widths[1])?widths[1]+" m":"offen")+" · rechts: "+(Double.isFinite(widths[2])?widths[2]+" m":"offen")+"\nVerbundene Vorschaukonturen; Überschneidungen nicht bereinigt, keine Flächenberechnung.");panel.addView(widthHint);
   TextView montageHint=new TextView(this);montageHint.setText("Montage: "+montagePoints.size()+" darstellbare Stationspunkte. Fehlender Versatz = Achse (Vorschau); Eckversatz nicht dargestellt.");panel.addView(montageHint);
   android.view.View drawing=new android.view.View(this){
    final android.graphics.Paint pen=new android.graphics.Paint(3);
@@ -1639,23 +1639,36 @@ public class MainActivity extends Activity {
     for(double[] p:model.vertices){minX=Math.min(minX,p[0]);maxX=Math.max(maxX,p[0]);minY=Math.min(minY,p[1]);maxY=Math.max(maxY,p[1]);}
     for(double[] p:montagePoints){minX=Math.min(minX,p[0]);maxX=Math.max(maxX,p[0]);minY=Math.min(minY,p[1]);maxY=Math.max(maxY,p[1]);}
     double margin=Double.isFinite(widths[0])?widths[0]/2+Math.max(Double.isFinite(widths[1])?widths[1]:0,Double.isFinite(widths[2])?widths[2]:0):0;
-    minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
+    margin*=2;minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
     double scale=Math.min((getWidth()-dp(48))/Math.max(.001,maxX-minX),(getHeight()-dp(64))/Math.max(.001,maxY-minY));if(!Double.isFinite(scale)||scale<=0)return;
     double ox=(getWidth()-(maxX-minX)*scale)/2-minX*scale,oy=(getHeight()-(maxY-minY)*scale)/2+maxY*scale;
     if(Double.isFinite(widths[0])){
-     for(int i=1;i<model.vertices.size();i++){
-      double[] a=model.vertices.get(i-1),b=model.vertices.get(i);
-      double dx=b[0]-a[0],dy=b[1]-a[1],n=Math.hypot(dx,dy);if(n<=0)continue;
-      double nx=-dy/n,ny=dx/n,half=widths[0]/2;
-      double[][] bands={{-half,half},{half,half+(Double.isFinite(widths[1])?widths[1]:0)},{-half-(Double.isFinite(widths[2])?widths[2]:0),-half}};
-      for(int j=0;j<bands.length;j++){double lo=bands[j][0],hi=bands[j][1];if(hi<=lo)continue;
-       android.graphics.Path shape=new android.graphics.Path();
-       shape.moveTo((float)(ox+(a[0]+nx*lo)*scale),(float)(oy-(a[1]+ny*lo)*scale));
-       shape.lineTo((float)(ox+(b[0]+nx*lo)*scale),(float)(oy-(b[1]+ny*lo)*scale));
-       shape.lineTo((float)(ox+(b[0]+nx*hi)*scale),(float)(oy-(b[1]+ny*hi)*scale));
-       shape.lineTo((float)(ox+(a[0]+nx*hi)*scale),(float)(oy-(a[1]+ny*hi)*scale));shape.close();
-       pen.setColor(j==0?0xffb79b70:0xff777e86);c.drawPath(shape,pen);
+     double half=widths[0]/2,left=Double.isFinite(widths[1])?widths[1]:0,right=Double.isFinite(widths[2])?widths[2]:0;
+     double[][] bands={{-half-right,half+left},{-half,half}};
+     for(int j=0;j<bands.length;j++){
+      android.graphics.Path shape=new android.graphics.Path();
+      java.util.ArrayList<double[]> polygon=new java.util.ArrayList<>();
+      for(int side=0;side<2;side++){
+       double offset=bands[j][side];int count=model.vertices.size();
+       for(int k=0;k<count;k++){
+        int i=side==0?k:count-1-k;
+        double[] v=model.vertices.get(i);
+        int prev=Math.max(0,i-1),next=Math.min(count-1,i+1);
+        double[] a=model.vertices.get(prev),b=model.vertices.get(next);
+        double dx1=v[0]-a[0],dy1=v[1]-a[1],dx2=b[0]-v[0],dy2=b[1]-v[1];
+        if(i==0){dx1=dx2;dy1=dy2;}if(i==count-1){dx2=dx1;dy2=dy1;}
+        double n1=Math.hypot(dx1,dy1),n2=Math.hypot(dx2,dy2);
+        double nx1=-dy1/n1,ny1=dx1/n1,nx2=-dy2/n2,ny2=dx2/n2;
+        double denom=1+nx1*nx2+ny1*ny2;
+        if(denom>=0.5){polygon.add(new double[]{v[0]+offset*(nx1+nx2)/denom,v[1]+offset*(ny1+ny2)/denom});}
+        else{
+         if(side==0){polygon.add(new double[]{v[0]+offset*nx1,v[1]+offset*ny1});polygon.add(new double[]{v[0]+offset*nx2,v[1]+offset*ny2});}
+         else{polygon.add(new double[]{v[0]+offset*nx2,v[1]+offset*ny2});polygon.add(new double[]{v[0]+offset*nx1,v[1]+offset*ny1});}
+        }
+       }
       }
+      for(int i=0;i<polygon.size();i++){double[] q=polygon.get(i);float x=(float)(ox+q[0]*scale),y=(float)(oy-q[1]*scale);if(i==0)shape.moveTo(x,y);else shape.lineTo(x,y);}
+      shape.close();pen.setColor(j==0?0xff777e86:0xffb79b70);c.drawPath(shape,pen);
      }
     }
     for(int i=1;i<model.vertices.size();i++){
