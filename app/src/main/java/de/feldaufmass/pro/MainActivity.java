@@ -759,7 +759,10 @@ public class MainActivity extends Activity {
   canvasFrame.addView(route,new android.widget.FrameLayout.LayoutParams(-1,-1));
   Button restoreTools=new Button(this);restoreTools.setText("☰");restoreTools.setContentDescription("Werkzeuge anzeigen");styleEditorButton(restoreTools,false);
   android.widget.FrameLayout.LayoutParams floating=new android.widget.FrameLayout.LayoutParams(dp(44),dp(44),Gravity.TOP|Gravity.RIGHT);floating.setMargins(dp(4),dp(4),dp(4),dp(4));canvasFrame.addView(restoreTools,floating);restoreTools.setVisibility(View.GONE);
-  canvasToggle.setOnClickListener(v->{for(View bar:new View[]{header,controls,historyBar,tools,save})bar.setVisibility(View.GONE);restoreTools.setVisibility(View.VISIBLE);});
+  Button floatingSave=new Button(this);floatingSave.setAllCaps(false);floatingSave.setText("Speichern");styleEditorButton(floatingSave,true);
+  android.widget.FrameLayout.LayoutParams floatingSaveParams=new android.widget.FrameLayout.LayoutParams(dp(112),dp(44),Gravity.BOTTOM|Gravity.RIGHT);floatingSaveParams.setMargins(dp(8),dp(8),dp(8),dp(8));canvasFrame.addView(floatingSave,floatingSaveParams);floatingSave.setVisibility(View.GONE);
+  floatingSave.setOnClickListener(v->save.performClick());
+  canvasToggle.setOnClickListener(v->{for(View bar:new View[]{header,controls,historyBar,tools,save})bar.setVisibility(View.GONE);restoreTools.setVisibility(View.VISIBLE);floatingSave.setVisibility(View.VISIBLE);});
   restoreTools.setOnTouchListener(new View.OnTouchListener(){
    float startX,startY,baseX,baseY;boolean moved;
    public boolean onTouch(View v,android.view.MotionEvent e){
@@ -775,7 +778,7 @@ public class MainActivity extends Activity {
    }
   });
   canvasFrame.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(restoreTools.getVisibility()==View.VISIBLE){restoreTools.setX(Math.max(0,Math.min(canvasFrame.getWidth()-restoreTools.getWidth(),restoreTools.getX())));restoreTools.setY(Math.max(0,Math.min(canvasFrame.getHeight()-restoreTools.getHeight(),restoreTools.getY())));}});
-  restoreTools.setOnClickListener(v->{for(View bar:new View[]{header,controls,historyBar,tools,save})bar.setVisibility(View.VISIBLE);restoreTools.setVisibility(View.GONE);});
+  restoreTools.setOnClickListener(v->{for(View bar:new View[]{header,controls,historyBar,tools,save})bar.setVisibility(View.VISIBLE);restoreTools.setVisibility(View.GONE);floatingSave.setVisibility(View.GONE);});
   full.setContentView(root);
   full.setOnDismissListener(d->{
    pendingEditorSpeech=null;route.darkEditor=false;
