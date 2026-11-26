@@ -21,6 +21,9 @@ final class RouteSketch extends View {
   final PointF point;
   String id=java.util.UUID.randomUUID().toString();
   String name="";
+  JSONArray gpsUndo;
+  void rememberGpsMove(){gpsUndo=new JSONArray();for(double n:new double[]{point.x,point.y,latitude,longitude,accuracy})gpsUndo.put(Double.isFinite(n)?(Object)n:org.json.JSONObject.NULL);}
+  boolean undoGpsMove(){if(gpsUndo==null||gpsUndo.length()!=5)return false;double x=gpsUndo.optDouble(0,Double.NaN),y=gpsUndo.optDouble(1,Double.NaN);if(!Double.isFinite(x)||!Double.isFinite(y))return false;point.set((float)x,(float)y);latitude=gpsUndo.optDouble(2,Double.NaN);longitude=gpsUndo.optDouble(3,Double.NaN);accuracy=gpsUndo.optDouble(4,Double.NaN);gpsUndo=null;return true;}
   JSONArray photos=new JSONArray();
   double latitude=Double.NaN,longitude=Double.NaN,accuracy=Double.NaN;
   double metres; // Length of the incoming segment, NaN if unmeasured.
@@ -44,7 +47,7 @@ final class RouteSketch extends View {
     v.id=row.optString(3,v.id);
     if(row.optJSONArray(4)!=null)v.photos=row.optJSONArray(4);
     v.latitude=row.optDouble(5,Double.NaN);v.longitude=row.optDouble(6,Double.NaN);v.accuracy=row.optDouble(7,Double.NaN);
-    v.name=row.optString(8,"");
+    v.name=row.optString(8,"");v.gpsUndo=row.optJSONArray(9);
     vertices.add(v);
    }
   }catch(JSONException e){vertices.clear();}
@@ -58,7 +61,7 @@ final class RouteSketch extends View {
     row.put(Double.isFinite(v.metres)?(Object)v.metres:org.json.JSONObject.NULL);
     row.put(v.id).put(v.photos);
     for(double n:new double[]{v.latitude,v.longitude,v.accuracy})row.put(Double.isFinite(n)?(Object)n:org.json.JSONObject.NULL);
-    row.put(v.name);
+    row.put(v.name);row.put(v.gpsUndo==null?org.json.JSONObject.NULL:v.gpsUndo);
     rows.put(row);
    }
   }catch(JSONException e){throw new IllegalStateException(e);}
@@ -260,6 +263,7 @@ final class RouteSketch extends View {
   return nearest;
  }
  void movePoint(int index,PointF target){
+  vertices.get(index).gpsUndo=null;
   PointF point=vertices.get(index).point;
   if(angle<0 || vertices.size()<2){point.set(target);invalidate();return;}
   PointF anchor=vertices.get(index==0?1:index-1).point;
