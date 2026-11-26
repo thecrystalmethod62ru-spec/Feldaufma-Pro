@@ -1724,6 +1724,7 @@ public class MainActivity extends Activity {
   LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);
   TextView geometryStatus=new TextView(this);panel.addView(geometryStatus);
   TextView overlapStatus=new TextView(this);panel.addView(overlapStatus);
+  final int axisCrossings=crossings;
   Runnable refreshGeometry=()->{
   int missingWidths=0;double totalLength=route.measuredLength();
   java.util.TreeSet<Double> widthCuts=new java.util.TreeSet<>();widthCuts.add(0.0);widthCuts.add(totalLength);
@@ -1776,7 +1777,7 @@ public class MainActivity extends Activity {
    }
    if(dist<=reachA+reachB+1e-8)possibleOverlaps++;
   }
-   geometryStatus.setText(crossings==0&&missingWidths==0?"Geometrie: keine Achsen-Selbstkreuzung erkannt; Flächenprüfung noch offen.":"Prüfung: "+crossings+" Achsen-Selbstkreuzung(en), "+missingWidths+" Abschnitt(e) ohne Grabenbreite. Keine automatische Abrechnung.");
+   geometryStatus.setText(axisCrossings==0&&missingWidths==0?"Geometrie: keine Achsen-Selbstkreuzung erkannt; Flächenprüfung noch offen.":"Prüfung: "+axisCrossings+" Achsen-Selbstkreuzung(en), "+missingWidths+" Abschnitt(e) ohne Grabenbreite. Keine automatische Abrechnung.");
    overlapStatus.setText(possibleOverlaps==0&&uncheckedPairs==0?"Außenkontur: keine Nähe-Konflikte zwischen getrennten Abschnitten erkannt (keine Flächenfreigabe).":"Außenkontur: "+possibleOverlaps+" mögliche Überlappung(en); "+uncheckedPairs+" Paar(e) wegen fehlender Maße nicht geprüft. Flächen manuell prüfen.");
   };
   refreshGeometry.run();
