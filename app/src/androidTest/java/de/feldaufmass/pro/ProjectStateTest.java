@@ -12,6 +12,25 @@ import static org.junit.Assert.*;
 
 @RunWith(AndroidJUnit4.class)
 public class ProjectStateTest {
+ @Test public void gpsCalibrationAndPointMetadata(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->{
+    RouteSketch route=new RouteSketch(activity,"[[0.2,0.5,null],[0.8,0.5,20],[0.5,0.7,10]]");
+    RouteSketch.Vertex a=route.vertices.get(0),b=route.vertices.get(1),c=route.vertices.get(2);
+    a.latitude=b.latitude=52;a.longitude=11;b.longitude=11.001;a.accuracy=b.accuracy=.5;
+    assertTrue(RouteSketch.preciseGps(.5));assertFalse(RouteSketch.preciseGps(.51));assertFalse(RouteSketch.preciseGps(Double.NaN));
+    android.graphics.PointF target=route.gpsPosition(52,11.0005,2);
+    assertNotNull(target);assertEquals(.5,target.x,.0001);assertEquals(.5,target.y,.0001);
+    c.name="Hausanschluss 12";c.photos.put("test.jpg");c.latitude=52;c.longitude=11.0005;c.accuracy=.4;
+    RouteSketch restored=new RouteSketch(activity,route.encode());
+    assertEquals("Hausanschluss 12",restored.vertices.get(2).name);
+    assertEquals("test.jpg",restored.vertices.get(2).photos.optString(0));
+    assertEquals(.4,restored.vertices.get(2).accuracy,0);
+    assertEquals(30,restored.measuredLength(),0);
+    b.accuracy=.51;assertNull(route.gpsPosition(52,11.0005,2));
+   });
+  }
+ }
  @Test public void contentClearsVisibleSystemBars(){
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    scenario.onActivity(activity->{
