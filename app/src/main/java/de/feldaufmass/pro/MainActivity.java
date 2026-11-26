@@ -1648,17 +1648,37 @@ public class MainActivity extends Activity {
   for(int i=1;i<orderedCuts.size();i++){double mid=(orderedCuts.get(i-1)+orderedCuts.get(i))/2;boolean defined=false;for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o!=null&&mid>=o.optDouble("from")&&mid<o.optDouble("to")&&o.optDouble("width")>0)defined=true;}if(!defined&&!Double.isFinite(widths[0]))missingWidths++;}
   // Conservative proximity check of non-neighboring trench strips.
   // This is a warning, not an exact polygon-union area computation.
+  // Conservative overlap screening: maximum half-extent on each measured
+  // centerline segment, including all station-specific trench and cutting widths.
   int possibleOverlaps=0;
-  double[] segmentWidths=new double[model.vertices.size()-1];
+  double[] segmentReach=new double[model.vertices.size()-1];
   double runningStation=0;
   for(int i=1;i<model.vertices.size();i++){
-   double mid=runningStation+route.vertices.get(i).metres/2;
-   double w=widths[0];
-   for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o!=null&&mid>=o.optDouble("from")&&mid<o.optDouble("to")&&o.optDouble("width")>0)w=o.optDouble("width");}
-   segmentWidths[i-1]=w;runningStation+=route.vertices.get(i).metres;
+   double from=runningStation,to=from+route.vertices.get(i).metres;
+   java.util.TreeSet<Double> cuts=new java.util.TreeSet<>();cuts.add(from);cuts.add(to);
+   for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o==null)continue;double lo=o.optDouble("from",Double.NaN),hi=o.optDouble("to",Double.NaN);
+    if(Double.isFinite(lo)&&lo>from&&lo<to)cuts.add(lo);
+    if(Double.isFinite(hi)&&hi>from&&hi<to)cuts.add(hi);
+   }
+   java.util.ArrayList<Double> stations=new java.util.ArrayList<>(cuts);
+   double maxReach=0;
+   for(int k=1;k<stations.size();k++){
+    double mid=(stations.get(k-1)+stations.get(k))/2,w=widths[0],left=widths[1],right=widths[2];
+    for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o==null||mid<o.optDouble("from",Double.NaN)||mid>=o.optDouble("to",Double.NaN))continue;
+     w=o.optDouble("width",Double.NaN);
+     if(o.has("left"))left=o.optDouble("left",Double.NaN);
+     if(o.has("right"))right=o.optDouble("right",Double.NaN);
+    }
+    if(!Double.isFinite(w)||w<=0){maxReach=Double.NaN;break;}
+    if(!Double.isFinite(left)||left<0||!Double.isFinite(right)||right<0){maxReach=Double.NaN;break;}
+    maxReach=Math.max(maxReach,w/2+Math.max(left,right));
+   }
+   segmentReach[i-1]=maxReach;runningStation=to;
   }
+  int uncheckedPairs=0;
   for(int i=1;i<model.vertices.size();i++)for(int j=i+2;j<model.vertices.size();j++){
-   double wi=segmentWidths[i-1],wj=segmentWidths[j-1];if(!Double.isFinite(wi)||!Double.isFinite(wj)||wi<=0||wj<=0)continue;
+   double reachA=segmentReach[i-1],reachB=segmentReach[j-1];
+   if(!Double.isFinite(reachA)||!Double.isFinite(reachB)){uncheckedPairs++;continue;}
    double[] a1=model.vertices.get(i-1),a2=model.vertices.get(i),b1=model.vertices.get(j-1),b2=model.vertices.get(j);
    double dx=a2[0]-a1[0],dy=a2[1]-a1[1],ex=b2[0]-b1[0],ey=b2[1]-b1[1];
    double den=dx*ey-dy*ex,dist=Double.POSITIVE_INFINITY;
@@ -1670,12 +1690,11 @@ public class MainActivity extends Activity {
     if(len2<=0)continue;double t=Math.max(0,Math.min(1,((point[0]-start[0])*vx+(point[1]-start[1])*vy)/len2));
     dist=Math.min(dist,Math.hypot(point[0]-start[0]-t*vx,point[1]-start[1]-t*vy));
    }
-   double leftCut=Double.isFinite(widths[1])?widths[1]:0,rightCut=Double.isFinite(widths[2])?widths[2]:0;
-   if(dist<=(wi+wj)/2+leftCut+rightCut+1e-8)possibleOverlaps++;
+   if(dist<=reachA+reachB+1e-8)possibleOverlaps++;
   }
   LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);
   TextView geometryStatus=new TextView(this);geometryStatus.setText(crossings==0&&missingWidths==0?"Geometrie: keine Achsen-Selbstkreuzung erkannt; Flächenprüfung noch offen.":"Prüfung: "+crossings+" Achsen-Selbstkreuzung(en), "+missingWidths+" Abschnitt(e) ohne Grabenbreite. Keine automatische Abrechnung.");panel.addView(geometryStatus);
-  TextView overlapStatus=new TextView(this);overlapStatus.setText(possibleOverlaps==0?"Außenkontur: keine Nähe-Konflikte zwischen getrennten Abschnitten erkannt (keine Flächenfreigabe).":"Außenkontur: "+possibleOverlaps+" mögliche Überlappung(en) zwischen getrennten Grabenabschnitten. Flächen manuell prüfen.");panel.addView(overlapStatus);
+  TextView overlapStatus=new TextView(this);overlapStatus.setText(possibleOverlaps==0&&uncheckedPairs==0?"Außenkontur: keine Nähe-Konflikte zwischen getrennten Abschnitten erkannt (keine Flächenfreigabe).":"Außenkontur: "+possibleOverlaps+" mögliche Überlappung(en); "+uncheckedPairs+" Paar(e) wegen fehlender Maße nicht geprüft. Flächen manuell prüfen.");panel.addView(overlapStatus);
   TextView nominalArea=new TextView(this);panel.addView(nominalArea);
   Runnable refreshNominalArea=()->{
    double total=route.measuredLength();
