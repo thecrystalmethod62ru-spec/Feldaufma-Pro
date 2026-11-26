@@ -4268,7 +4268,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
       Double previous=null;
       for(double stop:cuts){if(previous==null){previous=stop;continue;}double begin=previous;previous=stop;double mid=(begin+stop)/2,bw=trenchWidth;if(mid<routeFrom||mid>=routeTo)continue;
        for(int k=0;k<widths.length();k++){org.json.JSONObject section=widths.optJSONObject(k);if(section!=null&&mid>=section.optDouble("from")&&mid<section.optDouble("to")&&section.optDouble("width")>0){bw=section.optDouble("width");break;}}
-       if(!Double.isFinite(bw)||offset+diameter/2>bw){omitted=true;continue;}
+       if(!Double.isFinite(bw)||bw<=0||utilityOutsideProfile(row,bw,d)){omitted=true;continue;}
        double shift=(bw/2-offset)/factor,nx=dy/n*shift,ny=-dx/n*shift,t1=(begin-station)/len,t2=(stop-station)/len;
        utilityLegend.put(type+" · "+String.format(java.util.Locale.GERMANY,"%.0f mm",diameter*1000),p.getColor());
        float x1=(float)(40+(a.point.x+dx*t1+nx-minX)*unit),y1=(float)(85+(a.point.y+dy*t1+ny-minY)*unit),x2=(float)(40+(a.point.x+dx*t2+nx-minX)*unit),y2=(float)(85+(a.point.y+dy*t2+ny-minY)*unit);
@@ -4286,7 +4286,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
      }
      if(truncated){p.setColor(INK);c.drawText("…",width-55,ly,p);}
     }
-    if(utilities.length()>0){p.setColor(INK);p.setTextSize(9);c.drawText(omitted?"Zusatzleitungen: ungültige Profilversätze teilweise ausgelassen":"Zusatzleitungen: Profilversatz ab linker Kante; Verbindungen schematisch",36,height-110,p);}
+    if(utilities.length()>0){p.setColor(INK);p.setTextSize(9);c.drawText(omitted?"Zusatzleitungen: ungültige Profillage oder fehlende Maße teilweise ausgelassen":"Zusatzleitungen: Profilversatz ab linker Kante; Verbindungen schematisch",36,height-110,p);}
    }
    p.setColor(INK);p.setStrokeWidth(1);float bar=(float)(50*72/25.4);float by=height-47;c.drawLine(40,by,40+bar,by,p);c.drawLine(40,by-4,40,by+4,p);c.drawLine(40+bar,by-4,40+bar,by+4,p);c.drawText("50 mm Kontrollmaß",40,by+17,p);
   }finally{pdf.finishPage(page);}
@@ -5240,6 +5240,12 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
    }catch(Exception e){notice("Montagedaten konnten nicht gespeichert werden.");}
   }));dialog.show();
  }
+ boolean utilityOutsideProfile(org.json.JSONObject u,double width,double depth){
+  if(u==null)return false;
+  double radius=u.optDouble("diameter")/2000,ox=u.optDouble("offset"),oy=u.optDouble("axisDepth");
+  if(!Double.isFinite(radius)||radius<=0)return false;
+  return (Double.isFinite(width)&&width>0&&(radius*2>width+1e-8||(Double.isFinite(ox)&&(ox-radius< -1e-8||ox+radius>width+1e-8))))||(Double.isFinite(depth)&&depth>0&&(radius*2>depth+1e-8||(Double.isFinite(oy)&&(oy-radius< -1e-8||oy+radius>depth+1e-8))));
+ }
  int utilityCollisionCount(org.json.JSONArray rows,double length){
   int conflicts=0;
   for(int j=0;j<rows.length();j++)for(int k=j+1;k<rows.length();k++){
@@ -5312,7 +5318,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  int conflicts=utilityCollisionCount(utilities,Double.isFinite(l)&&l>0?l:Double.POSITIVE_INFINITY);
  if(conflicts>0){p.setColor(0xffb3261e);p.setTextSize(11);c.drawText("Achtung: "+conflicts+" mögliche Leitungskollision(en)",20,40,p);}
  int outside=0;
- for(int i=0;i<utilities.length();i++){org.json.JSONObject u=utilities.optJSONObject(i);if(u==null)continue;double radius=u.optDouble("diameter")/2000,ox=u.optDouble("offset"),oy=u.optDouble("axisDepth");if(!Double.isFinite(radius)||radius<=0)continue;if(radius*2>w||radius*2>d||(Double.isFinite(ox)&&(ox-radius< -1e-8||ox+radius>w+1e-8))||(Double.isFinite(oy)&&(oy-radius< -1e-8||oy+radius>d+1e-8)))outside++;}
+ for(int i=0;i<utilities.length();i++)if(utilityOutsideProfile(utilities.optJSONObject(i),w,d))outside++;
  if(outside>0){p.setColor(0xffb3261e);p.setTextSize(11);c.drawText("Profilgrenzen verletzt: "+outside+" Leitung(en)",20,52,p);}
 
  if(utilities.length()==0){if(Double.isFinite(previewPipe)){float radius=(float)(previewPipe/2000*scale);p.setColor(0xff3686bc);c.drawCircle(180,bottom-radius,radius,p);}}
