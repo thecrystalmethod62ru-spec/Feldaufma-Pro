@@ -137,7 +137,7 @@ public class MainActivity extends Activity {
   }
   if(manifest==null||!"FeldaufmassPro".equals(manifest.optString("format"))||manifest.optInt("version")!=1)throw new java.io.IOException("Unbekanntes Sicherungsformat");
   org.json.JSONObject fields=manifest.getJSONObject("preferences");
-  java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","objectUndo","objectRedo","elevationPoints"));
+  java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","objectUndo","objectRedo","elevationPoints","lvPositions"));
   java.util.Set<String> ints=new java.util.HashSet<>(java.util.Arrays.asList("surface","handling","dictationLanguage","gpsDurationSeconds"));
   SharedPreferences.Editor ed=projectStorage(id).edit();
   java.util.Iterator<String> keys=fields.keys();String name="Importiertes Projekt";java.util.Set<String> used=new java.util.HashSet<>();
@@ -155,7 +155,7 @@ public class MainActivity extends Activity {
      }v=rows.toString();
     }else if(key.equals("documents")){
      org.json.JSONArray docs=new org.json.JSONArray(v);for(int j=0;j<docs.length();j++){org.json.JSONObject doc=docs.getJSONObject(j);doc.remove("uri");doc.put("name",doc.optString("name")+" (neu verknüpfen)");}v=docs.toString();
-    }else if(key.equals("objects")||key.equals("segments")||key.equals("elevationPoints")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)rows.getJSONObject(j);}
+    }else if(key.equals("objects")||key.equals("segments")||key.equals("elevationPoints")||key.equals("lvPositions")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)rows.getJSONObject(j);}
     else if(key.equals("objectUndo")||key.equals("objectRedo")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)new org.json.JSONArray(rows.getString(j));}
     if(key.equals("project")&&!v.trim().isEmpty())name=v.trim();
     ed.putString(key,v);
@@ -773,6 +773,63 @@ public class MainActivity extends Activity {
   }
   new android.app.AlertDialog.Builder(this).setTitle("Längsschnitt").setView(scroll).setPositiveButton("Schließen",null).show();
  }
+ org.json.JSONArray lvPositions(){
+  try{return new org.json.JSONArray(getPreferences(0).getString("lvPositions","[]"));}catch(Exception e){return new org.json.JSONArray();}
+ }
+ boolean saveLv(org.json.JSONArray rows){
+  if(!getPreferences(0).edit().putString("lvPositions",rows.toString()).commit()){notice("LV konnte nicht gespeichert werden.");return false;}
+  recordProjectEvent("Leistungsverzeichnis geändert");return true;
+ }
+ String lvLabel(org.json.JSONObject o){return o.optString("oz")+" · "+o.optString("title")+" ["+o.optString("unit")+"]";}
+ double lvQuantity(org.json.JSONObject o){
+  String source=o.optString("source","manual");
+  double value=Double.NaN;
+  if("manual".equals(source))value=o.optDouble("quantity");
+  else if(l>0&&w>0&&d>0){
+   if("length".equals(source)&&"m".equals(o.optString("unit")))value=l;
+   if("area".equals(source)&&"m²".equals(o.optString("unit")))value=l*w;
+   if("volume".equals(source)&&"m³".equals(o.optString("unit")))value=l*w*d;
+   if("cut".equals(source)&&"m²".equals(o.optString("unit"))&&Double.isFinite(left)&&Double.isFinite(right))value=l*(w+left+right);
+  }
+  return Double.isFinite(value)&&value>=0?value:Double.NaN;
+ }
+ void showLv(){
+  org.json.JSONArray rows=lvPositions();LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
+  form.addView(sheetText("Manuelles LV · Zuordnung durch Anwender. Geometrische Mengen vor Abrechnung prüfen.",14,false));
+  for(int j=0;j<rows.length();j++){
+   final int index=j;org.json.JSONObject o=rows.optJSONObject(j);if(o==null)continue;double qty=lvQuantity(o),target=o.optDouble("target");
+   Button button=new Button(this);button.setAllCaps(false);button.setText(lvLabel(o)+"\nIst: "+(Double.isFinite(qty)?csvNumber(qty):"offen")+(Double.isFinite(target)?" · Soll: "+csvNumber(target):""));
+   button.setOnClickListener(v->editLv(index));form.addView(button);
+  }
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Leistungsverzeichnis").setView(scroll).setNegativeButton("Schließen",null).setPositiveButton("Neue Position",(a,b)->editLv(-1)).create();dialog.show();
+ }
+ void editLv(int index){
+  org.json.JSONArray original=lvPositions();org.json.JSONObject old=index<0?null:original.optJSONObject(index);
+  LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
+  String[] keys={"oz","title","unit","target","quantity"},hints={"Ordnungszahl / LV-Position","Kurztext","Einheit (m, m², m³, St ...)","Sollmenge (optional)","Istmenge manuell (optional)"};
+  EditText[] fields=new EditText[5];
+  for(int j=0;j<fields.length;j++){form.addView(sheetText(hints[j],14,false));fields[j]=new EditText(this);fields[j].setSingleLine(true);if(j>=3)fields[j].setInputType(8194);if(old!=null)fields[j].setText(old.optString(keys[j],""));form.addView(fields[j]);}
+  String[] sources={"manual","length","area","volume","cut"};String[] sourceLabels={"Manuelle Istmenge","Trassenlänge (m)","Grundfläche (m²)","Aushub – geometrisch (m³)","Fläche mit Nachschnitt (m²)"};
+  form.addView(sheetText("Mengenquelle",14,false));Spinner source=choices(form,sourceLabels);source.setSelection(Math.max(0,java.util.Arrays.asList(sources).indexOf(old==null?"manual":old.optString("source"))));
+  form.addView(sheetText("Automatische Quellen verwenden die gespeicherten Haupttrassenmaße, keine LV-spezifischen Abzugsregeln.",13,false));
+  android.app.AlertDialog.Builder builder=new android.app.AlertDialog.Builder(this).setTitle("LV-Position").setView(scroll).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null);
+  if(old!=null)builder.setNeutralButton("Löschen",(a,b)->new android.app.AlertDialog.Builder(this).setTitle("LV-Position löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(x,y)->{org.json.JSONArray next=lvPositions();if(!next.toString().equals(original.toString())){notice("LV geändert. Neu öffnen.");return;}next.remove(index);if(saveLv(next))showLv();}).show());
+  android.app.AlertDialog dialog=builder.create();dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(b->{
+   try{
+    String oz=fields[0].getText().toString().trim(),title=fields[1].getText().toString().trim(),unit=fields[2].getText().toString().trim();
+    if(oz.isEmpty()||title.isEmpty()||unit.isEmpty()){notice("Ordnungszahl, Kurztext und Einheit erforderlich.");return;}
+    String chosen=sources[source.getSelectedItemPosition()];
+    String expected="length".equals(chosen)?"m":"volume".equals(chosen)?"m³":"manual".equals(chosen)?unit:"m²";
+    if(!expected.equals(unit)){fields[2].setError("Einheit "+expected+" erforderlich");return;}
+    org.json.JSONObject item=new org.json.JSONObject().put("oz",oz).put("title",title).put("unit",unit).put("source",chosen);
+    for(int j=3;j<5;j++){if(j==4&&!"manual".equals(chosen))continue;if(fields[j].length()==0)continue;double value=number(fields[j]);if(!Double.isFinite(value)||value<0){fields[j].setError("Menge ab 0 erforderlich");return;}item.put(keys[j],value);}
+    org.json.JSONArray next=lvPositions();if(!next.toString().equals(original.toString())){notice("LV geändert. Neu öffnen.");return;}
+    for(int j=0;j<next.length();j++){org.json.JSONObject o=next.optJSONObject(j);if(j!=index&&o!=null&&oz.equals(o.optString("oz"))){fields[0].setError("Ordnungszahl bereits vorhanden");return;}}
+    if(index<0)next.put(item);else next.put(index,item);
+    if(saveLv(next)){dialog.dismiss();showLv();}
+   }catch(Exception e){notice("Bitte LV-Eingaben prüfen.");}
+  }));dialog.show();
+ }
  void showTools(){
   String[] names={"Maße","Beläge","Objekte","Unterlagen / PDF","Sprachassistent"};
   LinearLayout[] pages={measurePage,segmentPage,objectPage,documentsPage,voicePage};
@@ -786,7 +843,8 @@ public class MainActivity extends Activity {
   menu.getMenu().add(0,105,Menu.NONE,"Längsschnitt");
   menu.getMenu().add(0,106,Menu.NONE,"DXF exportieren");
   menu.getMenu().add(0,107,Menu.NONE,"Mengen als CSV exportieren");
-  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
+  menu.getMenu().add(0,108,Menu.NONE,"Leistungsverzeichnis");
+  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
   menu.show();
  }
  LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(dp(12),dp(8),dp(12),dp(8));return p;}
@@ -1204,6 +1262,10 @@ public class MainActivity extends Activity {
    boolean area=Double.isFinite(a*b)&&a>0&&b>0;
    csvRow(out,name,"Objektdetail",label+" – Fläche",st,n,a,b,n,area?a*b:n,"m²",note);
    csvRow(out,name,"Objektdetail",label+" – Körpervolumen",st,n,a,b,h,area&&Double.isFinite(a*b*h)&&h>0?a*b*h:n,"m³",note);
+  }
+  org.json.JSONArray lv=lvPositions();
+  for(int j=0;j<lv.length();j++){org.json.JSONObject o=lv.optJSONObject(j);if(o==null)continue;
+   csvRow(out,name,"LV-Zuordnung",o.optString("oz")+" "+o.optString("title"),n,n,n,n,n,lvQuantity(o),o.optString("unit"),"Quelle: "+o.optString("source")+"; Soll: "+csvNumber(o.optDouble("target"))+"; LV-Regeln prüfen; nicht zu Geometriemengen addieren");
   }
   out.flush();
  }
