@@ -312,13 +312,19 @@ final class RouteSketch extends View {
    previous=station;
   }
  }
+ private int configuredSurfaceColor(String name,org.json.JSONObject settings){
+  org.json.JSONObject item=settings.optJSONObject(name.trim());
+  if(item!=null)try{return Color.parseColor(item.optString("color"));}catch(Exception ignored){}
+  return surfaceColor(name);
+ }
  void drawSurfaceSections(Canvas c,float density){
   if(!layerVisible(LAYER_SURFACES))return;
+  org.json.JSONObject settings=legendSettings();
   for(int j=0;j<surfaceSections.length();j++){
    org.json.JSONObject section=surfaceSections.optJSONObject(j);if(section==null)continue;
    double from=section.optDouble("from"),to=section.optDouble("to");
    if(from>=to||stationPoint(from)==null||stationPoint(to)==null)continue;
-   paint.setColor(surfaceColor(section.optString("surface")));paint.setStrokeWidth(12*density);
+   paint.setColor(configuredSurfaceColor(section.optString("surface"),settings));paint.setStrokeWidth(12*density);
    double start=0;
    for(int i=1;i<vertices.size();i++){
     double end=start+vertices.get(i).metres,lo=Math.max(from,start),hi=Math.min(to,end);
@@ -463,7 +469,7 @@ final class RouteSketch extends View {
   return entries;
  }
  private org.json.JSONObject legendSettings(){
-  try{return new org.json.JSONObject(((android.app.Activity)getContext()).getPreferences(0).getString("drawingLegend","{}"));}catch(Exception e){return new org.json.JSONObject();}
+  try{return new org.json.JSONObject(getContext().getSharedPreferences("project_legend",0).getString(dimensionProject==null?"default":dimensionProject,"{}"));}catch(Exception e){return new org.json.JSONObject();}
  }
  void editLegend(){
   java.util.LinkedHashMap<String,Integer> entries=legendEntries();
@@ -474,6 +480,16 @@ final class RouteSketch extends View {
    android.widget.LinearLayout form=new android.widget.LinearLayout(getContext());form.setOrientation(1);form.setPadding(24,12,24,12);
    android.widget.EditText name=new android.widget.EditText(getContext());name.setSingleLine(true);name.setHint("Bezeichnung");name.setText(old==null?key:old.optString("name",key));form.addView(name);
    android.widget.EditText color=new android.widget.EditText(getContext());color.setSingleLine(true);color.setHint("#RRGGBB");color.setText(old==null?String.format(Locale.ROOT,"#%06X",entries.get(key)&0xffffff):old.optString("color",String.format(Locale.ROOT,"#%06X",entries.get(key)&0xffffff)));form.addView(color);
+   android.widget.LinearLayout palette=new android.widget.LinearLayout(getContext());palette.setOrientation(1);form.addView(palette);
+   int[] choices={0xff646B73,0xffBFC5CB,0xffD39B60,0xff9670AC,0xffC5A3D9,0xffE7D5B0,0xff76B5E5,0xffC66D56,0xffA49B89,0xffE3C96A,0xffF5E9A8,0xff916B49,0xff79BC65,0xff367D46,0xffC7B49B,0xffD58AB4};
+   for(int row=0;row<2;row++){
+    android.widget.LinearLayout strip=new android.widget.LinearLayout(getContext());palette.addView(strip);
+    for(int col=0;col<8;col++){
+     int choice=choices[row*8+col];String hex=String.format(Locale.ROOT,"#%06X",choice&0xffffff);
+     android.widget.Button swatch=new android.widget.Button(getContext());swatch.setBackgroundColor(choice);swatch.setContentDescription(hex);
+     android.widget.LinearLayout.LayoutParams lp=new android.widget.LinearLayout.LayoutParams(0,(int)(36*getResources().getDisplayMetrics().density),1);lp.setMargins(2,2,2,2);strip.addView(swatch,lp);swatch.setOnClickListener(v->color.setText(hex));
+    }
+   }
    android.widget.EditText order=new android.widget.EditText(getContext());order.setInputType(2);order.setHint("Reihenfolge");order.setText(String.valueOf(old==null?index:old.optInt("order",index)));form.addView(order);
    android.widget.CheckBox visible=new android.widget.CheckBox(getContext());visible.setText("In Legende anzeigen");visible.setChecked(old==null||old.optBoolean("visible",true));form.addView(visible);
    android.app.AlertDialog edit=new android.app.AlertDialog.Builder(getContext()).setTitle(key).setView(form).setNegativeButton("Abbrechen",null).setNeutralButton("Standard",(x,y)->{settings.remove(key);saveLegend(settings);}).setPositiveButton("Übernehmen",null).create();
@@ -485,7 +501,7 @@ final class RouteSketch extends View {
   }).setNegativeButton("Schließen",null).show();
  }
  private boolean saveLegend(org.json.JSONObject settings){
-  boolean ok=((android.app.Activity)getContext()).getPreferences(0).edit().putString("drawingLegend",settings.toString()).commit();
+  boolean ok=getContext().getSharedPreferences("project_legend",0).edit().putString(dimensionProject==null?"default":dimensionProject,settings.toString()).commit();
   if(ok)invalidate();else android.widget.Toast.makeText(getContext(),"Legende konnte nicht gespeichert werden.",0).show();return ok;
  }
  private void drawAutomaticLegend(Canvas c,float d){
