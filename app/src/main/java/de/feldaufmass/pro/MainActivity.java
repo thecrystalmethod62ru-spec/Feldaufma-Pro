@@ -1510,8 +1510,33 @@ public class MainActivity extends Activity {
  }
  void showMontage(){
   new android.app.AlertDialog.Builder(this).setTitle("Rohrleitungsbau – Montage")
-   .setItems(new String[]{"Formstückkatalog","Projekt-Formstücke"},(d,w)->{if(w==0)showMontageCatalog();else showMontageInventory();})
+   .setItems(new String[]{"Formstückkatalog","Projekt-Formstücke","Gesamtplan – Stationierung"},(d,w)->{if(w==0)showMontageCatalog();else if(w==1)showMontageInventory();else showMontageStationPlan();})
    .setNegativeButton("Schließen",null).show();
+ }
+ void showMontageStationPlan(){
+  try{
+   double total=Double.parseDouble(getPreferences(0).getString("length","").trim().replace(',','.'));
+   if(!Double.isFinite(total)||total<=0){notice("Gültige Tiefbau-Trassenlänge erforderlich.");return;}
+   org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));
+   java.util.ArrayList<org.json.JSONObject> linked=new java.util.ArrayList<>();int missing=0;
+   for(int i=0;i<rows.length();i++){org.json.JSONObject o=rows.getJSONObject(i);double st=o.optDouble("station",Double.NaN);if(!Double.isFinite(st)||st<0||st>total)missing++;else linked.add(o);}
+   linked.sort((x,y)->Double.compare(x.optDouble("station"),y.optDouble("station")));
+   LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(dp(12),dp(8),dp(12),dp(8));
+   TextView hint=new TextView(this);hint.setText("Lineare Stationsübersicht – keine maßstäbliche Montagegeometrie. Ohne gültige Station: "+missing);panel.addView(hint);
+   android.view.View axis=new android.view.View(this){
+    final android.graphics.Paint paint=new android.graphics.Paint(3);
+    @Override protected void onDraw(android.graphics.Canvas c){
+     super.onDraw(c);float left=dp(18),right=getWidth()-dp(18),y=dp(42);if(right<=left)return;
+     paint.setColor(0xff9b876c);paint.setStrokeWidth(dp(18));c.drawLine(left,y,right,y,paint);
+     paint.setColor(0xff398bda);paint.setStrokeWidth(dp(2));c.drawLine(left,y,right,y,paint);
+     for(org.json.JSONObject o:linked){float x=left+(right-left)*(float)(o.optDouble("station")/total);paint.setColor(0xffe6a23c);c.drawCircle(x,y,dp(5),paint);}
+    }
+   };panel.addView(axis,new LinearLayout.LayoutParams(-1,dp(70)));
+   TextView range=new TextView(this);range.setText("0,00 m  —  "+total+" m");panel.addView(range);
+   for(org.json.JSONObject o:linked){TextView row=new TextView(this);row.setPadding(0,dp(6),0,dp(6));row.setText(o.optDouble("station")+" m · "+MontageCatalog.Fitting.valueOf(o.getString("type")).label+" · DN "+(o.optString("dn").isEmpty()?"unbekannt":o.optString("dn")));panel.addView(row);}
+   android.widget.ScrollView scroll=new android.widget.ScrollView(this);scroll.addView(panel);
+   new android.app.AlertDialog.Builder(this).setTitle("Gesamtplan – Stationierung").setView(scroll).setPositiveButton("Zurück",(d,w)->showMontage()).show();
+  }catch(Exception e){notice("Stationsübersicht nicht verfügbar. Trassenlänge und Projektdaten prüfen.");}
  }
  void showMontageCatalog(){
   android.widget.ScrollView scroll=new android.widget.ScrollView(this);
