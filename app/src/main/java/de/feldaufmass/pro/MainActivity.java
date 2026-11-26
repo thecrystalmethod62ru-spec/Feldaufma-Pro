@@ -4250,13 +4250,7 @@ minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
    }catch(Exception ignored){}
    if(trenchWidth>0||widths.length()>0){
     org.json.JSONArray utilities=extraUtilities();
-    int conflicts=0;
-    for(int j=0;j<utilities.length();j++)for(int k=j+1;k<utilities.length();k++){
-     org.json.JSONObject u=utilities.optJSONObject(j),v=utilities.optJSONObject(k);if(u==null||v==null)continue;
-     double ud=u.optDouble("diameter")/1000,vd=v.optDouble("diameter")/1000,ux=u.optDouble("offset"),vx=v.optDouble("offset"),uy=u.optDouble("axisDepth"),vy=v.optDouble("axisDepth");
-     double from=Math.max(0,Math.max(u.optDouble("routeFrom",0),v.optDouble("routeFrom",0))),to=Math.min(route.measuredLength(),Math.min(u.optDouble("routeTo",Double.POSITIVE_INFINITY),v.optDouble("routeTo",Double.POSITIVE_INFINITY)));
-     if(to>from&&Double.isFinite(ud)&&Double.isFinite(vd)&&ud>0&&vd>0&&Double.isFinite(ux)&&Double.isFinite(vx)&&Double.isFinite(uy)&&Double.isFinite(vy)&&Math.hypot(ux-vx,uy-vy)<(ud+vd)/2)conflicts++;
-    }
+    int conflicts=utilityCollisionCount(utilities,route.measuredLength());
     if(conflicts>0){p.setColor(0xffb3261e);p.setTextSize(9);c.drawText("Profilprüfung: "+conflicts+" mögliche Leitungskollision(en)",36,height-137,p);}
 boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new java.util.LinkedHashMap<>();
     for(int j=0;j<utilities.length();j++){
@@ -5246,6 +5240,16 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
    }catch(Exception e){notice("Montagedaten konnten nicht gespeichert werden.");}
   }));dialog.show();
  }
+ int utilityCollisionCount(org.json.JSONArray rows,double length){
+  int conflicts=0;
+  for(int j=0;j<rows.length();j++)for(int k=j+1;k<rows.length();k++){
+   org.json.JSONObject u=rows.optJSONObject(j),v=rows.optJSONObject(k);if(u==null||v==null)continue;
+   double ud=u.optDouble("diameter")/1000,vd=v.optDouble("diameter")/1000,ux=u.optDouble("offset"),vx=v.optDouble("offset"),uy=u.optDouble("axisDepth"),vy=v.optDouble("axisDepth");
+   double from=Math.max(0,Math.max(u.optDouble("routeFrom",0),v.optDouble("routeFrom",0))),to=Math.min(length,Math.min(u.optDouble("routeTo",Double.POSITIVE_INFINITY),v.optDouble("routeTo",Double.POSITIVE_INFINITY)));
+   if(to>from&&Double.isFinite(ud)&&Double.isFinite(vd)&&ud>0&&vd>0&&Double.isFinite(ux)&&Double.isFinite(vx)&&Double.isFinite(uy)&&Double.isFinite(vy)&&Math.hypot(ux-vx,uy-vy)<(ud+vd)/2)conflicts++;
+  }
+  return conflicts;
+ }
  boolean saveUtilities(org.json.JSONArray rows){
   boolean ok=getPreferences(0).edit().putString("extraUtilities",rows.toString()).commit();
   if(ok){if(profile!=null)profile.invalidate();}else notice("Leitungen konnten nicht gespeichert werden.");return ok;
@@ -5305,6 +5309,9 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  if(!covering.equals("Asphalt")&&!covering.equals("Unbekannt")&&!covering.equals("Unbefestigt")&&!covering.equals("Sonstiges")){p.setColor(0xff777777);c.drawLine(20,top,340,top,p);for(int i=20;i<340;i+=covering.contains("platten")||covering.contains("Platten")?28:12)c.drawLine(i,top-4,i,top,p);}
  double previewPipe=pipe;try{previewPipe=optional(pipeInput);}catch(Exception ignored){}
  org.json.JSONArray utilities=dragRows==null?extraUtilities():dragRows;
+ int conflicts=utilityCollisionCount(utilities,Double.isFinite(l)&&l>0?l:Double.POSITIVE_INFINITY);
+ if(conflicts>0){p.setColor(0xffb3261e);p.setTextSize(11);c.drawText("Achtung: "+conflicts+" mögliche Leitungskollision(en)",20,40,p);}
+
  if(utilities.length()==0){if(Double.isFinite(previewPipe)){float radius=(float)(previewPipe/2000*scale);p.setColor(0xff3686bc);c.drawCircle(180,bottom-radius,radius,p);}}
  else{
   double sum=Double.isFinite(previewPipe)?previewPipe/1000:0;for(int i=0;i<utilities.length();i++)sum+=utilities.optJSONObject(i).optDouble("diameter",0)/1000;
