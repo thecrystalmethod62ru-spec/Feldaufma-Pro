@@ -38,6 +38,13 @@ public final class StripOverlap {
     }
     /** Each strip: x1,y1,x2,y2,leftExtent,rightExtent, in metres. */
     public static Result calculate(List<double[]> strips) {
+        return calculateInternal(strips,false);
+    }
+    /** Ordered connected route, including bevel corner fillers. */
+    public static Result calculateWithCorners(List<double[]> strips) {
+        return calculateInternal(strips,true);
+    }
+    private static Result calculateInternal(List<double[]> strips,boolean corners) {
         if (strips == null || strips.isEmpty()) throw new IllegalArgumentException("Keine Abschnitte");
         Path union = new Path();
         double gross = 0;
@@ -57,6 +64,16 @@ public final class StripOverlap {
             p.close();
             if (!union.op(p,Path.Op.UNION)) throw new IllegalStateException("Flächenvereinigung fehlgeschlagen");
             gross+=len*(s[4]+s[5]);
+        }
+        if(corners) for(int i=1;i<strips.size();i++){
+            double[][] q=cornerFiller(strips.get(i-1),strips.get(i));
+            if(q==null)continue;
+            Path p=new Path();
+            p.moveTo((float)(q[0][0]-ox),(float)(q[0][1]-oy));
+            p.lineTo((float)(q[1][0]-ox),(float)(q[1][1]-oy));
+            p.lineTo((float)(q[2][0]-ox),(float)(q[2][1]-oy));p.close();
+            if(!union.op(p,Path.Op.UNION))throw new IllegalStateException("Eckergänzung fehlgeschlagen");
+            gross+=Math.abs((q[1][0]-q[0][0])*(q[2][1]-q[0][1])-(q[1][1]-q[0][1])*(q[2][0]-q[0][0]))/2;
         }
         // Path.op on polygonal input produces polygonal contours. Approximate
         // samples include vertices; signed areas account for interior holes.
