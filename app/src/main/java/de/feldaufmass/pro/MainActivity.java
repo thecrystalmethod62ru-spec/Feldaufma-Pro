@@ -155,8 +155,8 @@ public class MainActivity extends Activity {
      }v=rows.toString();
     }else if(key.equals("documents")){
      org.json.JSONArray docs=new org.json.JSONArray(v);for(int j=0;j<docs.length();j++){org.json.JSONObject doc=docs.getJSONObject(j);doc.remove("uri");doc.put("name",doc.optString("name")+" (neu verknüpfen)");}v=docs.toString();
-    }else if(key.equals("dailyReports")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++){org.json.JSONArray items=dailyPhotos(rows.getJSONObject(j));for(int k=0;k<items.length();k++){org.json.JSONObject photo=items.getJSONObject(k);String old=photo.getString("file"),replacement=photos.get(old);if(replacement==null)throw new java.io.IOException("Berichtsfoto fehlt");used.add(old);photo.put("file",replacement);}}v=rows.toString();
-    }else if(key.equals("objects")||key.equals("segments")||key.equals("elevationPoints")||key.equals("lvPositions")||key.equals("nachtraege")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)rows.getJSONObject(j);}
+    }else if(key.equals("dailyReports")||key.equals("nachtraege")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++){org.json.JSONArray items=dailyPhotos(rows.getJSONObject(j));for(int k=0;k<items.length();k++){org.json.JSONObject photo=items.getJSONObject(k);String old=photo.getString("file"),replacement=photos.get(old);if(replacement==null)throw new java.io.IOException("Berichtsfoto fehlt");used.add(old);photo.put("file",replacement);}}v=rows.toString();
+    }else if(key.equals("objects")||key.equals("segments")||key.equals("elevationPoints")||key.equals("lvPositions")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)rows.getJSONObject(j);}
     else if(key.equals("objectUndo")||key.equals("objectRedo")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)new org.json.JSONArray(rows.getString(j));}
     if(key.equals("project")&&!v.trim().isEmpty())name=v.trim();
     ed.putString(key,v);
@@ -198,8 +198,10 @@ public class MainActivity extends Activity {
     photos.add(name);
    }
   }
-  Object reportsData=snapshot.get("dailyReports");
+  for(String reportKey:new String[]{"dailyReports","nachtraege"}){
+  Object reportsData=snapshot.get(reportKey);
   if(reportsData instanceof String){org.json.JSONArray reports=new org.json.JSONArray((String)reportsData);for(int j=0;j<reports.length();j++){org.json.JSONArray items=dailyPhotos(reports.getJSONObject(j));for(int k=0;k<items.length();k++){String name=items.getJSONObject(k).getString("file");if(!name.matches("[A-Za-z0-9._-]+")||name.equals(".")||name.equals(".."))throw new java.io.IOException("Ungültiger Fotodateiname");photos.add(name);}}}
+  }
   try(java.util.zip.ZipOutputStream zip=new java.util.zip.ZipOutputStream(new java.io.FileOutputStream(target))){
    zip.putNextEntry(new java.util.zip.ZipEntry("project.json"));zip.write(manifest.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));zip.closeEntry();
    for(String name:photos){
@@ -959,8 +961,9 @@ public class MainActivity extends Activity {
  org.json.JSONArray dailyPhotos(org.json.JSONObject report){
   org.json.JSONArray a=report==null?null:report.optJSONArray("photos");return a==null?new org.json.JSONArray():a;
  }
- void chooseDailyPhotos(int index){
-  org.json.JSONArray original=dailyReports();org.json.JSONObject report=original.optJSONObject(index);if(report==null)return;
+ void chooseDailyPhotos(int index){chooseRecordPhotos(index,false);}
+ void chooseRecordPhotos(int index,boolean changeOrder){
+  org.json.JSONArray original=changeOrder?nachtraege():dailyReports();org.json.JSONObject report=original.optJSONObject(index);if(report==null)return;
   java.util.LinkedHashMap<String,org.json.JSONObject> entries=new java.util.LinkedHashMap<>();java.util.HashSet<String> selected=new java.util.HashSet<>();
   org.json.JSONArray prior=dailyPhotos(report);
   for(int j=0;j<prior.length();j++){org.json.JSONObject o=prior.optJSONObject(j);if(o!=null){entries.put(o.optString("file"),o);selected.add(o.optString("file"));}}
@@ -978,11 +981,11 @@ public class MainActivity extends Activity {
   if(entries.isEmpty()){notice("Zuerst Fotos an Trassenpunkte anhängen.");return;}
   java.util.ArrayList<org.json.JSONObject> list=new java.util.ArrayList<>(entries.values());String[] labels=new String[list.size()];boolean[] checked=new boolean[list.size()];
   for(int j=0;j<list.size();j++){org.json.JSONObject o=list.get(j);labels[j]=o.optString("label");checked[j]=selected.contains(o.optString("file"));}
-  new android.app.AlertDialog.Builder(this).setTitle("Fotos zum Bautagesbericht").setMultiChoiceItems(labels,checked,(d,j,c)->checked[j]=c)
+  new android.app.AlertDialog.Builder(this).setTitle(changeOrder?"Fotos zum Nachtrag":"Fotos zum Bautagesbericht").setMultiChoiceItems(labels,checked,(d,j,c)->checked[j]=c)
    .setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",(d,w)->{
-    if(!dailyReports().toString().equals(original.toString())){notice("Bericht geändert. Neu öffnen.");return;}
+    if(!(changeOrder?nachtraege():dailyReports()).toString().equals(original.toString())){notice("Bericht geändert. Neu öffnen.");return;}
     org.json.JSONArray photos=new org.json.JSONArray();for(int j=0;j<list.size();j++)if(checked[j])photos.put(list.get(j));
-    try{report.put("photos",photos).put("modifiedAt",System.currentTimeMillis());if(saveDailyReports(original))showDailyReports();}catch(Exception e){notice("Fotos konnten nicht zugeordnet werden.");}
+    try{report.put("photos",photos).put("modifiedAt",System.currentTimeMillis());if(changeOrder){if(saveNachtraege(original))showNachtraege();}else if(saveDailyReports(original))showDailyReports();}catch(Exception e){notice("Fotos konnten nicht zugeordnet werden.");}
    }).show();
  }
  String pendingDailyPdfId;
@@ -1085,6 +1088,37 @@ public class MainActivity extends Activity {
  void addNachtragHint(LinearLayout form,String title,String description){
   Button b=new Button(this);b.setAllCaps(false);b.setText(title+"\n"+description);b.setOnClickListener(v->editNachtrag(-1,title,description));form.addView(b);
  }
+ String pendingNachtragPdfId;
+ void exportNachtragPdf(int index){
+  org.json.JSONObject row=nachtraege().optJSONObject(index);if(row==null)return;
+  String id=row.optString("id");if(id.isEmpty()){notice("Nachtrag erneut speichern.");return;}
+  new android.app.AlertDialog.Builder(this).setTitle("Nachtragsdokumentation als PDF")
+   .setMessage("Enthält die gespeicherte Begründung, Mengenangaben, Status und ausgewählte Fotos. Kein automatisch anerkanntes Nachtragsangebot.")
+   .setNegativeButton("Abbrechen",null).setPositiveButton("Exportieren",(d,w)->{
+    pendingNachtragPdfId=id;android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.setType("application/pdf");i.putExtra(android.content.Intent.EXTRA_TITLE,"Nachtrag_"+row.optString("date")+".pdf");startActivityForResult(i,424);
+   }).show();
+ }
+ void writeNachtragPdf(android.net.Uri uri){
+  String id=pendingNachtragPdfId;pendingNachtragPdfId=null;org.json.JSONObject row=null;org.json.JSONArray rows=nachtraege();
+  for(int j=0;j<rows.length();j++){org.json.JSONObject o=rows.optJSONObject(j);if(o!=null&&id!=null&&id.equals(o.optString("id")))row=o;}
+  if(row==null){notice("Nachtrag nicht gefunden. Export erneut starten.");return;}
+  android.graphics.pdf.PdfDocument pdf=new android.graphics.pdf.PdfDocument();
+  try(java.io.OutputStream out=getContentResolver().openOutputStream(uri,"wt")){
+   if(out==null)throw new java.io.IOException();
+   String projectName=projectHeader.getText().toString();StringBuilder text=new StringBuilder("Projekt: "+projectName+"\nDatum: "+row.optString("date")+"\nBearbeitungsstatus: "+row.optString("status")+"\n");
+   String[] keys={"title","reason","order","evidence"},labels={"Bezeichnung / LV-Bezug","Sachverhalt / Begründung","Anordnung / Auftraggeber","Nachweise / Bezug"};
+   for(int j=0;j<keys.length;j++){String value=row.optString(keys[j]);text.append("\n").append(labels[j]).append("\n").append(value.isEmpty()?"Nicht erfasst":value).append("\n");}
+   double q=row.optDouble("quantity");text.append("\nZusätzliche Menge\n").append(Double.isFinite(q)?csvNumber(q)+" "+row.optString("unit"):"Nicht erfasst");
+   org.json.JSONArray photos=dailyPhotos(row);text.append("\n\nZugeordnete Fotos: ").append(photos.length());
+   text.append("\n\nDokumentation – kein automatisch ermittelter Vergütungsanspruch. Vertragsgrundlage, Mengen und Freigabe gesondert prüfen.");
+   int page=dailyTextPdf(pdf,1,"Nachtragsdokumentation",text.toString(),null);
+   for(int j=0;j<photos.length();j++){org.json.JSONObject o=photos.optJSONObject(j);if(o==null)continue;android.graphics.Bitmap bitmap=reportPhoto(o.optString("file"));
+    String info=projectName+"\nNachtrag: "+row.optString("title")+"\n"+o.optString("info");if(bitmap==null)info+="\nBilddatei fehlt oder ist nicht lesbar.";
+    page=dailyTextPdf(pdf,page,"Nachweisfoto "+(j+1)+" / "+photos.length(),info,bitmap);
+   }
+   pdf.writeTo(out);notice("Nachtragsdokumentation gespeichert.");
+  }catch(Exception e){notice("PDF konnte nicht gespeichert werden.");}finally{pdf.close();}
+ }
  void showNachtraege(){
   LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
   form.addView(sheetText("Prüfhinweise, keine automatische Anerkennung oder Änderung von LV-Mengen. Vertrag, Anordnung und Abrechnung getrennt prüfen.",14,true));
@@ -1107,7 +1141,7 @@ public class MainActivity extends Activity {
   form.addView(sheetText("Dokumentierte Nachträge",16,true));
   org.json.JSONArray saved=nachtraege();
   if(saved.length()==0)form.addView(sheetText("Noch keine Nachträge erfasst.",13,false));
-  for(int j=0;j<saved.length();j++){final int index=j;org.json.JSONObject o=saved.optJSONObject(j);if(o==null)continue;Button b=new Button(this);b.setAllCaps(false);b.setText(o.optString("title")+"\n"+o.optString("date")+" · "+o.optString("status"));b.setOnClickListener(v->editNachtrag(index,"",""));form.addView(b);}
+  for(int j=0;j<saved.length();j++){final int index=j;org.json.JSONObject o=saved.optJSONObject(j);if(o==null)continue;Button b=new Button(this);b.setAllCaps(false);b.setText(o.optString("title")+"\n"+o.optString("date")+" · "+o.optString("status"));b.setOnClickListener(v->editNachtrag(index,"",""));form.addView(b);Button photos=new Button(this);photos.setAllCaps(false);photos.setText("Nachweisfotos ("+dailyPhotos(o).length()+")");photos.setOnClickListener(v->chooseRecordPhotos(index,true));form.addView(photos);Button pdf=new Button(this);pdf.setAllCaps(false);pdf.setText("Nachtrag als PDF");pdf.setOnClickListener(v->exportNachtragPdf(index));form.addView(pdf);}
   new android.app.AlertDialog.Builder(this).setTitle("Nachtragsmanagement").setView(scroll).setNegativeButton("Schließen",null).setPositiveButton("Neuer Nachtrag",(d,w)->editNachtrag(-1,"","")).show();
  }
  void editNachtrag(int index,String suggestedTitle,String suggestedReason){
@@ -2304,6 +2338,7 @@ public class MainActivity extends Activity {
  try{startActivityForResult(i,410);}catch(android.content.ActivityNotFoundException e){Toast.makeText(this,"Keine Spracherkennung verfügbar.",Toast.LENGTH_LONG).show();}
  }
  @Override protected void onActivityResult(int request,int result,android.content.Intent data){super.onActivityResult(request,result,data);
+ if(request==424){if(result==RESULT_OK&&data!=null&&data.getData()!=null)writeNachtragPdf(data.getData());else pendingNachtragPdfId=null;return;}
  if(request==423){if(result==RESULT_OK&&data!=null&&data.getData()!=null)writeDailyPdf(data.getData());else pendingDailyPdfId=null;return;}
  if(request==422&&result==RESULT_OK&&data!=null&&data.getData()!=null){writePhotoReport(data.getData());return;}
  if(request==421){if(result==RESULT_OK&&data!=null&&data.getData()!=null)writeX31(data.getData());else pendingX31Data=null;return;}
