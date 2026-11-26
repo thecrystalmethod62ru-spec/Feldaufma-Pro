@@ -42,3 +42,9 @@ Jede Funktion benötigt Build, Tests und Geräteprüfung. Geometrische Mengen si
 ### Umfang Formstückkatalog
 - [ ] Nur Standardformstücke: Bögen 11,25°/22,5°/30°/45°/90°, T-Stücke, Kreuzstücke, Reduzierungen, Muffen, Flansche, Endkappen und Schieber. Keine Herstellerkataloge oder Sonderformstücke.
 - [ ] Normgerechte Symbole anhand zugänglicher Normvorlagen prüfen; DN und Werkstoff editierbar, Drehung und Spiegelung möglich.
+
+### Montageplan aus Handskizze
+- [ ] Handskizze per Kamera, Galerie oder PDF importieren; zuschneiden und ausrichten.
+- [ ] Leitungsverlauf, Abzweige, Standardformstücke, Verbindungen und handschriftliche Maße als überprüfbare Vorschläge erkennen.
+- [ ] Unbekannte Maße als 'Maß fehlt' kennzeichnen; keine erfundenen Maße oder automatische Ist-Abrechnung.
+- [ ] Bestätigte Vorschläge in editierbare Montagezeichnung mit Bemaßung, Legende und Materialliste überführen; Originalskizze als Quelle behalten.
