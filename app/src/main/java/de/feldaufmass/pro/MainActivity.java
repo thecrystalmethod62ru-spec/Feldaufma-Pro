@@ -637,6 +637,13 @@ public class MainActivity extends Activity {
    }catch(Exception e){notice("Station und Maße prüfen.");}
   }));dialog.show();
  }
+ android.graphics.drawable.GradientDrawable editorShape(int color,int radius){
+  android.graphics.drawable.GradientDrawable shape=new android.graphics.drawable.GradientDrawable();shape.setColor(color);shape.setCornerRadius(dp(radius));return shape;
+ }
+ void styleEditorButton(Button b,boolean primary){
+  b.setAllCaps(false);b.setTextSize(primary?15:12);b.setTextColor(primary?Color.WHITE:TEAL);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(dp(4),dp(4),dp(4),dp(4));b.setBackgroundTintList(null);
+  b.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x3312665f),editorShape(primary?TEAL:0xfff0f6f5,12),null));
+ }
  void showFullscreenRoute(android.app.AlertDialog editor,LinearLayout form,RouteSketch route,Spinner mode,Spinner angles,LinearLayout historyBar,Runnable openObjects){
   // Move the existing views, not a second sketch: unsaved data and undo history stay shared.
   View[] views={route,mode,angles,historyBar};
@@ -649,11 +656,12 @@ public class MainActivity extends Activity {
   final int previousOrientation=getRequestedOrientation();
   LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setBackgroundColor(Color.WHITE);
   LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);root.addView(header);
-  Button back=new Button(this),save=new Button(this);back.setAllCaps(false);save.setAllCaps(false);back.setText("Vollbild beenden");save.setText("Speichern");
-  header.addView(back,new LinearLayout.LayoutParams(0,-2,1));
+  Button back=new Button(this),save=new Button(this);back.setAllCaps(false);save.setAllCaps(false);back.setText("‹");back.setContentDescription("Vollbild beenden");save.setText("Speichern");
+  header.addView(back,new LinearLayout.LayoutParams(dp(48),dp(48)));
+  LinearLayout heading=new LinearLayout(this);heading.setOrientation(1);heading.addView(sheetText("Feldaufmaß Pro",19,true));heading.addView(sheetText("Tiefbau · Zeichnungseditor",12,false));header.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
   Spinner orientation=new Spinner(this);
   orientation.setAdapter(new android.widget.ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Automatisch drehen","Querformat","Hochformat"}));
-  header.addView(orientation,new LinearLayout.LayoutParams(0,-2,1));
+  header.addView(orientation,new LinearLayout.LayoutParams(dp(100),dp(48)));
   orientation.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
    public void onItemSelected(android.widget.AdapterView<?> parent,View view,int position,long id){
     if(!full.isShowing())return;
@@ -662,20 +670,22 @@ public class MainActivity extends Activity {
    public void onNothingSelected(android.widget.AdapterView<?> parent){}
   });
   for(View view:views)form.removeView(view);
-  LinearLayout controls=new LinearLayout(this);root.addView(controls);
+  LinearLayout controls=new LinearLayout(this);controls.setPadding(dp(8),dp(4),dp(8),dp(4));controls.setBackground(editorShape(0xffe6f2ef,12));root.addView(controls);
   controls.addView(mode,new LinearLayout.LayoutParams(0,-2,1));controls.addView(angles,new LinearLayout.LayoutParams(0,-2,1));
   root.addView(route,new LinearLayout.LayoutParams(-1,0,1));
   root.addView(historyBar,new LinearLayout.LayoutParams(-1,-2));
+  for(int k=0;k<historyBar.getChildCount();k++)if(historyBar.getChildAt(k) instanceof Button)styleEditorButton((Button)historyBar.getChildAt(k),false);
   LinearLayout tools=new LinearLayout(this);root.addView(tools);
   Button mic=new Button(this),measureList=new Button(this),resetZoom=new Button(this);
-  mic.setAllCaps(false);mic.setText("🎙");mic.setContentDescription("Sprachassistent");measureList.setAllCaps(false);measureList.setText("Abschnitte");resetZoom.setAllCaps(false);resetZoom.setText("Ansicht");
-  tools.addView(mic,new LinearLayout.LayoutParams(0,-2,1));tools.addView(measureList,new LinearLayout.LayoutParams(0,-2,1));tools.addView(resetZoom,new LinearLayout.LayoutParams(0,-2,1));
+  mic.setAllCaps(false);mic.setText("🎙");mic.setContentDescription("Sprachassistent");measureList.setAllCaps(false);measureList.setText("↔\nMaße");resetZoom.setAllCaps(false);resetZoom.setText("⌖\nAnsicht");
+  header.addView(mic,new LinearLayout.LayoutParams(dp(48),dp(48)));tools.addView(measureList,new LinearLayout.LayoutParams(0,-2,1));tools.addView(resetZoom,new LinearLayout.LayoutParams(0,-2,1));
   mic.setOnClickListener(v->startEditorDictation(speech->applyEditorSpeech(speech,route,mode,historyBar,full)));
   measureList.setOnClickListener(v->showFullscreenMeasures(route));
-  Button legendEdit=new Button(this);legendEdit.setAllCaps(false);legendEdit.setText("Legende");tools.addView(legendEdit,new LinearLayout.LayoutParams(0,-2,1));legendEdit.setOnClickListener(v->route.editLegend());
+  Button legendEdit=new Button(this);legendEdit.setAllCaps(false);legendEdit.setText("☷\nLegende");tools.addView(legendEdit,new LinearLayout.LayoutParams(0,-2,1));legendEdit.setOnClickListener(v->route.editLegend());
   resetZoom.setOnClickListener(v->{route.zoom=1;route.centerX=.5f;route.centerY=.5f;route.invalidate();});
-  Button objectTools=new Button(this);objectTools.setAllCaps(false);objectTools.setText("Objekte");tools.addView(objectTools,new LinearLayout.LayoutParams(0,-2,1));objectTools.setOnClickListener(v->openObjects.run());
-  save.setBackgroundTintList(android.content.res.ColorStateList.valueOf(TEAL));save.setTextColor(Color.WHITE);root.addView(save,new LinearLayout.LayoutParams(-1,dp(48)));
+  Button objectTools=new Button(this);objectTools.setAllCaps(false);objectTools.setText("□\nObjekte");tools.addView(objectTools,new LinearLayout.LayoutParams(0,-2,1));objectTools.setOnClickListener(v->openObjects.run());
+  for(Button b:new Button[]{back,mic,measureList,resetZoom,legendEdit,objectTools})styleEditorButton(b,false);
+  styleEditorButton(save,true);LinearLayout.LayoutParams saveParams=new LinearLayout.LayoutParams(-1,dp(48));saveParams.setMargins(dp(10),dp(4),dp(10),dp(8));root.addView(save,saveParams);
   full.setContentView(root);
   full.setOnDismissListener(d->{
    pendingEditorSpeech=null;
