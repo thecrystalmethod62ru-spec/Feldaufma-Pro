@@ -1616,6 +1616,7 @@ public class MainActivity extends Activity {
  documentsList=new TextView(this);documentsPage.addView(documentsList);try{documents=new org.json.JSONArray(getPreferences(0).getString("documents","[]"));}catch(Exception ignored){}showDocuments();
  TextView info=new TextView(this);info.setText("Unterlagen sind Planungsdaten (Soll). Automatische KI-Auswertung noch nicht verfügbar. Ist-Maße bleiben unverändert.");documentsPage.addView(info);
  Button planAssistant=new Button(this);planAssistant.setText("KI-Planassistent – Unterlagen prüfen");documentsPage.addView(planAssistant);planAssistant.setOnClickListener(v->choosePlanDocument());
+ Button planText=new Button(this);planText.setText("Soll-Leitungen aus Text erkennen");documentsPage.addView(planText);planText.setOnClickListener(v->openPlanTextAnalysis());
  TextView sh=new TextView(this);sh.setText("Soll-Maße aus Ausführungsunterlagen");sh.setTextSize(20);documentsPage.addView(sh);
  sollLength=field(documentsPage,"Trassenlänge Soll (m)","sollLength",true);
  sollWidth=field(documentsPage,"Grabenbreite Soll (m)","sollWidth",true);
@@ -2451,6 +2452,23 @@ public class MainActivity extends Activity {
    ed.putString("sollSource",source.toString());if(!ed.commit()){notice("Sollwerte konnten nicht gespeichert werden.");return;}
    recordProjectEvent("Sollwerte aus Unterlage übernommen");compareSoll();dialog.dismiss();notice("Sollwerte gespeichert. Istmaße unverändert.");
   }));dialog.show();
+ }
+ void openPlanTextAnalysis(){
+  EditText input=new EditText(this);
+  input.setHint("Text aus dem Ausführungsplan einfügen");
+  input.setMinLines(4);
+  new android.app.AlertDialog.Builder(this).setTitle("Soll-Leitungen aus Text erkennen").setView(input)
+   .setNegativeButton("Abbrechen",null).setPositiveButton("Text prüfen",(d,w)->{
+    java.util.List<PlanTextParser.Candidate> candidates=PlanTextParser.parse(input.getText().toString());
+    StringBuilder result=new StringBuilder("Ungeprüfte Soll-Vorschläge – keine Übernahme in die Abrechnung.\n\n");
+    if(candidates.isEmpty())result.append("Keine eindeutigen Leitungsbezeichnungen gefunden.");
+    for(PlanTextParser.Candidate c:candidates){
+     result.append(c.type).append(" · DN ").append(c.nominalDiameter.isEmpty()?"unbekannt":c.nominalDiameter)
+      .append(" · ").append(c.material.isEmpty()?"Material unbekannt":c.material)
+      .append("\nZeile ").append(c.lineNumber).append(": ").append(c.sourceLine).append("\n\n");
+    }
+    new android.app.AlertDialog.Builder(this).setTitle("Erkannte Soll-Leitungen").setMessage(result.toString()).setPositiveButton("Schließen",null).show();
+   }).show();
  }
  void choosePlanDocument(){
   if(documents.length()==0){notice("Bitte zuerst Ausführungsunterlagen hinzufügen.");return;}
