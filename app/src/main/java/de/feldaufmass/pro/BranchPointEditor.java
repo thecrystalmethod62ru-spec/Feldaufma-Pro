@@ -22,6 +22,20 @@ public final class BranchPointEditor {
         points.add(after+1,new double[]{x,y});
         return rebuild(branch,points);
     }
+    /** Move a vertex, optionally snapping the incoming segment to a 15 degree grid. */
+    public static RouteBranch move(RouteBranch branch,List<double[]> main,int index,double x,double y,boolean snap){
+        List<double[]> points=new ArrayList<>(branch.vertices(main));
+        if(index<=0||index>=points.size()||!Double.isFinite(x)||!Double.isFinite(y))
+            throw new IllegalArgumentException("Ungültiger Punkt");
+        if(snap){
+            double[] previous=points.get(index-1);
+            double dx=x-previous[0],dy=y-previous[1],length=Math.hypot(dx,dy);
+            double angle=Math.toRadians(snapDirection(Math.toDegrees(Math.atan2(dy,dx))));
+            x=previous[0]+length*Math.cos(angle);y=previous[1]+length*Math.sin(angle);
+        }
+        points.set(index,new double[]{x,y});
+        return rebuild(branch,points);
+    }
     private static RouteBranch rebuild(RouteBranch branch,List<double[]> points){
         double[] lengths=new double[points.size()-1],directions=new double[lengths.length];
         for(int i=0;i<lengths.length;i++){
