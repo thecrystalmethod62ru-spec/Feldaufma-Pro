@@ -4196,7 +4196,7 @@ minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
    }
    p.setColor(TEAL);p.setStrokeWidth(1.5f);
    for(int i=1;i<route.vertices.size();i++){RouteSketch.Vertex a=route.vertices.get(i-1),b=route.vertices.get(i);c.drawLine((float)(40+(a.point.x-minX)*unit),(float)(85+(a.point.y-minY)*unit),(float)(40+(b.point.x-minX)*unit),(float)(85+(b.point.y-minY)*unit),p);}
-   if(widths.length()==0&&trenchWidth>0)try{
+   if(trenchWidth>0||widths.length()>0)try{
     org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("metricVerbauSections","[]"));
     double station=0;
     p.setColor(0xffa65e19);p.setStrokeWidth(.8f);
@@ -4210,9 +4210,16 @@ minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
       if(!Double.isFinite(from)||!Double.isFinite(to)||to<=from)continue;
       for(int side=0;side<2;side++){
        double h=row.optDouble(side+2);if(!Double.isFinite(h)||h<=0)continue;
-       double offset=(side==0?1:-1)*trenchWidth/(2*factor),nx=dy/n*offset,ny=-dx/n*offset;
-       double t1=(from-station)/len,t2=(to-station)/len;
-       c.drawLine((float)(40+(a.point.x+dx*t1+nx-minX)*unit),(float)(85+(a.point.y+dy*t1+ny-minY)*unit),(float)(40+(a.point.x+dx*t2+nx-minX)*unit),(float)(85+(a.point.y+dy*t2+ny-minY)*unit),p);
+       java.util.TreeSet<Double> cuts=new java.util.TreeSet<>();cuts.add(from);cuts.add(to);
+       for(int k=0;k<widths.length();k++){org.json.JSONObject section=widths.optJSONObject(k);if(section==null)continue;for(double boundary:new double[]{section.optDouble("from"),section.optDouble("to")})if(boundary>from&&boundary<to)cuts.add(boundary);}
+       Double previous=null;
+       for(double end:cuts){if(previous==null){previous=end;continue;}double start=previous;previous=end;double mid=start+(end-start)/2,bw=trenchWidth;
+        for(int k=0;k<widths.length();k++){org.json.JSONObject section=widths.optJSONObject(k);if(section!=null&&mid>=section.optDouble("from")&&mid<section.optDouble("to")&&section.optDouble("width")>0){bw=section.optDouble("width");break;}}
+        if(!Double.isFinite(bw)||bw<=0)continue;
+        double offset=(side==0?1:-1)*bw/(2*factor),nx=dy/n*offset,ny=-dx/n*offset;
+        double t1=(start-station)/len,t2=(end-station)/len;
+        c.drawLine((float)(40+(a.point.x+dx*t1+nx-minX)*unit),(float)(85+(a.point.y+dy*t1+ny-minY)*unit),(float)(40+(a.point.x+dx*t2+nx-minX)*unit),(float)(85+(a.point.y+dy*t2+ny-minY)*unit),p);
+       }
       }
      }
      station+=len;
