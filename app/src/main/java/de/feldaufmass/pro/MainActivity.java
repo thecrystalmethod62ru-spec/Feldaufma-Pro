@@ -1705,6 +1705,7 @@ public class MainActivity extends Activity {
   String[] overlapModes={"Nur Kontrollwerte","Überlappung beibehalten (Brutto)","Überlappung abziehen (Netto)"};
   overlapMode.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,overlapModes));
   panel.addView(overlapMode);
+  TextView overlapLegend=new TextView(this);overlapLegend.setText("Orange: Überlappung bemaßter Abschnittsstreifen (ohne Eckergänzungen)");panel.addView(overlapLegend);
   final SharedPreferences overlapPrefs=projectStorage(activeProject);
   int storedOverlapMode=0;
   try{storedOverlapMode=overlapPrefs.getInt("metricOverlapMode",0);}catch(ClassCastException ignored){}
@@ -1906,6 +1907,31 @@ public class MainActivity extends Activity {
      }
      for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o==null)continue;double from=o.optDouble("from"),to=o.optDouble("to"),w=o.optDouble("width");if(!(from>=0&&to<=total&&to>from&&Double.isFinite(w)&&w>0))continue;double[] q=model.station((from+to)/2);if(q==null)continue;pen.setColor(0xff555555);pen.setTextSize(dp(11));c.drawText(String.format(java.util.Locale.GERMANY,"B %.2f m",w),(float)(ox+q[0]*scale),(float)(oy-q[1]*scale-dp(38)),pen);}
     }
+    // Highlight overlap of measured flat-ended strips, independent of billing mode.
+    android.graphics.Path covered=new android.graphics.Path(), repeated=new android.graphics.Path();
+    java.util.TreeSet<Double> overlapCuts=new java.util.TreeSet<>();overlapCuts.add(0.0);
+    double overlapStation=0;
+    for(int k=1;k<route.vertices.size();k++){overlapStation+=route.vertices.get(k).metres;overlapCuts.add(overlapStation);}
+    for(int k=0;k<widthSections.length();k++){
+     org.json.JSONObject o=widthSections.optJSONObject(k);if(o==null)continue;
+     double f=o.optDouble("from"),t=o.optDouble("to");
+     if(f>=0&&t<=overlapStation&&t>f){overlapCuts.add(f);overlapCuts.add(t);}
+    }
+    java.util.ArrayList<Double> oc=new java.util.ArrayList<>(overlapCuts);
+    for(int k=1;k<oc.size();k++){
+     double f=oc.get(k-1),t=oc.get(k),mid=(f+t)/2,w=widthAt(mid),l=cutAt(mid,"left",widths[1]),r=cutAt(mid,"right",widths[2]);
+     if(!Double.isFinite(w)||w<=0||!Double.isFinite(l)||l<0||!Double.isFinite(r)||r<0)continue;
+     double[] u=model.station(f),v=model.station(t);if(u==null||v==null)continue;
+     double dx=v[0]-u[0],dy=v[1]-u[1],n=Math.hypot(dx,dy);if(n<=0)continue;
+     double nx=-dy/n,ny=dx/n,hi=w/2+l,lo=-w/2-r;
+     double[][] pts={{u[0]+nx*lo,u[1]+ny*lo},{v[0]+nx*lo,v[1]+ny*lo},{v[0]+nx*hi,v[1]+ny*hi},{u[0]+nx*hi,u[1]+ny*hi}};
+     android.graphics.Path strip=new android.graphics.Path();
+     for(int q=0;q<4;q++){float x=(float)(ox+pts[q][0]*scale),y=(float)(oy-pts[q][1]*scale);if(q==0)strip.moveTo(x,y);else strip.lineTo(x,y);}strip.close();
+     android.graphics.Path intersection=new android.graphics.Path();
+     if(intersection.op(covered,strip,android.graphics.Path.Op.INTERSECT))repeated.op(intersection,android.graphics.Path.Op.UNION);
+     covered.op(strip,android.graphics.Path.Op.UNION);
+    }
+    pen.setStyle(android.graphics.Paint.Style.FILL);pen.setColor(0x99ff9800);c.drawPath(repeated,pen);
     for(int i=1;i<model.vertices.size();i++){
      double[] a=model.vertices.get(i-1),b=model.vertices.get(i);
      float ax=(float)(ox+a[0]*scale),ay=(float)(oy-a[1]*scale),bx=(float)(ox+b[0]*scale),by=(float)(oy-b[1]*scale);
