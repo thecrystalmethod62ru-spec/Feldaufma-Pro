@@ -703,6 +703,7 @@ final class RouteSketch extends View {
   if(original.size()==2&&distance(original.get(0),original.get(1))<.02){stroke.clear();return;}
   ArrayList<PointF> straight=simplifiedStroke(original,.023);
   if(straight.size()==original.size()){appendStroke(original);return;}
+  if(darkEditor){appendStroke(straight);return;}
   new android.app.AlertDialog.Builder(getContext())
    .setTitle("Freihandlinie begradigen?")
    .setMessage("Die Skizze kann vereinfacht werden. Vorhandene Punkte und Aufmaßwerte bleiben unverändert.")
@@ -735,7 +736,7 @@ final class RouteSketch extends View {
    }
    if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL){
     if(action==MotionEvent.ACTION_CANCEL){restoreDimensionDrag();}
-    if(action==MotionEvent.ACTION_UP&&!saveDimensionLayout()){restoreDimensionDrag();}
+    if(action==MotionEvent.ACTION_UP&&dimensionMoved&&!saveDimensionLayout()){restoreDimensionDrag();}
     String key=activeDimension.key;boolean rotate=action==MotionEvent.ACTION_UP&&!dimensionMoved&&key.startsWith("route:")&&event.getEventTime()-dimensionDownTime>=android.view.ViewConfiguration.getLongPressTimeout();
     activeDimension=null;getParent().requestDisallowInterceptTouchEvent(false);invalidate();if(rotate)showDimensionRotation(key);return true;
    }
