@@ -1777,6 +1777,37 @@ public class MainActivity extends Activity {
     double coverValue=fitting.optDouble("cover"),ground=montageGround.elevation(fitting.optDouble("station"));
     if(Double.isFinite(coverValue)&&coverValue>=0&&Double.isFinite(ground)){derivedTops.put(fitting,ground-coverValue);derivedElevations++;}
    }
+   if(montageGround!=null){
+    final ElevationProfile profile=montageGround;
+    final java.util.List<double[]> ground=profile.stations();
+    final java.util.List<double[]> boxes=new java.util.ArrayList<>();
+    double low=Double.POSITIVE_INFINITY,high=Double.NEGATIVE_INFINITY;
+    for(double[] p:ground){low=Math.min(low,p[1]);high=Math.max(high,p[1]);}
+    for(org.json.JSONObject fitting:linked){
+     double z=fitting.optDouble("topElevation"),h=fitting.optDouble("verticalEnvelope"),st=fitting.optDouble("station"),len=fitting.optDouble("longitudinalEnvelope");
+     if(!Double.isFinite(z)&&derivedTops.containsKey(fitting))z=derivedTops.get(fitting);
+     if(!Double.isFinite(z)||!Double.isFinite(st))continue;
+     double bottom=Double.isFinite(h)&&h>0?z-h:z;
+     boxes.add(new double[]{st,z,bottom,Double.isFinite(len)&&len>0?len:0});
+     low=Math.min(low,bottom);high=Math.max(high,z);
+    }
+    final double base=low,range=Math.max(0.1,high-low);
+    panel.addView(sheetText("Längsschnitt – Formstücke und GOK (schematisch, überhöht)",16,true));
+    android.view.View longitudinalView=new android.view.View(this){
+     final android.graphics.Paint p=new android.graphics.Paint(3);
+     @Override protected void onDraw(android.graphics.Canvas c){
+      super.onDraw(c);float pad=24*getResources().getDisplayMetrics().density;
+      float w=getWidth()-2*pad,h=getHeight()-2*pad;if(w<=0||h<=0)return;
+      p.setColor(0xffad987c);p.setStrokeWidth(3);
+      for(int i=1;i<ground.size();i++){double[] a=ground.get(i-1),b=ground.get(i);c.drawLine(pad+(float)(a[0]/total*w),pad+(float)((1-(a[1]-base)/range)*h),pad+(float)(b[0]/total*w),pad+(float)((1-(b[1]-base)/range)*h),p);}
+      p.setColor(0xffeab65d);
+      for(double[] b:boxes){float x=pad+(float)(b[0]/total*w),y=pad+(float)((1-(b[1]-base)/range)*h),bottom=pad+(float)((1-(b[2]-base)/range)*h),half=(float)(b[3]/total*w/2);if(half>0&&bottom>y)c.drawRect(x-half,y,x+half,bottom,p);else c.drawCircle(x,y,4,p);}
+     }
+    };
+    longitudinalView.setBackgroundColor(0xff111111);
+    panel.addView(longitudinalView,new android.widget.LinearLayout.LayoutParams(-1,(int)(220*getResources().getDisplayMetrics().density)));
+    panel.addView(sheetText("Darstellbare Formstücke: "+boxes.size()+" / "+linked.size()+". Fehlende Abmessungen als Punkt.",13,false));
+   }
    if(derivedElevations>0)panel.addView(sheetText("Höhenkoten aus Tiefbau-GOK und Überdeckung berechnet: "+derivedElevations+". Gemeinsamen Höhenbezug prüfen.",14,false));
    int possibleConflicts=0, verticallySeparated=0;
    for(int i=0;i<linked.size();i++){
