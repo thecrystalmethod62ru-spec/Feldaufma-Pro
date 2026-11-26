@@ -14,4 +14,11 @@ final class CivilGeometry {
         double area = along * across;
         return Double.isFinite(area) ? area : Double.NaN;
     }
+    static double rectangularArea(double length, double width) {
+        return length * width;
+    }
+
+    static double rectangularVolume(double length, double width, double depth) {
+        return rectangularArea(length, width) * depth;
+    }
 }
