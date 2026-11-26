@@ -138,7 +138,10 @@ public class MainActivity extends Activity {
   if(manifest==null||!"FeldaufmassPro".equals(manifest.optString("format"))||manifest.optInt("version")!=1)throw new java.io.IOException("Unbekanntes Sicherungsformat");
   org.json.JSONObject fields=manifest.getJSONObject("preferences");
   java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","sollUtilities","montageFittings","metricWidthSections","objectUndo","objectRedo","elevationPoints","lvPositions","dailyReports","nachtraege","routeUnderlay","sketchCalibration"));
-  java.util.Set<String> ints=new java.util.HashSet<>(java.util.Arrays.asList("surface","handling","dictationLanguage","gpsDurationSeconds"));
+  strings.addAll(java.util.Arrays.asList("metricAreaCorrection","metricAreaCorrectionReason","metricCrossSectionDimensions",
+      "metricDepthSections","metricElevationPoints","metricMainExcavationDepth","metricMinimumCover","metricPipeMinGap",
+      "metricPipeMinCover","metricPipeProfile","extraUtilities",PipeLayoutStore.KEY,RouteBranchStore.KEY));
+  java.util.Set<String> ints=new java.util.HashSet<>(java.util.Arrays.asList("surface","handling","dictationLanguage","gpsDurationSeconds","metricCornerMode","metricOverlapMode"));
   SharedPreferences.Editor ed=projectStorage(id).edit();
   java.util.Iterator<String> keys=fields.keys();String name="Importiertes Projekt";java.util.Set<String> used=new java.util.HashSet<>();
   while(keys.hasNext()){
@@ -159,11 +162,15 @@ public class MainActivity extends Activity {
     }else if(key.equals("dailyReports")||key.equals("nachtraege")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++){org.json.JSONArray items=dailyPhotos(rows.getJSONObject(j));for(int k=0;k<items.length();k++){org.json.JSONObject photo=items.getJSONObject(k);String old=photo.getString("file"),replacement=photos.get(old);if(replacement==null)throw new java.io.IOException("Berichtsfoto fehlt");used.add(old);photo.put("file",replacement);}}v=rows.toString();
     }else if(key.equals("objects")||key.equals("segments")||key.equals("elevationPoints")||key.equals("lvPositions")||key.equals("sollUtilities")||key.equals("montageFittings")||key.equals("metricWidthSections")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++){org.json.JSONObject o=rows.getJSONObject(j);if(key.equals("metricWidthSections")){double from=o.getDouble("from"),to=o.getDouble("to"),width=o.getDouble("width");for(String side:new String[]{"left","right"})if(o.has(side)){double cut=o.getDouble(side);if(!Double.isFinite(cut)||cut<0)throw new org.json.JSONException("Ungültiger Nachschnitt");}if(!Double.isFinite(from)||!Double.isFinite(to)||!Double.isFinite(width)||from<0||to<=from||width<=0)throw new org.json.JSONException("Ungültiger Breitenabschnitt");for(int k=0;k<j;k++){org.json.JSONObject previous=rows.getJSONObject(k);if(from<previous.getDouble("to")&&to>previous.getDouble("from"))throw new org.json.JSONException("Überlappende Breitenabschnitte");}}}}
     else if(key.equals("objectUndo")||key.equals("objectRedo")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)new org.json.JSONArray(rows.getString(j));}
+    if(key.equals(PipeLayoutStore.KEY))PipeLayoutStore.decode(v);
+    if(key.equals(RouteBranchStore.KEY))RouteBranchStore.decode(v);
+    if(key.equals("extraUtilities"))new org.json.JSONArray(v);
     if(key.equals("project")&&!v.trim().isEmpty())name=v.trim();
     ed.putString(key,v);
    }else if(ints.contains(key)&&type.equals("Integer")&&value instanceof Number){
     int n=field.getInt("value");if(key.equals("dictationLanguage")&&(n<0||n>1))throw new java.io.IOException("Ungültige Sprache");ed.putInt(key,n);
-   }else if(key.equals("lastAutosave")&&type.equals("Long")&&value instanceof Number){ed.putLong(key,field.getLong("value"));}
+   }else if(key.equals("metricIncludeCorners")&&type.equals("Boolean")&&value instanceof Boolean){ed.putBoolean(key,(Boolean)value);}
+   else if(key.equals("lastAutosave")&&type.equals("Long")&&value instanceof Number){ed.putLong(key,field.getLong("value"));}
    else throw new java.io.IOException("Unbekannte Projekteinstellung: "+key);
   }
   if(!used.equals(photos.keySet()))throw new java.io.IOException("Nicht zugeordnete Fotos");

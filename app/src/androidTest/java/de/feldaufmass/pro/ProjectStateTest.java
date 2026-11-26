@@ -12,6 +12,35 @@ import static org.junit.Assert.*;
 
 @RunWith(AndroidJUnit4.class)
 public class ProjectStateTest {
+ @Test public void restoreMetricProjectWithPipesAndBranches(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->{
+    String source=java.util.UUID.randomUUID().toString(),target=java.util.UUID.randomUUID().toString();
+    File zip=null;
+    try{
+     android.content.SharedPreferences prefs=activity.projectStorage(source);
+     assertTrue(prefs.edit().putString("project","Hangweg").putInt("metricOverlapMode",2)
+         .putBoolean("metricIncludeCorners",true).putString("metricPipeMinGap","0.12").commit());
+     new PipeLayoutStore(prefs).save(java.util.Collections.singletonList(new PipeLayout.Pipe("TW",.1,.16,.01,.2,.12,.8,true)));
+     new RouteBranchStore(prefs).save(java.util.Collections.singletonList(new RouteBranch("a","Haus 2",4,.8,1.2,"Pflaster",new double[]{3},new double[]{90})));
+     zip=File.createTempFile("metric",".zip",activity.getCacheDir());
+     activity.writeProjectBackup(zip,prefs.getAll());
+     try(java.io.InputStream in=new java.io.FileInputStream(zip)){
+      activity.readProjectBackup(in,target,new java.util.ArrayList<>());
+     }
+     android.content.SharedPreferences copy=activity.projectStorage(target);
+     assertEquals("Hangweg (Import)",copy.getString("project",""));
+     assertEquals(2,copy.getInt("metricOverlapMode",0));assertTrue(copy.getBoolean("metricIncludeCorners",false));
+     assertEquals("0.12",copy.getString("metricPipeMinGap",""));
+     PipeLayout.Pipe pipe=new PipeLayoutStore(copy).load().get(0);
+     assertTrue(pipe.fixed);assertEquals(.1,pipe.offset,0);assertEquals(.8,pipe.minCover,0);
+     RouteBranch branch=new RouteBranchStore(copy).load().get(0);
+     assertEquals("a",branch.id);assertEquals(3,branch.length(),0);
+    }catch(Exception e){throw new AssertionError(e);}
+    finally{if(zip!=null)zip.delete();activity.deleteSharedPreferences("project_"+source);activity.deleteSharedPreferences("project_"+target);}
+   });
+  }
+ }
  @Test public void materialListCountsOnlyConfirmedInstallations(){
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    scenario.onActivity(activity->{

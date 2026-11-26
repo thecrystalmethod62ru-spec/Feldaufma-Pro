@@ -8,11 +8,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class PipeLayoutStore {
-    private static final String KEY="metricMultiPipeLayoutV1";
+    static final String KEY="metricMultiPipeLayoutV1";
     private final SharedPreferences prefs;
     public PipeLayoutStore(SharedPreferences prefs){this.prefs=prefs;}
     public List<PipeLayout.Pipe> load() throws JSONException {
-        JSONArray array=new JSONArray(prefs.getString(KEY,"[]"));
+        return decode(prefs.getString(KEY,"[]"));
+    }
+    static List<PipeLayout.Pipe> decode(String json) throws JSONException {
+        JSONArray array=new JSONArray(json);
         List<PipeLayout.Pipe> result=new ArrayList<>();
         for(int i=0;i<array.length();i++){
             JSONObject p=array.getJSONObject(i);
