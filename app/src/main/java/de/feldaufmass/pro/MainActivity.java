@@ -1829,20 +1829,22 @@ public class MainActivity extends Activity {
     panel.addView(sheetText("Darstellbare Formstücke: "+boxes.size()+" / "+linked.size()+". Fehlende Abmessungen als Punkt.",13,false));
    }
    if(derivedElevations>0)panel.addView(sheetText("Höhenkoten aus Tiefbau-GOK und Überdeckung berechnet: "+derivedElevations+". Gemeinsamen Höhenbezug prüfen.",14,false));
-   int possibleConflicts=0, verticallySeparated=0;
+   int possibleConflicts=0, verticallySeparated=0, incompleteLongitudinalChecks=0;
    for(int i=0;i<linked.size();i++){
     org.json.JSONObject first=linked.get(i);
     double st=first.optDouble("station"),w=first.optDouble("lateralEnvelope"),off=first.optDouble("offset",0);
     if(!Double.isFinite(w)||w<=0||!Double.isFinite(off))continue;
     for(int j=i+1;j<linked.size();j++){
      org.json.JSONObject second=linked.get(j);
-     double delta=second.optDouble("station")-st;
+     double delta=Math.abs(second.optDouble("station")-st);
      double l1=first.optDouble("longitudinalEnvelope"),l2=second.optDouble("longitudinalEnvelope");
      boolean lengthsKnown=Double.isFinite(l1)&&l1>0&&Double.isFinite(l2)&&l2>0;
-     if(lengthsKnown?delta>=(l1+l2)/2:delta>0.001)continue;
+     if(!Double.isFinite(delta))continue;
+     if(lengthsKnown&&delta>=(l1+l2)/2)continue;
      double w2=second.optDouble("lateralEnvelope"),off2=second.optDouble("offset",0);
      if(!Double.isFinite(w2)||w2<=0||!Double.isFinite(off2))continue;
      if(Math.abs(off-off2)<(w+w2)/2){
+      if(!lengthsKnown&&delta>0.001){incompleteLongitudinalChecks++;continue;}
       double c1=first.optDouble("cover"),c2=second.optDouble("cover"),h1=first.optDouble("verticalEnvelope"),h2=second.optDouble("verticalEnvelope");
       // Cover is measured from the local surface; different stations may have different surface elevations.
       boolean comparable=delta<=0.001&&Double.isFinite(c1)&&c1>=0&&Double.isFinite(c2)&&c2>=0&&Double.isFinite(h1)&&h1>0&&Double.isFinite(h2)&&h2>0;
@@ -1855,6 +1857,7 @@ public class MainActivity extends Activity {
      }
     }
    }
+   if(incompleteLongitudinalChecks>0)panel.addView(sheetText("Längsprüfung bei "+incompleteLongitudinalChecks+" Formstückpaaren offen: Längsabmessungen ergänzen.",14,false));
    if(verticallySeparated>0)panel.addView(sheetText("Bei "+verticallySeparated+" Überlappungen sind die angegebenen Höhen- oder Tiefenintervalle getrennt. Mindestabstand und Bezugshöhe prüfen.",14,false));
    if(possibleConflicts>0)panel.addView(sheetText("Hinweis: "+possibleConflicts+" mögliche Formstück-Überlappungen in der Draufsicht. Höhenlage, fehlende Längsmaße und Anschluss prüfen.",14,true));
    if(envelopeOutside>0)panel.addView(sheetText("Hinweis: "+envelopeOutside+" Formstücke überschreiten mit ihrer angegebenen Querabmessung die Grabenbreite.",14,true));
