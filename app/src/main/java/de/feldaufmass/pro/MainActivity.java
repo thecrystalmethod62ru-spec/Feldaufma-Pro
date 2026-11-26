@@ -4249,7 +4249,16 @@ minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
     if(rows.length()>0){p.setTextSize(10);c.drawText("Braun: Verbau an Grabenkante (symbolisch)",36,height-65,p);}
    }catch(Exception ignored){}
    if(trenchWidth>0||widths.length()>0){
-    org.json.JSONArray utilities=extraUtilities();boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new java.util.LinkedHashMap<>();
+    org.json.JSONArray utilities=extraUtilities();
+    int conflicts=0;
+    for(int j=0;j<utilities.length();j++)for(int k=j+1;k<utilities.length();k++){
+     org.json.JSONObject u=utilities.optJSONObject(j),v=utilities.optJSONObject(k);if(u==null||v==null)continue;
+     double ud=u.optDouble("diameter")/1000,vd=v.optDouble("diameter")/1000,ux=u.optDouble("offset"),vx=v.optDouble("offset"),uy=u.optDouble("axisDepth"),vy=v.optDouble("axisDepth");
+     double from=Math.max(0,Math.max(u.optDouble("routeFrom",0),v.optDouble("routeFrom",0))),to=Math.min(route.measuredLength(),Math.min(u.optDouble("routeTo",Double.POSITIVE_INFINITY),v.optDouble("routeTo",Double.POSITIVE_INFINITY)));
+     if(to>from&&Double.isFinite(ud)&&Double.isFinite(vd)&&ud>0&&vd>0&&Double.isFinite(ux)&&Double.isFinite(vx)&&Double.isFinite(uy)&&Double.isFinite(vy)&&Math.hypot(ux-vx,uy-vy)<(ud+vd)/2)conflicts++;
+    }
+    if(conflicts>0){p.setColor(0xffb3261e);p.setTextSize(9);c.drawText("Profilprüfung: "+conflicts+" mögliche Leitungskollision(en)",36,height-137,p);}
+boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new java.util.LinkedHashMap<>();
     for(int j=0;j<utilities.length();j++){
      org.json.JSONObject row=utilities.optJSONObject(j);if(row==null)continue;
      double diameter=row.optDouble("diameter")/1000,offset=row.optDouble("offset");
