@@ -5332,11 +5332,11 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   ScrollView positionScroll=new ScrollView(this);positionScroll.setFillViewport(false);positionScroll.addView(form);
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(source.optString("name",source.optString("type"))+" – Lage").setView(positionScroll).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
   Button fullscreen=new Button(this);fullscreen.setText("Vollbild");form.addView(fullscreen,2);
-  Button toggleControls=new Button(this);toggleControls.setText("Maße ausblenden");form.addView(toggleControls,3);form.addView(undoPosition,4);form.addView(redoPosition,5);
+  Button toggleControls=new Button(this);toggleControls.setText("Maße −");form.addView(toggleControls,3);form.addView(undoPosition,4);form.addView(redoPosition,5);
   toggleControls.setOnClickListener(v->{
-   boolean hide=toggleControls.getText().toString().equals("Maße ausblenden");
+   boolean hide=toggleControls.getText().toString().equals("Maße −");
    for(int k=2;k<form.getChildCount();k++)form.getChildAt(k).setVisibility(hide?View.GONE:View.VISIBLE);
-   toggleControls.setText(hide?"Maße einblenden":"Maße ausblenden");
+   toggleControls.setText(hide?"Maße +":"Maße −");
   });
   LinearLayout toolbar=new LinearLayout(this);toolbar.setOrientation(0);
   for(Button b:new Button[]{undoPosition,redoPosition,fullscreen,toggleControls}){form.removeView(b);toolbar.addView(b,new LinearLayout.LayoutParams(0,-2,1));b.setMinWidth(0);b.setMinimumWidth(0);b.setTextSize(11);}
@@ -5344,8 +5344,14 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   android.widget.FrameLayout workspace=new android.widget.FrameLayout(this);
   workspace.addView(preview,new android.widget.FrameLayout.LayoutParams(-1,-1));
   form.addView(workspace,0,new LinearLayout.LayoutParams(-1,dp(210)));
+  preview.setContentDescription("Leitungsquerschnitt. Ausgewählte Leitung zum Verschieben ziehen.");
+
   android.widget.FrameLayout.LayoutParams barParams=new android.widget.FrameLayout.LayoutParams(Math.min(dp(280),Math.max(dp(160),getResources().getDisplayMetrics().widthPixels-dp(96))),-2,android.view.Gravity.TOP|android.view.Gravity.LEFT);
   workspace.addView(toolbar,barParams);toolbar.setBackgroundColor(0xff303030);
+  fullscreen.setTextSize(10);toggleControls.setTextSize(10);
+  fullscreen.setPadding(dp(2),0,dp(2),0);toggleControls.setPadding(dp(2),0,dp(2),0);
+  undoPosition.setPadding(0,0,0,0);redoPosition.setPadding(0,0,0,0);
+
   workspace.addOnLayoutChangeListener((v,l,t,rr,b,ol,ot,orr,ob)->{toolbar.setTranslationX(Math.max(0,Math.min(workspace.getWidth()-toolbar.getWidth(),toolbar.getTranslationX())));toolbar.setTranslationY(Math.max(0,Math.min(workspace.getHeight()-toolbar.getHeight(),toolbar.getTranslationY())));});
   TextView handle=new TextView(this);handle.setText("⠿");handle.setTextSize(22);handle.setPadding(dp(8),dp(6),dp(8),dp(6));handle.setContentDescription("Werkzeugleiste verschieben");toolbar.addView(handle,0);
   handle.setOnTouchListener(new View.OnTouchListener(){
@@ -5374,7 +5380,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
    window.getDecorView().setSystemUiVisibility(full?5894:0);
    android.view.ViewGroup.LayoutParams lp=workspace.getLayoutParams();
    lp.height=full?Math.max(dp(160),getResources().getDisplayMetrics().heightPixels-dp(200)):dp(160);
-   workspace.setLayoutParams(lp);toolbar.setTranslationY(0);toolbar.setTranslationX(0);fullscreen.setText(full?"Vollbild beenden":"Vollbild");
+   workspace.setLayoutParams(lp);toolbar.setTranslationY(0);toolbar.setTranslationX(0);fullscreen.setText(full?"Normal":"Vollbild");
    expandPreview.setText(full?"Querschnitt verkleinern":"Querschnitt vergrößern");
   });
   dialog.setOnShowListener(x->dialog.getButton(-1).setOnClickListener(y->{
