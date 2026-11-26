@@ -140,7 +140,7 @@ public class MainActivity extends Activity {
   java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","sollUtilities","montageFittings","metricWidthSections","objectUndo","objectRedo","elevationPoints","lvPositions","dailyReports","nachtraege","routeUnderlay","sketchCalibration"));
   strings.addAll(java.util.Arrays.asList("metricAreaCorrection","metricAreaCorrectionReason","metricCrossSectionDimensions",
       "metricDepthSections","metricElevationPoints","metricMainExcavationDepth","metricMinimumCover","metricPipeMinGap",
-      "metricPipeMinCover","metricPipeProfile","extraUtilities",MontageConnections.KEY,PipeLayoutStore.KEY,RouteBranchStore.KEY));
+      "metricPipeMinCover","metricPipeProfile","extraUtilities",MontageProtocols.KEY,MontageConnections.KEY,PipeLayoutStore.KEY,RouteBranchStore.KEY));
   java.util.Set<String> ints=new java.util.HashSet<>(java.util.Arrays.asList("surface","handling","dictationLanguage","gpsDurationSeconds","metricCornerMode","metricOverlapMode"));
   SharedPreferences.Editor ed=projectStorage(id).edit();
   java.util.Iterator<String> keys=fields.keys();String name="Importiertes Projekt";java.util.Set<String> used=new java.util.HashSet<>();
@@ -164,7 +164,7 @@ public class MainActivity extends Activity {
     else if(key.equals("objectUndo")||key.equals("objectRedo")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)new org.json.JSONArray(rows.getString(j));}
     if(key.equals(PipeLayoutStore.KEY))PipeLayoutStore.decode(v);
     if(key.equals(RouteBranchStore.KEY))RouteBranchStore.decode(v);
-    if(key.equals("extraUtilities"))new org.json.JSONArray(v);
+    if(key.equals("extraUtilities")||key.equals(MontageProtocols.KEY))new org.json.JSONArray(v);
     if(key.equals("project")&&!v.trim().isEmpty())name=v.trim();
     ed.putString(key,v);
    }else if(ints.contains(key)&&type.equals("Integer")&&value instanceof Number){
@@ -1524,7 +1524,7 @@ public class MainActivity extends Activity {
  }
  void showMontage(){
   new android.app.AlertDialog.Builder(this).setTitle("Rohrleitungsbau – Montage")
-   .setItems(new String[]{"Formstückkatalog","Projekt-Formstücke","Gesamtplan – Stationierung","Materialliste (eingebaut)","Verbindungsregister"},(d,w)->{if(w==0)showMontageCatalog();else if(w==1)showMontageInventory();else if(w==2)showMontageStationPlan();else if(w==3)showMontageMaterials();else new MontageConnections(this).show();})
+   .setItems(new String[]{"Formstückkatalog","Projekt-Formstücke","Gesamtplan – Stationierung","Materialliste (eingebaut)","Verbindungsregister","Prüfprotokolle"},(d,w)->{if(w==0)showMontageCatalog();else if(w==1)showMontageInventory();else if(w==2)showMontageStationPlan();else if(w==3)showMontageMaterials();else if(w==4)new MontageConnections(this).show();else new MontageProtocols(this).show();})
    .setNegativeButton("Schließen",null).show();
  }
  void showMontageStationPlan(){
@@ -1571,7 +1571,7 @@ public class MainActivity extends Activity {
    dialog.show();
   }catch(Exception e){notice("Stationsübersicht nicht verfügbar. Trassenlänge und Projektdaten prüfen.");}
  }
- String pendingPlanProject;
+ String pendingPlanProject,pendingProtocolsProject;
  String planFittingLabel(org.json.JSONObject row,int index,MontagePlanView map)throws org.json.JSONException{
   String station=row.has("station")?row.optString("station")+" m":"offen";
   return (index+1)+". "+montageDescription(row)+" · Station "+station
@@ -2901,7 +2901,7 @@ public class MainActivity extends Activity {
  }
 
  public void onCreate(Bundle b){super.onCreate(b);activeProject=projectRegistry().getString("active",LEGACY_PROJECT);
- if(b!=null){selectedPoint=b.getString("selectedPoint");pendingPoint=b.getString("pendingPoint");pendingPhoto=b.getString("pendingPhoto");pendingMaterialProject=b.getString("pendingMaterialProject");pendingConnectionsProject=b.getString("pendingConnectionsProject");pendingPlanProject=b.getString("pendingPlanProject");}
+ if(b!=null){selectedPoint=b.getString("selectedPoint");pendingPoint=b.getString("pendingPoint");pendingPhoto=b.getString("pendingPhoto");pendingMaterialProject=b.getString("pendingMaterialProject");pendingConnectionsProject=b.getString("pendingConnectionsProject");pendingPlanProject=b.getString("pendingPlanProject");pendingProtocolsProject=b.getString("pendingProtocolsProject");}
  shell=page();shell.setPadding(0,0,0,0);shell.setBackgroundColor(0xfff4f6f8);setContentView(shell);fitSystemPanels(shell);
  planPage=page();measurePage=page();voicePage=page();profilePage=page();segmentPage=page();objectPage=page();quantityPage=page();
  LinearLayout header=new LinearLayout(this);
@@ -4081,7 +4081,7 @@ public class MainActivity extends Activity {
  }
  @Override protected void onSaveInstanceState(Bundle out){
   super.onSaveInstanceState(out);out.putString("selectedPoint",selectedPoint);
-  out.putString("pendingPoint",pendingPoint);out.putString("pendingPhoto",pendingPhoto);out.putString("pendingMaterialProject",pendingMaterialProject);out.putString("pendingConnectionsProject",pendingConnectionsProject);out.putString("pendingPlanProject",pendingPlanProject);
+  out.putString("pendingPoint",pendingPoint);out.putString("pendingPhoto",pendingPhoto);out.putString("pendingMaterialProject",pendingMaterialProject);out.putString("pendingConnectionsProject",pendingConnectionsProject);out.putString("pendingPlanProject",pendingPlanProject);out.putString("pendingProtocolsProject",pendingProtocolsProject);
  }
  com.google.mlkit.nl.translate.Translator translator;
  int speechVersion;
@@ -4289,6 +4289,13 @@ public class MainActivity extends Activity {
  try{startActivityForResult(i,410);}catch(android.content.ActivityNotFoundException e){Toast.makeText(this,"Keine Spracherkennung verfügbar.",Toast.LENGTH_LONG).show();}
  }
  @Override protected void onActivityResult(int request,int result,android.content.Intent data){super.onActivityResult(request,result,data);
+ if(request==432){
+  String projectId=pendingProtocolsProject;pendingProtocolsProject=null;
+  if(result==RESULT_OK&&data!=null&&data.getData()!=null){
+   if(activeProject.equals(projectId))new MontageProtocols(this).writePdf(data.getData());else notice("Projekt gewechselt. Export erneut starten.");
+  }
+  return;
+ }
  if(request==431){
   String projectId=pendingPlanProject;pendingPlanProject=null;
   if(result==RESULT_OK&&data!=null&&data.getData()!=null){
