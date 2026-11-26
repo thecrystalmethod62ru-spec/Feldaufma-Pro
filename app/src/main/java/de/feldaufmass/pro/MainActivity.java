@@ -176,12 +176,33 @@ public class MainActivity extends Activity {
  final java.util.LinkedHashMap<String,EditText> autosaveFields=new java.util.LinkedHashMap<>();
  final android.os.Handler autosaveHandler=new android.os.Handler(android.os.Looper.getMainLooper());
  final Runnable autosaveTick=new Runnable(){public void run(){saveDraft();autosaveHandler.postDelayed(this,AUTOSAVE_INTERVAL_MS);}};
+ static final java.util.Set<String> PROFILE_KEYS=new java.util.HashSet<>(java.util.Arrays.asList("length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying"));
+ boolean validProfileForAutosave(){
+  try{
+   double len=number(length),wid=number(width),dep=number(depth);
+   if(!Double.isFinite(len*wid*dep)||len<=0||wid<=0||dep<=0)return false;
+   optional(stoneLength);optional(stoneWidth);
+   double stone=optional(stoneDepth)/100,baseValue=optional(baseInput),pipeValue=optional(pipeInput);
+   double asphaltValue=optional(asphaltInput);optional(leftInput);optional(rightInput);
+   double top="Asphalt".equals(surface.getSelectedItem().toString())?asphaltValue:stone;
+   return (!Double.isFinite(pipeValue)||(pipeValue>0&&pipeValue/1000<=wid&&pipeValue/1000<=dep))
+    &&(!Double.isFinite(top)||top<=dep)&&(!Double.isFinite(baseValue)||baseValue+(Double.isFinite(top)?top:0)<=dep);
+  }catch(Exception e){return false;}
+ }
  boolean saveDraft(){
   if(project==null||surface==null||handling==null)return false;
-  SharedPreferences.Editor ed=getPreferences(0).edit();
-  for(java.util.Map.Entry<String,EditText> entry:autosaveFields.entrySet())ed.putString(entry.getKey(),entry.getValue().getText().toString());
-  ed.putInt("surface",surface.getSelectedItemPosition()).putInt("handling",handling.getSelectedItemPosition()).putLong("lastAutosave",System.currentTimeMillis());
-  boolean ok=ed.commit();if(!ok)notice("Automatische Speicherung fehlgeschlagen.");return ok;
+  SharedPreferences prefs=getPreferences(0);SharedPreferences.Editor ed=prefs.edit();
+  boolean valid=validProfileForAutosave();
+  boolean confirmed=false;
+  try{double a=Double.parseDouble(prefs.getString("length","").replace(',','.')),b=Double.parseDouble(prefs.getString("width","").replace(',','.')),c=Double.parseDouble(prefs.getString("depth","").replace(',','.'));confirmed=Double.isFinite(a*b*c)&&a>0&&b>0&&c>0;}catch(Exception ignored){}
+  for(java.util.Map.Entry<String,EditText> entry:autosaveFields.entrySet()){
+   if(!valid&&confirmed&&PROFILE_KEYS.contains(entry.getKey()))continue;
+   ed.putString(entry.getKey(),entry.getValue().getText().toString());
+  }
+  if(valid||!confirmed)ed.putInt("surface",surface.getSelectedItemPosition()).putInt("handling",handling.getSelectedItemPosition());
+  ed.putLong("lastAutosave",System.currentTimeMillis());
+  boolean ok=ed.commit();if(!ok)notice("Automatische Speicherung fehlgeschlagen.");
+  return ok;
  }
  EditText project,length,width,depth; TextView result; Sketch sketch;
  EditText objectStation,objectNote; Spinner objectType,objectSide; TextView objectList; org.json.JSONArray objects=new org.json.JSONArray(); EditText voiceText; Spinner voiceLanguage;
