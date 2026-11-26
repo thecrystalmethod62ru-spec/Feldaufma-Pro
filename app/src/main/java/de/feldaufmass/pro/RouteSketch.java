@@ -201,6 +201,10 @@ final class RouteSketch extends View {
   float ax=left()+scale()*a.x,ay=top()+scale()*a.y,bx=left()+scale()*b.x,by=top()+scale()*b.y;
   float length=(float)Math.hypot(bx-ax,by-ay);if(length<1)return;
   c.save();c.translate(ax,ay);c.rotate((float)Math.toDegrees(Math.atan2(by-ay,bx-ax)));c.clipRect(0,-6*density,length,6*density);
+  drawHatchBand(c,length,density,pattern);
+  c.restore();
+ }
+ private void drawHatchBand(Canvas c,float length,float density,int pattern){
   Paint hatch=new Paint(Paint.ANTI_ALIAS_FLAG);hatch.setColor(0xAA202020);hatch.setStrokeWidth(.8f*density);
   float step=(5+pattern%4*3)*density;
   for(float x=-12*density;x<length+12*density;x+=step){
@@ -211,7 +215,6 @@ final class RouteSketch extends View {
     default:c.drawLine(x,6*density,x+6*density,-6*density,hatch);c.drawLine(x,-6*density,x+6*density,6*density,hatch);break;
    }
   }
-  c.restore();
  }
  private static class DimensionHit {
   String key; android.graphics.RectF bounds;float nx,ny,offset;
@@ -312,6 +315,10 @@ final class RouteSketch extends View {
    previous=station;
   }
  }
+ private int configuredHatch(String name,org.json.JSONObject settings){
+  org.json.JSONObject style=settings.optJSONObject(name.trim());int hatch=style==null?0:style.optInt("hatch",0);
+  return hatch==17?-1:hatch>=1&&hatch<=16?hatch-1:surfacePattern(name);
+ }
  private int configuredSurfaceColor(String name,org.json.JSONObject settings){
   org.json.JSONObject item=settings.optJSONObject(name.trim());
   if(item!=null)try{return Color.parseColor(item.optString("color"));}catch(Exception ignored){}
@@ -328,7 +335,7 @@ final class RouteSketch extends View {
    double start=0;
    for(int i=1;i<vertices.size();i++){
     double end=start+vertices.get(i).metres,lo=Math.max(from,start),hi=Math.min(to,end);
-    if(hi>lo){PointF a=stationPoint(lo),b=stationPoint(hi);if(a!=null&&b!=null){line(c,a,b);org.json.JSONObject style=settings.optJSONObject(section.optString("surface").trim());int hatch=style==null?0:style.optInt("hatch",0);if(hatch!=17)surfaceHatch(c,a,b,density,hatch>=1&&hatch<=16?hatch-1:surfacePattern(section.optString("surface")));}}
+    if(hi>lo){PointF a=stationPoint(lo),b=stationPoint(hi);if(a!=null&&b!=null){line(c,a,b);int hatch=configuredHatch(section.optString("surface"),settings);if(hatch>=0)surfaceHatch(c,a,b,density,hatch);}}
     start=end;
    }
   }
@@ -511,10 +518,13 @@ final class RouteSketch extends View {
  }
  private void drawAutomaticLegend(Canvas c,float d){
   java.util.LinkedHashMap<String,Integer> raw=legendEntries(),entries=new java.util.LinkedHashMap<>();
+  java.util.HashMap<String,Integer> legendHatches=new java.util.HashMap<>();
+  java.util.HashSet<String> surfaceNames=new java.util.HashSet<>();
+  for(int j=0;j<surfaceSections.length();j++){org.json.JSONObject o=surfaceSections.optJSONObject(j);if(o!=null)surfaceNames.add(o.optString("surface").trim());}
   org.json.JSONObject settings=legendSettings();
   java.util.ArrayList<String> keys=new java.util.ArrayList<>(raw.keySet());
   keys.sort((a,b)->Integer.compare(settings.optJSONObject(a)==null?1000:settings.optJSONObject(a).optInt("order",1000),settings.optJSONObject(b)==null?1000:settings.optJSONObject(b).optInt("order",1000)));
-  for(String key:keys){org.json.JSONObject item=settings.optJSONObject(key);if(item!=null&&!item.optBoolean("visible",true))continue;int color=raw.get(key);if(item!=null)try{color=Color.parseColor(item.optString("color"));}catch(Exception ignored){}entries.put(item==null?key:item.optString("name",key),color);}
+  for(String key:keys){org.json.JSONObject item=settings.optJSONObject(key);if(item!=null&&!item.optBoolean("visible",true))continue;int color=raw.get(key);if(item!=null)try{color=Color.parseColor(item.optString("color"));}catch(Exception ignored){}String label=item==null?key:item.optString("name",key);if(entries.containsKey(label))label+=" ("+key+")";entries.put(label,color);if(surfaceNames.contains(key))legendHatches.put(label,configuredHatch(key,settings));}
   if(entries.isEmpty())return;
   Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);p.setTextSize(10*d);
   float row=15*d, width=0;for(String name:entries.keySet())width=Math.max(width,p.measureText(name)+30*d);
@@ -529,6 +539,7 @@ final class RouteSketch extends View {
    if(i>=shown)break;
    float yy=y+(i+2)*row;
    p.setColor(e.getValue());c.drawRect(x+5*d,yy-9*d,x+17*d,yy,p);
+   Integer hatch=legendHatches.get(e.getKey());if(hatch!=null&&hatch>=0){c.save();c.clipRect(x+5*d,yy-9*d,x+17*d,yy);c.translate(x+5*d,yy-4.5f*d);drawHatchBand(c,12*d,d*.75f,hatch);c.restore();}
    p.setColor(0xff173c42);
    String label=i==shown-1&&entries.size()>shown?"+"+(entries.size()-shown+1)+" weitere":e.getKey();
    c.save();c.clipRect(x+21*d,yy-row,x+width-3*d,yy+3*d);c.drawText(label,x+21*d,yy,p);c.restore();i++;
