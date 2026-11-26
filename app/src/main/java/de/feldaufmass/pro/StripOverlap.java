@@ -36,6 +36,22 @@ public final class StripOverlap {
         double x=a[2],y=a[3];
         return new double[][]{{x,y},{x-ay*wa,y+ax*wa},{x-by*wb,y+bx*wb}};
     }
+    /** Miter join with a bounded extension; falls back to bevel at sharp bends. */
+    public static double[][] miterCorner(double[] a,double[] b) {
+        double[][] q=cornerFiller(a,b);
+        if(q==null)return null;
+        double ax=a[2]-a[0],ay=a[3]-a[1],bx=b[2]-b[0],by=b[3]-b[1];
+        double al=Math.hypot(ax,ay),bl=Math.hypot(bx,by);
+        ax/=al;ay/=al;bx/=bl;by/=bl;
+        double den=ax*by-ay*bx;
+        double dx=q[2][0]-q[1][0],dy=q[2][1]-q[1][1];
+        double t=(dx*by-dy*bx)/den;
+        double u=(dx*ay-dy*ax)/den;
+        double x=q[1][0]+t*ax,y=q[1][1]+t*ay;
+        double reach=Math.max(Math.hypot(q[1][0]-q[0][0],q[1][1]-q[0][1]),Math.hypot(q[2][0]-q[0][0],q[2][1]-q[0][1]));
+        if(t<0||u>0||!Double.isFinite(x)||!Double.isFinite(y)||Math.hypot(x-q[0][0],y-q[0][1])>4*reach)return q;
+        return new double[][]{q[0],q[1],{x,y},q[2]};
+    }
     /** Each strip: x1,y1,x2,y2,leftExtent,rightExtent, in metres. */
     public static Result calculate(List<double[]> strips) {
         return calculateInternal(strips,false);
