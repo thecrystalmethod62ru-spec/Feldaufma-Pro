@@ -5360,6 +5360,11 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
      dimension(c,cx+rr,cy,right,cy,width-x-radius);
      dimension(c,cx,top,cx,cy-rr,y-radius);
      dimension(c,left,top,right,top,width);
+     float bottom=(float)(top+height*scale);
+     dimension(c,right,top,right,bottom,height);
+     dimension(c,left,top,left,cy,y);
+     dimension(c,cx,cy-rr,cx,cy+rr,2*radius);
+     dimension(c,cx,cy+rr,cx,bottom,height-y-radius);
      for(int k=0;k<rows.length();k++){if(k==selected[0])continue;org.json.JSONObject n=rows.optJSONObject(k);if(n==null||station<n.optDouble("routeFrom",0)||station>=n.optDouble("routeTo",Double.POSITIVE_INFINITY))continue;
       double nx=n.optDouble("offset"),ny=n.optDouble("axisDepth"),nr=n.optDouble("diameter")/2000,dist=Math.hypot(nx-x,ny-y);
       if(!Double.isFinite(dist)||!Double.isFinite(nr)||nr<=0||dist<=0)continue;
