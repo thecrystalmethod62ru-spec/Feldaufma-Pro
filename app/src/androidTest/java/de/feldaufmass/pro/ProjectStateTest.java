@@ -12,6 +12,35 @@ import static org.junit.Assert.*;
 
 @RunWith(AndroidJUnit4.class)
 public class ProjectStateTest {
+ @Test public void routeEditorUndoRedoPreservesMetadata(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->{
+    String saved=activity.routeData();
+    RouteSketch route=new RouteSketch(activity,"[[0.2,0.2,null],[0.6,0.4,12.5]]");
+    RouteSketch.Vertex point=route.vertices.get(1);
+    point.name="KVS";point.latitude=52;point.longitude=11;point.accuracy=.4;point.photos.put("point.jpg");
+    String original=route.encode(),id=point.id;
+    MainActivity.RouteEditHistory history=new MainActivity.RouteEditHistory(original);
+    history.record(original);assertTrue(history.undo.isEmpty());
+    route.movePoint(1,new android.graphics.PointF(.7f,.5f));history.record(route.encode());
+    String moved=route.encode();
+    point.metres=17;history.record(route.encode());String measured=route.encode();
+    route.vertices.remove(1);history.record(route.encode());
+    assertEquals(measured,history.step(false));
+    assertEquals(moved,history.step(false));
+    RouteSketch restored=new RouteSketch(activity,history.step(false));
+    RouteSketch.Vertex v=restored.vertices.get(1);
+    assertEquals(id,v.id);assertEquals("KVS",v.name);assertEquals("point.jpg",v.photos.optString(0));
+    assertEquals(52,v.latitude,0);assertEquals(11,v.longitude,0);assertEquals(.4,v.accuracy,0);
+    assertEquals(12.5,restored.measuredLength(),0);assertEquals(.6,v.point.x,.00001);
+    assertEquals(moved,history.step(true));assertEquals(measured,history.step(true));
+    restored.vertices.get(1).metres=30;history.record(restored.encode());assertTrue(history.redo.isEmpty());
+    for(int j=0;j<60;j++){restored.vertices.get(1).metres=100+j;history.record(restored.encode());}
+    assertEquals(50,history.undo.size());
+    assertEquals(saved,activity.routeData());
+   });
+  }
+ }
  @Test public void projectsRemainIsolatedAcrossRecreation(){
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    String a=java.util.UUID.randomUUID().toString(),b=java.util.UUID.randomUUID().toString();
