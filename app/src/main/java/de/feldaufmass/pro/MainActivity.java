@@ -781,10 +781,88 @@ public class MainActivity extends Activity {
   recordProjectEvent("Leistungsverzeichnis geändert");return true;
  }
  String lvLabel(org.json.JSONObject o){return o.optString("oz")+" · "+o.optString("title")+" ["+o.optString("unit")+"]";}
+ static double ansatzQuantity(org.json.JSONObject row,String unit){
+  if(row==null||!unit.equals(row.optString("unit")))return Double.NaN;
+  double value=row.optDouble("quantity");return Double.isFinite(value)&&value>=0?value:Double.NaN;
+ }
+ static double sumAnsatz(org.json.JSONObject position){
+  org.json.JSONArray rows=position.optJSONArray("ansatz");
+  if(rows==null||rows.length()==0)return Double.NaN;
+  double sum=0;for(int j=0;j<rows.length();j++){double q=ansatzQuantity(rows.optJSONObject(j),position.optString("unit"));if(!Double.isFinite(q))return Double.NaN;sum+=q;}
+  return Double.isFinite(sum)?sum:Double.NaN;
+ }
+ java.util.ArrayList<org.json.JSONObject> ansatzCandidates(String unit){
+  java.util.ArrayList<org.json.JSONObject> rows=new java.util.ArrayList<>();
+  try{
+   for(int j=0;j<segments.length();j++){
+    org.json.JSONObject o=segments.optJSONObject(j);if(o==null)continue;double a=o.optDouble("from"),b=o.optDouble("to"),width=o.optDouble("width"),cut=o.optDouble("cutWidth"),len=b-a;
+    if(!Double.isFinite(len)||a<0||b>l||len<=0)continue;
+    String label="Abschnitt "+(j+1)+" · "+o.optString("surface")+" · "+csvNumber(a)+"–"+csvNumber(b)+" m";
+    if("m".equals(unit))addAnsatzCandidate(rows,unit,label+" · Länge",len,"segment",o,"length");
+    if("m²".equals(unit)&&width>0)addAnsatzCandidate(rows,unit,label+" · "+csvNumber(len)+" × "+csvNumber(width),len*width,"segment",o,"area");
+    if("m²".equals(unit)&&cut>0)addAnsatzCandidate(rows,unit,label+" · mit Nachschnitt "+csvNumber(len)+" × "+csvNumber(cut),len*cut,"segment",o,"cut");
+   }
+   for(int j=0;j<objects.length();j++){
+    org.json.JSONObject o=objects.optJSONObject(j);if(o==null)continue;double a=detailNumber(o,"detailLength"),b=detailNumber(o,"detailWidth"),h=detailNumber(o,"detailDepth");
+    String label="Objekt "+(j+1)+" · "+o.optString("type")+" · "+csvNumber(o.optDouble("station"))+" m"+overlapStatus(j);
+    if("m".equals(unit)&&a>0)addAnsatzCandidate(rows,unit,label+" · Länge",a,"object",o,"length");
+    if("m²".equals(unit)&&a>0&&b>0)addAnsatzCandidate(rows,unit,label+" · "+csvNumber(a)+" × "+csvNumber(b),a*b,"object",o,"area");
+    if("m³".equals(unit)&&a>0&&b>0&&h>0)addAnsatzCandidate(rows,unit,label+" · "+csvNumber(a)+" × "+csvNumber(b)+" × "+csvNumber(h),a*b*h,"object",o,"volume");
+    if("St".equalsIgnoreCase(unit)||"Stk".equalsIgnoreCase(unit))addAnsatzCandidate(rows,unit,label,1,"object",o,"count");
+   }
+  }catch(Exception e){notice("Einige Mengenquellen konnten nicht gelesen werden.");}
+  return rows;
+ }
+ void addAnsatzCandidate(java.util.ArrayList<org.json.JSONObject> rows,String unit,String label,double qty,String kind,org.json.JSONObject source,String mode)throws org.json.JSONException{
+  if(!Double.isFinite(qty)||qty<0)return;
+  String snapshot=kind.equals("object")?overlapGeometry(source):source.toString();
+  rows.add(new org.json.JSONObject().put("unit",unit).put("label",label).put("quantity",qty).put("kind",kind).put("snapshot",snapshot).put("mode",mode));
+ }
+ boolean ansatzSourceCurrent(org.json.JSONObject row){
+  if(row==null)return false;
+  String kind=row.optString("kind"),snap=row.optString("snapshot");
+  org.json.JSONArray list="object".equals(kind)?objects:"segment".equals(kind)?segments:null;if(list==null)return false;
+  for(int j=0;j<list.length();j++){org.json.JSONObject o=list.optJSONObject(j);if(o!=null&&snap.equals("object".equals(kind)?overlapGeometry(o):o.toString()))return true;}
+  return false;
+ }
+ void showLvAnsatz(int index){
+  org.json.JSONArray original=lvPositions();org.json.JSONObject position=original.optJSONObject(index);if(position==null)return;
+  org.json.JSONArray rows=position.optJSONArray("ansatz");if(rows==null)rows=new org.json.JSONArray();
+  final org.json.JSONArray stored=rows;
+  LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
+  form.addView(sheetText(lvLabel(position),16,true));
+  form.addView(sheetText("Mengenansätze sind bestätigte Messwert-Schnappschüsse. Geänderte Quellen neu übernehmen. Keine automatische Addition zu anderen LV-Positionen oder Abzüge.",14,false));
+  double sum=sumAnsatz(position);form.addView(sheetText("Summe: "+(Double.isFinite(sum)?csvNumber(sum)+" "+position.optString("unit"):"offen"),16,true));
+  for(int j=0;j<stored.length();j++){final int rowIndex=j;org.json.JSONObject row=stored.optJSONObject(j);if(row==null)continue;
+   Button b=new Button(this);b.setAllCaps(false);b.setText(row.optString("label")+"\n"+csvNumber(ansatzQuantity(row,position.optString("unit")))+" "+row.optString("unit")+(ansatzSourceCurrent(row)?"":" · Quelle prüfen"));
+   b.setOnClickListener(v->new android.app.AlertDialog.Builder(this).setTitle("Mengenansatz entfernen?").setNegativeButton("Abbrechen",null).setPositiveButton("Entfernen",(x,y)->{if(!lvPositions().toString().equals(original.toString())){notice("LV geändert. Neu öffnen.");return;}stored.remove(rowIndex);persistAnsatz(original,index,stored);}).show());form.addView(b);
+  }
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Mengenansätze").setView(scroll).setNegativeButton("Schließen",null).setPositiveButton("Messwert hinzufügen",(x,y)->chooseLvAnsatz(index)).create();dialog.show();
+ }
+ void chooseLvAnsatz(int index){
+  org.json.JSONArray original=lvPositions();org.json.JSONObject position=original.optJSONObject(index);if(position==null)return;
+  java.util.ArrayList<org.json.JSONObject> candidates=ansatzCandidates(position.optString("unit"));
+  if(candidates.isEmpty()){notice("Keine passenden Messwerte für diese Einheit vorhanden.");return;}
+  String[] labels=new String[candidates.size()];
+  for(int j=0;j<labels.length;j++){org.json.JSONObject row=candidates.get(j);labels[j]=row.optString("label")+" = "+csvNumber(row.optDouble("quantity"))+" "+row.optString("unit");}
+  new android.app.AlertDialog.Builder(this).setTitle("Messwert auswählen").setItems(labels,(a,b)->{
+   org.json.JSONObject row=candidates.get(b);
+   new android.app.AlertDialog.Builder(this).setTitle("Mengenansatz übernehmen?").setMessage(labels[b]+"\n\nDie Menge wird als eigener Ansatz gespeichert. Bereits zugeordnete Leistungen und LV-Regeln prüfen.").setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",(x,y)->{
+    if(!lvPositions().toString().equals(original.toString())||!ansatzSourceCurrent(row)){notice("Daten geändert. Neu öffnen.");return;}
+    org.json.JSONArray stored=position.optJSONArray("ansatz");if(stored==null)stored=new org.json.JSONArray();
+    for(int j=0;j<stored.length();j++){org.json.JSONObject old=stored.optJSONObject(j);if(old!=null&&old.optString("kind").equals(row.optString("kind"))&&old.optString("snapshot").equals(row.optString("snapshot"))&&old.optString("mode").equals(row.optString("mode"))){notice("Dieser Mengenansatz ist bereits vorhanden.");return;}}
+    stored.put(row);persistAnsatz(original,index,stored);
+   }).show();
+  }).setNegativeButton("Abbrechen",null).show();
+ }
+ void persistAnsatz(org.json.JSONArray positions,int index,org.json.JSONArray rows){
+  try{org.json.JSONObject position=positions.getJSONObject(index);position.put("ansatz",rows);position.put("source","ansatz");if(saveLv(positions))showLvAnsatz(index);}catch(Exception e){notice("Mengenansatz konnte nicht gespeichert werden.");}
+ }
  double lvQuantity(org.json.JSONObject o){
   String source=o.optString("source","manual");
   double value=Double.NaN;
-  if("manual".equals(source))value=o.optDouble("quantity");
+  if("ansatz".equals(source))value=sumAnsatz(o);
+  else if("manual".equals(source))value=o.optDouble("quantity");
   else if(l>0&&w>0&&d>0){
    if("length".equals(source)&&"m".equals(o.optString("unit")))value=l;
    if("area".equals(source)&&"m²".equals(o.optString("unit")))value=l*w;
@@ -834,7 +912,7 @@ public class MainActivity extends Activity {
   for(int j=0;j<rows.length();j++){
    final int index=j;org.json.JSONObject o=rows.optJSONObject(j);if(o==null)continue;double qty=lvQuantity(o),target=o.optDouble("target");
    Button button=new Button(this);button.setAllCaps(false);button.setText(lvLabel(o)+"\nIst: "+(Double.isFinite(qty)?csvNumber(qty):"offen")+(Double.isFinite(target)?" · Soll: "+csvNumber(target):""));
-   button.setOnClickListener(v->editLv(index));form.addView(button);
+   button.setOnClickListener(v->editLv(index));form.addView(button);Button amounts=new Button(this);amounts.setAllCaps(false);amounts.setText("Mengenansätze · "+o.optString("oz"));amounts.setOnClickListener(v->showLvAnsatz(index));form.addView(amounts);
   }
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Leistungsverzeichnis").setView(scroll).setNegativeButton("Schließen",null).setNeutralButton("GAEB importieren",(a,b)->requestGaebImport()).setPositiveButton("Neue Position",(a,b)->editLv(-1)).create();dialog.show();
  }
@@ -844,7 +922,7 @@ public class MainActivity extends Activity {
   String[] keys={"oz","title","unit","target","quantity"},hints={"Ordnungszahl / LV-Position","Kurztext","Einheit (m, m², m³, St ...)","Sollmenge (optional)","Istmenge manuell (optional)"};
   EditText[] fields=new EditText[5];
   for(int j=0;j<fields.length;j++){form.addView(sheetText(hints[j],14,false));fields[j]=new EditText(this);fields[j].setSingleLine(true);if(j>=3)fields[j].setInputType(8194);if(old!=null)fields[j].setText(old.optString(keys[j],""));form.addView(fields[j]);}
-  String[] sources={"manual","length","area","volume","cut"};String[] sourceLabels={"Manuelle Istmenge","Trassenlänge (m)","Grundfläche (m²)","Aushub – geometrisch (m³)","Fläche mit Nachschnitt (m²)"};
+  String[] sources={"manual","length","area","volume","cut","ansatz"};String[] sourceLabels={"Manuelle Istmenge","Trassenlänge (m)","Grundfläche (m²)","Aushub – geometrisch (m³)","Fläche mit Nachschnitt (m²)","Mengenansätze"};
   form.addView(sheetText("Mengenquelle",14,false));Spinner source=choices(form,sourceLabels);source.setSelection(Math.max(0,java.util.Arrays.asList(sources).indexOf(old==null?"manual":old.optString("source"))));
   form.addView(sheetText("Automatische Quellen verwenden die gespeicherten Haupttrassenmaße, keine LV-spezifischen Abzugsregeln.",13,false));
   android.app.AlertDialog.Builder builder=new android.app.AlertDialog.Builder(this).setTitle("LV-Position").setView(scroll).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null);
@@ -855,7 +933,7 @@ public class MainActivity extends Activity {
     String oz=fields[0].getText().toString().trim(),title=fields[1].getText().toString().trim(),unit=fields[2].getText().toString().trim();
     if(oz.isEmpty()||title.isEmpty()||unit.isEmpty()){notice("Ordnungszahl, Kurztext und Einheit erforderlich.");return;}
     String chosen=sources[source.getSelectedItemPosition()];
-    String expected="length".equals(chosen)?"m":"volume".equals(chosen)?"m³":"manual".equals(chosen)?unit:"m²";
+    String expected="length".equals(chosen)?"m":"volume".equals(chosen)?"m³":("manual".equals(chosen)||"ansatz".equals(chosen))?unit:"m²";
     if(!expected.equals(unit)){fields[2].setError("Einheit "+expected+" erforderlich");return;}
     org.json.JSONObject item=old==null?new org.json.JSONObject():new org.json.JSONObject(old.toString());item.remove("target");item.remove("quantity");item.put("oz",oz).put("title",title).put("unit",unit).put("source",chosen);
     for(int j=3;j<5;j++){if(j==4&&!"manual".equals(chosen))continue;if(fields[j].length()==0)continue;double value=number(fields[j]);if(!Double.isFinite(value)||value<0){fields[j].setError("Menge ab 0 erforderlich");return;}item.put(keys[j],value);}
@@ -1302,6 +1380,7 @@ public class MainActivity extends Activity {
   org.json.JSONArray lv=lvPositions();
   for(int j=0;j<lv.length();j++){org.json.JSONObject o=lv.optJSONObject(j);if(o==null)continue;
    csvRow(out,name,"LV-Zuordnung",o.optString("oz")+" "+o.optString("title"),n,n,n,n,n,lvQuantity(o),o.optString("unit"),"Quelle: "+o.optString("source")+"; Soll: "+csvNumber(o.optDouble("target"))+"; LV-Regeln prüfen; nicht zu Geometriemengen addieren");
+   org.json.JSONArray rows=o.optJSONArray("ansatz");if("ansatz".equals(o.optString("source"))&&rows!=null)for(int k=0;k<rows.length();k++){org.json.JSONObject row=rows.optJSONObject(k);if(row==null)continue;csvRow(out,name,"LV-Mengenansatz",o.optString("oz")+" "+row.optString("label"),n,n,n,n,n,ansatzQuantity(row,o.optString("unit")),row.optString("unit"),"Teilmenge der LV-Summe; "+(ansatzSourceCurrent(row)?"Messwert-Schnappschuss":"Quelle geändert / prüfen"));}
   }
   out.flush();
  }
