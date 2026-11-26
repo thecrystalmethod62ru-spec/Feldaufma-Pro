@@ -1819,6 +1819,21 @@ public class MainActivity extends Activity {
      }
     }catch(Exception invalid){trenchBottom.clear();}
     for(double[] segment:trenchBottom)low=Math.min(low,Math.min(segment[1],segment[3]));
+    final java.util.Set<double[]> belowBottom=java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<double[],Boolean>());
+    int unknownBottom=0;
+    for(double[] box:boxes){
+     if(box[2]>=box[1]){unknownBottom++;continue;}
+     boolean known=false;
+     for(double[] segment:trenchBottom){
+      if(box[0]<segment[0]||box[0]>segment[2])continue;
+      double z=segment[1]+(segment[3]-segment[1])*(box[0]-segment[0])/(segment[2]-segment[0]);
+      known=true;
+      if(box[2]<z-0.001)belowBottom.add(box);
+     }
+     if(!known)unknownBottom++;
+    }
+    if(!belowBottom.isEmpty())panel.addView(sheetText("Achtung: "+belowBottom.size()+" Formstücke reichen an ihrer Station unter die Grabensohle. Rote Markierung; Maße prüfen.",14,true));
+    if(unknownBottom>0)panel.addView(sheetText("Grabensohlenprüfung nicht möglich für "+unknownBottom+" Formstücke (Tiefe oder Bauhöhe fehlt).",13,false));
     final double margin=Math.max(0.05,(high-low)*0.08);
     final double base=low-margin,range=Math.max(0.1,high-low+2*margin);
     panel.addView(sheetText("Längsschnitt – Formstücke und GOK (schematisch, überhöht)",16,true));
@@ -1850,7 +1865,7 @@ public class MainActivity extends Activity {
       p.setColor(0xff62b5db);p.setStrokeWidth(2);
       for(double[] segment:trenchBottom)c.drawLine(pad+(float)(segment[0]/total*w),pad+(float)((1-(segment[1]-base)/range)*h),pad+(float)(segment[2]/total*w),pad+(float)((1-(segment[3]-base)/range)*h),p);
       p.setColor(0xffeab65d);
-      for(double[] b:boxes){float x=pad+(float)(b[0]/total*w),y=pad+(float)((1-(b[1]-base)/range)*h),bottom=pad+(float)((1-(b[2]-base)/range)*h),half=(float)(b[3]/total*w/2);if(half>0&&bottom>y)c.drawRect(x-half,y,x+half,bottom,p);else c.drawCircle(x,y,4,p);}
+      for(double[] b:boxes){p.setColor(belowBottom.contains(b)?0xffef5350:0xffeab65d);float x=pad+(float)(b[0]/total*w),y=pad+(float)((1-(b[1]-base)/range)*h),bottom=pad+(float)((1-(b[2]-base)/range)*h),half=(float)(b[3]/total*w/2);if(half>0&&bottom>y)c.drawRect(x-half,y,x+half,bottom,p);else c.drawCircle(x,y,4,p);}
      }
     };
     longitudinalView.setBackgroundColor(0xff111111);
