@@ -1741,13 +1741,25 @@ public class MainActivity extends Activity {
    int outside=0;
    double nominalWidth=Double.NaN;
    try{nominalWidth=Double.parseDouble(getPreferences(0).getString("width","").trim().replace(',','.'));}catch(NumberFormatException ignored){}
-   boolean widthKnown=Double.isFinite(nominalWidth)&&nominalWidth>0;
-   for(org.json.JSONObject fitting:linked){double lateral=fitting.optDouble("offset",0);if(widthKnown&&Double.isFinite(lateral)&&Math.abs(lateral)>nominalWidth/2)outside++;}
+   org.json.JSONArray localWidths;
+   try{localWidths=new org.json.JSONArray(getPreferences(0).getString("metricWidthSections","[]"));}catch(Exception ex){localWidths=null;}
+   int unknownWidth=0;
+   for(org.json.JSONObject fitting:linked){
+    double station=fitting.optDouble("station"),lateral=fitting.optDouble("offset",0),width=nominalWidth;
+    int matches=0;
+    if(localWidths!=null)for(int k=0;k<localWidths.length();k++){
+     org.json.JSONObject section=localWidths.optJSONObject(k);if(section==null)continue;
+     double from=section.optDouble("from"),to=section.optDouble("to"),w=section.optDouble("width");
+     if(Double.isFinite(from)&&Double.isFinite(to)&&station>=from&&(station<to||(station==total&&station==to))){matches++;width=w;}
+    }
+    if(localWidths==null||matches>1||!Double.isFinite(width)||width<=0||!Double.isFinite(lateral)){unknownWidth++;continue;}
+    if(Math.abs(lateral)>width/2)outside++;
+   }
 
    LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(dp(12),dp(8),dp(12),dp(8));
    TextView hint=new TextView(this);hint.setText("Lineare Stationsübersicht – keine maßstäbliche Montagegeometrie. Ohne gültige Station: "+missing);panel.addView(hint);
-   if(widthKnown&&outside>0)panel.addView(sheetText("Hinweis: "+outside+" Formstück-Mittelpunkte außerhalb der nominalen Grabenbreite. Örtliche Breite und Bauteilabmessungen prüfen.",14,true));
-   if(!widthKnown)panel.addView(sheetText("Grabenbreite fehlt – seitliche Lage nicht prüfbar.",14,false));
+   if(outside>0)panel.addView(sheetText("Hinweis: "+outside+" Formstück-Mittelpunkte außerhalb der örtlichen Grabenbreite. Bauteilabmessungen prüfen.",14,true));
+   if(unknownWidth>0)panel.addView(sheetText("Seitliche Lage bei "+unknownWidth+" Formstücken nicht prüfbar: Breitenangaben fehlen oder sind widersprüchlich.",14,false));
    android.view.View axis=new android.view.View(this){
     final android.graphics.Paint paint=new android.graphics.Paint(3);
     @Override protected void onDraw(android.graphics.Canvas c){
