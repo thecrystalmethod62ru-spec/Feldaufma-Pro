@@ -5545,6 +5545,10 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   stationFrom.setInputType(8194);stationTo.setInputType(8194);
   stationFrom.setHint("Station von (m, optional)");stationTo.setHint("Station bis (m, optional)");
   stationFrom.setText(source.optString("routeFrom",""));stationTo.setText(source.optString("routeTo",""));form.addView(stationFrom);form.addView(stationTo);
+  TextView stationLength=sheetText("",14,false);form.addView(stationLength);
+  Runnable updateStationLength=()->{try{double from=Double.parseDouble(stationFrom.getText().toString().trim().replace(',','.')),to=Double.parseDouble(stationTo.getText().toString().trim().replace(',','.'));if(!Double.isFinite(from)||!Double.isFinite(to)||from<0||to<=from||(Double.isFinite(l)&&l>0&&to>l))throw new IllegalArgumentException();stationLength.setText(String.format(java.util.Locale.GERMANY,"Stationslänge: %.2f m (nicht gemessene Einbaulänge)",to-from));}catch(Exception ex){stationLength.setText("Stationslänge: –");}};
+  for(EditText stationField:new EditText[]{stationFrom,stationTo})stationField.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){updateStationLength.run();}public void afterTextChanged(android.text.Editable e){}});
+  updateStationLength.run();
   CheckBox installed=new CheckBox(this);installed.setText("Einbau bestätigen und Länge in Materialliste übernehmen");
   installed.setChecked(source.optBoolean("installed",false));form.addView(installed);
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Leitungsmontage").setView(scroll)
