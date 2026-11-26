@@ -1783,6 +1783,34 @@ public class MainActivity extends Activity {
   depthSectionsInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
   depthSectionsInput.setText(overlapPrefs.getString("metricDepthSections",""));
   panel.addView(depthSectionsInput);
+  final java.util.List<double[]> profileData=new java.util.ArrayList<>();
+  final android.view.View longitudinalProfile=new android.view.View(this){
+   @Override protected void onDraw(android.graphics.Canvas c){
+    super.onDraw(c);
+    android.graphics.Paint p=new android.graphics.Paint(3);
+    p.setColor(0xff777777);p.setTextSize(dp(12));
+    if(profileData.isEmpty()){c.drawText("Längsschnitt: Tiefenangaben fehlen oder sind ungültig",dp(8),dp(24),p);return;}
+    double total=0,maxDepth=0;
+    for(double[] v:profileData){total+=v[0];maxDepth=Math.max(maxDepth,v[1]);}
+    if(total<=0||maxDepth<=0)return;
+    float left=dp(12),top=dp(32),width=getWidth()-dp(24),height=getHeight()-dp(76);
+    if(width<=0||height<=0)return;
+    p.setColor(0xff68945d);p.setStrokeWidth(dp(2));c.drawLine(left,top,left+width,top,p);
+    double station=0;
+    for(double[] v:profileData){
+     float x1=left+(float)(station/total*width),x2=left+(float)((station+v[0])/total*width),y=top+(float)(v[1]/maxDepth*height);
+     p.setColor(0xffb79b70);c.drawRect(x1,top,x2,y,p);
+     p.setColor(0xff555555);c.drawLine(x1,y,x2,y,p);c.drawLine(x1,top,x1,y,p);
+     if(x2-x1>dp(48))c.drawText(String.format(java.util.Locale.GERMANY,"%.2f m",v[1]),x1+dp(3),y-dp(4),p);
+     station+=v[0];
+    }
+    p.setColor(0xff777777);c.drawText("0,00 m",left,getHeight()-dp(12),p);
+    String end=String.format(java.util.Locale.GERMANY,"%.2f m",total);c.drawText(end,left+width-p.measureText(end),getHeight()-dp(12),p);
+    c.drawText("Längsschnitt – relative Tiefe, gemeinsame GOK",left,dp(16),p);
+   }
+  };
+  panel.addView(longitudinalProfile,new LinearLayout.LayoutParams(-1,dp(210)));
+
 
   Runnable refreshNominalArea=()->{
    java.util.ArrayList<double[]> mainVolumeStrips=new java.util.ArrayList<>();
@@ -1830,6 +1858,20 @@ public class MainActivity extends Activity {
     }
     station=end;
    }
+   profileData.clear();
+   if(depthSectionsValid){
+    double fallback=Double.NaN;
+    try{fallback=Double.parseDouble(mainExcavationDepth.getText().toString().trim().replace(',','.'));}catch(Exception ignored){}
+    boolean complete=true;
+    for(double[] strip:mainVolumeStrips){
+     double depth=strip[6]>0?strip[6]:fallback;
+     double len=Math.hypot(strip[2]-strip[0],strip[3]-strip[1]);
+     if(!Double.isFinite(depth)||depth<=0||!Double.isFinite(len)){complete=false;break;}
+     if(len>0)profileData.add(new double[]{len,depth});
+    }
+    if(!complete)profileData.clear();
+   }
+   longitudinalProfile.invalidate();
    java.util.TreeSet<Double> cuts=new java.util.TreeSet<>();cuts.add(0.0);cuts.add(total);
    for(org.json.JSONArray sections:new org.json.JSONArray[]{widthSections,surfaces})for(int j=0;j<sections.length();j++){
     org.json.JSONObject o=sections.optJSONObject(j);if(o==null)continue;double from=o.optDouble("from",Double.NaN),to=o.optDouble("to",Double.NaN);
