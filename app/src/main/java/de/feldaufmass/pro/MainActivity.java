@@ -1721,10 +1721,12 @@ public class MainActivity extends Activity {
     if(matches==1){bySurface.put(surface,bySurface.containsKey(surface)?bySurface.get(surface)+part:part);if(Double.isFinite(cutLeft)&&cutLeft>=0&&Double.isFinite(cutRight)&&cutRight>=0){double extra=(to-from)*(cutLeft+cutRight);cutsBySurface.put(surface,cutsBySurface.containsKey(surface)?cutsBySurface.get(surface)+extra:extra);}}
     else{unknownSurface+=part;if(matches>1)surfaceConflicts++;}
    }
-   StringBuilder result=new StringBuilder(String.format(java.util.Locale.GERMANY,"Rechnerische Grabenfläche (Länge × Breite): %.2f m²",area));
-   if(!missingCuts)result.append(String.format(java.util.Locale.GERMANY,"\\nNachschnitt links: %.2f m²\\nNachschnitt rechts: %.2f m²\\nNachschnitt gesamt: %.2f m²",nachschnittLeft,nachschnittRight,nachschnittArea));
+   StringBuilder result=new StringBuilder(String.format(java.util.Locale.GERMANY,unmeasured>0?"Rechnerische Grabenfläche (nur bemaßte Abschnitte): %.2f m²":"Rechnerische Grabenfläche (Länge × Breite): %.2f m²",area));
+   if(!missingCuts&&unmeasured==0)result.append(String.format(java.util.Locale.GERMANY,"\\nNachschnitt links: %.2f m²\\nNachschnitt rechts: %.2f m²\\nNachschnitt gesamt: %.2f m²",nachschnittLeft,nachschnittRight,nachschnittArea));
+   else if(!missingCuts)result.append(String.format(java.util.Locale.GERMANY,"\\nNachschnitt (nur bemaßte Abschnitte): %.2f m²",nachschnittArea));
    else result.append("\\nNachschnitt-Zusatzfläche: unvollständig bemaßt (links/rechts).");
-   if(!missingCuts)result.append(String.format(java.util.Locale.GERMANY,"\\nRechnerische Gesamtfläche inkl. Nachschnitt: %.2f m²",area+nachschnittArea));
+   if(!missingCuts&&unmeasured==0)result.append(String.format(java.util.Locale.GERMANY,"\\nRechnerische Gesamtfläche inkl. Nachschnitt: %.2f m²",area+nachschnittArea));
+   else result.append("\\nGesamtfläche: nicht vollständig berechenbar (fehlende Maße).");
    for(java.util.Map.Entry<String,Double> item:bySurface.entrySet()){result.append(String.format(java.util.Locale.GERMANY,"\\n%s · Graben: %.2f m²",item.getKey(),item.getValue()));Double cut=cutsBySurface.get(item.getKey());if(cut!=null)result.append(String.format(java.util.Locale.GERMANY," · Nachschnitt: %.2f m²",cut));}
    if(unknownSurface>0)result.append(String.format(java.util.Locale.GERMANY,"\\nOberfläche unklar / nicht zugeordnet: %.2f m²",unknownSurface));
    if(unmeasured>0)result.append(String.format(java.util.Locale.GERMANY,"\\nNicht bemaßte Länge: %.2f m",unmeasured));
@@ -1752,7 +1754,7 @@ public class MainActivity extends Activity {
     for(double[] p:model.vertices){minX=Math.min(minX,p[0]);maxX=Math.max(maxX,p[0]);minY=Math.min(minY,p[1]);maxY=Math.max(maxY,p[1]);}
     for(double[] p:montagePoints){minX=Math.min(minX,p[0]);maxX=Math.max(maxX,p[0]);minY=Math.min(minY,p[1]);maxY=Math.max(maxY,p[1]);}
     double margin=Double.isFinite(widths[0])?widths[0]/2+Math.max(Double.isFinite(widths[1])?widths[1]:0,Double.isFinite(widths[2])?widths[2]:0):0;
-    for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o!=null){double w=o.optDouble("width");if(Double.isFinite(w)&&w>0)margin=Math.max(margin,w/2+Math.max(Double.isFinite(widths[1])?widths[1]:0,Double.isFinite(widths[2])?widths[2]:0));}}
+    for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o!=null){double w=o.optDouble("width");if(Double.isFinite(w)&&w>0){double left=o.has("left")?o.optDouble("left",0):(Double.isFinite(widths[1])?widths[1]:0),right=o.has("right")?o.optDouble("right",0):(Double.isFinite(widths[2])?widths[2]:0);margin=Math.max(margin,w/2+Math.max(left,right));}}}
     margin*=2;minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
     double scale=Math.min((getWidth()-dp(48))/Math.max(.001,maxX-minX),(getHeight()-dp(64))/Math.max(.001,maxY-minY));if(!Double.isFinite(scale)||scale<=0)return;
     double ox=(getWidth()-(maxX-minX)*scale)/2-minX*scale,oy=(getHeight()-(maxY-minY)*scale)/2+maxY*scale;
