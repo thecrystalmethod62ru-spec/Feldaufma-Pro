@@ -661,7 +661,7 @@ public class MainActivity extends Activity {
   Runnable updateQuantities=()->{
    double[] values={Double.NaN,Double.NaN,Double.NaN};
    for(int k=0;k<3;k++)try{double n=number(fields[k]);if(Double.isFinite(n)&&n>0)values[k]=n;}catch(Exception ignored){}
-   double area=values[0]*values[1],volume=area*values[2];
+   double area=CivilGeometry.rectangularArea(values[0],values[1]),volume=area*values[2];
    results[0].setText(Double.isFinite(area)?String.format(java.util.Locale.GERMANY,"%.2f m²",area):"—");
    results[1].setText(Double.isFinite(volume)?String.format(java.util.Locale.GERMANY,"%.3f m³",volume):"—");
   };
@@ -2861,7 +2861,7 @@ public class MainActivity extends Activity {
     double from=stations.get(i-1),to=stations.get(i),mid=(from+to)/2,w=widths[0];
     for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o!=null&&mid>=o.optDouble("from",Double.NaN)&&mid<o.optDouble("to",Double.NaN))w=o.optDouble("width",Double.NaN);}
     if(!Double.isFinite(w)||w<=0){unmeasured+=to-from;continue;}
-    double part=(to-from)*w;area+=part;
+    double part=CivilGeometry.rectangularArea(to-from,w);area+=part;
     double cutLeft=widths[1],cutRight=widths[2];for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o!=null&&mid>=o.optDouble("from",Double.NaN)&&mid<o.optDouble("to",Double.NaN)){if(o.has("left"))cutLeft=o.optDouble("left",Double.NaN);if(o.has("right"))cutRight=o.optDouble("right",Double.NaN);}}
     if(Double.isFinite(cutLeft)&&cutLeft>=0&&Double.isFinite(cutRight)&&cutRight>=0){nachschnittLeft+=(to-from)*cutLeft;nachschnittRight+=(to-from)*cutRight;nachschnittArea+=(to-from)*(cutLeft+cutRight);}else missingCuts=true;
     String surface=null;int matches=0;
@@ -3811,7 +3811,7 @@ public class MainActivity extends Activity {
    for(org.json.JSONObject row:sorted){
     double from=row.getDouble("from"),to=row.getDouble("to"),bw=row.getDouble("width"),bd=row.getDouble("depth");
     if(!Double.isFinite(from)||!Double.isFinite(to)||!Double.isFinite(bw)||!Double.isFinite(bd)||from<last||to<=from||bw<=0||bd<=0)throw new IllegalArgumentException("Ungültige oder überlappende Abschnittsprofile");
-    double length=to-from,volume=length*bw*bd;total+=volume;covered+=length;last=to;
+    double length=to-from,volume=CivilGeometry.rectangularVolume(length,bw,bd);total+=volume;covered+=length;last=to;
     report.append(String.format(java.util.Locale.GERMANY,"Station %.2f – %.2f m\n%.2f × %.2f × %.2f = %.3f m³\n\n",from,to,length,bw,bd,volume));
    }
    report.append(String.format(java.util.Locale.GERMANY,"Summe: %.3f m³\nErfasste Länge: %.2f m",total,covered));
@@ -3823,7 +3823,7 @@ public class MainActivity extends Activity {
      try{
       double standardWidth=number(width),standardDepth=number(depth);
       if(!Double.isFinite(standardWidth)||!Double.isFinite(standardDepth)||standardWidth<=0||standardDepth<=0)throw new IllegalArgumentException();
-      double remainderVolume=remaining*standardWidth*standardDepth;
+      double remainderVolume=CivilGeometry.rectangularVolume(remaining,standardWidth,standardDepth);
       report.append(String.format(java.util.Locale.GERMANY,"\nResttrasse (allgemeines Regelprofil): %.2f × %.2f × %.2f = %.3f m³\nGesamtaushub: %.3f m³",remaining,standardWidth,standardDepth,remainderVolume,total+remainderVolume));
      }catch(Exception ex){report.append("\nGesamtaushub nicht ermittelbar: allgemeine Grabenmaße fehlen.");}
     }
