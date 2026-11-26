@@ -5264,6 +5264,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     Button undoPosition=new Button(this);undoPosition.setText("Verschieben rückgängig");undoPosition.setEnabled(false);
   undoPosition.setOnClickListener(v->{if(positionHistory.isEmpty())return;redoHistory.push(new String[]{offset.getText().toString(),depth.getText().toString()});redoPosition.setEnabled(true);String[] previous=positionHistory.pop();offset.setText(previous[0]);depth.setText(previous[1]);undoPosition.setEnabled(!positionHistory.isEmpty());});
   redoPosition.setOnClickListener(v->{if(redoHistory.isEmpty())return;positionHistory.push(new String[]{offset.getText().toString(),depth.getText().toString()});String[] next=redoHistory.pop();offset.setText(next[0]);depth.setText(next[1]);undoPosition.setEnabled(true);redoPosition.setEnabled(!redoHistory.isEmpty());});
+  final java.util.ArrayDeque<String> groupUndo=new java.util.ArrayDeque<>(),groupRedo=new java.util.ArrayDeque<>();
   final java.util.Set<Integer> group=new java.util.HashSet<>();
   final boolean[] groupMode={false};
   Button groupButton=new Button(this);groupButton.setText("Gruppe");
@@ -5293,7 +5294,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
        positionHistory.clear();redoHistory.clear();if(undoByUtility.containsKey(hit))positionHistory.addAll(undoByUtility.get(hit));if(redoByUtility.containsKey(hit))redoHistory.addAll(redoByUtility.get(hit));undoPosition.setEnabled(!positionHistory.isEmpty());redoPosition.setEnabled(!redoHistory.isEmpty());
        notice(current[0].optString("name",current[0].optString("type")));invalidate();return true;
       }
-      if(groupMode[0]&&group.size()>1){positionHistory.clear();redoHistory.clear();undoPosition.setEnabled(false);redoPosition.setEnabled(false);}else{redoHistory.clear();redoPosition.setEnabled(false);positionHistory.push(new String[]{offset.getText().toString(),depth.getText().toString()});if(positionHistory.size()>50)positionHistory.removeLast();undoPosition.setEnabled(true);}
+      if(groupMode[0]&&group.size()>1){try{current[0].put("offset",x);current[0].put("axisDepth",y);groupUndo.push(rows.toString());if(groupUndo.size()>50)groupUndo.removeLast();groupRedo.clear();}catch(Exception ex){return true;}positionHistory.clear();redoHistory.clear();undoPosition.setEnabled(false);redoPosition.setEnabled(false);}else{redoHistory.clear();redoPosition.setEnabled(false);positionHistory.push(new String[]{offset.getText().toString(),depth.getText().toString()});if(positionHistory.size()>50)positionHistory.removeLast();undoPosition.setEnabled(true);}
       grabX=e.getX()-dragLeft-x*dragScale;grabY=e.getY()-dragTop-y*dragScale;dragging=true;getParent().requestDisallowInterceptTouchEvent(true);return true;
      case android.view.MotionEvent.ACTION_MOVE:
       if(!dragging)return false;
@@ -5350,13 +5351,19 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     if(outside||collision){pen.setColor(0xffff7777);pen.setTextSize(dp(11));c.drawText(outside&&collision?"Profilgrenze und Leitungskollision":outside?"Außerhalb des Grabenprofils":"Leitungskollision",dp(8),getHeight()-dp(4),pen);}
    }
   };
-  groupButton.setOnClickListener(v->{groupMode[0]=!groupMode[0];group.clear();if(groupMode[0])group.add(selected[0]);groupButton.setText(groupMode[0]?"Gruppe ✓":"Gruppe");preview.invalidate();});
+  Button groupBack=new Button(this);groupBack.setText("Gruppe ↶");groupBack.setEnabled(false);
+  Button groupForward=new Button(this);groupForward.setText("Gruppe ↷");groupForward.setEnabled(false);
+  Runnable restoreGroup=()->{preview.invalidate();groupBack.setEnabled(!groupUndo.isEmpty());groupForward.setEnabled(!groupRedo.isEmpty());};
+  groupBack.setOnClickListener(v->{if(groupUndo.isEmpty())return;try{current[0].put("offset",Double.parseDouble(offset.getText().toString().replace(',','.')));current[0].put("axisDepth",Double.parseDouble(depth.getText().toString().replace(',','.')));org.json.JSONArray previous=new org.json.JSONArray(groupUndo.peek());groupRedo.push(rows.toString());groupUndo.pop();for(int k=0;k<rows.length();k++)rows.put(k,previous.getJSONObject(k));current[0]=rows.optJSONObject(selected[0]);offset.setText(current[0].optString("offset"));depth.setText(current[0].optString("axisDepth"));restoreGroup.run();}catch(Exception ex){notice("Ungültige Maße");}});
+  groupForward.setOnClickListener(v->{if(groupRedo.isEmpty())return;try{current[0].put("offset",Double.parseDouble(offset.getText().toString().replace(',','.')));current[0].put("axisDepth",Double.parseDouble(depth.getText().toString().replace(',','.')));org.json.JSONArray next=new org.json.JSONArray(groupRedo.peek());groupUndo.push(rows.toString());groupRedo.pop();for(int k=0;k<rows.length();k++)rows.put(k,next.getJSONObject(k));current[0]=rows.optJSONObject(selected[0]);offset.setText(current[0].optString("offset"));depth.setText(current[0].optString("axisDepth"));restoreGroup.run();}catch(Exception ex){notice("Ungültige Maße");}});
+    groupButton.setOnClickListener(v->{groupMode[0]=!groupMode[0];group.clear();if(groupMode[0])group.add(selected[0]);groupButton.setText(groupMode[0]?"Gruppe ✓":"Gruppe");preview.invalidate();});
+  form.addView(groupBack);form.addView(groupForward);
   form.addView(preview,0,new LinearLayout.LayoutParams(-1,dp(160)));
   Button expandPreview=new Button(this);expandPreview.setText("Querschnitt vergrößern");form.addView(expandPreview,1);
 
   for(EditText field:fields)field.addTextChangedListener(new android.text.TextWatcher(){
    public void beforeTextChanged(CharSequence s,int start,int count,int after){}
-   public void onTextChanged(CharSequence s,int start,int before,int count){preview.invalidate();}
+   public void onTextChanged(CharSequence s,int start,int before,int count){preview.invalidate();groupBack.setEnabled(!groupUndo.isEmpty());groupForward.setEnabled(!groupRedo.isEmpty());}
    public void afterTextChanged(android.text.Editable e){}
   });
   ScrollView positionScroll=new ScrollView(this);positionScroll.setFillViewport(false);positionScroll.addView(form);
