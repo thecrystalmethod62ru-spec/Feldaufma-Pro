@@ -1778,8 +1778,29 @@ public class MainActivity extends Activity {
   mainExcavationDepth.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
   mainExcavationDepth.setText(overlapPrefs.getString("metricMainExcavationDepth",""));
   panel.addView(mainExcavationDepth);
+  final EditText depthSectionsInput=new EditText(this);
+  depthSectionsInput.setHint("Grabentiefe abschnittsweise: von;bis;Tiefe (je Zeile)");
+  depthSectionsInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+  depthSectionsInput.setText(overlapPrefs.getString("metricDepthSections",""));
+  panel.addView(depthSectionsInput);
+
   Runnable refreshNominalArea=()->{
    java.util.ArrayList<double[]> mainVolumeStrips=new java.util.ArrayList<>();
+   java.util.List<double[]> depthSections=new java.util.ArrayList<>();
+   boolean depthSectionsValid=true;
+   try{
+    for(String line:depthSectionsInput.getText().toString().split("\\n")){
+     if(line.trim().isEmpty())continue;
+     String[] parts=line.trim().split(";",-1);
+     if(parts.length!=3)throw new IllegalArgumentException();
+     double[] v=new double[3];
+     for(int i=0;i<3;i++){v[i]=Double.parseDouble(parts[i].trim().replace(',','.'));if(!Double.isFinite(v[i]))throw new IllegalArgumentException();}
+     if(v[0]<0||v[1]<=v[0]||v[1]>route.measuredLength()+1e-8||v[2]<=0)throw new IllegalArgumentException();
+     for(double[] old:depthSections)if(v[0]<old[1]&&v[1]>old[0])throw new IllegalArgumentException();
+     depthSections.add(v);
+    }
+   }catch(Exception ex){depthSectionsValid=false;depthSections.clear();}
+
    double total=route.measuredLength();
    java.util.ArrayList<double[]> strips=new java.util.ArrayList<>();
    double station=0;
@@ -1793,6 +1814,7 @@ public class MainActivity extends Activity {
      double lo=o.optDouble("from"),hi=o.optDouble("to");
      if(lo>station&&lo<end)split.add(lo);if(hi>station&&hi<end)split.add(hi);
     }
+    for(double[] section:depthSections){if(section[0]>station&&section[0]<end)split.add(section[0]);if(section[1]>station&&section[1]<end)split.add(section[1]);}
     java.util.ArrayList<Double> ss=new java.util.ArrayList<>(split);
     for(int j=1;j<ss.size();j++){
      double lo=ss.get(j-1),hi=ss.get(j),mid=(lo+hi)/2,w=widths[0],l=widths[1],rr=widths[2];
@@ -1802,6 +1824,7 @@ public class MainActivity extends Activity {
      }
      double t=(lo-station)/length,u=(hi-station)/length;
      mainVolumeStrips.add(new double[]{a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u,w/2,w/2,0});
+     for(double[] section:depthSections)if(mid>=section[0]&&mid<section[1])mainVolumeStrips.get(mainVolumeStrips.size()-1)[6]=section[2];
 
      strips.add(new double[]{a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u,w>0&&l>=0?w/2+l:Double.NaN,w>0&&rr>=0?w/2+rr:Double.NaN});
     }
@@ -1881,15 +1904,17 @@ public class MainActivity extends Activity {
        if(combinedMode==1||combinedMode==2)result.append(String.format(java.util.Locale.GERMANY,"\nAushub-Kontrollwert Abzweigungen: %.2f m³",combinedMode==1?branchVolumes.gross:branchVolumes.net));
        result.append("\nHauptgraben nicht in dieser Volumenprüfung enthalten; keine Abrechnungsfreigabe.");
        try{
-        double depth=Double.parseDouble(mainExcavationDepth.getText().toString().trim().replace(',','.'));
-        if(!Double.isFinite(depth)||depth<=0)throw new IllegalArgumentException();
+        if(!depthSectionsValid)throw new IllegalArgumentException("Ungültige oder überlappende Tiefenabschnitte");
+        double depth=Double.NaN;
+        try{depth=Double.parseDouble(mainExcavationDepth.getText().toString().trim().replace(',','.'));}catch(NumberFormatException ignored){}
+
         java.util.List<double[]> allVolume=new java.util.ArrayList<>(branchVolumeStrips);
-        for(double[] strip:mainVolumeStrips){strip[6]=depth;allVolume.add(strip);}
+        for(double[] strip:mainVolumeStrips){if(strip[6]<=0)strip[6]=depth;if(!Double.isFinite(strip[6])||strip[6]<=0)throw new IllegalArgumentException("Grabentiefe fehlt");allVolume.add(strip);}
         StripVolume.Result all=StripVolume.calculate(allVolume);
         result.append(String.format(java.util.Locale.GERMANY,"\nAushub Gesamttrasse inkl. Abzweigungen:\nBrutto: %.2f m³\nÜberschneidung: %.2f m³\nNetto: %.2f m³",all.gross,all.overlap,all.net));
         if(combinedMode==1||combinedMode==2)result.append(String.format(java.util.Locale.GERMANY,"\nAushub-Kontrollwert Gesamttrasse: %.2f m³",combinedMode==1?all.gross:all.net));
-        result.append("\nEinheitliche Hauptgrabentiefe, gemeinsame Bezugshöhe, ohne Nachschnitt und Eckergänzungen.");
-       }catch(Exception ex){result.append("\nGesamt-Aushub: gültige Hauptgrabentiefe erforderlich.");}
+        result.append("\nAbschnittsweise Hauptgrabentiefe, gemeinsame Bezugshöhe, ohne Nachschnitt und Eckergänzungen.");
+       }catch(Exception ex){result.append("\nGesamt-Aushub: Tiefenangaben fehlen oder Tiefenabschnitte sind ungültig.");}
 
 
        if(combinedMode==1||combinedMode==2)result.append(String.format(java.util.Locale.GERMANY,"\nKontrollwert Gesamttrasse: %.2f m²",combinedMode==1?total.gross:total.net));
@@ -1919,6 +1944,11 @@ public class MainActivity extends Activity {
    }
    nominalArea.setText(result.toString());
   };
+  depthSectionsInput.addTextChangedListener(new android.text.TextWatcher(){
+   public void beforeTextChanged(CharSequence s,int start,int count,int after){}
+   public void onTextChanged(CharSequence s,int start,int before,int count){}
+   public void afterTextChanged(android.text.Editable e){overlapPrefs.edit().putString("metricDepthSections",e.toString()).apply();refreshNominalArea.run();}
+  });
   mainExcavationDepth.addTextChangedListener(new android.text.TextWatcher(){
    public void beforeTextChanged(CharSequence s,int start,int count,int after){}
    public void onTextChanged(CharSequence s,int start,int before,int count){}
