@@ -137,7 +137,7 @@ public class MainActivity extends Activity {
   }
   if(manifest==null||!"FeldaufmassPro".equals(manifest.optString("format"))||manifest.optInt("version")!=1)throw new java.io.IOException("Unbekanntes Sicherungsformat");
   org.json.JSONObject fields=manifest.getJSONObject("preferences");
-  java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","objectUndo","objectRedo","elevationPoints","lvPositions","dailyReports"));
+  java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","objectUndo","objectRedo","elevationPoints","lvPositions","dailyReports","nachtraege"));
   java.util.Set<String> ints=new java.util.HashSet<>(java.util.Arrays.asList("surface","handling","dictationLanguage","gpsDurationSeconds"));
   SharedPreferences.Editor ed=projectStorage(id).edit();
   java.util.Iterator<String> keys=fields.keys();String name="Importiertes Projekt";java.util.Set<String> used=new java.util.HashSet<>();
@@ -156,7 +156,7 @@ public class MainActivity extends Activity {
     }else if(key.equals("documents")){
      org.json.JSONArray docs=new org.json.JSONArray(v);for(int j=0;j<docs.length();j++){org.json.JSONObject doc=docs.getJSONObject(j);doc.remove("uri");doc.put("name",doc.optString("name")+" (neu verknüpfen)");}v=docs.toString();
     }else if(key.equals("dailyReports")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++){org.json.JSONArray items=dailyPhotos(rows.getJSONObject(j));for(int k=0;k<items.length();k++){org.json.JSONObject photo=items.getJSONObject(k);String old=photo.getString("file"),replacement=photos.get(old);if(replacement==null)throw new java.io.IOException("Berichtsfoto fehlt");used.add(old);photo.put("file",replacement);}}v=rows.toString();
-    }else if(key.equals("objects")||key.equals("segments")||key.equals("elevationPoints")||key.equals("lvPositions")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)rows.getJSONObject(j);}
+    }else if(key.equals("objects")||key.equals("segments")||key.equals("elevationPoints")||key.equals("lvPositions")||key.equals("nachtraege")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)rows.getJSONObject(j);}
     else if(key.equals("objectUndo")||key.equals("objectRedo")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)new org.json.JSONArray(rows.getString(j));}
     if(key.equals("project")&&!v.trim().isEmpty())name=v.trim();
     ed.putString(key,v);
@@ -1063,6 +1063,78 @@ public class MainActivity extends Activity {
    }catch(Exception e){notice("Bericht konnte nicht gespeichert werden.");}
   }));dialog.show();
  }
+ org.json.JSONArray nachtraege(){
+  try{return new org.json.JSONArray(getPreferences(0).getString("nachtraege","[]"));}catch(Exception e){return new org.json.JSONArray();}
+ }
+ boolean saveNachtraege(org.json.JSONArray rows){
+  if(!getPreferences(0).edit().putString("nachtraege",rows.toString()).commit()){notice("Nachtrag konnte nicht gespeichert werden.");return false;}
+  recordProjectEvent("Nachtragsliste geändert");return true;
+ }
+ boolean lvHasStaleAnsatz(org.json.JSONObject o){
+  if(!"ansatz".equals(o.optString("source")))return false;
+  org.json.JSONArray rows=o.optJSONArray("ansatz");if(rows==null)return false;
+  for(int j=0;j<rows.length();j++)if(!ansatzSourceCurrent(rows.optJSONObject(j)))return true;
+  return false;
+ }
+ boolean hasExplicitLvSource(org.json.JSONArray lv,String kind,String snapshot){
+  for(int j=0;j<lv.length();j++){org.json.JSONObject o=lv.optJSONObject(j);if(o==null||!"ansatz".equals(o.optString("source")))continue;
+   org.json.JSONArray rows=o.optJSONArray("ansatz");if(rows==null)continue;
+   for(int k=0;k<rows.length();k++){org.json.JSONObject row=rows.optJSONObject(k);if(row!=null&&kind.equals(row.optString("kind"))&&snapshot.equals(row.optString("snapshot")))return true;}
+  }return false;
+ }
+ void addNachtragHint(LinearLayout form,String title,String description){
+  Button b=new Button(this);b.setAllCaps(false);b.setText(title+"\n"+description);b.setOnClickListener(v->editNachtrag(-1,title,description));form.addView(b);
+ }
+ void showNachtraege(){
+  LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
+  form.addView(sheetText("Prüfhinweise, keine automatische Anerkennung oder Änderung von LV-Mengen. Vertrag, Anordnung und Abrechnung getrennt prüfen.",14,true));
+  org.json.JSONArray lv=lvPositions();int hints=0;
+  form.addView(sheetText("Soll / Ist – Auffälligkeiten",16,true));
+  for(int j=0;j<lv.length();j++){
+   org.json.JSONObject o=lv.optJSONObject(j);if(o==null)continue;double ist=lvQuantity(o),soll=o.optDouble("target");
+   if(lvHasStaleAnsatz(o)){addNachtragHint(form,lvLabel(o),"Mengenansatz geändert – Quelle prüfen");hints++;continue;}
+   if(Double.isFinite(ist)&&Double.isFinite(soll)&&ist-soll>0.0005){
+    String note="Soll "+csvNumber(soll)+" · Ist "+csvNumber(ist)+" · Mehrmenge "+csvNumber(ist-soll)+" "+o.optString("unit");
+    if(soll>0)note+=" ("+String.format(java.util.Locale.GERMANY,"%.1f",100*(ist-soll)/soll)+" % über Soll)";
+    addNachtragHint(form,lvLabel(o),note);hints++;
+   }
+  }
+  if(hints==0)form.addView(sheetText("Keine festgestellten Mehrmengen oder geänderten Mengenansätze. Fehlende Soll-/Istwerte nicht bewertbar.",13,false));
+  form.addView(sheetText("Ohne explizite Mengenansatz-Zuordnung",16,true));
+  form.addView(sheetText("Eine Leistung kann bereits über eine Haupttrassenmenge oder manuelle LV-Position erfasst sein.",13,false));
+  for(int j=0;j<objects.length();j++){org.json.JSONObject o=objects.optJSONObject(j);if(o!=null&&!hasExplicitLvSource(lv,"object",overlapGeometry(o)))addNachtragHint(form,"Objekt "+(j+1)+" · "+o.optString("type"),"Station "+o.optString("station")+" m · LV-Zuordnung prüfen"+overlapStatus(j));}
+  for(int j=0;j<segments.length();j++){org.json.JSONObject o=segments.optJSONObject(j);if(o!=null&&!hasExplicitLvSource(lv,"segment",o.toString()))addNachtragHint(form,"Abschnitt "+(j+1)+" · "+o.optString("surface"),"Station "+o.optString("from")+"–"+o.optString("to")+" m · LV-Zuordnung prüfen");}
+  form.addView(sheetText("Dokumentierte Nachträge",16,true));
+  org.json.JSONArray saved=nachtraege();
+  if(saved.length()==0)form.addView(sheetText("Noch keine Nachträge erfasst.",13,false));
+  for(int j=0;j<saved.length();j++){final int index=j;org.json.JSONObject o=saved.optJSONObject(j);if(o==null)continue;Button b=new Button(this);b.setAllCaps(false);b.setText(o.optString("title")+"\n"+o.optString("date")+" · "+o.optString("status"));b.setOnClickListener(v->editNachtrag(index,"",""));form.addView(b);}
+  new android.app.AlertDialog.Builder(this).setTitle("Nachtragsmanagement").setView(scroll).setNegativeButton("Schließen",null).setPositiveButton("Neuer Nachtrag",(d,w)->editNachtrag(-1,"","")).show();
+ }
+ void editNachtrag(int index,String suggestedTitle,String suggestedReason){
+  org.json.JSONArray original=nachtraege();org.json.JSONObject old=index<0?null:original.optJSONObject(index);
+  LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
+  String[] keys={"title","date","reason","order","evidence","quantity","unit"},labels={"Bezeichnung / LV-Bezug","Datum (JJJJ-MM-TT)","Beschreibung / Begründung","Anordnung / Auftraggeber","Nachweise (Foto, Bericht, Station)","Zusätzliche Menge (optional)","Einheit"};
+  EditText[] fields=new EditText[keys.length];
+  for(int j=0;j<fields.length;j++){form.addView(sheetText(labels[j],14,true));fields[j]=new EditText(this);if(j==5)fields[j].setInputType(8194);if(j==2||j==3||j==4)fields[j].setMinLines(2);else fields[j].setSingleLine(true);fields[j].setText(old==null?(j==0?suggestedTitle:j==1?java.time.LocalDate.now().toString():j==2?suggestedReason:""):old.optString(keys[j],""));form.addView(fields[j]);}
+  String[] statuses={"Prüfen","Dokumentiert","Eingereicht","Bestätigt (manuell)","Abgelehnt"};
+  form.addView(sheetText("Status (manuelle Dokumentation)",14,true));Spinner status=choices(form,statuses);status.setSelection(Math.max(0,java.util.Arrays.asList(statuses).indexOf(old==null?"Prüfen":old.optString("status"))));
+  android.app.AlertDialog.Builder builder=new android.app.AlertDialog.Builder(this).setTitle("Nachtrag dokumentieren").setView(scroll).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null);
+  if(old!=null)builder.setNeutralButton("Löschen",(a,b)->new android.app.AlertDialog.Builder(this).setTitle("Nachtrag löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(x,y)->{org.json.JSONArray next=nachtraege();if(!next.toString().equals(original.toString())){notice("Daten geändert. Neu öffnen.");return;}next.remove(index);if(saveNachtraege(next))showNachtraege();}).show());
+  android.app.AlertDialog dialog=builder.create();dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(b->{
+   try{
+    String title=fields[0].getText().toString().trim(),date=fields[1].getText().toString().trim();
+    if(title.isEmpty()){fields[0].setError("Bezeichnung erforderlich");return;}
+    try{if(!date.matches("\\d{4}-\\d{2}-\\d{2}")||!java.time.LocalDate.parse(date).toString().equals(date))throw new IllegalArgumentException();}catch(Exception e){fields[1].setError("Gültiges Datum erforderlich");return;}
+    org.json.JSONObject row=old==null?new org.json.JSONObject().put("id",java.util.UUID.randomUUID().toString()):new org.json.JSONObject(old.toString());
+    for(int j=0;j<keys.length;j++)if(j!=5)row.put(keys[j],fields[j].getText().toString().trim());
+    row.remove("quantity");if(fields[5].length()>0){double q=number(fields[5]);if(!Double.isFinite(q)||q<=0||row.optString("unit").isEmpty()){fields[5].setError("Positive Menge und Einheit erforderlich");return;}row.put("quantity",q);}
+    row.put("status",status.getSelectedItem().toString()).put("modifiedAt",System.currentTimeMillis());
+    org.json.JSONArray next=nachtraege();if(!next.toString().equals(original.toString())){notice("Daten geändert. Neu öffnen.");return;}
+    if(index<0)next.put(row);else next.put(index,row);
+    if(saveNachtraege(next)){dialog.dismiss();showNachtraege();}
+   }catch(Exception e){notice("Nachtrag konnte nicht gespeichert werden.");}
+  }));dialog.show();
+ }
  void showTools(){
   String[] names={"Maße","Beläge","Objekte","Unterlagen / PDF","Sprachassistent"};
   LinearLayout[] pages={measurePage,segmentPage,objectPage,documentsPage,voicePage};
@@ -1081,7 +1153,8 @@ public class MainActivity extends Activity {
   menu.getMenu().add(0,110,Menu.NONE,"GAEB X31 exportieren (Test)");
   menu.getMenu().add(0,111,Menu.NONE,"Fotobericht als PDF");
   menu.getMenu().add(0,112,Menu.NONE,"Bautagesbericht");
-  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==112)showDailyReports();else if(item.getItemId()==111)exportPhotoReport();else if(item.getItemId()==110)exportX31();else if(item.getItemId()==109)exportReb();else if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
+  menu.getMenu().add(0,113,Menu.NONE,"Nachtragsmanagement");
+  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==113)showNachtraege();else if(item.getItemId()==112)showDailyReports();else if(item.getItemId()==111)exportPhotoReport();else if(item.getItemId()==110)exportX31();else if(item.getItemId()==109)exportReb();else if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
   menu.show();
  }
  LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(dp(12),dp(8),dp(12),dp(8));return p;}
