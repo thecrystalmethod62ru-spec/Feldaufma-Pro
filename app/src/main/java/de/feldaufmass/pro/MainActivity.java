@@ -889,6 +889,12 @@ public class MainActivity extends Activity {
   Button undo=new Button(this),redo=new Button(this);undo.setAllCaps(false);redo.setAllCaps(false);undo.setText("↶");undo.setContentDescription("Rückgängig");redo.setText("↷");redo.setContentDescription("Wiederholen");
   historyBar.addView(undo,new LinearLayout.LayoutParams(0,-2,1));historyBar.addView(redo,new LinearLayout.LayoutParams(0,-2,1));
   Button legendEdit=new Button(this);legendEdit.setAllCaps(false);legendEdit.setText("Legende bearbeiten");form.addView(legendEdit);legendEdit.setOnClickListener(v->route.editLegend());
+  Button proportional=new Button(this);proportional.setAllCaps(false);proportional.setText("Maßstab");proportional.setContentDescription("Trasse proportional nach Abschnittsmaßen neu zeichnen");historyBar.addView(proportional,new LinearLayout.LayoutParams(0,-2,1));
+  proportional.setOnClickListener(v->{
+   for(RouteSketch.Vertex vertex:route.vertices)if(Double.isFinite(vertex.latitude)&&Double.isFinite(vertex.longitude)){notice("GPS-gebundene Trasse: proportionale Umformung nicht verfügbar.");return;}
+   if(!getPreferences(0).getString("routeUnderlay","").isEmpty()||savedSketchCalibration().length()>0){notice("Zeichenvorlage oder Kalibrierung vorhanden. Umformung nicht verfügbar.");return;}
+   if(!route.rebuildMeasuredGeometry())notice("Alle Abschnittsmaße und eindeutige Segmentrichtungen erforderlich.");
+  });
   Button resetDimensions=new Button(this);resetDimensions.setAllCaps(false);resetDimensions.setText("Maße ↺");resetDimensions.setContentDescription("Maßpositionen zurücksetzen");historyBar.addView(resetDimensions,new LinearLayout.LayoutParams(0,-2,1));resetDimensions.setOnClickListener(v->route.resetDimensionLayout());
   Button deletePoint=new Button(this);deletePoint.setAllCaps(false);deletePoint.setText("Punkt −");deletePoint.setContentDescription("Punkt löschen");historyBar.addView(deletePoint,new LinearLayout.LayoutParams(0,-2,1));deletePoint.setOnClickListener(v->deleteRoutePoint(route));
   Button remove=new Button(this);remove.setText("Letzten Abschnitt entfernen");form.addView(remove);
