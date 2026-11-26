@@ -2118,7 +2118,13 @@ public class MainActivity extends Activity {
   crossSectionButton.setOnClickListener(v->{
    final EditText dimensions=new EditText(this);
    dimensions.setHint("Grabenbreite;Grabentiefe (m)");
-   dimensions.setText(overlapPrefs.getString("metricCrossSectionDimensions",""));
+   String savedCrossDimensions=overlapPrefs.getString("metricCrossSectionDimensions","");
+   try{
+    double projectWidth=number(width),projectDepth=number(depth);
+    if(Double.isFinite(projectWidth)&&projectWidth>0&&Double.isFinite(projectDepth)&&projectDepth>0)
+     savedCrossDimensions=projectWidth+";"+projectDepth;
+   }catch(Exception ignored){}
+   dimensions.setText(savedCrossDimensions);
    new android.app.AlertDialog.Builder(this).setTitle("Querschnitt – Bezugsmaße").setView(dimensions).setNegativeButton("Abbrechen",null).setPositiveButton("Öffnen",(d,w)->{
     try{
      String[] parts=dimensions.getText().toString().split(";",-1);
