@@ -1508,6 +1508,20 @@ public class MainActivity extends Activity {
    }catch(Exception e){notice("Nachtrag konnte nicht gespeichert werden.");}
   }));dialog.show();
  }
+ void showMontage(){
+  new android.app.AlertDialog.Builder(this).setTitle("Rohrleitungsbau – Montage")
+   .setItems(new String[]{"Formstückkatalog"},(d,w)->showMontageCatalog())
+   .setNegativeButton("Schließen",null).show();
+ }
+ void showMontageCatalog(){
+  new android.app.AlertDialog.Builder(this).setTitle("Formstückkatalog")
+   .setItems(MontageCatalog.labels(),(d,w)->{
+    MontageCatalog.Fitting fitting=MontageCatalog.Fitting.values()[w];
+    new android.app.AlertDialog.Builder(this).setTitle(fitting.label)
+     .setMessage("Anschlüsse: "+fitting.ports+(fitting.bendAngle>0?"\nWinkel: "+fitting.bendAngle+"°":"")+"\nKatalogvorschau – noch keine Platzierung im Montageplan.")
+     .setPositiveButton("Zurück",(x,y)->showMontageCatalog()).show();
+   }).setNegativeButton("Zurück",(d,w)->showMontage()).show();
+ }
  void showTools(){
   String[] names={"Maße","Beläge","Objekte","Unterlagen / PDF","Sprachassistent"};
   LinearLayout[] pages={measurePage,segmentPage,objectPage,documentsPage,voicePage};
@@ -1531,7 +1545,8 @@ public class MainActivity extends Activity {
   menu.getMenu().add(0,115,Menu.NONE,"Foto / Handskizze analysieren");
   menu.getMenu().add(0,116,Menu.NONE,"Handskizze als Zeichenvorlage");
   menu.getMenu().add(0,117,Menu.NONE,"Bluetooth-Messgerät (Test)");
-  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==117)testBleMeasure();else if(item.getItemId()==116)chooseRouteUnderlay();else if(item.getItemId()==115)chooseImageAnalysis();else if(item.getItemId()==114)choosePdfAnalysis();else if(item.getItemId()==113)showNachtraege();else if(item.getItemId()==112)showDailyReports();else if(item.getItemId()==111)exportPhotoReport();else if(item.getItemId()==110)exportX31();else if(item.getItemId()==109)exportReb();else if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
+  menu.getMenu().add(0,118,Menu.NONE,"Rohrleitungsbau – Montage");
+  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==118)showMontage();else if(item.getItemId()==117)testBleMeasure();else if(item.getItemId()==116)chooseRouteUnderlay();else if(item.getItemId()==115)chooseImageAnalysis();else if(item.getItemId()==114)choosePdfAnalysis();else if(item.getItemId()==113)showNachtraege();else if(item.getItemId()==112)showDailyReports();else if(item.getItemId()==111)exportPhotoReport();else if(item.getItemId()==110)exportX31();else if(item.getItemId()==109)exportReb();else if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
   menu.show();
  }
  LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(dp(12),dp(8),dp(12),dp(8));return p;}
