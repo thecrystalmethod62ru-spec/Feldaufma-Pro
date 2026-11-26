@@ -327,10 +327,19 @@ public class MainActivity extends Activity {
   if(liveManager!=null){liveManager.removeUpdates(liveListener);liveManager=null;}
   liveFix=null;if(livePreview!=null)livePreview.setLiveFix(null);super.onPause();
  }
- int drawingLayers(){return getSharedPreferences("drawing_view",MODE_PRIVATE).getInt(activeProject,RouteSketch.ALL_LAYERS)&RouteSketch.ALL_LAYERS;}
+ int drawingLayers(){
+  android.content.SharedPreferences prefs=getSharedPreferences("drawing_view",MODE_PRIVATE);
+  int mask=prefs.getInt(activeProject,RouteSketch.ALL_LAYERS)&RouteSketch.ALL_LAYERS;
+  if(!prefs.getBoolean("surfaceDimensionsMigrated:"+activeProject,false)){
+   if((mask&RouteSketch.LAYER_DIMENSIONS)!=0)mask|=RouteSketch.LAYER_SURFACE_DIMENSIONS;
+   else mask&=~RouteSketch.LAYER_SURFACE_DIMENSIONS;
+   prefs.edit().putInt(activeProject,mask).putBoolean("surfaceDimensionsMigrated:"+activeProject,true).apply();
+  }
+  return mask;
+ }
  void showDrawingLayers(){
-  String[] labels={"Leitungsverlauf / Punkte","Bemaßung","Punktnamen","GPS / Standort","Fotodokumentation","Objekte","Oberflächen"};
-  int[] masks={RouteSketch.LAYER_ROUTE,RouteSketch.LAYER_DIMENSIONS,RouteSketch.LAYER_NAMES,RouteSketch.LAYER_GPS,RouteSketch.LAYER_PHOTOS,RouteSketch.LAYER_OBJECTS,RouteSketch.LAYER_SURFACES};
+  String[] labels={"Leitungsverlauf / Punkte","Bemaßung","Punktnamen","GPS / Standort","Fotodokumentation","Objekte","Oberflächen","Oberflächenbemaßung"};
+  int[] masks={RouteSketch.LAYER_ROUTE,RouteSketch.LAYER_DIMENSIONS,RouteSketch.LAYER_NAMES,RouteSketch.LAYER_GPS,RouteSketch.LAYER_PHOTOS,RouteSketch.LAYER_OBJECTS,RouteSketch.LAYER_SURFACES,RouteSketch.LAYER_SURFACE_DIMENSIONS};
   boolean[] checked=new boolean[labels.length];int current=drawingLayers();
   for(int j=0;j<labels.length;j++)checked[j]=(current&masks[j])!=0;
   new android.app.AlertDialog.Builder(this).setTitle("Zeichnungsebenen")
