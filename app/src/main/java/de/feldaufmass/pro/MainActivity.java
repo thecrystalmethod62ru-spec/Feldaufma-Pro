@@ -4196,6 +4196,28 @@ minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
    }
    p.setColor(TEAL);p.setStrokeWidth(1.5f);
    for(int i=1;i<route.vertices.size();i++){RouteSketch.Vertex a=route.vertices.get(i-1),b=route.vertices.get(i);c.drawLine((float)(40+(a.point.x-minX)*unit),(float)(85+(a.point.y-minY)*unit),(float)(40+(b.point.x-minX)*unit),(float)(85+(b.point.y-minY)*unit),p);}
+   if(route.surfaceSections.length()>0){
+    double station=0;java.util.LinkedHashMap<String,Integer> legend=new java.util.LinkedHashMap<>();
+    p.setStrokeWidth(3f);
+    for(int i=1;i<route.vertices.size();i++){
+     RouteSketch.Vertex a=route.vertices.get(i-1),b=route.vertices.get(i);double len=b.metres,dx=b.point.x-a.point.x,dy=b.point.y-a.point.y;
+     if(len<=0)continue;
+     for(int j=0;j<route.surfaceSections.length();j++){
+      org.json.JSONObject row=route.surfaceSections.optJSONObject(j);if(row==null)continue;
+      double from=Math.max(station,row.optDouble("from")),to=Math.min(station+len,row.optDouble("to"));String name=row.optString("surface").trim();
+      if(name.isEmpty()||!Double.isFinite(from)||!Double.isFinite(to)||to<=from)continue;
+      int color=RouteSketch.surfaceColor(name);legend.put(name,color);p.setColor(color);
+      double t1=(from-station)/len,t2=(to-station)/len;
+      c.drawLine((float)(40+(a.point.x+dx*t1-minX)*unit),(float)(85+(a.point.y+dy*t1-minY)*unit),(float)(40+(a.point.x+dx*t2-minX)*unit),(float)(85+(a.point.y+dy*t2-minY)*unit),p);
+     }station+=len;
+    }
+    float lx=40,ly=height-95;p.setTextSize(9);
+    for(java.util.Map.Entry<String,Integer> entry:legend.entrySet()){
+     String label=entry.getKey();float space=p.measureText(label)+28;
+     if(lx+space>width-36){lx=40;ly+=12;}if(ly>height-78)break;
+     p.setColor(entry.getValue());c.drawRect(lx,ly-7,lx+12,ly+1,p);p.setColor(INK);c.drawText(label,lx+16,ly,p);lx+=space;
+    }
+   }
    if(trenchWidth>0||widths.length()>0)try{
     org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("metricVerbauSections","[]"));
     double station=0;
