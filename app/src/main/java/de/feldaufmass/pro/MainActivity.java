@@ -8,7 +8,7 @@ import android.content.SharedPreferences;
 
 public class MainActivity extends Activity {
  EditText project,length,width,depth; TextView result; Sketch sketch;
- double l,w,d,asphalt,left,right; EditText asphaltInput,leftInput,rightInput; Profile profile;
+ double l,w,d,asphalt,left,right; EditText asphaltInput,leftInput,rightInput; Profile profile; Spinner surface; EditText baseInput,pipeInput; double base=Double.NaN,pipe=Double.NaN; String covering="Unbekannt";
  EditText field(LinearLayout root,String label,String key,boolean numeric){
  TextView t=new TextView(this);t.setText(label);root.addView(t);
  EditText e=new EditText(this);e.setSingleLine(true);
@@ -23,6 +23,12 @@ public class MainActivity extends Activity {
  length=field(root,"Trassenlänge (m)","length",true);
  width=field(root,"Grabenbreite (m)","width",true);
  depth=field(root,"Grabentiefe (m)","depth",true);
+ TextView surfaceLabel=new TextView(this);surfaceLabel.setText("Oberfläche");root.addView(surfaceLabel);
+ surface=new Spinner(this);String[] types={"Unbekannt","Asphalt","Pflaster","Gehwegplatten","Unbefestigt"};
+ surface.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,types));root.addView(surface);
+ surface.setSelection(Math.min(4,Math.max(0,getPreferences(0).getInt("surface",0))));
+ baseInput=field(root,"Tragschichtstärke (m, optional)","base",true);
+ pipeInput=field(root,"Rohr-Außendurchmesser (mm, optional)","pipe",true);
  asphaltInput=field(root,"Asphaltstärke (m, optional)","asphalt",true);
  leftInput=field(root,"Nachschnitt links (m, optional)","left",true);
  rightInput=field(root,"Nachschnitt rechts (m, optional)","right",true);
@@ -34,8 +40,10 @@ public class MainActivity extends Activity {
  save.setOnClickListener(v->calculate());if(length.length()>0&&width.length()>0&&depth.length()>0)calculate();
  }
  void calculate(){try{l=number(length);w=number(width);d=number(depth);if(!Double.isFinite(l*w*d)||l<=0||w<=0||d<=0)throw new Exception();
+ covering=surface.getSelectedItem().toString();base=optional(baseInput);pipe=optional(pipeInput);if(Double.isFinite(pipe)&&(pipe<=0||pipe/1000>w||pipe/1000>d))throw new Exception();
  asphalt=optional(asphaltInput);left=optional(leftInput);right=optional(rightInput);if(Double.isFinite(asphalt)&&asphalt>d)throw new Exception();
- getPreferences(0).edit().putString("asphalt",asphaltInput.getText().toString()).putString("left",leftInput.getText().toString()).putString("right",rightInput.getText().toString()).putString("project",project.getText().toString()).putString("length",length.getText().toString()).putString("width",width.getText().toString()).putString("depth",depth.getText().toString()).apply();
+ if(Double.isFinite(base)&&base+(Double.isFinite(asphalt)?asphalt:0)>d)throw new Exception();
+ getPreferences(0).edit().putInt("surface",surface.getSelectedItemPosition()).putString("base",baseInput.getText().toString()).putString("pipe",pipeInput.getText().toString()).putString("asphalt",asphaltInput.getText().toString()).putString("left",leftInput.getText().toString()).putString("right",rightInput.getText().toString()).putString("project",project.getText().toString()).putString("length",length.getText().toString()).putString("width",width.getText().toString()).putString("depth",depth.getText().toString()).apply();
  result.setText(String.format(java.util.Locale.GERMANY,"Aushub: %.2f m³\nGrundfläche: %.2f m²",l*w*d,l*w));sketch.invalidate();profile.invalidate();
  }catch(Exception e){result.setText("Bitte gültige positive Maße eingeben.");}}
  double optional(EditText e)throws Exception{if(e.length()==0)return Double.NaN;double v=number(e);if(!Double.isFinite(v)||v<0)throw new Exception();return v;}
@@ -50,14 +58,21 @@ public class MainActivity extends Activity {
  float x=180-(float)(w*scale/2),z=180+(float)(w*scale/2),top=55,bottom=top+(float)(d*scale);
  p.setColor(0xffb7a48a);c.drawRect(20,top,340,bottom,p);
  p.setColor(0xffeee2cc);c.drawRect(x,top,z,bottom,p);
- if(Double.isFinite(asphalt)){p.setColor(0xff454950);c.drawRect(20,top,340,top+(float)(asphalt*scale),p);}
+ float layerTop=top;
+ if(Double.isFinite(asphalt)&&covering.equals("Asphalt")){p.setColor(0xff454950);layerTop=top+(float)(asphalt*scale);c.drawRect(20,top,340,layerTop,p);}
+ if(Double.isFinite(base)){p.setColor(0xffa6a6a6);c.drawRect(20,layerTop,340,layerTop+(float)(base*scale),p);}
+ if(covering.equals("Pflaster")||covering.equals("Gehwegplatten")){p.setColor(0xff777777);c.drawLine(20,top,340,top,p);for(int i=20;i<340;i+=covering.equals("Pflaster")?12:28)c.drawLine(i,top-4,i,top,p);}
+ if(Double.isFinite(pipe)){float radius=(float)(pipe/2000*scale);p.setColor(0xff3686bc);c.drawCircle(180,bottom-radius,radius,p);}
+
  p.setColor(Color.BLACK);p.setStrokeWidth(1);c.drawLine(x,top,x,bottom,p);c.drawLine(z,top,z,bottom,p);c.drawLine(x,bottom,z,bottom,p);
  c.drawLine(x,bottom+14,z,bottom+14,p);c.drawLine(x,bottom+8,x,bottom+20,p);c.drawLine(z,bottom+8,z,bottom+20,p);
  label(c,m(w),150,bottom+29);
  c.drawLine(z+12,top,z+12,bottom,p);label(c,m(d),z+16,(top+bottom)/2);
  if(Double.isFinite(left)&&Double.isFinite(right)){float a=x-(float)(nl*scale),b=z+(float)(nr*scale);c.drawLine(a,35,b,35,p);c.drawLine(a,30,a,45,p);c.drawLine(b,30,b,45,p);label(c,m(w+nl+nr),145,27);}
  else label(c,"Nachschnitt: nicht vollständig erfasst",20,27);
- label(c,Double.isFinite(asphalt)?"Asphalt: "+m(asphalt):"Asphaltstärke: unbekannt",20,260);
+ label(c,"Oberfläche: "+covering,20,238);
+ label(c,covering.equals("Asphalt")?(Double.isFinite(asphalt)?"Asphalt: "+m(asphalt):"Asphaltstärke: unbekannt"):"Belagsstärke: nicht erfasst",20,252);
+ label(c,Double.isFinite(pipe)?"Rohr Ø "+pipe+" mm (Lage symbolisch)":"Rohrmaße: unbekannt",20,266);
  label(c,"Schematisch – keine Ausführungsplanung",20,282);c.restore();
  }}
  class Sketch extends View{Paint p=new Paint(3);Sketch(){super(MainActivity.this);}
