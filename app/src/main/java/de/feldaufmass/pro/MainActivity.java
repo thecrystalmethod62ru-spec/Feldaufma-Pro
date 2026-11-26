@@ -599,6 +599,21 @@ public class MainActivity extends Activity {
   setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
   if(window!=null){window.setLayout(-1,-1);androidx.core.view.WindowInsetsControllerCompat c=androidx.core.view.WindowCompat.getInsetsController(window,root);c.setSystemBarsBehavior(androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);c.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars());androidx.core.view.ViewCompat.requestApplyInsets(root);}
  }
+ void deleteRoutePoint(RouteSketch route){
+  if(route.vertices.size()<3){notice("Mindestens drei Punkte erforderlich.");return;}
+  String[] labels=new String[route.vertices.size()-2];
+  for(int i=1;i<route.vertices.size()-1;i++){RouteSketch.Vertex p=route.vertices.get(i);labels[i-1]="Punkt "+(i+1)+(p.name.isEmpty()?"":" · "+p.name);}
+  new android.app.AlertDialog.Builder(this).setTitle("Punkt löschen und Trasse verbinden").setItems(labels,(d,which)->{
+   int index=which+1;RouteSketch.Vertex p=route.vertices.get(index);
+   new android.app.AlertDialog.Builder(this).setTitle(labels[which]+" löschen?")
+    .setMessage("Die Nachbarpunkte werden direkt verbunden. Die beiden bisherigen Abschnittsmaße werden verworfen; das neue Maß muss eingetragen werden. Punktname, GPS-Daten und Fotozuordnungen dieses Punktes entfallen. Rückgängig bleibt möglich.")
+    .setNegativeButton("Abbrechen",null).setPositiveButton("Löschen und verbinden",(a,b)->{
+     if(index>=route.vertices.size()-1||route.vertices.get(index)!=p)return;
+     route.vertices.remove(index);route.vertices.get(index).metres=Double.NaN;
+     route.highlight=-1;route.dragged=-1;if(route.changed!=null)route.changed.run();route.invalidate();
+    }).show();
+  }).setNegativeButton("Abbrechen",null).show();
+ }
  void editRoute(boolean measure){editRoute(measure,false);}
  void editRoute(boolean measure,boolean startFullscreen){
   LinearLayout form=page();
@@ -640,6 +655,7 @@ public class MainActivity extends Activity {
   LinearLayout historyBar=new LinearLayout(this);form.addView(historyBar);
   Button undo=new Button(this),redo=new Button(this);undo.setAllCaps(false);redo.setAllCaps(false);undo.setText("Rückgängig");redo.setText("Wiederholen");
   historyBar.addView(undo,new LinearLayout.LayoutParams(0,-2,1));historyBar.addView(redo,new LinearLayout.LayoutParams(0,-2,1));
+  Button deletePoint=new Button(this);deletePoint.setAllCaps(false);deletePoint.setText("Punkt löschen");historyBar.addView(deletePoint,new LinearLayout.LayoutParams(0,-2,1));deletePoint.setOnClickListener(v->deleteRoutePoint(route));
   Button remove=new Button(this);remove.setText("Letzten Abschnitt entfernen");form.addView(remove);
   final org.json.JSONObject[] calibration={savedSketchCalibration()};
   TextView scaleStatus=sheetText("",13,false);form.addView(scaleStatus);
@@ -649,7 +665,7 @@ public class MainActivity extends Activity {
   route.selected=i->measureSegment(route,i);
   Runnable refreshEditor=()->{
    undo.setEnabled(!history.undo.isEmpty());redo.setEnabled(!history.redo.isEmpty());
-   remove.setEnabled(route.vertices.size()>1);
+   remove.setEnabled(route.vertices.size()>1);deletePoint.setEnabled(route.vertices.size()>2);
    list.removeAllViews();
    double factor=sketchCalibration(route,calibration[0]);
    scaleStatus.setText(Double.isFinite(factor)?"Maßstab aktiv – Schätzwerte, keine Istmaße":calibration[0].length()>0?"Referenzpunkte geändert – neu kalibrieren":"Kein Zeichnungsmaßstab");
