@@ -5293,12 +5293,20 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
        positionHistory.clear();redoHistory.clear();if(undoByUtility.containsKey(hit))positionHistory.addAll(undoByUtility.get(hit));if(redoByUtility.containsKey(hit))redoHistory.addAll(redoByUtility.get(hit));undoPosition.setEnabled(!positionHistory.isEmpty());redoPosition.setEnabled(!redoHistory.isEmpty());
        notice(current[0].optString("name",current[0].optString("type")));invalidate();return true;
       }
-      redoHistory.clear();redoPosition.setEnabled(false);positionHistory.push(new String[]{offset.getText().toString(),depth.getText().toString()});if(positionHistory.size()>50)positionHistory.removeLast();undoPosition.setEnabled(true);
+      if(groupMode[0]&&group.size()>1){positionHistory.clear();redoHistory.clear();undoPosition.setEnabled(false);redoPosition.setEnabled(false);}else{redoHistory.clear();redoPosition.setEnabled(false);positionHistory.push(new String[]{offset.getText().toString(),depth.getText().toString()});if(positionHistory.size()>50)positionHistory.removeLast();undoPosition.setEnabled(true);}
       grabX=e.getX()-dragLeft-x*dragScale;grabY=e.getY()-dragTop-y*dragScale;dragging=true;getParent().requestDisallowInterceptTouchEvent(true);return true;
      case android.view.MotionEvent.ACTION_MOVE:
       if(!dragging)return false;
-      offset.setText(String.format(java.util.Locale.US,"%.2f",Math.max(0,(e.getX()-dragLeft-grabX)/dragScale)));
-      depth.setText(String.format(java.util.Locale.US,"%.2f",Math.max(0,(e.getY()-dragTop-grabY)/dragScale)));return true;
+      double targetX=Math.max(0,(e.getX()-dragLeft-grabX)/dragScale),targetY=Math.max(0,(e.getY()-dragTop-grabY)/dragScale);
+      if(groupMode[0]&&group.size()>1){
+       double dx=targetX-x,dy=targetY-y;
+       for(int k:group){if(k==selected[0])continue;org.json.JSONObject n=rows.optJSONObject(k);if(n==null)continue;double nx=n.optDouble("offset"),ny=n.optDouble("axisDepth");if(!Double.isFinite(nx)||!Double.isFinite(ny))return true;dx=Math.max(dx,-nx);dy=Math.max(dy,-ny);}
+       dx=Math.round(dx*100)/100.0;dy=Math.round(dy*100)/100.0;
+       for(int k:group){if(k==selected[0])continue;org.json.JSONObject n=rows.optJSONObject(k);if(n==null)continue;try{n.put("offset",Math.max(0,n.optDouble("offset")+dx));n.put("axisDepth",Math.max(0,n.optDouble("axisDepth")+dy));}catch(Exception ex){return true;}}
+       targetX=x+dx;targetY=y+dy;
+      }
+      offset.setText(String.format(java.util.Locale.US,"%.2f",targetX));
+      depth.setText(String.format(java.util.Locale.US,"%.2f",targetY));return true;
      case android.view.MotionEvent.ACTION_UP:
      case android.view.MotionEvent.ACTION_CANCEL:
       boolean handled=dragging;dragging=false;getParent().requestDisallowInterceptTouchEvent(false);if(handled&&e.getActionMasked()==android.view.MotionEvent.ACTION_UP)performClick();return handled;
