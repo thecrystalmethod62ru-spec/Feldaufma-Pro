@@ -4140,7 +4140,10 @@ public class MainActivity extends Activity {
   for(RouteSketch.Vertex v:route.vertices){minX=Math.min(minX,v.point.x);minY=Math.min(minY,v.point.y);maxX=Math.max(maxX,v.point.x);maxY=Math.max(maxY,v.point.y);}
   double trenchWidth=Double.isFinite(w)&&w>0?w:0;
   double cutL=Double.isFinite(left)&&left>=0?left:0,cutR=Double.isFinite(right)&&right>=0?right:0;
-  double margin=(trenchWidth/2+Math.max(cutL,cutR))/factor;minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
+  org.json.JSONArray widths;try{widths=new org.json.JSONArray(getPreferences(0).getString("metricWidthSections","[]"));}catch(Exception e){widths=new org.json.JSONArray();}
+  double margin=(trenchWidth/2+Math.max(cutL,cutR))/factor;
+  for(int j=0;j<widths.length();j++){org.json.JSONObject row=widths.optJSONObject(j);if(row==null)continue;double bw=row.optDouble("width"),cl=row.optDouble("left",cutL),cr=row.optDouble("right",cutR);if(Double.isFinite(bw)&&bw>0&&Double.isFinite(cl)&&cl>=0&&Double.isFinite(cr)&&cr>=0)margin=Math.max(margin,(bw/2+Math.max(cl,cr))/factor);}
+minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
   int denominator=0,width=595,height=842,format=4;double unit=0;
   int[][] formats={{595,842},{842,1191},{1191,1684},{1684,2384},{2384,3370}};
   search:for(int candidate:new int[]{100,200,500,1000,2000,5000}){
@@ -4155,7 +4158,24 @@ public class MainActivity extends Activity {
   try{
    Canvas c=page.getCanvas();Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);p.setColor(INK);p.setTextSize(16);c.drawText("Trassenachse – Maßstab 1:"+denominator,36,40,p);
    p.setTextSize(10);c.drawText("A"+format+" · Druckgröße 100 % · "+(trenchWidth>0?"Grabenbreite "+reportMeasure(trenchWidth):"nur Trassenachse"),36,58,p);
-   if(trenchWidth>0&&(cutL>0||cutR>0)){
+   if(widths.length()>0){
+    double st=0;
+    for(int i=1;i<route.vertices.size();i++){
+     RouteSketch.Vertex a=route.vertices.get(i-1),b=route.vertices.get(i);double len=b.metres,dx=b.point.x-a.point.x,dy=b.point.y-a.point.y,n=Math.hypot(dx,dy);
+     java.util.TreeSet<Double> breaks=new java.util.TreeSet<>();breaks.add(st);breaks.add(st+len);
+     for(int j=0;j<widths.length();j++){org.json.JSONObject row=widths.optJSONObject(j);if(row==null)continue;for(double v:new double[]{row.optDouble("from"),row.optDouble("to")})if(v>st&&v<st+len)breaks.add(v);}
+     Double previous=null;
+     for(double end:breaks){if(previous==null){previous=end;continue;}double start=previous;previous=end;double mid=start+(end-start)/2,bw=trenchWidth,cl=cutL,cr=cutR;
+      for(int j=0;j<widths.length();j++){org.json.JSONObject row=widths.optJSONObject(j);if(row!=null&&mid>=row.optDouble("from")&&mid<row.optDouble("to")&&row.optDouble("width")>0){bw=row.optDouble("width");cl=row.optDouble("left",cutL);cr=row.optDouble("right",cutR);break;}}
+      if(!Double.isFinite(bw)||bw<=0||n<=0)continue;
+      double t1=(start-st)/len,t2=(end-st)/len,ax=40+(a.point.x+dx*t1-minX)*unit,ay=85+(a.point.y+dy*t1-minY)*unit,bx=40+(a.point.x+dx*t2-minX)*unit,by=85+(a.point.y+dy*t2-minY)*unit;
+      for(int layer=0;layer<2;layer++){double L=(bw/2+(layer==0?Math.max(0,cl):0))*unit/factor,R=(bw/2+(layer==0?Math.max(0,cr):0))*unit/factor,nx=dy/n,ny=-dx/n;if(!Double.isFinite(L)||!Double.isFinite(R))continue;
+       android.graphics.Path shape=new android.graphics.Path();shape.moveTo((float)(ax+nx*L),(float)(ay+ny*L));shape.lineTo((float)(bx+nx*L),(float)(by+ny*L));shape.lineTo((float)(bx-nx*R),(float)(by-ny*R));shape.lineTo((float)(ax-nx*R),(float)(ay-ny*R));shape.close();p.setColor(layer==0?0xffaeb9c2:0xffded4c3);c.drawPath(shape,p);}
+     }st+=len;
+    }
+    p.setColor(INK);p.setTextSize(10);c.drawText("Abschnittsbreiten / Nachschnitt – ohne Eckergänzung",36,72,p);
+   }
+   if(widths.length()==0&&trenchWidth>0&&(cutL>0||cutR>0)){
     p.setColor(0xffaeb9c2);p.setStyle(Paint.Style.FILL);
     for(int i=1;i<route.vertices.size();i++){
      RouteSketch.Vertex a=route.vertices.get(i-1),b=route.vertices.get(i);
@@ -4168,7 +4188,7 @@ public class MainActivity extends Activity {
     }
     p.setColor(INK);p.setTextSize(10);c.drawText("Nachschnitt L/R: "+reportMeasure(left)+" / "+reportMeasure(right)+" · ohne Eckergänzung",36,72,p);
    }
-   if(trenchWidth>0){
+   if(widths.length()==0&&trenchWidth>0){
     p.setColor(0xffded4c3);p.setStrokeWidth((float)(trenchWidth/factor*unit));p.setStrokeJoin(Paint.Join.ROUND);p.setStrokeCap(Paint.Cap.BUTT);p.setStyle(Paint.Style.STROKE);
     android.graphics.Path trench=new android.graphics.Path();
     for(int i=0;i<route.vertices.size();i++){RouteSketch.Vertex v=route.vertices.get(i);float x=(float)(40+(v.point.x-minX)*unit),y=(float)(85+(v.point.y-minY)*unit);if(i==0)trench.moveTo(x,y);else trench.lineTo(x,y);}
@@ -4176,7 +4196,7 @@ public class MainActivity extends Activity {
    }
    p.setColor(TEAL);p.setStrokeWidth(1.5f);
    for(int i=1;i<route.vertices.size();i++){RouteSketch.Vertex a=route.vertices.get(i-1),b=route.vertices.get(i);c.drawLine((float)(40+(a.point.x-minX)*unit),(float)(85+(a.point.y-minY)*unit),(float)(40+(b.point.x-minX)*unit),(float)(85+(b.point.y-minY)*unit),p);}
-   if(trenchWidth>0)try{
+   if(widths.length()==0&&trenchWidth>0)try{
     org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("metricVerbauSections","[]"));
     double station=0;
     p.setColor(0xffa65e19);p.setStrokeWidth(.8f);
