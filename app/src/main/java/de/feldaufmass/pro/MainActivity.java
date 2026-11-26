@@ -1804,6 +1804,7 @@ public class MainActivity extends Activity {
   crossSectionButton.setOnClickListener(v->{
    final EditText dimensions=new EditText(this);
    dimensions.setHint("Grabenbreite;Grabentiefe (m)");
+   dimensions.setText(overlapPrefs.getString("metricCrossSectionDimensions",""));
    new android.app.AlertDialog.Builder(this).setTitle("Querschnitt – Bezugsmaße").setView(dimensions).setNegativeButton("Abbrechen",null).setPositiveButton("Öffnen",(d,w)->{
     try{
      String[] parts=dimensions.getText().toString().split(";",-1);
@@ -1816,8 +1817,9 @@ public class MainActivity extends Activity {
      content.addView(cross,new android.widget.LinearLayout.LayoutParams(-1,dp(300)));
      final EditText limits=new EditText(this);
      limits.setHint("Mindestabstand;Mindestüberdeckung (m)");
-     limits.setText("0;0");content.addView(limits);
-     final double[] requirements={0,0};
+     final double[] requirements={Double.parseDouble(overlapPrefs.getString("metricPipeMinGap","0")),Double.parseDouble(overlapPrefs.getString("metricPipeMinCover","0"))};
+     PipeLayout.warnings(pipes,bw,bd,requirements[0],requirements[1]);
+     limits.setText(requirements[0]+";"+requirements[1]);content.addView(limits);
      final Button applyLimits=new Button(this);applyLimits.setText("Grenzwerte übernehmen");content.addView(applyLimits);
      final TextView warnings=new TextView(this);content.addView(warnings);
      Runnable refresh=()->{cross.setLayoutData(pipes,bw,bd);warnings.setText(android.text.TextUtils.join("\n",PipeLayout.dimensions(pipes,bw,bd))+"\n"+android.text.TextUtils.join("\n",PipeLayout.warnings(pipes,bw,bd,requirements[0],requirements[1])));};
@@ -1827,9 +1829,11 @@ public class MainActivity extends Activity {
        if(values.length!=2)throw new IllegalArgumentException("Zwei Werte erforderlich");
        double gap=Double.parseDouble(values[0].trim().replace(',','.')),cover=Double.parseDouble(values[1].trim().replace(',','.'));
        PipeLayout.warnings(pipes,bw,bd,gap,cover);
+       if(!overlapPrefs.edit().putString("metricPipeMinGap",String.valueOf(gap)).putString("metricPipeMinCover",String.valueOf(cover)).commit())throw new IllegalStateException("Grenzwerte konnten nicht gespeichert werden");
        requirements[0]=gap;requirements[1]=cover;limits.setError(null);refresh.run();
       }catch(Exception ex){limits.setError(ex.getMessage());}
      });
+     if(!overlapPrefs.edit().putString("metricCrossSectionDimensions",bw+";"+bd).commit())throw new IllegalStateException("Bezugsmaße konnten nicht gespeichert werden");
      refresh.run();
      cross.setMove((index,offset,bedding)->{
       try{
