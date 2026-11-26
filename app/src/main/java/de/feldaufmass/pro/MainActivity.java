@@ -1836,6 +1836,27 @@ public class MainActivity extends Activity {
    if(!missingCuts&&unmeasured==0){
     try{
      StripOverlap.Result geometric=StripOverlap.calculate(strips);
+     try{
+      java.util.List<double[]> combined=new java.util.ArrayList<>(strips);
+      java.util.List<RouteBranch> branches=branchStore.load();
+      double branchLength=0,branchArea=0;
+      for(RouteBranch branch:branches){
+       java.util.List<double[]> points=branch.vertices(model.vertices);
+       branchLength+=branch.length();branchArea+=branch.nominalArea();
+       for(int k=1;k<points.size();k++){
+        double[] p=points.get(k-1),q=points.get(k);
+        combined.add(new double[]{p[0],p[1],q[0],q[1],branch.width/2,branch.width/2});
+       }
+      }
+      if(!branches.isEmpty()){
+       StripOverlap.Result total=StripOverlap.calculate(combined);
+       result.append(String.format(java.util.Locale.GERMANY,"\nGesamttrasse inkl. Abzweigungen (gerade Streifen):\nAbzweiglänge: %.2f m\nAbzweigfläche nominal: %.2f m²\nBrutto gesamt: %.2f m²\nÜberlappung gesamt: %.2f m²\nNetto gesamt: %.2f m²",branchLength,branchArea,total.gross,total.overlap,total.net));
+       int combinedMode=overlapMode.getSelectedItemPosition();
+       if(combinedMode==1||combinedMode==2)result.append(String.format(java.util.Locale.GERMANY,"\nKontrollwert Gesamttrasse: %.2f m²",combinedMode==1?total.gross:total.net));
+       result.append("\nAbzweige ohne Nachschnitt und Eckergänzungen; keine automatische Abrechnung.");
+      }
+     }catch(Exception ex){result.append("\nGesamtfläche inkl. Abzweigungen nicht vollständig berechenbar.");}
+
      StripOverlap.Result withCorners=StripOverlap.calculateWithCorners(strips);
      result.append(String.format(java.util.Locale.GERMANY,"\nAlternative mit abgeschrägten Außenecken:\nBruttofläche: %.2f m²\nNettofläche: %.2f m²\nNetto-Differenz: %+.2f m²",withCorners.gross,withCorners.net,withCorners.net-geometric.net));
      result.append("\nEckmodell nur zur Kontrolle; noch nicht mit Zeichnung oder Abrechnung abgeglichen.");
@@ -2211,7 +2232,7 @@ public class MainActivity extends Activity {
    }
    drawing.invalidate();
   };
-  branchChanged[0]=refreshLegend;
+  branchChanged[0]=()->{refreshLegend.run();refreshNominalArea.run();};
   refreshLegend.run();
   Button addWidth=new Button(this);addWidth.setText("Grabenbreite abschnittsweise");panel.addView(addWidth);
   addWidth.setOnClickListener(v->{
