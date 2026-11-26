@@ -12,6 +12,86 @@ public class MainActivity extends Activity {
  SharedPreferences projectRegistry(){return getSharedPreferences("project_registry",MODE_PRIVATE);}
  SharedPreferences projectStorage(String id){return LEGACY_PROJECT.equals(id)?super.getPreferences(MODE_PRIVATE):getSharedPreferences("project_"+id,MODE_PRIVATE);}
  @Override public SharedPreferences getPreferences(int mode){return projectStorage(activeProject);}
+ void requestProjectRestore(){
+  new android.app.AlertDialog.Builder(this).setTitle("Projekt wiederherstellen").setMessage("Eine ZIP-Sicherung wird als neues Projekt importiert. Bestehende Projekte bleiben unverändert. Externe Unterlagen müssen neu verknüpft werden.").setNegativeButton("Abbrechen",null).setPositiveButton("ZIP auswählen",(d,w)->{
+   android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);i.setType("application/zip");i.addCategory(android.content.Intent.CATEGORY_OPENABLE);startActivityForResult(i,415);
+  }).show();
+ }
+ static long copyRestoreBytes(java.io.InputStream in,java.io.OutputStream out,long limit)throws java.io.IOException{
+  byte[] buffer=new byte[32768];long total=0;int n;while((n=in.read(buffer))!=-1){total+=n;if(total>limit)throw new java.io.IOException("Sicherung zu groß");out.write(buffer,0,n);}return total;
+ }
+ void importProjectBackup(android.net.Uri source){
+  new Thread(()->{
+   String id=java.util.UUID.randomUUID().toString();
+   java.util.List<java.io.File> created=new java.util.ArrayList<>();
+   try(java.io.InputStream in=getContentResolver().openInputStream(source)){
+    if(in==null)throw new java.io.IOException("Datei nicht verfügbar");
+    String name=readProjectBackup(in,id,created);
+    runOnUiThread(()->{
+     java.util.Set<String> ids=new java.util.HashSet<>(projectRegistry().getStringSet("ids",java.util.Collections.emptySet()));ids.add(id);
+     if(!projectRegistry().edit().putStringSet("ids",ids).commit()){deleteSharedPreferences("project_"+id);for(java.io.File f:created)f.delete();if(!isDestroyed())notice("Import fehlgeschlagen.");return;}
+     if(!isDestroyed())notice(name+" importiert. Unter Werkzeuge → Projekte öffnen. Externe Unterlagen neu verknüpfen.");
+    });
+   }catch(Exception e){deleteSharedPreferences("project_"+id);for(java.io.File f:created)f.delete();runOnUiThread(()->{if(!isDestroyed())notice("Import fehlgeschlagen. Sicherung prüfen.");});}
+  },"project-restore").start();
+ }
+ String readProjectBackup(java.io.InputStream input,String id,java.util.List<java.io.File> created)throws Exception{
+  java.util.Map<String,String> photos=new java.util.HashMap<>();
+  org.json.JSONObject manifest=null;
+  java.io.File dir=new java.io.File(getFilesDir(),"photos");if(!dir.isDirectory()&&!dir.mkdirs())throw new java.io.IOException("Fotoordner fehlt");
+  long remaining=512L*1024*1024;int count=0;
+  try(java.util.zip.ZipInputStream zip=new java.util.zip.ZipInputStream(input)){
+   java.util.zip.ZipEntry entry;
+   while((entry=zip.getNextEntry())!=null){
+    if(++count>5000||entry.isDirectory())throw new java.io.IOException("Ungültiges Archiv");
+    String path=entry.getName();
+    if(path.equals("project.json")){
+     if(manifest!=null)throw new java.io.IOException("Doppeltes Manifest");
+     java.io.ByteArrayOutputStream data=new java.io.ByteArrayOutputStream();
+     remaining-=copyRestoreBytes(zip,data,Math.min(remaining,16L*1024*1024));
+     manifest=new org.json.JSONObject(data.toString("UTF-8"));
+    }else if(path.matches("photos/[A-Za-z0-9._-]+")){
+     String old=path.substring(7);if(old.equals(".")||old.equals("..")||photos.containsKey(old))throw new java.io.IOException("Ungültiger Fotopfad");
+     java.io.File f=java.io.File.createTempFile("import_",".jpg",dir);created.add(f);
+     try(java.io.OutputStream out=new java.io.FileOutputStream(f)){remaining-=copyRestoreBytes(zip,out,remaining);}
+     photos.put(old,f.getName());
+    }else throw new java.io.IOException("Unbekannter Archiveintrag");
+    zip.closeEntry();
+   }
+  }
+  if(manifest==null||!"FeldaufmassPro".equals(manifest.optString("format"))||manifest.optInt("version")!=1)throw new java.io.IOException("Unbekanntes Sicherungsformat");
+  org.json.JSONObject fields=manifest.getJSONObject("preferences");
+  java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","objectUndo","objectRedo"));
+  java.util.Set<String> ints=new java.util.HashSet<>(java.util.Arrays.asList("surface","handling","dictationLanguage","gpsDurationSeconds"));
+  SharedPreferences.Editor ed=projectStorage(id).edit();
+  java.util.Iterator<String> keys=fields.keys();String name="Importiertes Projekt";java.util.Set<String> used=new java.util.HashSet<>();
+  while(keys.hasNext()){
+   String key=keys.next();org.json.JSONObject field=fields.getJSONObject(key);String type=field.getString("type");Object value=field.get("value");
+   if(strings.contains(key)&&type.equals("String")&&value instanceof String){
+    String v=(String)value;
+    if(key.equals("routeSketch")){
+     org.json.JSONArray rows=new org.json.JSONArray(v);
+     for(int j=0;j<rows.length();j++){
+      org.json.JSONArray row=rows.getJSONArray(j);double x=row.getDouble(0),y=row.getDouble(1);
+      if(!Double.isFinite(x)||!Double.isFinite(y)||x<0||x>1||y<0||y>1)throw new java.io.IOException("Ungültiger Trassenpunkt");
+      org.json.JSONArray items=row.optJSONArray(4);if(items==null)continue;
+      for(int k=0;k<items.length();k++){String old=items.getString(k),replacement=photos.get(old);if(replacement==null)throw new java.io.IOException("Foto fehlt");used.add(old);items.put(k,replacement);}
+     }v=rows.toString();
+    }else if(key.equals("documents")){
+     org.json.JSONArray docs=new org.json.JSONArray(v);for(int j=0;j<docs.length();j++){org.json.JSONObject doc=docs.getJSONObject(j);doc.remove("uri");doc.put("name",doc.optString("name")+" (neu verknüpfen)");}v=docs.toString();
+    }else if(key.equals("objects")||key.equals("segments")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)rows.getJSONObject(j);}
+    else if(key.equals("objectUndo")||key.equals("objectRedo")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)new org.json.JSONArray(rows.getString(j));}
+    if(key.equals("project")&&!v.trim().isEmpty())name=v.trim();
+    ed.putString(key,v);
+   }else if(ints.contains(key)&&type.equals("Integer")&&value instanceof Number){
+    int n=field.getInt("value");if(key.equals("dictationLanguage")&&(n<0||n>1))throw new java.io.IOException("Ungültige Sprache");ed.putInt(key,n);
+   }else if(key.equals("lastAutosave")&&type.equals("Long")&&value instanceof Number){ed.putLong(key,field.getLong("value"));}
+   else throw new java.io.IOException("Unbekannte Projekteinstellung: "+key);
+  }
+  if(!used.equals(photos.keySet()))throw new java.io.IOException("Nicht zugeordnete Fotos");
+  name+=" (Import)";ed.putString("project",name);if(!ed.commit())throw new java.io.IOException("Projekt konnte nicht gespeichert werden");
+  return name;
+ }
  void requestProjectBackup(){
   new android.app.AlertDialog.Builder(this).setTitle("Projekt sichern").setMessage("Gespeicherte Projektdaten und Fotos als ZIP exportieren. Externe Unterlagen bleiben Verweise. Bitte Änderungen vorher speichern.").setNegativeButton("Abbrechen",null).setPositiveButton("Exportieren",(d,w)->{
    android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);i.setType("application/zip");i.addCategory(android.content.Intent.CATEGORY_OPENABLE);
@@ -341,7 +421,8 @@ public class MainActivity extends Activity {
   for(int i=0;i<names.length;i++)menu.getMenu().add(0,i,Menu.NONE,names[i]);
   menu.getMenu().add(0,100,Menu.NONE,"Projekte");
   menu.getMenu().add(0,101,Menu.NONE,"Projekt sichern");
-  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
+  menu.getMenu().add(0,102,Menu.NONE,"Projekt wiederherstellen");
+  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
   menu.show();
  }
  LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(dp(12),dp(8),dp(12),dp(8));return p;}
@@ -1015,6 +1096,7 @@ public class MainActivity extends Activity {
  try{startActivityForResult(i,410);}catch(android.content.ActivityNotFoundException e){Toast.makeText(this,"Keine Spracherkennung verfügbar.",Toast.LENGTH_LONG).show();}
  }
  @Override protected void onActivityResult(int request,int result,android.content.Intent data){super.onActivityResult(request,result,data);
+ if(request==415&&result==RESULT_OK&&data!=null&&data.getData()!=null){importProjectBackup(data.getData());return;}
  if(request==414&&result==RESULT_OK&&data!=null&&data.getData()!=null){exportProjectBackup(data.getData());return;}
  if(request==413){finishPhoto(result==RESULT_OK);return;}
  if(request==412&&result==RESULT_OK&&data!=null&&data.getData()!=null){writePdf(data.getData());return;}
