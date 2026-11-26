@@ -20,18 +20,130 @@ public class MainActivity extends Activity {
  EditText sollLength,sollWidth,sollDepth,sollAsphalt,sollSource; TextView sollComparison;
  LinearLayout documentsPage; TextView documentsList; org.json.JSONArray documents=new org.json.JSONArray();
  LinearLayout shell,body,planPage,measurePage,voicePage,profilePage,segmentPage,objectPage,quantityPage; TextView projectHeader; TextView detailQuantities; Button undoObjectsButton,redoObjectsButton; java.util.ArrayDeque<String> undoObjects=new java.util.ArrayDeque<>(),redoObjects=new java.util.ArrayDeque<>();
- LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(16,12,16,12);return p;}
+ static final int INK=0xff193747, TEAL=0xff12665f;
+ TextView[] overviewValues=new TextView[4];
+ LinearLayout stationRows;
+ final java.util.LinkedHashMap<LinearLayout,Button> sheetTabs=new java.util.LinkedHashMap<>();
+ Button toolsMenu;
+
+ TextView sheetText(String text,int size,boolean bold) {
+  TextView label=new TextView(this);
+  label.setText(text);
+  label.setTextSize(size);
+  label.setTextColor(INK);
+  if(bold)label.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+  return label;
+ }
+
+ void sheetHeading(LinearLayout page,String name) {
+  TextView heading=sheetText(name,21,true);
+  heading.setPadding(0,dp(12),0,dp(8));
+  page.addView(heading);
+ }
+
+ void addOverview() {
+  String[] names={"Trassenlänge","Grabenbreite","Grabentiefe","Trassenobjekte"};
+  for(int row=0;row<2;row++){
+   LinearLayout pair=new LinearLayout(this);
+   planPage.addView(pair);
+   for(int col=0;col<2;col++){
+    int i=row*2+col;
+    LinearLayout metric=page();
+    metric.setBackgroundColor(Color.WHITE);
+    LinearLayout.LayoutParams box=new LinearLayout.LayoutParams(0,-2,1);
+    box.setMargins(0,0,dp(4),dp(4));
+    pair.addView(metric,box);
+    overviewValues[i]=sheetText("–",21,true);
+    overviewValues[i].setTextColor(TEAL);
+    metric.addView(overviewValues[i]);
+    metric.addView(sheetText(names[i],13,false));
+   }
+  }
+ }
+
+ void refreshOverview(){
+  if(stationRows==null)return;
+  double[] lengths={l,w,d};
+  for(int i=0;i<lengths.length;i++)overviewValues[i].setText(lengths[i]>0?reportMeasure(lengths[i]):"–");
+  overviewValues[3].setText(String.valueOf(objects.length()));
+  stationRows.removeAllViews();
+  java.util.List<Integer> sorted=new java.util.ArrayList<>();
+  for(int i=0;i<objects.length();i++)if(objects.optJSONObject(i)!=null)sorted.add(i);
+  sorted.sort((a,b)->Double.compare(objects.optJSONObject(a).optDouble("station"),objects.optJSONObject(b).optDouble("station")));
+  if(sorted.isEmpty())stationRows.addView(sheetText("Keine Trassenobjekte erfasst.",15,false));
+  for(int index:sorted){
+   org.json.JSONObject object=objects.optJSONObject(index);
+   Button entry=new Button(this);
+   entry.setAllCaps(false);
+   entry.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);
+   entry.setTextColor(objectWarning(index)?0xff982f20:INK);
+   entry.setText(String.format(java.util.Locale.GERMANY,"%.2f m   ·   %s",object.optDouble("station"),object.optString("type")));
+   entry.setOnClickListener(v->detailObject(index));
+   stationRows.addView(entry);
+  }
+ }
+
+ void addSheetTab(LinearLayout bar,String name,LinearLayout sheet){
+  Button tab=new Button(this);
+  tab.setAllCaps(false);
+  tab.setSingleLine(true);
+  tab.setText(name);
+  bar.addView(tab);
+  sheetTabs.put(sheet,tab);
+  tab.setOnClickListener(v->showPage(sheet));
+ }
+
+ void showTools(){
+  String[] names={"Maße","Beläge","Objekte","Unterlagen / PDF","Sprachassistent"};
+  LinearLayout[] pages={measurePage,segmentPage,objectPage,documentsPage,voicePage};
+  PopupMenu menu=new PopupMenu(this,toolsMenu);
+  for(int i=0;i<names.length;i++)menu.getMenu().add(0,i,Menu.NONE,names[i]);
+  menu.setOnMenuItemClickListener(item->{showPage(pages[item.getItemId()]);return true;});
+  menu.show();
+ }
+ LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(dp(12),dp(8),dp(12),dp(8));return p;}
  int dp(int n){return (int)(n*getResources().getDisplayMetrics().density+.5f);}
- void showPage(LinearLayout p){if(p==documentsPage)compareSoll();if(p==quantityPage)refreshDetailQuantities();body.removeAllViews();ScrollView sc=new ScrollView(this);sc.setFillViewport(true);if(p.getParent()!=null)((android.view.ViewGroup)p.getParent()).removeView(p);sc.addView(p);body.addView(sc,new LinearLayout.LayoutParams(-1,-1));}
- void nav(LinearLayout bar,String name,Runnable action){Button b=new Button(this);b.setText(name);b.setTextSize(12);b.setAllCaps(false);bar.addView(b,new LinearLayout.LayoutParams(0,-2,1));b.setOnClickListener(v->action.run());}
+ void showPage(LinearLayout p){
+  for(java.util.Map.Entry<LinearLayout,Button> entry:sheetTabs.entrySet()){
+   boolean selected=entry.getKey()==p;
+   Button tab=entry.getValue();
+   tab.setSelected(selected);
+   tab.setBackgroundTintList(android.content.res.ColorStateList.valueOf(selected?TEAL:Color.WHITE));
+   tab.setTextColor(selected?Color.WHITE:INK);
+  }
+  if(p==documentsPage)compareSoll();if(p==quantityPage)refreshDetailQuantities();body.removeAllViews();ScrollView sc=new ScrollView(this);sc.setFillViewport(true);if(p.getParent()!=null)((android.view.ViewGroup)p.getParent()).removeView(p);sc.addView(p);body.addView(sc,new LinearLayout.LayoutParams(-1,-1));}
  public void onCreate(Bundle b){super.onCreate(b);
  shell=page();shell.setPadding(0,dp(28),0,dp(20));shell.setBackgroundColor(0xfff4f6f8);setContentView(shell);
- projectHeader=new TextView(this);projectHeader.setText("Feldaufmaß Pro");projectHeader.setTextColor(Color.WHITE);projectHeader.setTextSize(22);projectHeader.setPadding(dp(16),dp(12),dp(16),dp(12));projectHeader.setBackgroundColor(0xff203849);shell.addView(projectHeader);
- LinearLayout tabs=new LinearLayout(this);shell.addView(tabs);nav(tabs,"Zeichnung",()->showPage(planPage));nav(tabs,"Regelprofil",()->showPage(profilePage));nav(tabs,"Mengen",()->showPage(quantityPage));
- body=new LinearLayout(this);shell.addView(body,new LinearLayout.LayoutParams(-1,0,1));
- LinearLayout tools=new LinearLayout(this);shell.addView(tools);nav(tools,"Maße",()->showPage(measurePage));nav(tools,"Beläge",()->showPage(segmentPage));nav(tools,"Objekte",()->showPage(objectPage));nav(tools,"Unterlagen",()->showPage(documentsPage));
- Button voiceButton=new Button(this);voiceButton.setText("Sprachassistent");voiceButton.setAllCaps(false);shell.addView(voiceButton);voiceButton.setOnClickListener(v->showPage(voicePage));
  planPage=page();measurePage=page();voicePage=page();profilePage=page();segmentPage=page();objectPage=page();quantityPage=page();
+ LinearLayout header=new LinearLayout(this);
+ header.setGravity(Gravity.CENTER_VERTICAL);
+ header.setPadding(dp(16),dp(4),dp(8),dp(4));
+ header.setBackgroundColor(INK);
+ shell.addView(header);
+ projectHeader=sheetText("Feldaufmaß Pro",22,true);
+ projectHeader.setTextColor(Color.WHITE);
+ projectHeader.setMaxLines(2);
+ projectHeader.setEllipsize(android.text.TextUtils.TruncateAt.END);
+ header.addView(projectHeader,new LinearLayout.LayoutParams(0,-2,1));
+ toolsMenu=new Button(this);
+ toolsMenu.setAllCaps(false);
+ toolsMenu.setText("Werkzeuge");
+ header.addView(toolsMenu);
+ toolsMenu.setOnClickListener(v->showTools());
+ HorizontalScrollView tabsScroll=new HorizontalScrollView(this);
+ tabsScroll.setHorizontalScrollBarEnabled(false);
+ shell.addView(tabsScroll);
+ LinearLayout tabs=new LinearLayout(this);
+ tabsScroll.addView(tabs);
+ addSheetTab(tabs,"Übersicht",planPage);
+ addSheetTab(tabs,"Regelprofil",profilePage);
+ addSheetTab(tabs,"Mengen",quantityPage);
+ body=new LinearLayout(this);shell.addView(body,new LinearLayout.LayoutParams(-1,0,1));
+ sheetHeading(planPage,"Gesamtübersicht");
+ addOverview();
+ sheetHeading(planPage,"Trassenübersicht");
+ sheetHeading(quantityPage,"Mengenermittlung");
+ sheetHeading(measurePage,"Trassenmaße");
  documentsPage=page();TextView dh=new TextView(this);dh.setText("Ausführungsunterlagen – Soll");dh.setTextSize(22);documentsPage.addView(dh);
  Button importDoc=new Button(this);importDoc.setText("Unterlagen hinzufügen");documentsPage.addView(importDoc);importDoc.setOnClickListener(v->{android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.putExtra(android.content.Intent.EXTRA_ALLOW_MULTIPLE,true);i.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION|android.content.Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);startActivityForResult(i,411);});
  TextView cloudInfo=new TextView(this);cloudInfo.setText("Your Secure Cloud: In der offiziellen App anmelden. Im Android-Dateidialog SecureCloud auswählen, sofern verfügbar. Keine Zugangsdaten in Feldaufmaß Pro erforderlich.");documentsPage.addView(cloudInfo);
@@ -83,8 +195,12 @@ public class MainActivity extends Activity {
  root=quantityPage;
  result=new TextView(this);result.setTextSize(18);root.addView(result);detailQuantities=new TextView(this);root.addView(detailQuantities);
  root=planPage;
- sketch=new Sketch();root.addView(sketch,new LinearLayout.LayoutParams(-1,dp(280))); LinearLayout historyBar=new LinearLayout(this);root.addView(historyBar);undoObjectsButton=new Button(this);undoObjectsButton.setText("Rückgängig");historyBar.addView(undoObjectsButton,new LinearLayout.LayoutParams(0,-2,1));redoObjectsButton=new Button(this);redoObjectsButton.setText("Wiederholen");historyBar.addView(redoObjectsButton,new LinearLayout.LayoutParams(0,-2,1));undoObjectsButton.setOnClickListener(v->restoreObjectHistory(false));redoObjectsButton.setOnClickListener(v->restoreObjectHistory(true));updateHistoryButtons();
+ sketch=new Sketch();sketch.setBackgroundColor(Color.WHITE);root.addView(sketch,new LinearLayout.LayoutParams(-1,dp(280))); LinearLayout historyBar=new LinearLayout(this);root.addView(historyBar);undoObjectsButton=new Button(this);undoObjectsButton.setText("Rückgängig");historyBar.addView(undoObjectsButton,new LinearLayout.LayoutParams(0,-2,1));redoObjectsButton=new Button(this);redoObjectsButton.setText("Wiederholen");historyBar.addView(redoObjectsButton,new LinearLayout.LayoutParams(0,-2,1));undoObjectsButton.setOnClickListener(v->restoreObjectHistory(false));redoObjectsButton.setOnClickListener(v->restoreObjectHistory(true));updateHistoryButtons();
  Button edit=new Button(this);edit.setText("Trassenmaße bearbeiten");root.addView(edit);edit.setOnClickListener(v->showPage(measurePage));
+ sheetHeading(planPage,"Stationierte Objekte");
+ stationRows=new LinearLayout(this);
+ stationRows.setOrientation(LinearLayout.VERTICAL);
+ planPage.addView(stationRows);
  root=profilePage;
  TextView heading=new TextView(this);heading.setText("Regelprofil – Grabenquerschnitt");heading.setTextSize(20);root.addView(heading);
  legend=new TextView(this);legend.setTextSize(14);root.addView(legend);
@@ -188,7 +304,7 @@ public class MainActivity extends Activity {
 
  void refreshDetailQuantities(){if(detailQuantities==null)return;StringBuilder b=new StringBuilder("\nDetailmengen – geometrisch, nicht addiert\n");for(int i=0;i<objects.length();i++){org.json.JSONObject o=objects.optJSONObject(i);if(o==null)continue;double a=detailNumber(o,"detailLength"),w=detailNumber(o,"detailWidth"),h=detailNumber(o,"detailDepth");b.append(o.optString("type")).append(" / ").append(o.optString("station")).append(" m\n");if(Double.isFinite(a*w)&&a>0&&w>0){b.append(String.format(java.util.Locale.GERMANY,"Fläche: %.2f m²",a*w));if(Double.isFinite(a*w*h)&&h>0)b.append(String.format(java.util.Locale.GERMANY," | Körpervolumen: %.2f m³",a*w*h));else b.append(" | Tiefe fehlt");}else b.append("Detailmaße fehlen");if(objectWarning(i))b.append(" | ⚠ Lage prüfen");b.append("\n");}b.append("\nNicht zur Haupttrasse addieren: Überschneidungen und LV-Regeln prüfen.");detailQuantities.setText(b.toString());}
  String detailSummary(org.json.JSONObject o){StringBuilder b=new StringBuilder();String[] keys={"detailLength","detailWidth","detailDepth"},names={"L","B","T"};for(int j=0;j<3;j++){String v=o.optString(keys[j],"");if(!v.isEmpty())b.append(" | ").append(names[j]).append("=").append(v).append(" m");}return b.toString();}
- void showObjects(){StringBuilder b=new StringBuilder();for(int i=0;i<objects.length();i++){org.json.JSONObject o=objects.optJSONObject(i);if(o!=null)b.append(String.format(java.util.Locale.GERMANY,"%.2f m | %s | %s | %s\n",o.optDouble("station"),o.optString("type"),o.optString("side"),o.optString("note")+detailSummary(o)+(objectWarning(i)?" | ⚠ Station prüfen":"")));}objectList.setText(b.toString());}
+ void showObjects(){refreshOverview();StringBuilder b=new StringBuilder();for(int i=0;i<objects.length();i++){org.json.JSONObject o=objects.optJSONObject(i);if(o!=null)b.append(String.format(java.util.Locale.GERMANY,"%.2f m | %s | %s | %s\n",o.optDouble("station"),o.optString("type"),o.optString("side"),o.optString("note")+detailSummary(o)+(objectWarning(i)?" | ⚠ Station prüfen":"")));}objectList.setText(b.toString());}
  void saveSoll(){try{EditText[] fields={sollLength,sollWidth,sollDepth,sollAsphalt};String[] keys={"sollLength","sollWidth","sollDepth","sollAsphalt"};for(EditText e:fields){if(e.length()>0){double n=number(e);if(!Double.isFinite(n)||n<=0)throw new Exception();}}android.content.SharedPreferences.Editor ed=getPreferences(0).edit();for(int i=0;i<fields.length;i++)ed.putString(keys[i],fields[i].getText().toString());ed.putString("sollSource",sollSource.getText().toString()).apply();compareSoll();}catch(Exception e){Toast.makeText(this,"Bitte gültige positive Soll-Maße eingeben.",Toast.LENGTH_LONG).show();}}
  void compareSoll(){if(sollComparison==null||length==null||asphaltInput==null)return;EditText[] actual={length,width,depth,asphaltInput};String[] keys={"sollLength","sollWidth","sollDepth","sollAsphalt"};String[] names={"Trassenlänge","Grabenbreite","Grabentiefe","Asphaltstärke"};StringBuilder b=new StringBuilder("Soll / Ist – Abweichungen (Ist minus Soll)\n");for(int i=0;i<keys.length;i++){b.append(names[i]).append(": ");try{double p=Double.parseDouble(getPreferences(0).getString(keys[i],"").replace(',','.'));double a=number(actual[i]);if(!Double.isFinite(a)||a<=0)throw new Exception();b.append(String.format(java.util.Locale.GERMANY,"Soll %.2f m | Ist %.2f m | Δ %+.2f m",p,a,a-p));}catch(Exception e){b.append("Nicht vollständig erfasst");}b.append("\n");}sollComparison.setText(b.toString());}
  void exportPdf(){if(!calculate()){showPage(measurePage);return;}android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.setType("application/pdf");i.putExtra(android.content.Intent.EXTRA_TITLE,"Feldaufmass.pdf");startActivityForResult(i,412);}
