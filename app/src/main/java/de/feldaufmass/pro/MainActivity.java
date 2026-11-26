@@ -1826,6 +1826,7 @@ public class MainActivity extends Activity {
      final Button optimizePipes=new Button(this);optimizePipes.setText("Rohranordnung optimieren");content.addView(optimizePipes,content.indexOfChild(warnings));
      optimizePipes.setOnClickListener(button->{
       try{
+       for(PipeLayout.Pipe p:pipes)if(p.fixed){warnings.setText("Fixierte Leitungen: automatische Anordnung derzeit nicht verfügbar.");return;}
        if(pipes.isEmpty()){warnings.setText("Keine Leitungen vorhanden.");return;}
        final java.util.List<PipeLayout.Pipe> rowProposal=PipeLayout.proposeRow(pipes,bw,bd,requirements[0],requirements[1]);
        final boolean layered=rowProposal.isEmpty();
@@ -1859,19 +1860,27 @@ public class MainActivity extends Activity {
       try{
        PipeLayout.Pipe pipe=pipes.get(index);
        java.util.List<PipeLayout.Pipe> next=new java.util.ArrayList<>(pipes);
-       next.set(index,new PipeLayout.Pipe(pipe.name,offset,pipe.diameter,pipe.wall,bedding,pipe.minGap,pipe.minCover));
+       next.set(index,new PipeLayout.Pipe(pipe.name,offset,pipe.diameter,pipe.wall,bedding,pipe.minGap,pipe.minCover,pipe.fixed));
        multiPipeStore.save(next);pipes.clear();pipes.addAll(next);refresh.run();
       }catch(Exception ex){refresh.run();warnings.setText("Speichern fehlgeschlagen: "+ex.getMessage());}
      });
      cross.setSelection(index->{
       PipeLayout.Pipe pipe=pipes.get(index);
-      new android.app.AlertDialog.Builder(this).setTitle(pipe.name).setItems(new String[]{"Bearbeiten","Duplizieren","Löschen"},(menu,action)->{
+      new android.app.AlertDialog.Builder(this).setTitle(pipe.name).setItems(new String[]{"Bearbeiten","Duplizieren","Löschen",pipe.fixed?"Position freigeben":"Position fixieren"},(menu,action)->{
+       if(action==3){
+        try{
+         java.util.List<PipeLayout.Pipe> next=new java.util.ArrayList<>(pipes);
+         next.set(index,new PipeLayout.Pipe(pipe.name,pipe.offset,pipe.diameter,pipe.wall,pipe.bedding,pipe.minGap,pipe.minCover,!pipe.fixed));
+         multiPipeStore.save(next);pipes.clear();pipes.addAll(next);refresh.run();
+        }catch(Exception ex){warnings.setText(ex.getMessage());}
+        return;
+       }
        if(action==0){
         final android.widget.LinearLayout fields=new android.widget.LinearLayout(this);fields.setOrientation(1);
         final EditText offset=new EditText(this), bedding=new EditText(this);
         offset.setHint("Achslage zur Grabenmitte (m)");offset.setText(String.valueOf(pipe.offset));
         bedding.setHint("Rohrunterkante über Grabensohle (m)");bedding.setText(String.valueOf(pipe.bedding));
-        fields.addView(offset);fields.addView(bedding);
+        offset.setEnabled(!pipe.fixed);bedding.setEnabled(!pipe.fixed);fields.addView(offset);fields.addView(bedding);
         final EditText gapInput=new EditText(this),coverInput=new EditText(this);
         gapInput.setHint("Rohr-Mindestabstand (m)");gapInput.setText(String.valueOf(pipe.minGap));
         coverInput.setHint("Rohr-Mindestüberdeckung (m)");coverInput.setText(String.valueOf(pipe.minCover));
@@ -1882,7 +1891,7 @@ public class MainActivity extends Activity {
           double o=Double.parseDouble(offset.getText().toString().trim().replace(',','.'));
           double b=Double.parseDouble(bedding.getText().toString().trim().replace(',','.'));
           java.util.List<PipeLayout.Pipe> next=new java.util.ArrayList<>(pipes);
-          next.set(index,new PipeLayout.Pipe(pipe.name,o,pipe.diameter,pipe.wall,b,Double.parseDouble(gapInput.getText().toString().trim().replace(',','.')),Double.parseDouble(coverInput.getText().toString().trim().replace(',','.'))));
+          next.set(index,new PipeLayout.Pipe(pipe.name,o,pipe.diameter,pipe.wall,b,Double.parseDouble(gapInput.getText().toString().trim().replace(',','.')),Double.parseDouble(coverInput.getText().toString().trim().replace(',','.')),pipe.fixed));
           multiPipeStore.save(next);pipes.clear();pipes.addAll(next);refresh.run();edit.dismiss();
          }catch(Exception ex){bedding.setError("Ungültige Lage oder Speicherfehler: "+ex.getMessage());}
         }));edit.show();return;
