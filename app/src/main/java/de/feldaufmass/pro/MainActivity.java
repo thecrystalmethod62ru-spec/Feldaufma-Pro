@@ -856,7 +856,40 @@ public class MainActivity extends Activity {
  void editObject(int index){org.json.JSONObject o=objects.optJSONObject(index);if(o==null)return;LinearLayout form=page();EditText st=new EditText(this);st.setInputType(8194);st.setHint("Station (m)");st.setText(o.optString("station"));form.addView(st);String[] sides={"Unbekannt","links","rechts","mittig"};Spinner side=choices(form,sides);side.setSelection(Math.max(0,java.util.Arrays.asList(sides).indexOf(o.optString("side"))));EditText offset=new EditText(this);offset.setInputType(8194);offset.setHint("Abstand zum Grabenrand (m, optional)");offset.setText(o.optString("detailOffset",""));form.addView(offset);TextView gapHint=sheetText("Nur links / rechts: 0 = direkt angrenzend; leer = nicht gemessen.",13,false);form.addView(gapHint);EditText note=new EditText(this);note.setHint("Bemerkung");note.setText(o.optString("note"));form.addView(note);android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(o.optString("type")+" bearbeiten").setView(form).setNeutralButton("Detailzeichnung",(v,j)->detailObject(index)).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(b->{try{double x=number(st),total=l;if(!Double.isFinite(x)||!Double.isFinite(total)||x<0||x>total)throw new Exception();String chosenSide=side.getSelectedItem().toString();double gap=Double.NaN;if(offset.length()>0&&("links".equals(chosenSide)||"rechts".equals(chosenSide))){try{gap=number(offset);}catch(Exception ignored){}if(!Double.isFinite(gap)||gap<0){offset.setError("Abstand ab 0 m eingeben");return;}}o.put("station",x);o.put("side",chosenSide);if(Double.isFinite(gap))o.put("detailOffset",offset.getText().toString());else o.remove("detailOffset");o.put("note",note.getText().toString());saveObjects();dialog.dismiss();}catch(Exception e){st.setError("Station außerhalb der Trasse");}}));dialog.show();}
  double detailNumber(org.json.JSONObject o,String key){try{return Double.parseDouble(o.optString(key).replace(',','.'));}catch(Exception e){return Double.NaN;}}
  double detailExtent(org.json.JSONObject o){try{double v=Double.parseDouble(o.optString("detailLength","").replace(',','.'));return Double.isFinite(v)&&v>0?v:0;}catch(Exception e){return 0;}}
- boolean objectWarning(int index){org.json.JSONObject o=objects.optJSONObject(index);if(o==null)return false;double x=o.optDouble("station"),a=detailExtent(o)/2;if(!Double.isFinite(x)||x-a<0||x+a>l)return true;for(int j=0;j<objects.length();j++){org.json.JSONObject q=objects.optJSONObject(j);if(j==index||q==null)continue;double y=q.optDouble("station"),b=detailExtent(q)/2;if(!Double.isFinite(y))continue;if(o.optString("side").equals(q.optString("side"))&&(Math.abs(x-y)<0.01||Math.abs(x-y)<a+b))return true;}return false;}
+ static double[] lateralInterval(org.json.JSONObject o,double trenchWidth){
+  double width=RouteSketch.positiveDimension(o,"detailWidth"),gap=RouteSketch.lateralGap(o);
+  if(!Double.isFinite(width))return null;
+  String side=o.optString("side");
+  if("mittig".equals(side))return new double[]{-width/2,width/2};
+  if(!Double.isFinite(gap)||!Double.isFinite(trenchWidth)||trenchWidth<=0)return null;
+  double edge=trenchWidth/2+gap;
+  if(!Double.isFinite(edge+width))return null;
+  if("links".equals(side))return new double[]{edge,edge+width};
+  if("rechts".equals(side))return new double[]{-edge-width,-edge};
+  return null;
+ }
+ static boolean potentialObjectOverlap(org.json.JSONObject a,org.json.JSONObject b,double trenchWidth){
+  double x=a.optDouble("station"),y=b.optDouble("station");
+  if(!Double.isFinite(x)||!Double.isFinite(y))return false;
+  double lenA=RouteSketch.positiveDimension(a,"detailLength"),lenB=RouteSketch.positiveDimension(b,"detailLength");
+  if(Double.isFinite(lenA)&&Double.isFinite(lenB)){
+   if(Math.abs(x-y)>=(lenA+lenB)/2)return false;
+  }else if(Math.abs(x-y)>=.01)return false;
+  double[] u=lateralInterval(a,trenchWidth),v=lateralInterval(b,trenchWidth);
+  if(u!=null&&v!=null)return Math.min(u[1],v[1])>Math.max(u[0],v[0]);
+  String sideA=a.optString("side"),sideB=b.optString("side");
+  if(("links".equals(sideA)&&"rechts".equals(sideB))||("rechts".equals(sideA)&&"links".equals(sideB)))return false;
+  return true;
+ }
+ boolean objectWarning(int index){
+  org.json.JSONObject o=objects.optJSONObject(index);if(o==null)return false;
+  double x=o.optDouble("station"),a=detailExtent(o)/2;
+  if(!Double.isFinite(x)||x-a<0||x+a>l)return true;
+  for(int j=0;j<objects.length();j++){
+   org.json.JSONObject q=objects.optJSONObject(j);if(j!=index&&q!=null&&potentialObjectOverlap(o,q,w))return true;
+  }
+  return false;
+ }
  void addObject(){try{double st=number(objectStation),total=l;if(!Double.isFinite(st)||!Double.isFinite(total)||total<=0||st<0||st>total)throw new Exception();org.json.JSONObject o=new org.json.JSONObject();o.put("station",st);o.put("type",objectType.getSelectedItem().toString());o.put("side",objectSide.getSelectedItem().toString());o.put("note",objectNote.getText().toString());objects.put(o);saveObjects();}catch(Exception e){Toast.makeText(this,"Objektstation außerhalb der Trasse oder ungültig.",Toast.LENGTH_LONG).show();}}
  void updateHistoryButtons(){if(undoObjectsButton!=null)undoObjectsButton.setEnabled(!undoObjects.isEmpty());if(redoObjectsButton!=null)redoObjectsButton.setEnabled(!redoObjects.isEmpty());}
  static final int HISTORY_LIMIT = 50;
