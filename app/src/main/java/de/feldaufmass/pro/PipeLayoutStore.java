@@ -16,7 +16,7 @@ public final class PipeLayoutStore {
         List<PipeLayout.Pipe> result=new ArrayList<>();
         for(int i=0;i<array.length();i++){
             JSONObject p=array.getJSONObject(i);
-            result.add(new PipeLayout.Pipe(p.getString("name"),p.getDouble("offset"),p.getDouble("diameter"),p.getDouble("wall"),p.getDouble("bedding")));
+            result.add(new PipeLayout.Pipe(p.getString("name"),p.getDouble("offset"),p.getDouble("diameter"),p.getDouble("wall"),p.getDouble("bedding"),p.optDouble("minGap",0),p.optDouble("minCover",0)));
         }
         return result;
     }
@@ -25,7 +25,7 @@ public final class PipeLayoutStore {
         for(PipeLayout.Pipe p:pipes){
             JSONObject o=new JSONObject();
             o.put("name",p.name);o.put("offset",p.offset);o.put("diameter",p.diameter);
-            o.put("wall",p.wall);o.put("bedding",p.bedding);array.put(o);
+            o.put("wall",p.wall);o.put("bedding",p.bedding);o.put("minGap",p.minGap);o.put("minCover",p.minCover);array.put(o);
         }
         if(!prefs.edit().putString(KEY,array.toString()).commit())
             throw new IllegalStateException("Rohrprofil konnte nicht gespeichert werden");
