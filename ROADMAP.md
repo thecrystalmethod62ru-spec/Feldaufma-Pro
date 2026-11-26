@@ -24,7 +24,7 @@ Android, deutsche Oberfläche, Offline-first. Gemeinsame Objektdaten für Zeichn
 ## 4 – Erweiterungen
 - [ ] Bluetooth-Laserdistanzmesser
 - [ ] GNSS-RTK mit Genauigkeitsangabe
-- [ ] Zusammenarbeit mit Rollen, Konfliktlösung und Offline-Synchronisierung
+- [ ] Zusammenarbeit mit Rollen, Konfliktlösung und Offline-Synchronisierung — PAUSIERT (Abschnitt 17; keine Entwicklung bis zur ausdrücklichen Freigabe)
 
 ## Abnahmekriterien
 Jede Funktion benötigt Build, Tests und Geräteprüfung. Geometrische Mengen sind keine freigegebenen Abrechnungsmengen. Keine ungeprüfte automatische Zuordnung oder Übermittlung vertraulicher Unterlagen.
