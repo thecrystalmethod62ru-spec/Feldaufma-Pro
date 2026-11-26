@@ -364,6 +364,30 @@ final class RouteSketch extends View {
   if(item!=null)try{return Color.parseColor(item.optString("color"));}catch(Exception ignored){}
   return surfaceColor(name);
  }
+ void drawShoring(Canvas c,float density){
+  if(!layerVisible(LAYER_ROUTE))return;
+  try{
+   JSONArray rows=new JSONArray(((android.app.Activity)getContext()).getPreferences(0).getString("metricVerbauSections","[]"));
+   paint.setColor(darkEditor?0xffe6a45e:0xffa65e19);paint.setStrokeWidth(3*density);
+   for(int j=0;j<rows.length();j++){
+    JSONArray row=rows.optJSONArray(j);if(row==null)continue;
+    double from=row.optDouble(0),to=row.optDouble(1);
+    if(!Double.isFinite(from)||!Double.isFinite(to)||from>=to||stationPoint(from)==null||stationPoint(to)==null)continue;
+    double start=0;
+    for(int i=1;i<vertices.size();i++){
+     double end=start+vertices.get(i).metres,lo=Math.max(from,start),hi=Math.min(to,end);
+     if(hi>lo){PointF a=stationPoint(lo),b=stationPoint(hi);if(a!=null&&b!=null){
+      float dx=b.x-a.x,dy=b.y-a.y;double norm=Math.hypot(dx,dy);
+      if(norm>0){float offset=9*density,ox=(float)(dy/norm)*offset,oy=(float)(-dx/norm)*offset;
+       float ax=left()+scale()*a.x,ay=top()+scale()*a.y,bx=left()+scale()*b.x,by=top()+scale()*b.y;
+       if(row.optDouble(2,0)>0)c.drawLine(ax+ox,ay+oy,bx+ox,by+oy,paint);
+       if(row.optDouble(3,0)>0)c.drawLine(ax-ox,ay-oy,bx-ox,by-oy,paint);
+      }
+     }}start=end;
+    }
+   }
+  }catch(Exception ignored){}
+ }
  void drawSurfaceSections(Canvas c,float density){
   if(!layerVisible(LAYER_SURFACES))return;
   org.json.JSONObject settings=legendSettings();
@@ -615,6 +639,7 @@ final class RouteSketch extends View {
   paint.setTextSize(13*density);
   dimensionHits.clear();
   drawSurfaceSections(c,density);
+  drawShoring(c,density);
   for(int i=1;i<vertices.size();i++){
    PointF a=vertices.get(i-1).point,b=vertices.get(i).point;
    if(layerVisible(LAYER_ROUTE)){paint.setColor(darkEditor?0xff55c7b5:0xff13665f);paint.setStrokeWidth(4);line(c,a,b);}
