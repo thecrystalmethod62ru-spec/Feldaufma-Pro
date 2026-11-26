@@ -45,10 +45,47 @@ public final class PipeLayoutView extends View {
         for(int i=0;i<pipes.size();i++){
             PipeLayout.Pipe pipe=pipes.get(i);
             float x=cx+(float)(pipe.offset*scale),y=bottom-(float)(pipe.centerHeight()*scale),r=(float)(pipe.diameter*scale/2);
-            p.setColor(colors[i%colors.length]);c.drawCircle(x,y,r,p);
+            boolean conflict=Math.abs(pipe.offset)+pipe.diameter/2>width/2||pipe.bedding+pipe.diameter>depth;
+            for(int j=0;j<pipes.size();j++){
+                if(i==j)continue;
+                PipeLayout.Pipe other=pipes.get(j);
+                if(Math.hypot(pipe.offset-other.offset,pipe.centerHeight()-other.centerHeight())<(pipe.diameter+other.diameter)/2)conflict=true;
+            }
+            p.setColor(conflict?0xffd32f2f:colors[i%colors.length]);c.drawCircle(x,y,r,p);
             p.setColor(0xffeeeeee);c.drawCircle(x,y,r-(float)(pipe.wall*scale),p);
             p.setColor(0xff777777);c.drawText(pipe.name,x-p.measureText(pipe.name)/2,y-r-4,p);
         }
+        // Dimension the selected pipe while dragging, or the only pipe in the section.
+        int selected=dragged>=0?dragged:(pipes.size()==1?0:-1);
+        if(selected>=0&&selected<pipes.size()){
+            PipeLayout.Pipe a=pipes.get(selected);
+            float x=cx+(float)(a.offset*scale),y=bottom-(float)(a.centerHeight()*scale),r=(float)(a.diameter*scale/2);
+            dimension(c,left,y,x-r,y,width/2+a.offset-a.diameter/2);
+            dimension(c,x+r,y,right,y,width/2-a.offset-a.diameter/2);
+            dimension(c,x,top,x,y-r,depth-a.bedding-a.diameter);
+            for(int j=0;j<pipes.size();j++){
+                if(j==selected)continue;
+                PipeLayout.Pipe b=pipes.get(j);
+                double dx=b.offset-a.offset,dy=b.centerHeight()-a.centerHeight(),d=Math.hypot(dx,dy);
+                if(d==0)continue;
+                float ux=(float)(dx/d),uy=(float)(-dy/d);
+                float bx=cx+(float)(b.offset*scale),by=bottom-(float)(b.centerHeight()*scale),br=(float)(b.diameter*scale/2);
+                dimension(c,x+ux*r,y+uy*r,bx-ux*br,by-uy*br,d-(a.diameter+b.diameter)/2);
+            }
+        }
+    }
+    private void dimension(Canvas c,float x1,float y1,float x2,float y2,double metres){
+        p.setColor(metres<0?0xffd32f2f:0xff777777);
+        p.setStrokeWidth(1.5f);
+        c.drawLine(x1,y1,x2,y2,p);
+        double length=Math.hypot(x2-x1,y2-y1);
+        if(length>0){
+            float nx=(float)(-(y2-y1)/length*4),ny=(float)((x2-x1)/length*4);
+            c.drawLine(x1-nx,y1-ny,x1+nx,y1+ny,p);
+            c.drawLine(x2-nx,y2-ny,x2+nx,y2+ny,p);
+        }
+        String label=String.format(java.util.Locale.GERMANY,"%.3f m",metres);
+        c.drawText(label,(x1+x2-p.measureText(label))/2,(y1+y2)/2-5,p);
     }
     private int hit(float x,float y){
         int best=-1;double distance=Double.POSITIVE_INFINITY;
