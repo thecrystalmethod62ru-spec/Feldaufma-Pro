@@ -473,7 +473,7 @@ public class MainActivity extends Activity {
  if(Double.isFinite(base)&&base+(Double.isFinite(topLayer)?topLayer:0)>d)throw new Exception();
  this.l=l; this.w=w; this.d=d; this.covering=covering;
  topThickness=topLayer; this.base=base; this.pipe=pipe; this.asphalt=asphalt; this.left=left; this.right=right;
- getPreferences(0).edit().putString("stoneLength",stoneLength.getText().toString()).putString("stoneWidth",stoneWidth.getText().toString()).putString("stoneDepth",stoneDepth.getText().toString()).putString("stoneColor",stoneColor.getText().toString()).putString("pattern",pattern.getText().toString()).putString("bedding",bedding.getText().toString()).putString("underlying",underlying.getText().toString()).putInt("handling",handling.getSelectedItemPosition()).putInt("surface",surface.getSelectedItemPosition()).putString("base",baseInput.getText().toString()).putString("pipe",pipeInput.getText().toString()).putString("asphalt",asphaltInput.getText().toString()).putString("left",leftInput.getText().toString()).putString("right",rightInput.getText().toString()).putString("project",project.getText().toString()).putString("length",length.getText().toString()).putString("width",width.getText().toString()).putString("depth",depth.getText().toString()).apply();
+ if(!getPreferences(0).edit().putString("stoneLength",stoneLength.getText().toString()).putString("stoneWidth",stoneWidth.getText().toString()).putString("stoneDepth",stoneDepth.getText().toString()).putString("stoneColor",stoneColor.getText().toString()).putString("pattern",pattern.getText().toString()).putString("bedding",bedding.getText().toString()).putString("underlying",underlying.getText().toString()).putInt("handling",handling.getSelectedItemPosition()).putInt("surface",surface.getSelectedItemPosition()).putString("base",baseInput.getText().toString()).putString("pipe",pipeInput.getText().toString()).putString("asphalt",asphaltInput.getText().toString()).putString("left",leftInput.getText().toString()).putString("right",rightInput.getText().toString()).putString("project",project.getText().toString()).putString("length",length.getText().toString()).putString("width",width.getText().toString()).putString("depth",depth.getText().toString()).commit())throw new Exception("Speichern fehlgeschlagen");
  projectHeader.setText(project.length()>0?project.getText().toString():"Feldaufmaß Pro");
  result.setText(String.format(java.util.Locale.GERMANY,"Aushub: %.2f m³\nGrundfläche: %.2f m²",l*w*d,l*w));StringBuilder details=new StringBuilder("Legende\nOberfläche: "+covering);
  if(stoneLength.length()>0||stoneWidth.length()>0)details.append("\nSteinformat: "+(stoneLength.length()>0?stoneLength.getText():"?")+" × "+(stoneWidth.length()>0?stoneWidth.getText():"?")+" cm");
@@ -881,9 +881,15 @@ public class MainActivity extends Activity {
    if(saveRoute(latest)){selectedPoint=v.id;refreshRoute();notice("Trassenpunkt gespeichert.");}
   }).show();return true;
  }
+ boolean offerVoiceSave(String text){
+  if(!text.trim().matches("(?iu)^(?:сохрани(?:\\s+(?:проект|всё|все|данные))?|(?:projekt|alles|daten)\\s+speichern|speichere(?:\\s+(?:das\\s+)?projekt|\\s+alles)?)[.!]?$"))return false;
+  new android.app.AlertDialog.Builder(this).setTitle("Projekt speichern").setMessage("Aktuelle Profilmaße prüfen und speichern? Trasse, Objekte und Fotos bleiben erhalten.").setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",(d,w)->{
+   if(calculate())notice("Projekt gespeichert.");else notice("Projekt nicht gespeichert. Bitte Maße prüfen.");
+  }).show();return true;
+ }
  void handleSpeech(String text){
   int version=++speechVersion;
-  if(offerAssistantAnswer(text))return;
+  if(offerVoiceSave(text)||offerAssistantAnswer(text))return;
   String normalized=text.toLowerCase(java.util.Locale.ROOT);
   if(normalized.matches(".*(?:сделай|сделать|сними|прикрепи|прицепи|mach|nimm|nehme|aufnehmen|erstelle|hänge|füge).*?(?:фото|снимок|foto).*") ||
      normalized.matches(".*(?:сфотографируй|fotografier|foto aufnehmen|foto machen|foto erstellen|foto anhängen|foto hinzufügen|foto aufnehmen).*")){
@@ -897,7 +903,7 @@ public class MainActivity extends Activity {
    new com.google.mlkit.nl.translate.TranslatorOptions.Builder().setSourceLanguage("ru").setTargetLanguage("de").build());
   voiceText.setText("");notice("Diktat wird ins Deutsche übersetzt …");
   translator.downloadModelIfNeeded().onSuccessTask(ignored->translator.translate(text))
-   .addOnSuccessListener(this,german->{if(version==speechVersion){voiceText.setText(german);if(!offerVoiceNewPoint(german)&&!offerVoiceObjectDimensions(german)&&!offerVoiceSurface(german)&&!offerVoiceObject(german)&&!offerVoiceSegment(german))offerVoiceRename(german);}})
+   .addOnSuccessListener(this,german->{if(version==speechVersion){voiceText.setText(german);if(!offerVoiceSave(german)&&!offerVoiceNewPoint(german)&&!offerVoiceObjectDimensions(german)&&!offerVoiceSurface(german)&&!offerVoiceObject(german)&&!offerVoiceSegment(german))offerVoiceRename(german);}})
    .addOnFailureListener(this,error->{if(version==speechVersion)notice("Übersetzung fehlgeschlagen. Für den ersten Modellabruf wird Internet benötigt.");});
  }
  @Override protected void onDestroy(){if(translator!=null)translator.close();super.onDestroy();}
