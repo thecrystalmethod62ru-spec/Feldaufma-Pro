@@ -1930,7 +1930,21 @@ public class MainActivity extends Activity {
     if(best<0)return true;
     final String id=branchHitIds.get(best);final int index=(int)branchHits.get(best)[2];
     if(index==0){notice("Anschlussstation über Abzweigungen verwalten ändern");return true;}
-    new android.app.AlertDialog.Builder(MainActivity.this).setTitle("Knickpunkt "+index).setItems(new String[]{"Punkt löschen und verbinden"},(dialog,which)->{
+    new android.app.AlertDialog.Builder(MainActivity.this).setTitle("Knickpunkt "+index).setItems(new String[]{"Punkt löschen und verbinden","Knickpunkt danach einfügen"},(dialog,which)->{
+     if(which==1){
+      try{
+       java.util.List<RouteBranch> branches=branchStore.load();boolean found=false;
+       for(int j=0;j<branches.size();j++)if(branches.get(j).id.equals(id)){
+        RouteBranch branch=branches.get(j);java.util.List<double[]> points=branch.vertices(model.vertices);
+        if(index>=points.size()-1)throw new IllegalArgumentException("Kein Folgeabschnitt vorhanden");
+        double[] a=points.get(index),b=points.get(index+1);
+        branches.set(j,BranchPointEditor.insert(branch,model.vertices,index,(a[0]+b[0])/2,(a[1]+b[1])/2));found=true;break;
+       }
+       if(!found)throw new IllegalStateException("Abzweigung nicht gefunden");
+       branchStore.save(branches);invalidate();notice("Knickpunkt eingefügt – zum Verschieben ziehen");
+      }catch(Exception ex){notice("Einfügen fehlgeschlagen: "+ex.getMessage());}
+      return;
+     }
      new android.app.AlertDialog.Builder(MainActivity.this).setMessage("Punkt löschen und Abschnittslängen neu berechnen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(d,w)->{
       try{java.util.List<RouteBranch> branches=branchStore.load();boolean found=false;
        for(int j=0;j<branches.size();j++)if(branches.get(j).id.equals(id)){branches.set(j,BranchPointEditor.remove(branches.get(j),model.vertices,index));found=true;break;}
