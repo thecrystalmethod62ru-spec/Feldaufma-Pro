@@ -1781,6 +1781,9 @@ public class MainActivity extends Activity {
    if(!missingCuts&&unmeasured==0){
     try{
      StripOverlap.Result geometric=StripOverlap.calculate(strips);
+     StripOverlap.Result withCorners=StripOverlap.calculateWithCorners(strips);
+     result.append(String.format(java.util.Locale.GERMANY,"\nAlternative mit abgeschrägten Außenecken:\nBruttofläche: %.2f m²\nNettofläche: %.2f m²\nNetto-Differenz: %+.2f m²",withCorners.gross,withCorners.net,withCorners.net-geometric.net));
+     result.append("\nEckmodell nur zur Kontrolle; noch nicht mit Zeichnung oder Abrechnung abgeglichen.");
      result.append(String.format(java.util.Locale.GERMANY,"\nGeometrische Kontrollwerte (inkl. Nachschnitt):\nBruttofläche: %.2f m²\nÜberlappungsfläche: %.2f m²\nNettofläche: %.2f m²",geometric.gross,geometric.overlap,geometric.net));
      result.append("\nGerade Abschnittsstreifen ohne Eckergänzungen; keine automatische Abrechnung.");
      int mode=overlapMode.getSelectedItemPosition();
