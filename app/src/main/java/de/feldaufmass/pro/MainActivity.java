@@ -1622,9 +1622,9 @@ public class MainActivity extends Activity {
   dialog.show();
  }
  void showMontageFitting(MontageCatalog.Fitting fitting, org.json.JSONObject original){
-  showMontageFitting(fitting,original,null,null);
+  showMontageFitting(fitting,original,null,null,null);
  }
- void showMontageFitting(MontageCatalog.Fitting fitting,org.json.JSONObject original,String source,FittingTextParser.Candidate suggestion){
+ void showMontageFitting(MontageCatalog.Fitting fitting,org.json.JSONObject original,String source,FittingTextParser.Candidate suggestion,java.util.function.Consumer<Boolean> reviewResult){
   final String projectId=activeProject;
   LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);
   MontageSymbolView preview=new MontageSymbolView(this,fitting);panel.addView(preview,new LinearLayout.LayoutParams(-1,dp(100)));
@@ -1644,7 +1644,7 @@ public class MainActivity extends Activity {
    installed.setChecked(original.optBoolean("installed",false));
   }
   if(suggestion!=null){
-   dn.setText(suggestion.dn);station.setText(suggestion.station);
+   dn.setText(suggestion.dn);station.setText(suggestion.station.replace(',','.'));
    panel.addView(sheetText("Quelle: "+source+" · Zeile "+suggestion.line+"\n"+suggestion.evidence,14,false));
   }else if(original!=null&&original.has("sourceLine")){
    panel.addView(sheetText("Quelle: "+original.optString("sourceName")+" · Zeile "+original.optInt("sourceLineNumber")+"\n"+original.optString("sourceLine"),14,false));
@@ -1661,7 +1661,8 @@ public class MainActivity extends Activity {
   });
   mirror.setOnCheckedChangeListener((button,checked)->updatePreview.run());updatePreview.run();
   android.widget.ScrollView scroll=new android.widget.ScrollView(this);scroll.addView(panel);
-  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(fitting.label).setView(scroll).setNegativeButton("Zurück",(d,w)->{if(original==null)showMontageCatalog();else showMontageInventory();}).setPositiveButton(original==null?"Zum Projekt hinzufügen":"Änderungen speichern",null).create();
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(fitting.label).setView(scroll).setNegativeButton("Zurück",(d,w)->{if(reviewResult!=null)reviewResult.accept(false);else if(original==null)showMontageCatalog();else showMontageInventory();}).setPositiveButton(original==null?"Zum Projekt hinzufügen":"Änderungen speichern",null).create();
+  if(reviewResult!=null)dialog.setOnCancelListener(d->reviewResult.accept(false));
   if(original!=null)dialog.setButton(android.app.AlertDialog.BUTTON_NEUTRAL,"Entfernen",(android.content.DialogInterface.OnClickListener)(d,w)->
    new android.app.AlertDialog.Builder(this).setTitle("Formstück entfernen?")
     .setMessage("Das Formstück wird aus dem Projekt, dem Stationsplan und der Materialliste entfernt.")
@@ -1695,7 +1696,7 @@ public class MainActivity extends Activity {
     if(suggestion!=null)item.put("sourceName",source).put("sourceLine",suggestion.evidence).put("sourceLineNumber",suggestion.line);
     item.put("stationLinked",item.has("station"));if(index<0)rows.put(item);else rows.put(index,item);
     if(!getPreferences(0).edit().putString("montageFittings",rows.toString()).commit()){notice("Speichern fehlgeschlagen.");return;}
-    dialog.dismiss();notice("Formstück gespeichert.");if(original==null&&suggestion==null)showMontageCatalog();else showMontageInventory();
+    dialog.dismiss();notice("Formstück gespeichert.");if(reviewResult!=null)reviewResult.accept(true);else if(original==null)showMontageCatalog();else showMontageInventory();
    }catch(Exception e){notice("Formstück konnte nicht gespeichert werden.");}
   }));dialog.show();
  }
@@ -3736,13 +3737,27 @@ public class MainActivity extends Activity {
   java.util.List<FittingTextParser.Candidate> matches=FittingTextParser.parse(text);
   if(matches.isEmpty()){new android.app.AlertDialog.Builder(this).setTitle("Keine eindeutige Bezeichnung gefunden").setMessage("Eine Bezeichnung je Zeile verwenden, z. B. Bogen 45° DN 80, Station 12,5 m.")
     .setPositiveButton("Text prüfen",(d,w)->reviewImageText(source,text)).setNegativeButton("Schließen",null).show();return;}
-  String[] labels=new String[matches.size()];
+  reviewPendingFittings(source,text,matches,matches.size(),activeProject);
+ }
+ void reviewPendingFittings(String source,String text,java.util.List<FittingTextParser.Candidate> pending,int total,String projectId){
+  if(!projectId.equals(activeProject)){notice("Projekt wurde gewechselt.");return;}
+  if(pending.isEmpty()){showMontageInventory();return;}
+  String[] labels=new String[pending.size()];
   for(int i=0;i<labels.length;i++){
-   FittingTextParser.Candidate c=matches.get(i);labels[i]="Zeile "+c.line+" · "+c.evidence;
+   FittingTextParser.Candidate candidate=pending.get(i);
+   labels[i]="Zeile "+candidate.line+" · "+candidate.evidence;
   }
-  new android.app.AlertDialog.Builder(this).setTitle("Formstück zur Prüfung auswählen").setItems(labels,(d,i)->{
-   FittingTextParser.Candidate c=matches.get(i);showMontageFitting(c.type,null,source,c);
-  }).setNegativeButton("Zurück",(d,w)->reviewImageText(source,text)).show();
+  android.app.AlertDialog.Builder menu=new android.app.AlertDialog.Builder(this)
+    .setTitle("Formstücke prüfen · "+pending.size()+" von "+total+" offen")
+    .setItems(labels,(d,i)->{
+     FittingTextParser.Candidate candidate=pending.get(i);
+     showMontageFitting(candidate.type,null,source,candidate,saved->{
+      if(saved)pending.remove(candidate);
+      reviewPendingFittings(source,text,pending,total,projectId);
+     });
+    }).setPositiveButton("Fertig",(d,w)->showMontageInventory());
+  if(pending.size()==total)menu.setNegativeButton("Text prüfen",(d,w)->reviewImageText(source,text));
+  menu.show();
  }
  void choosePdfAnalysis(){
   java.util.ArrayList<org.json.JSONObject> pdfs=new java.util.ArrayList<>();java.util.ArrayList<String> labels=new java.util.ArrayList<>();
