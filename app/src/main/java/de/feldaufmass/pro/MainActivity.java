@@ -5340,9 +5340,14 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   Button toggleControls=new Button(this);toggleControls.setText("Maße ausblenden");form.addView(toggleControls,3);form.addView(undoPosition,4);form.addView(redoPosition,5);
   toggleControls.setOnClickListener(v->{
    boolean hide=toggleControls.getText().toString().equals("Maße ausblenden");
-   for(int k=6;k<form.getChildCount();k++)form.getChildAt(k).setVisibility(hide?View.GONE:View.VISIBLE);
+   for(int k=3;k<form.getChildCount();k++)form.getChildAt(k).setVisibility(hide?View.GONE:View.VISIBLE);
    toggleControls.setText(hide?"Maße einblenden":"Maße ausblenden");
   });
+  LinearLayout toolbar=new LinearLayout(this);toolbar.setOrientation(0);
+  for(Button b:new Button[]{undoPosition,redoPosition,fullscreen,toggleControls}){form.removeView(b);toolbar.addView(b,new LinearLayout.LayoutParams(0,-2,1));b.setMinWidth(0);b.setMinimumWidth(0);b.setTextSize(11);}
+  form.addView(toolbar,1);
+  undoPosition.setText("↶");undoPosition.setContentDescription("Verschieben rückgängig");
+  redoPosition.setText("↷");redoPosition.setContentDescription("Wiederholen");
   fullscreen.setOnClickListener(v->{
    android.view.Window window=dialog.getWindow();if(window==null)return;
    boolean full=fullscreen.getText().toString().equals("Vollbild");
