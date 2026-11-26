@@ -12,6 +12,29 @@ import static org.junit.Assert.*;
 
 @RunWith(AndroidJUnit4.class)
 public class ProjectStateTest {
+ @Test public void exportConnectionsWithMissingPhotoKeepsBothPages(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->{
+    String original=activity.activeProject;
+    String testId=java.util.UUID.randomUUID().toString();
+    File file=null;
+    try{
+     activity.activeProject=testId;
+     org.json.JSONObject photo=new org.json.JSONObject().put("file","missing_joint_test.jpg");
+     org.json.JSONObject joint=new org.json.JSONObject().put("id","j1").put("number","S-101")
+         .put("type","Schweißverbindung").put("photos",new org.json.JSONArray().put(photo));
+     assertTrue(activity.projectStorage(testId).edit().putString(MontageConnections.KEY,new org.json.JSONArray().put(joint).toString()).commit());
+     file=File.createTempFile("joint-register",".pdf",activity.getCacheDir());
+     new MontageConnections(activity).writePdf(Uri.fromFile(file));
+     try(ParcelFileDescriptor fd=ParcelFileDescriptor.open(file,ParcelFileDescriptor.MODE_READ_ONLY);
+         PdfRenderer pdf=new PdfRenderer(fd)){
+      assertEquals(2,pdf.getPageCount());
+     }
+    }catch(Exception e){throw new AssertionError(e);}
+    finally{activity.activeProject=original;activity.deleteSharedPreferences("project_"+testId);if(file!=null)file.delete();}
+   });
+  }
+ }
  @Test public void restoreMetricProjectWithPipesAndBranches(){
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    scenario.onActivity(activity->{

@@ -40,11 +40,44 @@ final class MontageConnections {
                     .setPositiveButton("Neue Verbindung", (d, w) -> edit(rows, -1))
                     .setNegativeButton("Zurück", (d, w) -> activity.showMontage());
             if (labels.length == 0) dialog.setMessage("Keine Verbindungen erfasst.");
-            else dialog.setItems(labels, (d, i) -> actions(rows, i));
+            else {
+                dialog.setItems(labels, (d, i) -> actions(rows, i));
+                dialog.setNeutralButton("Als PDF speichern", (d, w) -> activity.exportConnectionsPdf(projectId));
+            }
             dialog.show();
         } catch (JSONException invalid) {
             activity.notice("Verbindungsregister konnte nicht gelesen werden.");
         }
+    }
+
+    void writePdf(android.net.Uri target) {
+        try (android.graphics.pdf.PdfDocument pdf = new android.graphics.pdf.PdfDocument()) {
+            JSONArray rows = new JSONArray(prefs.getString(KEY, "[]"));
+            if (rows.length() == 0) { activity.notice("Keine Verbindungen erfasst."); return; }
+            String project = prefs.getString("project", "Projekt");
+            int page = 1;
+            for (int i = 0; i < rows.length(); i++) {
+                JSONObject row = rows.getJSONObject(i);
+                JSONArray photos = activity.dailyPhotos(row);
+                String header = project + "\nVerbindung " + row.getString("number") + " · " + row.getString("type");
+                String body = header + "\nStation: " + (row.has("station") ? row.getString("station") + " m" : "offen")
+                        + "\nKennung: " + row.getString("id") + "\nFotos: " + photos.length()
+                        + "\n\nBemerkungen\n" + row.optString("notes");
+                page = activity.dailyTextPdf(pdf, page, "Montage – Verbindungsregister", body, null);
+                for (int j = 0; j < photos.length(); j++) {
+                    JSONObject photo = photos.getJSONObject(j);
+                    android.graphics.Bitmap bitmap = activity.reportPhoto(photo.getString("file"));
+                    String caption = header + "\n" + photo.optString("info");
+                    if (bitmap == null) caption += "\nBilddatei fehlt oder ist nicht lesbar.";
+                    page = activity.dailyTextPdf(pdf, page, "Verbindungsfoto " + (j + 1), caption, bitmap);
+                }
+            }
+            try (java.io.OutputStream stream = activity.getContentResolver().openOutputStream(target, "wt")) {
+                if (stream == null) throw new java.io.IOException();
+                pdf.writeTo(stream);
+            }
+            activity.notice("Verbindungsregister gespeichert.");
+        } catch (Exception e) { activity.notice("Verbindungsregister konnte nicht exportiert werden."); }
     }
 
     private void actions(JSONArray rows, int index) {

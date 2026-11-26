@@ -1699,6 +1699,13 @@ public class MainActivity extends Activity {
   }
   return list.toString().trim();
  }
+ String pendingConnectionsProject;
+ void exportConnectionsPdf(String projectId){
+  android.content.Intent intent=new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);
+  intent.addCategory(android.content.Intent.CATEGORY_OPENABLE);intent.setType("application/pdf");
+  intent.putExtra(android.content.Intent.EXTRA_TITLE,"Montage_Verbindungsregister.pdf");
+  pendingConnectionsProject=projectId;startActivityForResult(intent,430);
+ }
  String pendingMaterialProject;
  void showMontageMaterials(){
   try{
@@ -2862,7 +2869,7 @@ public class MainActivity extends Activity {
  }
 
  public void onCreate(Bundle b){super.onCreate(b);activeProject=projectRegistry().getString("active",LEGACY_PROJECT);
- if(b!=null){selectedPoint=b.getString("selectedPoint");pendingPoint=b.getString("pendingPoint");pendingPhoto=b.getString("pendingPhoto");pendingMaterialProject=b.getString("pendingMaterialProject");}
+ if(b!=null){selectedPoint=b.getString("selectedPoint");pendingPoint=b.getString("pendingPoint");pendingPhoto=b.getString("pendingPhoto");pendingMaterialProject=b.getString("pendingMaterialProject");pendingConnectionsProject=b.getString("pendingConnectionsProject");}
  shell=page();shell.setPadding(0,0,0,0);shell.setBackgroundColor(0xfff4f6f8);setContentView(shell);fitSystemPanels(shell);
  planPage=page();measurePage=page();voicePage=page();profilePage=page();segmentPage=page();objectPage=page();quantityPage=page();
  LinearLayout header=new LinearLayout(this);
@@ -4040,7 +4047,7 @@ public class MainActivity extends Activity {
  }
  @Override protected void onSaveInstanceState(Bundle out){
   super.onSaveInstanceState(out);out.putString("selectedPoint",selectedPoint);
-  out.putString("pendingPoint",pendingPoint);out.putString("pendingPhoto",pendingPhoto);out.putString("pendingMaterialProject",pendingMaterialProject);
+  out.putString("pendingPoint",pendingPoint);out.putString("pendingPhoto",pendingPhoto);out.putString("pendingMaterialProject",pendingMaterialProject);out.putString("pendingConnectionsProject",pendingConnectionsProject);
  }
  com.google.mlkit.nl.translate.Translator translator;
  int speechVersion;
@@ -4248,6 +4255,13 @@ public class MainActivity extends Activity {
  try{startActivityForResult(i,410);}catch(android.content.ActivityNotFoundException e){Toast.makeText(this,"Keine Spracherkennung verfügbar.",Toast.LENGTH_LONG).show();}
  }
  @Override protected void onActivityResult(int request,int result,android.content.Intent data){super.onActivityResult(request,result,data);
+ if(request==430){
+  String projectId=pendingConnectionsProject;pendingConnectionsProject=null;
+  if(result==RESULT_OK&&data!=null&&data.getData()!=null){
+   if(activeProject.equals(projectId))new MontageConnections(this).writePdf(data.getData());else notice("Projekt gewechselt. Export erneut starten.");
+  }
+  return;
+ }
  if(request==429){String id=pendingMaterialProject;pendingMaterialProject=null;if(result==RESULT_OK&&data!=null&&data.getData()!=null)writeMaterialPdf(data.getData(),id);return;}
  if(request==428){java.util.function.Consumer<String> accept=pendingEditorSpeech;pendingEditorSpeech=null;if(accept!=null&&result==RESULT_OK&&data!=null){java.util.ArrayList<String> values=data.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS);if(values!=null&&!values.isEmpty())accept.accept(values.get(0));}return;}
  if(request==427&&result==RESULT_OK&&data!=null&&data.getData()!=null){importRouteUnderlay(data.getData());return;}
