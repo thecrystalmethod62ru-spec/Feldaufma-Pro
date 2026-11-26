@@ -30,6 +30,64 @@ public class MainActivity extends Activity {
   }catch(Exception e){b.append("Projektverlauf nicht lesbar.");}
   new android.app.AlertDialog.Builder(this).setTitle("Projektverlauf").setMessage(b.length()==0?"Noch keine Änderungen erfasst.":b.toString()).setPositiveButton("Schließen",null).show();
  }
+ static final int AUTO_BACKUP_COUNT=5;
+ static final long AUTO_BACKUP_LIMIT=256L*1024*1024;
+ static final java.util.concurrent.ExecutorService backupExecutor=java.util.concurrent.Executors.newSingleThreadExecutor();
+ static final java.util.Set<String> pendingBackups=java.util.concurrent.ConcurrentHashMap.newKeySet();
+ java.io.File backupDirectory(String id){return new java.io.File(getFilesDir(),"backups/"+id);}
+ java.io.File[] automaticBackups(String id){
+  java.io.File[] files=backupDirectory(id).listFiles(f->f.isFile()&&f.getName().matches("[0-9]+_[a-f0-9]{64}\\.zip"));
+  if(files==null)return new java.io.File[0];
+  java.util.Arrays.sort(files,(a,b)->b.getName().compareTo(a.getName()));return files;
+ }
+ static String backupFingerprint(java.util.Map<String,?> snapshot)throws Exception{
+  java.security.MessageDigest md=java.security.MessageDigest.getInstance("SHA-256");
+  org.json.JSONArray values=new org.json.JSONArray();
+  for(String key:new java.util.TreeSet<>(snapshot.keySet())){
+   if(key.equals("lastAutosave"))continue;
+   Object value=snapshot.get(key);values.put(new org.json.JSONArray().put(key).put(value.getClass().getSimpleName()).put(value));
+  }
+  StringBuilder hex=new StringBuilder();for(byte b:md.digest(values.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)))hex.append(String.format(java.util.Locale.ROOT,"%02x",b&255));return hex.toString();
+ }
+ void scheduleAutomaticBackup(){
+  final String id=activeProject;
+  final java.util.Map<String,?> snapshot=new java.util.HashMap<>(getPreferences(0).getAll());
+  if(snapshot.isEmpty()||!pendingBackups.add(id))return;
+  backupExecutor.execute(()->{
+   java.io.File temp=null;
+   try{
+    String hash=backupFingerprint(snapshot);
+    java.io.File[] previous=automaticBackups(id);
+    if(previous.length>0&&previous[0].getName().endsWith("_"+hash+".zip"))return;
+    java.io.File dir=backupDirectory(id);if(!dir.isDirectory()&&!dir.mkdirs())throw new java.io.IOException("Sicherungsordner fehlt");
+    temp=java.io.File.createTempFile("pending_",".tmp",dir);writeProjectBackup(temp,snapshot);
+    if(temp.length()>AUTO_BACKUP_LIMIT)throw new java.io.IOException("Sicherung zu groß");
+    java.io.File target=new java.io.File(dir,System.currentTimeMillis()+"_"+hash+".zip");
+    if(!temp.renameTo(target))throw new java.io.IOException("Sicherung konnte nicht abgeschlossen werden");
+    long total=0;int kept=0;
+    for(java.io.File f:automaticBackups(id)){
+     if(kept>=AUTO_BACKUP_COUNT||total+f.length()>AUTO_BACKUP_LIMIT){if(!f.delete())android.util.Log.w("Feldaufmass","Alte Sicherung nicht löschbar");}
+     else{kept++;total+=f.length();}
+    }
+   }catch(Exception e){
+    android.util.Log.w("Feldaufmass","Automatische Sicherung fehlgeschlagen",e);
+    runOnUiThread(()->{if(!isDestroyed()&&id.equals(activeProject))notice("Automatische Sicherung fehlgeschlagen. Manuelle Sicherung prüfen.");});
+   }finally{if(temp!=null)temp.delete();pendingBackups.remove(id);}
+  });
+ }
+ void showAutomaticBackups(){
+  java.io.File[] files=automaticBackups(activeProject);
+  if(files.length==0){new android.app.AlertDialog.Builder(this).setTitle("Sicherungsversionen").setMessage("Noch keine automatische Sicherung vorhanden. Sicherungen entstehen bei geänderten Daten während der Nutzung.").setPositiveButton("Schließen",null).show();return;}
+  String[] labels=new String[files.length];
+  java.text.DateFormat format=java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM,java.text.DateFormat.SHORT,java.util.Locale.GERMANY);
+  for(int j=0;j<files.length;j++){
+   long timestamp=Long.parseLong(files[j].getName().split("_")[0]);
+   labels[j]=format.format(new java.util.Date(timestamp))+" · "+String.format(java.util.Locale.GERMANY,"%.1f MB",files[j].length()/1048576.0);
+  }
+  new android.app.AlertDialog.Builder(this).setTitle("Sicherungsversionen").setItems(labels,(d,w)->{
+   new android.app.AlertDialog.Builder(this).setTitle("Version wiederherstellen").setMessage(labels[w]+"\nAls separates Projekt importieren?").setNegativeButton("Abbrechen",null).setPositiveButton("Wiederherstellen",(a,b)->importProjectBackup(android.net.Uri.fromFile(files[w]))).show();
+  }).setNegativeButton("Schließen",null).show();
+ }
  void requestProjectRestore(){
   new android.app.AlertDialog.Builder(this).setTitle("Projekt wiederherstellen").setMessage("Eine ZIP-Sicherung wird als neues Projekt importiert. Bestehende Projekte bleiben unverändert. Externe Unterlagen müssen neu verknüpft werden.").setNegativeButton("Abbrechen",null).setPositiveButton("ZIP auswählen",(d,w)->{
    android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);i.setType("application/zip");i.addCategory(android.content.Intent.CATEGORY_OPENABLE);startActivityForResult(i,415);
@@ -193,7 +251,7 @@ public class MainActivity extends Activity {
  static final long AUTOSAVE_INTERVAL_MS=300000L;
  final java.util.LinkedHashMap<String,EditText> autosaveFields=new java.util.LinkedHashMap<>();
  final android.os.Handler autosaveHandler=new android.os.Handler(android.os.Looper.getMainLooper());
- final Runnable autosaveTick=new Runnable(){public void run(){saveDraft();autosaveHandler.postDelayed(this,AUTOSAVE_INTERVAL_MS);}};
+ final Runnable autosaveTick=new Runnable(){public void run(){if(saveDraft())scheduleAutomaticBackup();autosaveHandler.postDelayed(this,AUTOSAVE_INTERVAL_MS);}};
  static final java.util.Set<String> PROFILE_KEYS=new java.util.HashSet<>(java.util.Arrays.asList("length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying"));
  boolean validProfileForAutosave(){
   try{
@@ -462,7 +520,8 @@ public class MainActivity extends Activity {
   menu.getMenu().add(0,101,Menu.NONE,"Projekt sichern");
   menu.getMenu().add(0,102,Menu.NONE,"Projekt wiederherstellen");
   menu.getMenu().add(0,103,Menu.NONE,"Projektverlauf");
-  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
+  menu.getMenu().add(0,104,Menu.NONE,"Sicherungsversionen");
+  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
   menu.show();
  }
  LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(dp(12),dp(8),dp(12),dp(8));return p;}
