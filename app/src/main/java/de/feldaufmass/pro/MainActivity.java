@@ -5269,6 +5269,8 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   final boolean[] groupMode={false};
   Button groupButton=new Button(this);groupButton.setText("Gruppe");
   final boolean[] showDimensions={false};
+  final double[] zoomReset={0};
+  Button resetProfileZoom=new Button(this);resetProfileZoom.setText("100%");resetProfileZoom.setContentDescription("Maßstab zurücksetzen");
   View preview=new View(this){
    final Paint pen=new Paint(3);
    double read(EditText field){try{return Double.parseDouble(field.getText().toString().trim().replace(',','.'));}catch(Exception ex){return Double.NaN;}}
@@ -5279,7 +5281,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     if(dragScale<=0)return false;
     int action=e.getActionMasked();
     if(action==android.view.MotionEvent.ACTION_POINTER_DOWN&&e.getPointerCount()==2){pinching=true;dragging=false;dragPointer=-1;pinchSpan=span(e);pinchZoom=profileZoom;pinchBaseScale=dragScale/profileZoom;pinchWidth=(getWidth()-2*(dragLeft-panX))/dragScale;pinchWorldX=((e.getX(0)+e.getX(1))/2-dragLeft)/dragScale;pinchWorldY=((e.getY(0)+e.getY(1))/2-dragTop)/dragScale;getParent().requestDisallowInterceptTouchEvent(true);return true;}
-    if(pinching){if(action==android.view.MotionEvent.ACTION_MOVE&&e.getPointerCount()==2&&pinchSpan>0){double next=Math.max(1,Math.min(5,pinchZoom*span(e)/pinchSpan));double nextScale=pinchBaseScale*next;panX=(e.getX(0)+e.getX(1))/2-pinchWorldX*nextScale-(getWidth()-pinchWidth*nextScale)/2;panY=(e.getY(0)+e.getY(1))/2-pinchWorldY*nextScale-dp(12);profileZoom=next;if(next==1){panX=0;panY=0;}invalidate();}if(action==android.view.MotionEvent.ACTION_UP||action==android.view.MotionEvent.ACTION_CANCEL){pinching=false;getParent().requestDisallowInterceptTouchEvent(false);}return true;}
+    if(pinching){if(action==android.view.MotionEvent.ACTION_MOVE&&e.getPointerCount()==2&&pinchSpan>0){double next=Math.max(1,Math.min(5,pinchZoom*span(e)/pinchSpan));double nextScale=pinchBaseScale*next;panX=(e.getX(0)+e.getX(1))/2-pinchWorldX*nextScale-(getWidth()-pinchWidth*nextScale)/2;panY=(e.getY(0)+e.getY(1))/2-pinchWorldY*nextScale-dp(12);profileZoom=next;resetProfileZoom.setText(Math.round(next*100)+"%");if(next==1){panX=0;panY=0;}invalidate();}if(action==android.view.MotionEvent.ACTION_UP||action==android.view.MotionEvent.ACTION_CANCEL){pinching=false;getParent().requestDisallowInterceptTouchEvent(false);}return true;}
     double x=read(offset),y=read(depth);
     switch(e.getActionMasked()){
      case android.view.MotionEvent.ACTION_DOWN:
@@ -5345,6 +5347,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     try{double value=Double.parseDouble(prefs.getString("metricPipeMinGap","0").replace(',','.'));if(Double.isFinite(value)&&value>=0)gap=value;}catch(Exception ignored){}
     try{double value=Double.parseDouble(prefs.getString("metricPipeMinCover","0").replace(',','.'));if(Double.isFinite(value)&&value>=0)cover=value;}catch(Exception ignored){}
 
+    if(zoomReset[0]!=0){profileZoom=1;panX=0;panY=0;zoomReset[0]=0;}
     dragScale=0;c.drawColor(0xff171717);
     if(!Double.isFinite(width)||!Double.isFinite(height)||width<=0||height<=0)return;
     double scale=Math.min((getWidth()-dp(32))/width,(getHeight()-dp(32))/height)*profileZoom;if(scale<=0)return;
@@ -5443,6 +5446,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   form.addView(groupBack);form.addView(groupForward);
   form.addView(preview,0,new LinearLayout.LayoutParams(-1,dp(160)));
   Button expandPreview=new Button(this);expandPreview.setText("Querschnitt vergrößern");form.addView(expandPreview,1);
+  resetProfileZoom.setOnClickListener(v->{zoomReset[0]=1;resetProfileZoom.setText("100%");preview.invalidate();});
 
   for(EditText field:fields)field.addTextChangedListener(new android.text.TextWatcher(){
    public void beforeTextChanged(CharSequence s,int start,int count,int after){}
@@ -5467,7 +5471,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   preview.setContentDescription("Leitungsquerschnitt. Ausgewählte Leitung zum Verschieben ziehen.");
 
   android.widget.FrameLayout.LayoutParams barParams=new android.widget.FrameLayout.LayoutParams(Math.min(dp(280),Math.max(dp(160),getResources().getDisplayMetrics().widthPixels-dp(96))),-2,android.view.Gravity.TOP|android.view.Gravity.LEFT);
-  workspace.addView(toolbar,barParams);toolbar.addView(groupButton,new LinearLayout.LayoutParams(0,-2,1));groupButton.setMinWidth(0);groupButton.setMinimumWidth(0);groupButton.setPadding(0,0,0,0);groupButton.setTextSize(10);toolbar.setBackgroundColor(0xff303030);
+  workspace.addView(toolbar,barParams);android.widget.FrameLayout.LayoutParams zoomParams=new android.widget.FrameLayout.LayoutParams(dp(72),-2,android.view.Gravity.BOTTOM|android.view.Gravity.RIGHT);workspace.addView(resetProfileZoom,zoomParams);resetProfileZoom.setTextSize(11);resetProfileZoom.setMinWidth(0);resetProfileZoom.setMinimumWidth(0);toolbar.addView(groupButton,new LinearLayout.LayoutParams(0,-2,1));groupButton.setMinWidth(0);groupButton.setMinimumWidth(0);groupButton.setPadding(0,0,0,0);groupButton.setTextSize(10);toolbar.setBackgroundColor(0xff303030);
   fullscreen.setTextSize(10);toggleControls.setTextSize(10);
   fullscreen.setPadding(dp(2),0,dp(2),0);toggleControls.setPadding(dp(2),0,dp(2),0);
   undoPosition.setPadding(0,0,0,0);redoPosition.setPadding(0,0,0,0);
