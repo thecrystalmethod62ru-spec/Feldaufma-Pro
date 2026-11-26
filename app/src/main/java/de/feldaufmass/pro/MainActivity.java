@@ -2170,9 +2170,10 @@ public class MainActivity extends Activity {
      if(!overlapPrefs.edit().putString("metricCrossSectionDimensions",bw+";"+bd).commit())throw new IllegalStateException("Bezugsmaße konnten nicht gespeichert werden");
      refresh.run();
      final android.widget.PopupWindow[] activePipePanel={null};
+     final PipeLayoutView.Move[] draftMove={null};
      cross.setMove((index,offset,bedding)->{
       try{
-       if(activePipePanel[0]!=null&&activePipePanel[0].isShowing()){refresh.run();warnings.setText("Bitte zuerst die Leitungseinstellungen speichern oder abbrechen.");return;}
+       if(activePipePanel[0]!=null&&activePipePanel[0].isShowing()){if(draftMove[0]!=null)draftMove[0].move(index,offset,bedding);return;}
        PipeLayout.Pipe pipe=pipes.get(index);
        java.util.List<PipeLayout.Pipe> next=new java.util.ArrayList<>(pipes);
        next.set(index,new PipeLayout.Pipe(pipe.name,offset,pipe.diameter,pipe.wall,bedding,pipe.minGap,pipe.minCover,pipe.fixed));
@@ -2219,7 +2220,7 @@ public class MainActivity extends Activity {
          if(!Double.isFinite(o+b+g+c)||b<0||g<0||c<0)throw new IllegalArgumentException("Ungültige Maße");
          java.util.List<PipeLayout.Pipe> draft=new java.util.ArrayList<>(pipes);
          draft.set(index,new PipeLayout.Pipe(pipe.name,o,number(diameterInput),number(wallInput),b,g,c,pipe.fixed));
-         livePreview.setLayoutData(draft,bw,bd);livePreview.setRequirements(requirements[0],requirements[1]);
+         cross.setLayoutData(draft,bw,bd);livePreview.setLayoutData(draft,bw,bd);livePreview.setRequirements(requirements[0],requirements[1]);
          liveWarnings.setText(android.text.TextUtils.join("\n",PipeLayout.warnings(draft,bw,bd,requirements[0],requirements[1])));
         }catch(Exception ex){liveWarnings.setText("Maße prüfen");}};
         for(EditText f:new EditText[]{offset,bedding,gapInput,coverInput,diameterInput,wallInput})f.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){previewUpdate.run();}public void afterTextChanged(android.text.Editable e){}});
@@ -2231,7 +2232,8 @@ public class MainActivity extends Activity {
         android.widget.LinearLayout actions=new android.widget.LinearLayout(this);sheet.addView(actions);
         Button cancel=new Button(this),apply=new Button(this);cancel.setText("Abbrechen");apply.setText("Speichern");actions.addView(cancel,new android.widget.LinearLayout.LayoutParams(0,-2,1));actions.addView(apply,new android.widget.LinearLayout.LayoutParams(0,-2,1));
         final android.widget.PopupWindow edit=new android.widget.PopupWindow(sheet,Math.min(dp(420),getResources().getDisplayMetrics().widthPixels),Math.min(dp(360),getResources().getDisplayMetrics().heightPixels/2),true);
-        edit.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0xff202827));edit.setOutsideTouchable(false);if(android.os.Build.VERSION.SDK_INT>=29)edit.setTouchModal(false);activePipePanel[0]=edit;edit.setOnDismissListener(()->activePipePanel[0]=null);edit.setInputMethodMode(android.widget.PopupWindow.INPUT_METHOD_NEEDED);
+        edit.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0xff202827));edit.setOutsideTouchable(false);if(android.os.Build.VERSION.SDK_INT>=29)edit.setTouchModal(false);activePipePanel[0]=edit;edit.setOnDismissListener(()->{activePipePanel[0]=null;draftMove[0]=null;refresh.run();});
+        draftMove[0]=(movedIndex,o,b)->{if(movedIndex!=index||pipe.fixed){previewUpdate.run();return;}offset.setText(String.valueOf(o));bedding.setText(String.valueOf(b));previewUpdate.run();};edit.setInputMethodMode(android.widget.PopupWindow.INPUT_METHOD_NEEDED);
         cancel.setOnClickListener(button->edit.dismiss());
         apply.setOnClickListener(button->{
          try{
