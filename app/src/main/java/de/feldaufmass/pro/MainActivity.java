@@ -1800,6 +1800,21 @@ public class MainActivity extends Activity {
       float w=getWidth()-2*pad,h=getHeight()-2*pad;if(w<=0||h<=0)return;
       p.setColor(0xffad987c);p.setStrokeWidth(3);
       for(int i=1;i<ground.size();i++){double[] a=ground.get(i-1),b=ground.get(i);c.drawLine(pad+(float)(a[0]/total*w),pad+(float)((1-(a[1]-base)/range)*h),pad+(float)(b[0]/total*w),pad+(float)((1-(b[1]-base)/range)*h),p);}
+      p.setColor(0xffaaaaaa);p.setStrokeWidth(1);p.setTextSize(10*getResources().getDisplayMetrics().scaledDensity);
+      p.setTextAlign(android.graphics.Paint.Align.CENTER);
+      for(int tick=0;tick<=4;tick++){
+       float x=pad+w*tick/4f;
+       c.drawLine(x,pad+h,x,pad+h+5,p);
+       c.drawText(String.format(java.util.Locale.GERMANY,"%.2f",total*tick/4),x,pad+h+17,p);
+      }
+      p.setTextAlign(android.graphics.Paint.Align.LEFT);
+      for(int i=1;i<ground.size();i++){
+       double[] a=ground.get(i-1),b=ground.get(i);
+       float x=pad+(float)((a[0]+b[0])/2/total*w),y=pad+(float)((1-((a[1]+b[1])/2-base)/range)*h);
+       p.setColor(0xffad987c);p.setTextAlign(android.graphics.Paint.Align.CENTER);
+       c.drawText(String.format(java.util.Locale.GERMANY,"%+.1f %%",profile.fallPercent(a[0],b[0])),x,Math.max(12,y-7),p);
+      }
+      p.setTextAlign(android.graphics.Paint.Align.LEFT);
       p.setColor(0xffeab65d);
       for(double[] b:boxes){float x=pad+(float)(b[0]/total*w),y=pad+(float)((1-(b[1]-base)/range)*h),bottom=pad+(float)((1-(b[2]-base)/range)*h),half=(float)(b[3]/total*w/2);if(half>0&&bottom>y)c.drawRect(x-half,y,x+half,bottom,p);else c.drawCircle(x,y,4,p);}
      }
