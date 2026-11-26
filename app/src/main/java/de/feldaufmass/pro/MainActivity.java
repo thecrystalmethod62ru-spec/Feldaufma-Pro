@@ -645,7 +645,7 @@ public class MainActivity extends Activity {
   LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setBackgroundColor(Color.WHITE);
   LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);root.addView(header);
   Button back=new Button(this),save=new Button(this);back.setAllCaps(false);save.setAllCaps(false);back.setText("Vollbild beenden");save.setText("Speichern");
-  header.addView(back,new LinearLayout.LayoutParams(0,-2,1));header.addView(save,new LinearLayout.LayoutParams(0,-2,1));
+  header.addView(back,new LinearLayout.LayoutParams(0,-2,1));
   Spinner orientation=new Spinner(this);
   orientation.setAdapter(new android.widget.ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Automatisch drehen","Querformat","Hochformat"}));
   header.addView(orientation,new LinearLayout.LayoutParams(0,-2,1));
@@ -663,13 +663,14 @@ public class MainActivity extends Activity {
   root.addView(historyBar,new LinearLayout.LayoutParams(-1,-2));
   LinearLayout tools=new LinearLayout(this);root.addView(tools);
   Button mic=new Button(this),measureList=new Button(this),resetZoom=new Button(this);
-  mic.setAllCaps(false);mic.setText("🎙 Assistent");measureList.setAllCaps(false);measureList.setText("Abschnitte");resetZoom.setAllCaps(false);resetZoom.setText("Ansicht");
+  mic.setAllCaps(false);mic.setText("🎙");mic.setContentDescription("Sprachassistent");measureList.setAllCaps(false);measureList.setText("Abschnitte");resetZoom.setAllCaps(false);resetZoom.setText("Ansicht");
   tools.addView(mic,new LinearLayout.LayoutParams(0,-2,1));tools.addView(measureList,new LinearLayout.LayoutParams(0,-2,1));tools.addView(resetZoom,new LinearLayout.LayoutParams(0,-2,1));
   mic.setOnClickListener(v->startEditorDictation(speech->applyEditorSpeech(speech,route,mode,historyBar,full)));
   measureList.setOnClickListener(v->showFullscreenMeasures(route));
   Button legendEdit=new Button(this);legendEdit.setAllCaps(false);legendEdit.setText("Legende");tools.addView(legendEdit,new LinearLayout.LayoutParams(0,-2,1));legendEdit.setOnClickListener(v->route.editLegend());
   resetZoom.setOnClickListener(v->{route.zoom=1;route.centerX=.5f;route.centerY=.5f;route.invalidate();});
   Button objectTools=new Button(this);objectTools.setAllCaps(false);objectTools.setText("Objekte");tools.addView(objectTools,new LinearLayout.LayoutParams(0,-2,1));objectTools.setOnClickListener(v->openObjects.run());
+  save.setBackgroundTintList(android.content.res.ColorStateList.valueOf(TEAL));save.setTextColor(Color.WHITE);root.addView(save,new LinearLayout.LayoutParams(-1,dp(48)));
   full.setContentView(root);
   full.setOnDismissListener(d->{
    pendingEditorSpeech=null;
@@ -738,16 +739,16 @@ public class MainActivity extends Activity {
    }else form.addView(sheetText("Zeichenvorlage fehlt oder ist nicht lesbar.",13,false));
   }
 
-  Spinner mode=choices(form,new String[]{"Zeichnen","Maß eintragen","Punkte verschieben","Objekt platzieren","Objekt bearbeiten"});
+  Spinner mode=choices(form,new String[]{"Zeichnen","Maß eintragen","Bearbeiten","Objekt platzieren","Objekt bearbeiten"});
   Spinner angles=choices(form,new String[]{"Freier Winkel","0°","15°","30°","45°","60°","75°","90°"});
   angles.setVisibility(View.GONE);
   onChoice(angles,index->route.angle=index==0?-1:(index-1)*15);
   onChoice(mode,index->{
    route.dimensioning=index==1;route.moving=index==2;route.placingObject=index==3;route.editingObjects=index==4;
    angles.setVisibility(route.moving?View.VISIBLE:View.GONE);
-   hint.setText(new String[]{"Mit einem Finger zeichnen, mit zwei Fingern zoomen oder verschieben.","Abschnitt zum Bemaßen antippen.","Punkt ziehen. Der Winkel gilt zur Waagerechten am benachbarten Punkt.","Trasse antippen, um ein Objekt an einer Station zu platzieren.","Objekt auf dem Plan antippen."}[index]);
+   hint.setText(new String[]{"Mit einem Finger zeichnen, mit zwei Fingern zoomen oder verschieben.","Abschnitt lange drücken. Freie Fläche ziehen zum Verschieben.","Punkte, Objekte und Maße ziehen. Freie Fläche verschiebt den Plan.","Trasse antippen, um ein Objekt an einer Station zu platzieren.","Objekt ziehen oder lange drücken für Einstellungen."}[index]);
   });
-  mode.setSelection(measure?1:0);
+  mode.setSelection(measure?1:route.vertices.isEmpty()?0:2);
   final String initialSaved=routeData();
   final String initialObjects=objects.toString();final org.json.JSONArray draftObjects=copyEditorObjects(initialObjects);
   Runnable refreshObjects=()->{route.setTrenchWidth(w);route.setStationLayers(draftObjects,segments);route.invalidate();};
@@ -757,11 +758,11 @@ public class MainActivity extends Activity {
   Button objectTools=new Button(this);objectTools.setAllCaps(false);objectTools.setText("Objekte hinzufügen");form.addView(objectTools);objectTools.setOnClickListener(v->openObjects.run());refreshObjects.run();
   RouteEditHistory history=loadRouteHistory(route.encode());
   LinearLayout historyBar=new LinearLayout(this);form.addView(historyBar);
-  Button undo=new Button(this),redo=new Button(this);undo.setAllCaps(false);redo.setAllCaps(false);undo.setText("Rückgängig");redo.setText("Wiederholen");
+  Button undo=new Button(this),redo=new Button(this);undo.setAllCaps(false);redo.setAllCaps(false);undo.setText("↶");undo.setContentDescription("Rückgängig");redo.setText("↷");redo.setContentDescription("Wiederholen");
   historyBar.addView(undo,new LinearLayout.LayoutParams(0,-2,1));historyBar.addView(redo,new LinearLayout.LayoutParams(0,-2,1));
   Button legendEdit=new Button(this);legendEdit.setAllCaps(false);legendEdit.setText("Legende bearbeiten");form.addView(legendEdit);legendEdit.setOnClickListener(v->route.editLegend());
-  Button resetDimensions=new Button(this);resetDimensions.setAllCaps(false);resetDimensions.setText("Maßpositionen zurücksetzen");historyBar.addView(resetDimensions,new LinearLayout.LayoutParams(0,-2,1));resetDimensions.setOnClickListener(v->route.resetDimensionLayout());
-  Button deletePoint=new Button(this);deletePoint.setAllCaps(false);deletePoint.setText("Punkt löschen");historyBar.addView(deletePoint,new LinearLayout.LayoutParams(0,-2,1));deletePoint.setOnClickListener(v->deleteRoutePoint(route));
+  Button resetDimensions=new Button(this);resetDimensions.setAllCaps(false);resetDimensions.setText("Maße ↺");resetDimensions.setContentDescription("Maßpositionen zurücksetzen");historyBar.addView(resetDimensions,new LinearLayout.LayoutParams(0,-2,1));resetDimensions.setOnClickListener(v->route.resetDimensionLayout());
+  Button deletePoint=new Button(this);deletePoint.setAllCaps(false);deletePoint.setText("Punkt −");deletePoint.setContentDescription("Punkt löschen");historyBar.addView(deletePoint,new LinearLayout.LayoutParams(0,-2,1));deletePoint.setOnClickListener(v->deleteRoutePoint(route));
   Button remove=new Button(this);remove.setText("Letzten Abschnitt entfernen");form.addView(remove);
   final org.json.JSONObject[] calibration={savedSketchCalibration()};
   TextView scaleStatus=sheetText("",13,false);form.addView(scaleStatus);
