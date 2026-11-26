@@ -3281,6 +3281,27 @@ public class MainActivity extends Activity {
  root=planPage;
  sketch=new Sketch();sketch.setBackgroundColor(Color.WHITE);root.addView(sketch,new LinearLayout.LayoutParams(-1,dp(280))); LinearLayout historyBar=new LinearLayout(this);root.addView(historyBar);undoObjectsButton=new Button(this);undoObjectsButton.setText("Rückgängig");historyBar.addView(undoObjectsButton,new LinearLayout.LayoutParams(0,-2,1));redoObjectsButton=new Button(this);redoObjectsButton.setText("Wiederholen");historyBar.addView(redoObjectsButton,new LinearLayout.LayoutParams(0,-2,1));undoObjectsButton.setOnClickListener(v->restoreObjectHistory(false));redoObjectsButton.setOnClickListener(v->restoreObjectHistory(true));updateHistoryButtons();
  Button edit=new Button(this);edit.setText("Trassenmaße bearbeiten");root.addView(edit);edit.setOnClickListener(v->showPage(measurePage));
+ actionButtonSingle(planPage,"Verbauflächen berechnen",()->{
+  LinearLayout fields=new LinearLayout(this);fields.setOrientation(1);
+  String[] hints={"Station von (m)","Station bis (m)","Verbauhöhe links (m; 0 = kein Verbau)","Verbauhöhe rechts (m; 0 = kein Verbau)"};
+  EditText[] inputs=new EditText[4];for(int i=0;i<4;i++){inputs[i]=new EditText(this);inputs[i].setHint(hints[i]);inputs[i].setInputType(8194);fields.addView(inputs[i]);}
+  TextView resultText=new TextView(this);fields.addView(resultText);
+  java.util.ArrayList<double[]> entries=new java.util.ArrayList<>();
+  Button add=new Button(this);add.setText("Abschnitt hinzufügen");fields.addView(add);
+  add.setOnClickListener(button->{
+   try{
+    double[] v=new double[4];for(int i=0;i<4;i++){if(inputs[i].length()==0)throw new IllegalArgumentException("Alle Maße eingeben");v[i]=number(inputs[i]);if(!Double.isFinite(v[i])||v[i]<0)throw new IllegalArgumentException("Ungültiges Maß");}
+    if(v[1]<=v[0]||(l>0&&v[1]>l)||v[2]+v[3]<=0)throw new IllegalArgumentException("Stationsgrenzen oder Verbauhöhe prüfen");
+    for(double[] e:entries)if(v[0]<e[1]&&v[1]>e[0]&&((v[2]>0&&e[2]>0)||(v[3]>0&&e[3]>0)))throw new IllegalArgumentException("Überlappender Verbau auf derselben Seite");
+    entries.add(v);StringBuilder report=new StringBuilder();double left=0,right=0;
+    for(double[] e:entries){double a=(e[1]-e[0])*e[2],b=(e[1]-e[0])*e[3];left+=a;right+=b;report.append(String.format(java.util.Locale.GERMANY,"%.2f – %.2f m: L %.2f / R %.2f m²\n",e[0],e[1],a,b));}
+    report.append(String.format(java.util.Locale.GERMANY,"\nLinks: %.2f m²\nRechts: %.2f m²\nGesamt: %.2f m²",left,right,left+right));resultText.setText(report.toString());
+   }catch(Exception ex){notice(ex.getMessage());}
+  });
+  Button reset=new Button(this);reset.setText("Berechnung zurücksetzen");fields.addView(reset);reset.setOnClickListener(button->{entries.clear();resultText.setText("");});
+  ScrollView scroll=new ScrollView(this);scroll.addView(fields);
+  new android.app.AlertDialog.Builder(this).setTitle("Verbau – Flächenvorberechnung").setView(scroll).setPositiveButton("Schließen",null).show();
+ });
  actionButtonSingle(planPage,"Bodenaustausch und Entsorgung",()->{
   LinearLayout fields=new LinearLayout(this);fields.setOrientation(1);
   String[] hints={"Bodenaushub fest (m³), ohne Oberbau","Wiederverwendbarer Boden fest (m³)","Benötigte Verfüllung verdichtet (m³)","Auflockerungsfaktor Entsorgung","Lieferfaktor Ersatzmaterial"};
