@@ -12,6 +12,57 @@ public class MainActivity extends Activity {
  SharedPreferences projectRegistry(){return getSharedPreferences("project_registry",MODE_PRIVATE);}
  SharedPreferences projectStorage(String id){return LEGACY_PROJECT.equals(id)?super.getPreferences(MODE_PRIVATE):getSharedPreferences("project_"+id,MODE_PRIVATE);}
  @Override public SharedPreferences getPreferences(int mode){return projectStorage(activeProject);}
+ void requestProjectBackup(){
+  new android.app.AlertDialog.Builder(this).setTitle("Projekt sichern").setMessage("Gespeicherte Projektdaten und Fotos als ZIP exportieren. Externe Unterlagen bleiben Verweise. Bitte Änderungen vorher speichern.").setNegativeButton("Abbrechen",null).setPositiveButton("Exportieren",(d,w)->{
+   android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);i.setType("application/zip");i.addCategory(android.content.Intent.CATEGORY_OPENABLE);
+   String name=getPreferences(0).getString("project","Projekt").replaceAll("[^\\p{L}\\p{N}._-]","_");
+   i.putExtra(android.content.Intent.EXTRA_TITLE,name+"_"+System.currentTimeMillis()+".zip");startActivityForResult(i,414);
+  }).show();
+ }
+ static void copyBackupBytes(java.io.InputStream in,java.io.OutputStream out)throws java.io.IOException{
+  byte[] buffer=new byte[32768];int n;while((n=in.read(buffer))!=-1)out.write(buffer,0,n);
+ }
+ void writeProjectBackup(java.io.File target,java.util.Map<String,?> snapshot)throws Exception{
+  org.json.JSONObject fields=new org.json.JSONObject();
+  for(java.util.Map.Entry<String,?> e:snapshot.entrySet()){
+   Object v=e.getValue();
+   if(!(v instanceof String||v instanceof Boolean||v instanceof Integer||v instanceof Long||v instanceof Float))throw new java.io.IOException("Nicht unterstützter Datentyp");
+   fields.put(e.getKey(),new org.json.JSONObject().put("type",v.getClass().getSimpleName()).put("value",v));
+  }
+  org.json.JSONObject manifest=new org.json.JSONObject().put("format","FeldaufmassPro").put("version",1).put("createdAt",System.currentTimeMillis()).put("preferences",fields);
+  java.util.Set<String> photos=new java.util.TreeSet<>();
+  Object data=snapshot.get("routeSketch");
+  org.json.JSONArray rows=new org.json.JSONArray(data==null?"[]":(String)data);
+  for(int j=0;j<rows.length();j++){
+   org.json.JSONArray items=rows.getJSONArray(j).optJSONArray(4);if(items==null)continue;
+   for(int k=0;k<items.length();k++){
+    String name=items.getString(k);if(!name.matches("[A-Za-z0-9._-]+")||name.equals(".")||name.equals(".."))throw new java.io.IOException("Ungültiger Fotodateiname");
+    photos.add(name);
+   }
+  }
+  try(java.util.zip.ZipOutputStream zip=new java.util.zip.ZipOutputStream(new java.io.FileOutputStream(target))){
+   zip.putNextEntry(new java.util.zip.ZipEntry("project.json"));zip.write(manifest.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));zip.closeEntry();
+   for(String name:photos){
+    java.io.File f=new java.io.File(getFilesDir(),"photos/"+name);
+    if(!f.isFile())throw new java.io.IOException("Foto fehlt: "+name);
+    zip.putNextEntry(new java.util.zip.ZipEntry("photos/"+name));try(java.io.InputStream in=new java.io.FileInputStream(f)){copyBackupBytes(in,zip);}zip.closeEntry();
+   }
+  }
+ }
+ void exportProjectBackup(android.net.Uri target){
+  java.util.Map<String,?> snapshot=new java.util.HashMap<>(getPreferences(0).getAll());
+  new Thread(()->{
+   java.io.File temp=null;
+   try{
+    temp=java.io.File.createTempFile("project_backup_",".zip",getCacheDir());writeProjectBackup(temp,snapshot);
+    try(java.io.InputStream in=new java.io.FileInputStream(temp);java.io.OutputStream out=getContentResolver().openOutputStream(target,"wt")){
+     if(out==null)throw new java.io.IOException("Zieldatei nicht verfügbar");copyBackupBytes(in,out);
+    }
+    runOnUiThread(()->{if(!isDestroyed())notice("Projektsicherung exportiert.");});
+   }catch(Exception e){runOnUiThread(()->{if(!isDestroyed())notice("Sicherung fehlgeschlagen. Zieldatei kann unvollständig sein.");});}
+   finally{if(temp!=null)temp.delete();}
+  },"project-backup").start();
+ }
  void showProjects(){
   java.util.ArrayList<String> ids=new java.util.ArrayList<>(projectRegistry().getStringSet("ids",java.util.Collections.emptySet()));
   java.util.Collections.sort(ids);ids.remove(LEGACY_PROJECT);ids.add(0,LEGACY_PROJECT);
@@ -289,7 +340,8 @@ public class MainActivity extends Activity {
   PopupMenu menu=new PopupMenu(this,toolsMenu);
   for(int i=0;i<names.length;i++)menu.getMenu().add(0,i,Menu.NONE,names[i]);
   menu.getMenu().add(0,100,Menu.NONE,"Projekte");
-  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
+  menu.getMenu().add(0,101,Menu.NONE,"Projekt sichern");
+  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
   menu.show();
  }
  LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(dp(12),dp(8),dp(12),dp(8));return p;}
@@ -963,6 +1015,7 @@ public class MainActivity extends Activity {
  try{startActivityForResult(i,410);}catch(android.content.ActivityNotFoundException e){Toast.makeText(this,"Keine Spracherkennung verfügbar.",Toast.LENGTH_LONG).show();}
  }
  @Override protected void onActivityResult(int request,int result,android.content.Intent data){super.onActivityResult(request,result,data);
+ if(request==414&&result==RESULT_OK&&data!=null&&data.getData()!=null){exportProjectBackup(data.getData());return;}
  if(request==413){finishPhoto(result==RESULT_OK);return;}
  if(request==412&&result==RESULT_OK&&data!=null&&data.getData()!=null){writePdf(data.getData());return;}
  if(request==411&&result==RESULT_OK&&data!=null){if(data.getClipData()!=null){for(int j=0;j<data.getClipData().getItemCount();j++)attachDocument(data.getClipData().getItemAt(j).getUri(),data.getFlags());}else attachDocument(data.getData(),data.getFlags());showDocuments();return;}
