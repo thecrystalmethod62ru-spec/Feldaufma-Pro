@@ -1773,7 +1773,13 @@ public class MainActivity extends Activity {
   panel.addView(correction);panel.addView(correctionReason);
   Button saveCorrection=new Button(this);saveCorrection.setText("Flächenkorrektur speichern");panel.addView(saveCorrection);
   TextView nominalArea=new TextView(this);panel.addView(nominalArea);
+  final EditText mainExcavationDepth=new EditText(this);
+  mainExcavationDepth.setHint("Hauptgraben – einheitliche Grabentiefe (m)");
+  mainExcavationDepth.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+  mainExcavationDepth.setText(overlapPrefs.getString("metricMainExcavationDepth",""));
+  panel.addView(mainExcavationDepth);
   Runnable refreshNominalArea=()->{
+   java.util.ArrayList<double[]> mainVolumeStrips=new java.util.ArrayList<>();
    double total=route.measuredLength();
    java.util.ArrayList<double[]> strips=new java.util.ArrayList<>();
    double station=0;
@@ -1795,6 +1801,8 @@ public class MainActivity extends Activity {
       w=o.optDouble("width");if(o.has("left"))l=o.optDouble("left");if(o.has("right"))rr=o.optDouble("right");
      }
      double t=(lo-station)/length,u=(hi-station)/length;
+     mainVolumeStrips.add(new double[]{a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u,w/2,w/2,0});
+
      strips.add(new double[]{a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u,w>0&&l>=0?w/2+l:Double.NaN,w>0&&rr>=0?w/2+rr:Double.NaN});
     }
     station=end;
@@ -1872,6 +1880,17 @@ public class MainActivity extends Activity {
        result.append(String.format(java.util.Locale.GERMANY,"\nAushub nur Abzweigungen (gemeinsame Bezugshöhe):\nBrutto: %.2f m³\nVolumenüberschneidung: %.2f m³\nNetto: %.2f m³",branchVolumes.gross,branchVolumes.overlap,branchVolumes.net));
        if(combinedMode==1||combinedMode==2)result.append(String.format(java.util.Locale.GERMANY,"\nAushub-Kontrollwert Abzweigungen: %.2f m³",combinedMode==1?branchVolumes.gross:branchVolumes.net));
        result.append("\nHauptgraben nicht in dieser Volumenprüfung enthalten; keine Abrechnungsfreigabe.");
+       try{
+        double depth=Double.parseDouble(mainExcavationDepth.getText().toString().trim().replace(',','.'));
+        if(!Double.isFinite(depth)||depth<=0)throw new IllegalArgumentException();
+        java.util.List<double[]> allVolume=new java.util.ArrayList<>(branchVolumeStrips);
+        for(double[] strip:mainVolumeStrips){strip[6]=depth;allVolume.add(strip);}
+        StripVolume.Result all=StripVolume.calculate(allVolume);
+        result.append(String.format(java.util.Locale.GERMANY,"\nAushub Gesamttrasse inkl. Abzweigungen:\nBrutto: %.2f m³\nÜberschneidung: %.2f m³\nNetto: %.2f m³",all.gross,all.overlap,all.net));
+        if(combinedMode==1||combinedMode==2)result.append(String.format(java.util.Locale.GERMANY,"\nAushub-Kontrollwert Gesamttrasse: %.2f m³",combinedMode==1?all.gross:all.net));
+        result.append("\nEinheitliche Hauptgrabentiefe, gemeinsame Bezugshöhe, ohne Nachschnitt und Eckergänzungen.");
+       }catch(Exception ex){result.append("\nGesamt-Aushub: gültige Hauptgrabentiefe erforderlich.");}
+
 
        if(combinedMode==1||combinedMode==2)result.append(String.format(java.util.Locale.GERMANY,"\nKontrollwert Gesamttrasse: %.2f m²",combinedMode==1?total.gross:total.net));
        result.append("\nAbzweige ohne Nachschnitt und Eckergänzungen; keine automatische Abrechnung.");
@@ -1900,6 +1919,11 @@ public class MainActivity extends Activity {
    }
    nominalArea.setText(result.toString());
   };
+  mainExcavationDepth.addTextChangedListener(new android.text.TextWatcher(){
+   public void beforeTextChanged(CharSequence s,int start,int count,int after){}
+   public void onTextChanged(CharSequence s,int start,int before,int count){}
+   public void afterTextChanged(android.text.Editable e){overlapPrefs.edit().putString("metricMainExcavationDepth",e.toString()).apply();refreshNominalArea.run();}
+  });
   cornerMode.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
    @Override public void onItemSelected(android.widget.AdapterView<?> parent,android.view.View view,int position,long id){
     if(position<0||position>2)return;
