@@ -1524,7 +1524,7 @@ public class MainActivity extends Activity {
  }
  void showMontage(){
   new android.app.AlertDialog.Builder(this).setTitle("Rohrleitungsbau – Montage")
-   .setItems(new String[]{"Formstückkatalog","Projekt-Formstücke","Gesamtplan – Stationierung","Materialliste (eingebaut)","Verbindungsregister","Prüfprotokolle"},(d,w)->{if(w==0)showMontageCatalog();else if(w==1)showMontageInventory();else if(w==2)showMontageStationPlan();else if(w==3)showMontageMaterials();else if(w==4)new MontageConnections(this).show();else new MontageProtocols(this).show();})
+   .setItems(new String[]{"Formstückkatalog","Projekt-Formstücke","Gesamtplan – Stationierung","Materialliste (eingebaut)","Verbindungsregister","Prüfprotokolle","Projektleitungen"},(d,w)->{if(w==0)showMontageCatalog();else if(w==1)showMontageInventory();else if(w==2)showMontageStationPlan();else if(w==3)showMontageMaterials();else if(w==4)new MontageConnections(this).show();else if(w==5)new MontageProtocols(this).show();else editUtilities();})
    .setNegativeButton("Schließen",null).show();
  }
  void showMontageStationPlan(){
@@ -1733,6 +1733,31 @@ public class MainActivity extends Activity {
   }
   return list.toString().trim();
  }
+ String projectMaterialText(SharedPreferences prefs)throws org.json.JSONException{
+  String fittings=montageMaterialText(new org.json.JSONArray(prefs.getString("montageFittings","[]")));
+  StringBuilder list=new StringBuilder();
+  if(!fittings.isEmpty())list.append("Formstücke\n").append(fittings);
+  org.json.JSONArray rows=new org.json.JSONArray(prefs.getString("extraUtilities","[]"));
+  java.util.SortedMap<String,java.math.BigDecimal> lengths=new java.util.TreeMap<>();
+  for(int i=0;i<rows.length();i++){
+   org.json.JSONObject row=rows.getJSONObject(i);if(!row.optBoolean("installed",false))continue;
+   double length=row.getDouble("installedLength");
+   if(!Double.isFinite(length)||length<=0)throw new org.json.JSONException("Ungültige Einbaulänge");
+   String spec=row.getString("type")+" · Ø "+row.getString("diameter")+" mm";
+   if(!row.optString("dn").isEmpty())spec+=" · DN / Typ "+row.optString("dn");
+   if(!row.optString("material").isEmpty())spec+=" · "+row.optString("material");
+   if(row.has("sdr"))spec+=" · SDR "+row.optString("sdr");
+   if(row.has("pn"))spec+=" · PN "+row.optString("pn");
+   lengths.merge(spec,java.math.BigDecimal.valueOf(length),java.math.BigDecimal::add);
+  }
+  if(!lengths.isEmpty()){
+   if(list.length()>0)list.append("\n\n");list.append("Leitungen");
+   for(java.util.Map.Entry<String,java.math.BigDecimal> entry:lengths.entrySet()){
+    list.append("\n").append(entry.getValue().stripTrailingZeros().toPlainString().replace('.',',')).append(" m  ").append(entry.getKey());
+   }
+  }
+  return list.toString();
+ }
  String pendingConnectionsProject;
  void exportConnectionsPdf(String projectId){
   android.content.Intent intent=new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);
@@ -1743,7 +1768,7 @@ public class MainActivity extends Activity {
  String pendingMaterialProject;
  void showMontageMaterials(){
   try{
-   String list=montageMaterialText(new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]")));
+   String list=projectMaterialText(getPreferences(0));
    android.app.AlertDialog.Builder dialog=new android.app.AlertDialog.Builder(this).setTitle("Materialliste · bestätigter Einbau")
        .setMessage(list.isEmpty()?"Noch kein Einbau bestätigt.":list)
        .setNegativeButton("Zurück",(d,w)->showMontage());
@@ -1761,9 +1786,9 @@ public class MainActivity extends Activity {
   android.graphics.pdf.PdfDocument pdf=new android.graphics.pdf.PdfDocument();
   try{
    SharedPreferences prefs=projectStorage(projectId);
-   String list=montageMaterialText(new org.json.JSONArray(prefs.getString("montageFittings","[]")));
+   String list=projectMaterialText(prefs);
    if(list.isEmpty()){notice("Noch kein Einbau bestätigt.");return;}
-   String body="Projekt: "+prefs.getString("project","Projekt")+"\n\nBestätigter Einbau · Formstücke\n\n"+list;
+   String body="Projekt: "+prefs.getString("project","Projekt")+"\n\nBestätigter Einbau\n\n"+list;
    dailyTextPdf(pdf,1,"Montage – Materialliste",body,null);
    try(java.io.OutputStream out=getContentResolver().openOutputStream(uri,"wt")){
     if(out==null)throw new java.io.IOException();
@@ -4424,12 +4449,13 @@ public class MainActivity extends Activity {
    Spinner type=new Spinner(this);type.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Trinkwasser","Gas","Abwasser","Fernwärme","Stromkabel","Glasfaser","Kabelschutzrohr","Sonstige Leitung"}));form.addView(type);
    EditText diameter=new EditText(this);diameter.setHint("Außendurchmesser (mm)");diameter.setInputType(8194);form.addView(diameter);
    android.app.AlertDialog add=new android.app.AlertDialog.Builder(this).setTitle("Leitung hinzufügen").setView(form).setNegativeButton("Abbrechen",null).setPositiveButton("Hinzufügen",null).create();
-   add.setOnShowListener(x->add.getButton(-1).setOnClickListener(y->{try{double mm=Double.parseDouble(diameter.getText().toString().replace(',','.'));if(!Double.isFinite(mm)||mm<=0)throw new Exception();org.json.JSONObject o=new org.json.JSONObject();o.put("type",type.getSelectedItem().toString());o.put("diameter",mm);rows.put(o);if(saveUtilities(rows))add.dismiss();}catch(Exception e){diameter.setError("Positiven Durchmesser eingeben");}}));add.show();
+   add.setOnShowListener(x->add.getButton(-1).setOnClickListener(y->{try{double mm=Double.parseDouble(diameter.getText().toString().replace(',','.'));if(!Double.isFinite(mm)||mm<=0)throw new Exception();org.json.JSONObject o=new org.json.JSONObject();o.put("id",java.util.UUID.randomUUID().toString()).put("type",type.getSelectedItem().toString());o.put("diameter",mm);rows.put(o);if(saveUtilities(rows))add.dismiss();}catch(Exception e){diameter.setError("Positiven Durchmesser eingeben");}}));add.show();
   }).setNegativeButton("Schließen",null).show();
  }
  void utilityMenu(int index){
   org.json.JSONArray rows=extraUtilities();org.json.JSONObject o=rows.optJSONObject(index);if(o==null)return;
-  new android.app.AlertDialog.Builder(this).setTitle(o.optString("name",o.optString("type"))).setItems(new String[]{"Eigenschaften bearbeiten","Leitung entfernen"},(dialog,choice)->{
+  new android.app.AlertDialog.Builder(this).setTitle(o.optString("name",o.optString("type"))).setItems(new String[]{"Eigenschaften bearbeiten","Leitung entfernen","Montagedaten und Einbaulänge"},(dialog,choice)->{
+   if(choice==2){editInstalledUtility(rows,index);return;}
    if(choice==1){new android.app.AlertDialog.Builder(this).setMessage("Leitung entfernen?").setNegativeButton("Abbrechen",null).setPositiveButton("Entfernen",(x,y)->{rows.remove(index);saveUtilities(rows);}).show();return;}
    LinearLayout form=new LinearLayout(this);form.setOrientation(1);
    String[] keys={"name","type","material","dn","diameter"},titles={"Bezeichnung","Leitungsart","Material","DN / Kabeltyp","Außendurchmesser (mm)"};
@@ -4437,6 +4463,41 @@ public class MainActivity extends Activity {
    android.app.AlertDialog edit=new android.app.AlertDialog.Builder(this).setTitle("Leitung bearbeiten").setView(form).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
    edit.setOnShowListener(x->edit.getButton(-1).setOnClickListener(y->{try{double mm=Double.parseDouble(fields[4].getText().toString().replace(',','.'));if(!Double.isFinite(mm)||mm<=0)throw new Exception();if(fields[1].length()==0){fields[1].setError("Leitungsart eingeben");return;}for(int j=0;j<4;j++)o.put(keys[j],fields[j].getText().toString().trim());o.put("diameter",mm);if(saveUtilities(rows))edit.dismiss();}catch(Exception e){fields[4].setError("Positiven Durchmesser eingeben");}}));edit.show();
   }).show();
+ }
+ void editInstalledUtility(org.json.JSONArray rows,int index){
+  org.json.JSONObject source=rows.optJSONObject(index);if(source==null)return;
+  String before=rows.toString(),projectId=activeProject;
+  LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
+  form.addView(sheetText(source.optString("type")+" · "+source.optDouble("diameter")+" mm",16,true));
+  String[] keys={"sdr","pn","installedLength"},labels={"SDR (optional)","PN (optional)","Gemessene Einbaulänge (m)"};
+  EditText[] fields=new EditText[keys.length];
+  for(int i=0;i<keys.length;i++){
+   form.addView(sheetText(labels[i],14,true));fields[i]=new EditText(this);fields[i].setSingleLine(true);
+   fields[i].setInputType(8194);fields[i].setText(source.optString(keys[i],""));form.addView(fields[i]);
+  }
+  CheckBox installed=new CheckBox(this);installed.setText("Einbau bestätigen und Länge in Materialliste übernehmen");
+  installed.setChecked(source.optBoolean("installed",false));form.addView(installed);
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Leitungsmontage").setView(scroll)
+    .setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
+  dialog.setOnShowListener(d->dialog.getButton(-1).setOnClickListener(button->{
+   if(!projectId.equals(activeProject)||!before.equals(extraUtilities().toString())){notice("Projektdaten geändert. Leitung erneut öffnen.");return;}
+   try{
+    org.json.JSONObject updated=new org.json.JSONObject(source.toString());
+    for(int i=0;i<fields.length;i++){
+     String raw=fields[i].getText().toString().trim();
+     if(raw.isEmpty()){updated.remove(keys[i]);continue;}
+     double value;
+     try{value=Double.parseDouble(raw.replace(',','.'));if(!Double.isFinite(value)||value<=0)throw new NumberFormatException();}
+     catch(NumberFormatException invalid){fields[i].setError("Positiven Wert eingeben");return;}
+     updated.put(keys[i],value);
+    }
+    if(installed.isChecked()&&!updated.has("installedLength")){fields[2].setError("Gemessene Einbaulänge erforderlich");return;}
+    updated.put("installed",installed.isChecked());
+    if(!updated.has("id"))updated.put("id",java.util.UUID.randomUUID().toString());
+    org.json.JSONArray next=new org.json.JSONArray(before);next.put(index,updated);
+    if(saveUtilities(next)){dialog.dismiss();recordProjectEvent("Leitungsmontage geändert");editUtilities();}
+   }catch(Exception e){notice("Montagedaten konnten nicht gespeichert werden.");}
+  }));dialog.show();
  }
  boolean saveUtilities(org.json.JSONArray rows){
   boolean ok=getPreferences(0).edit().putString("extraUtilities",rows.toString()).commit();

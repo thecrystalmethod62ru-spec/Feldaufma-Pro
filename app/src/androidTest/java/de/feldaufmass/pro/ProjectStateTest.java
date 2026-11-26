@@ -12,6 +12,24 @@ import static org.junit.Assert.*;
 
 @RunWith(AndroidJUnit4.class)
 public class ProjectStateTest {
+ @Test public void confirmedPipeLengthsAreIndependentOfTrenchLength(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->{
+    String id=java.util.UUID.randomUUID().toString();
+    try{
+     org.json.JSONObject pipe=new org.json.JSONObject().put("type","Trinkwasser").put("diameter",90)
+       .put("material","PE").put("sdr",11).put("installed",true).put("installedLength",2.1);
+     org.json.JSONArray rows=new org.json.JSONArray().put(pipe)
+       .put(new org.json.JSONObject(pipe.toString()).put("installedLength",3.2))
+       .put(new org.json.JSONObject(pipe.toString()).put("installed",false).put("installedLength",80));
+     android.content.SharedPreferences prefs=activity.projectStorage(id);
+     assertTrue(prefs.edit().putString("extraUtilities",rows.toString()).putString("length","75").commit());
+     assertEquals("Leitungen\n5,3 m  Trinkwasser · Ø 90 mm · PE · SDR 11",activity.projectMaterialText(prefs));
+    }catch(Exception e){throw new AssertionError(e);}
+    finally{activity.deleteSharedPreferences("project_"+id);}
+   });
+  }
+ }
  @Test public void savedMontagePlanHasDrawingAndRegister(){
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    scenario.onActivity(activity->{

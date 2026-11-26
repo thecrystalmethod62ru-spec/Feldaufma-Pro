@@ -42,13 +42,14 @@ Jede Funktion benötigt Build, Tests und Geräteprüfung. Geometrische Mengen si
 ### Implementierter Umfang im Android-Stand
 
 - Unter **Werkzeuge → Rohrleitungsbau – Montage** lassen sich Standardformstücke anlegen, nachträglich bearbeiten, einer Tiefbau-Station zuordnen und entfernen. Eine Bestätigung des Einbaus übernimmt das Formstück in die Materialliste. Anzahl, Typ, DN und Werkstoff erscheinen im PDF.
+- Projektleitungen übernehmen DN bzw. Kabeltyp, Außendurchmesser, Werkstoff, SDR, PN und gemessene Einbaulänge ins Montageaufmaß. Bestätigte Längen werden pro Spezifikation in Metern summiert.
 - Der Montageplan nutzt die eingegebenen Abschnittslängen und die Richtungen der Trassenskizze. Er zeigt nummerierte Positionen und erzeugt ein PDF mit Verzeichnis. Fehlende Stationen und uneindeutige seitliche Versätze an Ecken bleiben zur Prüfung offen.
 - Das Verbindungsregister speichert Schweiß-, Steck- und Flanschverbindungen mit beständiger Kennung, eigener Nummer und zugeordneten Projektfotos. Der PDF-Bericht enthält die Verbindungseinträge und Fotoseiten.
 - Der metrische DXF-Export enthält die Ebenen MONTAGE und VERBINDUNGEN mit Positionsmarkierungen und Beschriftung.
 - Druckprüfung, Spülung und Desinfektion lassen sich mit Datum, Leitungsabschnitt, ausführender Person, Messwerten und Ergebnis dokumentieren und als PDF ausgeben.
 - Die ZIP-Wiederherstellung unterstützt Mehrrohrprofile mit Positionsfixierung, Abzweigungen, Montageobjekte, Registerfotos und Überlappungseinstellungen.
 
-Offen für die Abnahme sind unter anderem die Prüfung der Symbole an Normvorlagen, die Erkennung von Formstücken aus Handskizzen, die Rohrstückliste mit SDR und PN sowie die Feldprüfung mit Messgeräten.
+Offen für die Abnahme sind unter anderem die Prüfung der Symbole an Normvorlagen, die Erkennung von Formstücken aus Handskizzen sowie die Feldprüfung mit Messgeräten.
 
 ### Umfang Formstückkatalog
 - [ ] Nur Standardformstücke: Bögen 11,25°/22,5°/30°/45°/90°, T-Stücke, Kreuzstücke, Reduzierungen, Muffen, Flansche, Endkappen und Schieber. Keine Herstellerkataloge oder Sonderformstücke.
