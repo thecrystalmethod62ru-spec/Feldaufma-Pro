@@ -5381,15 +5381,23 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     current[0].put("offset",x);current[0].put("axisDepth",y);
     java.util.List<Integer> ordered=new java.util.ArrayList<>(group);
     ordered.sort((aa,bb)->Double.compare(rows.optJSONObject(aa).optDouble("offset"),rows.optJSONObject(bb).optDouble("offset")));
-    double edge=0;double[] centers=new double[ordered.size()];
+    double margin=Double.parseDouble(getPreferences(0).getString("metricUtilitySideClearance","0").replace(',','.'));
+    if(!Double.isFinite(margin)||margin<0)throw new IllegalArgumentException();
+    double edge=margin;double[] centers=new double[ordered.size()];
     for(int k=0;k<ordered.size();k++){org.json.JSONObject n=rows.optJSONObject(ordered.get(k));double radius=n.optDouble("diameter")/2000;if(!Double.isFinite(radius)||radius<=0)throw new IllegalArgumentException();centers[k]=edge+radius;edge+=2*radius+gap;}
-    double required=edge-gap;
+    double required=edge-gap+margin;
+    double available=w;
+    try{org.json.JSONArray sections=new org.json.JSONArray(getPreferences(0).getString("metricWidthSections","[]"));for(int k=0;k<sections.length();k++){org.json.JSONObject section=sections.getJSONObject(k);if(station>=section.optDouble("from")&&station<section.optDouble("to")){available=section.optDouble("width");break;}}}catch(Exception ignored){}
+    if(!Double.isFinite(available)||available<=0||required>available+1e-8){notice(String.format(java.util.Locale.GERMANY,"Graben zu schmal: benötigt %.3f m, vorhanden %.3f m",required,available));return;}
     groupUndo.push(rows.toString());if(groupUndo.size()>50)groupUndo.removeLast();groupRedo.clear();
     for(int k=0;k<ordered.size();k++){org.json.JSONObject n=rows.optJSONObject(ordered.get(k));n.put("offset",centers[k]);n.put("axisDepth",y);}
     offset.setText(current[0].optString("offset"));depth.setText(current[0].optString("axisDepth"));restoreGroup.run();
-    notice(String.format(java.util.Locale.GERMANY,"Benötigte Breite ohne Randabstand: %.3f m",required));
+    notice(String.format(java.util.Locale.GERMANY,"Benötigte Breite mit Randabstand: %.3f m",required));
    }catch(Exception ex){notice("Gültige Durchmesser und Maße erforderlich");}
   });
+  Button sideClearance=new Button(this);sideClearance.setText("Seitlichen Randabstand einstellen");
+  sideClearance.setOnClickListener(v->{EditText input=new EditText(this);input.setInputType(8194);input.setText(getPreferences(0).getString("metricUtilitySideClearance","0"));android.app.AlertDialog dd=new android.app.AlertDialog.Builder(this).setTitle("Randabstand je Seite (m)").setView(input).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();dd.setOnShowListener(q->dd.getButton(-1).setOnClickListener(z->{try{double m=Double.parseDouble(input.getText().toString().replace(',','.'));if(!Double.isFinite(m)||m<0)throw new IllegalArgumentException();getPreferences(0).edit().putString("metricUtilitySideClearance",String.valueOf(m)).apply();dd.dismiss();}catch(Exception ex){input.setError("Gültiges Maß eingeben");}}));dd.show();});
+  form.addView(sideClearance);
   form.addView(distribute);
   form.addView(alignGroup);
   form.addView(groupBack);form.addView(groupForward);
