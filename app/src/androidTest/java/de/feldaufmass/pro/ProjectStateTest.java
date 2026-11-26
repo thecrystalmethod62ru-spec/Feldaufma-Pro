@@ -12,6 +12,28 @@ import static org.junit.Assert.*;
 
 @RunWith(AndroidJUnit4.class)
 public class ProjectStateTest {
+ @Test public void savedMontagePlanHasDrawingAndRegister(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->{
+    String original=activity.activeProject,testId=java.util.UUID.randomUUID().toString();File file=null;
+    try{
+     activity.activeProject=testId;
+     org.json.JSONObject fitting=new org.json.JSONObject().put("type","TEE").put("station",5).put("offset",1);
+     assertTrue(activity.projectStorage(testId).edit().putString("project","Bergstraße").putString("length","12,0")
+       .putString("routeSketch","[[0.1,0.2,null],[0.5,0.2,8],[0.5,0.5,4]]")
+       .putString("montageFittings",new org.json.JSONArray().put(fitting).toString()).commit());
+     file=File.createTempFile("montageplan",".pdf",activity.getCacheDir());
+     activity.writeMontagePlan(Uri.fromFile(file));
+     try(ParcelFileDescriptor fd=ParcelFileDescriptor.open(file,ParcelFileDescriptor.MODE_READ_ONLY);
+         PdfRenderer pdf=new PdfRenderer(fd)){
+      assertEquals(2,pdf.getPageCount());
+      try(PdfRenderer.Page drawing=pdf.openPage(0)){assertTrue(drawing.getWidth()>drawing.getHeight());}
+     }
+    }catch(Exception e){throw new AssertionError(e);}
+    finally{activity.activeProject=original;activity.deleteSharedPreferences("project_"+testId);if(file!=null)file.delete();}
+   });
+  }
+ }
  @Test public void metricDxfPositionsMontageOnSharedRoute(){
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    scenario.onActivity(activity->{

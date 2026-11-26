@@ -1549,27 +1549,61 @@ public class MainActivity extends Activity {
    TextView range=new TextView(this);range.setText("0,00 m  —  "+total+" m");panel.addView(range);
    RouteSketch geometry=new RouteSketch(this,routeData());
    double measured=geometry.measuredLength();
-   if(Double.isFinite(measured)&&measured>0&&Math.abs(measured-total)<0.001){
-    TextView title=new TextView(this);title.setText("Gemeinsame Trassenskizze – Stationspunkte (ohne seitlichen Versatz)");panel.addView(title);
-    android.view.View map=new android.view.View(this){
-     final android.graphics.Paint pen=new android.graphics.Paint(3);
-     @Override protected void onDraw(android.graphics.Canvas c){
-      super.onDraw(c);float size=Math.min(getWidth(),getHeight())-dp(32);if(size<=0)return;
-      float ox=(getWidth()-size)/2,oy=(getHeight()-size)/2;
-      pen.setColor(0xff9b876c);pen.setStrokeWidth(dp(14));pen.setStrokeCap(android.graphics.Paint.Cap.ROUND);
-      for(int i=1;i<geometry.vertices.size();i++){android.graphics.PointF a=geometry.vertices.get(i-1).point,b=geometry.vertices.get(i).point;c.drawLine(ox+a.x*size,oy+a.y*size,ox+b.x*size,oy+b.y*size,pen);}
-      pen.setColor(0xff398bda);pen.setStrokeWidth(dp(2));
-      for(int i=1;i<geometry.vertices.size();i++){android.graphics.PointF a=geometry.vertices.get(i-1).point,b=geometry.vertices.get(i).point;c.drawLine(ox+a.x*size,oy+a.y*size,ox+b.x*size,oy+b.y*size,pen);}
-      pen.setColor(0xffe6a23c);
-      for(org.json.JSONObject o:linked){android.graphics.PointF p=geometry.stationPoint(o.optDouble("station"));if(p!=null)c.drawCircle(ox+p.x*size,oy+p.y*size,dp(5),pen);}
-     }
-    };panel.addView(map,new LinearLayout.LayoutParams(-1,dp(240)));
-   }else{TextView warning=new TextView(this);warning.setText("Geometrische Zuordnung offen: Skizzenmaße fehlen oder stimmen nicht mit der Trassenlänge überein.");panel.addView(warning);}
-
-   for(org.json.JSONObject o:linked){TextView row=new TextView(this);row.setPadding(0,dp(6),0,dp(6));row.setText(o.optDouble("station")+" m · "+MontageCatalog.Fitting.valueOf(o.getString("type")).label+" · DN "+(o.optString("dn").isEmpty()?"unbekannt":o.optString("dn")));panel.addView(row);}
+   boolean metricPlan=DxfExport.metricAvailable(geometry)&&Math.abs(measured-total)<0.001;
+   MontagePlanView map=metricPlan?new MontagePlanView(this,new DxfExport(new java.io.StringWriter(),geometry,true),rows):null;
+   if(map!=null){
+    panel.addView(sheetText("Montageplan · Abschnittslängen in Metern, Richtungen aus der Skizze",15,true));
+    panel.addView(map,new LinearLayout.LayoutParams(-1,dp(240)));
+   }else panel.addView(sheetText("Geometrische Zuordnung offen: Skizzenmaße fehlen oder stimmen nicht mit der Trassenlänge überein.",14,false));
    android.widget.ScrollView scroll=new android.widget.ScrollView(this);scroll.addView(panel);
-   new android.app.AlertDialog.Builder(this).setTitle("Gesamtplan – Stationierung").setView(scroll).setPositiveButton("Zurück",(d,w)->showMontage()).show();
+   android.app.AlertDialog.Builder builder=new android.app.AlertDialog.Builder(this).setTitle("Gesamtplan – Stationierung").setView(scroll)
+       .setNegativeButton("Zurück",(d,w)->showMontage());
+   if(map!=null)builder.setPositiveButton("Plan als PDF",(d,w)->{
+    android.content.Intent intent=new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);
+    intent.addCategory(android.content.Intent.CATEGORY_OPENABLE);intent.setType("application/pdf");
+    intent.putExtra(android.content.Intent.EXTRA_TITLE,"Montageplan.pdf");pendingPlanProject=activeProject;startActivityForResult(intent,431);
+   });
+   android.app.AlertDialog dialog=builder.create();
+   for(int i=0;i<rows.length();i++){
+    org.json.JSONObject row=rows.getJSONObject(i);Button item=new Button(this);item.setAllCaps(false);
+    item.setText(planFittingLabel(row,i,map));item.setOnClickListener(v->{dialog.dismiss();showMontageFitting(MontageCatalog.Fitting.valueOf(row.optString("type")),row);});panel.addView(item);
+   }
+   dialog.show();
   }catch(Exception e){notice("Stationsübersicht nicht verfügbar. Trassenlänge und Projektdaten prüfen.");}
+ }
+ String pendingPlanProject;
+ String planFittingLabel(org.json.JSONObject row,int index,MontagePlanView map)throws org.json.JSONException{
+  String station=row.has("station")?row.optString("station")+" m":"offen";
+  return (index+1)+". "+montageDescription(row)+" · Station "+station
+      +(row.has("offset")?" · Versatz "+row.optString("offset")+" m":"")
+      +(map!=null&&!map.hasPosition(index)?" · Lage offen":"");
+ }
+ void writeMontagePlan(android.net.Uri target){
+  android.graphics.pdf.PdfDocument pdf=new android.graphics.pdf.PdfDocument();
+  try{
+   RouteSketch route=new RouteSketch(this,routeData());
+   double total=Double.parseDouble(getPreferences(0).getString("length","").trim().replace(',','.'));
+   if(!Double.isFinite(total)||!DxfExport.metricAvailable(route)||Math.abs(route.measuredLength()-total)>=0.001){notice("Trassenmaße prüfen und Export erneut starten.");return;}
+   org.json.JSONArray fittings=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));
+   MontagePlanView map=new MontagePlanView(this,new DxfExport(new java.io.StringWriter(),route,true),fittings);
+   android.graphics.pdf.PdfDocument.Page page=pdf.startPage(new android.graphics.pdf.PdfDocument.PageInfo.Builder(842,595,1).create());
+   String name=getPreferences(0).getString("project","Projekt");
+   try{
+    Canvas canvas=page.getCanvas();Paint pen=new Paint(Paint.ANTI_ALIAS_FLAG);pen.setColor(INK);pen.setTextSize(19);
+    canvas.drawText("Montageplan",28,36,pen);pen.setTextSize(12);
+    canvas.drawText(name,28,58,pen);canvas.save();canvas.translate(28,76);map.render(canvas,786,445);canvas.restore();
+    canvas.drawText("0,00 – "+String.format(java.util.Locale.GERMANY,"%.2f m",total)+" · Abschnittslängen gemessen, Richtungen aus der Skizze",28,553,pen);
+    canvas.drawText("Seite 1",765,566,pen);
+   }finally{pdf.finishPage(page);}
+   StringBuilder list=new StringBuilder(name).append("\n\n");
+   for(int i=0;i<fittings.length();i++)list.append(planFittingLabel(fittings.getJSONObject(i),i,map)).append("\n\n");
+   if(fittings.length()==0)list.append("Keine Formstücke erfasst.");
+   dailyTextPdf(pdf,2,"Montageplan · Formstückverzeichnis",list.toString(),null);
+   try(java.io.OutputStream out=getContentResolver().openOutputStream(target,"wt")){
+    if(out==null)throw new java.io.IOException();pdf.writeTo(out);
+   }
+   notice("Montageplan gespeichert.");
+  }catch(Exception e){notice("Montageplan konnte nicht gespeichert werden.");}finally{pdf.close();}
  }
  void showMontageCatalog(){
   android.widget.ScrollView scroll=new android.widget.ScrollView(this);
@@ -2867,7 +2901,7 @@ public class MainActivity extends Activity {
  }
 
  public void onCreate(Bundle b){super.onCreate(b);activeProject=projectRegistry().getString("active",LEGACY_PROJECT);
- if(b!=null){selectedPoint=b.getString("selectedPoint");pendingPoint=b.getString("pendingPoint");pendingPhoto=b.getString("pendingPhoto");pendingMaterialProject=b.getString("pendingMaterialProject");pendingConnectionsProject=b.getString("pendingConnectionsProject");}
+ if(b!=null){selectedPoint=b.getString("selectedPoint");pendingPoint=b.getString("pendingPoint");pendingPhoto=b.getString("pendingPhoto");pendingMaterialProject=b.getString("pendingMaterialProject");pendingConnectionsProject=b.getString("pendingConnectionsProject");pendingPlanProject=b.getString("pendingPlanProject");}
  shell=page();shell.setPadding(0,0,0,0);shell.setBackgroundColor(0xfff4f6f8);setContentView(shell);fitSystemPanels(shell);
  planPage=page();measurePage=page();voicePage=page();profilePage=page();segmentPage=page();objectPage=page();quantityPage=page();
  LinearLayout header=new LinearLayout(this);
@@ -4047,7 +4081,7 @@ public class MainActivity extends Activity {
  }
  @Override protected void onSaveInstanceState(Bundle out){
   super.onSaveInstanceState(out);out.putString("selectedPoint",selectedPoint);
-  out.putString("pendingPoint",pendingPoint);out.putString("pendingPhoto",pendingPhoto);out.putString("pendingMaterialProject",pendingMaterialProject);out.putString("pendingConnectionsProject",pendingConnectionsProject);
+  out.putString("pendingPoint",pendingPoint);out.putString("pendingPhoto",pendingPhoto);out.putString("pendingMaterialProject",pendingMaterialProject);out.putString("pendingConnectionsProject",pendingConnectionsProject);out.putString("pendingPlanProject",pendingPlanProject);
  }
  com.google.mlkit.nl.translate.Translator translator;
  int speechVersion;
@@ -4255,6 +4289,13 @@ public class MainActivity extends Activity {
  try{startActivityForResult(i,410);}catch(android.content.ActivityNotFoundException e){Toast.makeText(this,"Keine Spracherkennung verfügbar.",Toast.LENGTH_LONG).show();}
  }
  @Override protected void onActivityResult(int request,int result,android.content.Intent data){super.onActivityResult(request,result,data);
+ if(request==431){
+  String projectId=pendingPlanProject;pendingPlanProject=null;
+  if(result==RESULT_OK&&data!=null&&data.getData()!=null){
+   if(activeProject.equals(projectId))writeMontagePlan(data.getData());else notice("Projekt gewechselt. Export erneut starten.");
+  }
+  return;
+ }
  if(request==430){
   String projectId=pendingConnectionsProject;pendingConnectionsProject=null;
   if(result==RESULT_OK&&data!=null&&data.getData()!=null){
