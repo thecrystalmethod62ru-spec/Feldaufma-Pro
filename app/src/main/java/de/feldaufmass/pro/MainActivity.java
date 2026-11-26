@@ -5371,6 +5371,26 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     }catch(Exception ex){notice("Gültige Maße eingeben");}
    }).setNegativeButton("Abbrechen",null).show();
   });
+  Button distribute=new Button(this);distribute.setText("Gruppe mit Mindestabstand verteilen");
+  distribute.setOnClickListener(v->{
+   if(!groupMode[0]||group.size()<2){notice("Mindestens zwei Leitungen auswählen");return;}
+   try{
+    double x=Double.parseDouble(offset.getText().toString().replace(',','.')),y=Double.parseDouble(depth.getText().toString().replace(',','.'));
+    double gap=Double.parseDouble(getPreferences(0).getString("metricPipeMinGap","0").replace(',','.'));
+    if(!Double.isFinite(x)||!Double.isFinite(y)||!Double.isFinite(gap)||x<0||y<0||gap<0)throw new IllegalArgumentException();
+    current[0].put("offset",x);current[0].put("axisDepth",y);
+    java.util.List<Integer> ordered=new java.util.ArrayList<>(group);
+    ordered.sort((aa,bb)->Double.compare(rows.optJSONObject(aa).optDouble("offset"),rows.optJSONObject(bb).optDouble("offset")));
+    double edge=0;double[] centers=new double[ordered.size()];
+    for(int k=0;k<ordered.size();k++){org.json.JSONObject n=rows.optJSONObject(ordered.get(k));double radius=n.optDouble("diameter")/2000;if(!Double.isFinite(radius)||radius<=0)throw new IllegalArgumentException();centers[k]=edge+radius;edge+=2*radius+gap;}
+    double required=edge-gap;
+    groupUndo.push(rows.toString());if(groupUndo.size()>50)groupUndo.removeLast();groupRedo.clear();
+    for(int k=0;k<ordered.size();k++){org.json.JSONObject n=rows.optJSONObject(ordered.get(k));n.put("offset",centers[k]);n.put("axisDepth",y);}
+    offset.setText(current[0].optString("offset"));depth.setText(current[0].optString("axisDepth"));restoreGroup.run();
+    notice(String.format(java.util.Locale.GERMANY,"Benötigte Breite ohne Randabstand: %.3f m",required));
+   }catch(Exception ex){notice("Gültige Durchmesser und Maße erforderlich");}
+  });
+  form.addView(distribute);
   form.addView(alignGroup);
   form.addView(groupBack);form.addView(groupForward);
   form.addView(preview,0,new LinearLayout.LayoutParams(-1,dp(160)));
