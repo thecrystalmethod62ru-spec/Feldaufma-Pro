@@ -4033,6 +4033,10 @@ public class MainActivity extends Activity {
   double[] u=lateralInterval(a,trenchWidth),v=lateralInterval(b,trenchWidth);
   return CivilGeometry.overlapArea(x,y,la,lb,u,v);
  }
+ static String overlapObjectLabel(int index,org.json.JSONObject object){
+  String label=String.format(java.util.Locale.GERMANY,"Nr. %d %s (Station %.2f m)",index+1,object.optString("type"),object.optDouble("station"));
+  return Double.isFinite(RouteSketch.positiveDimension(object,"detailLength"))?label:label+" [Länge fehlt]";
+ }
  String overlapReport(){
   StringBuilder out=new StringBuilder();int count=0;
   for(int i=0;i<objects.length();i++){
@@ -4040,7 +4044,7 @@ public class MainActivity extends Activity {
    for(int j=i+1;j<objects.length();j++){
     org.json.JSONObject b=objects.optJSONObject(j);if(b==null||!potentialObjectOverlap(a,b,w))continue;
     count++;
-    out.append("\n").append(i+1).append(" / ").append(j+1).append(": ").append(a.optString("type")).append(" / ").append(b.optString("type")).append(" – ");
+    out.append("\n").append(overlapObjectLabel(i,a)).append(" / ").append(overlapObjectLabel(j,b)).append(" – ");
     double area=overlapArea(a,b,w);
     if(Double.isFinite(area))out.append(String.format(java.util.Locale.GERMANY,"%.2f m²",area));else out.append("Fläche offen (Maße / Abstand fehlen)");
     out.append(overlapAccepted(i)&&overlapAccepted(j)?" · bestätigt":" · prüfen");
@@ -4069,7 +4073,7 @@ public class MainActivity extends Activity {
  }
  boolean overlapAccepted(int index){
   org.json.JSONObject o=objects.optJSONObject(index);if(o==null)return false;
-  String signature=overlapSignature(index);return !signature.isEmpty()&&signature.equals(o.optString("acceptedOverlap"));
+  String accepted=o.optString("acceptedOverlap");return !accepted.isEmpty()&&accepted.equals(overlapSignature(index));
  }
  boolean objectWarning(int index){
   org.json.JSONObject o=objects.optJSONObject(index);if(o==null)return false;
