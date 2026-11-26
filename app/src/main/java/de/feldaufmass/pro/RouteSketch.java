@@ -109,6 +109,22 @@ final class RouteSketch extends View {
   for(int i=1;i<vertices.size();i++)total+=vertices.get(i).metres;
   return total;
  }
+ boolean rebuildMeasuredGeometry(){
+  if(vertices.size()<2)return false;
+  double[] xs=new double[vertices.size()],ys=new double[vertices.size()];
+  double minX=0,maxX=0,minY=0,maxY=0;
+  for(int i=1;i<vertices.size();i++){
+   Vertex a=vertices.get(i-1),b=vertices.get(i);
+   double dx=b.point.x-a.point.x,dy=b.point.y-a.point.y,n=Math.hypot(dx,dy);
+   if(!Double.isFinite(b.metres)||b.metres<=0||!Double.isFinite(n)||n<1e-8)return false;
+   xs[i]=xs[i-1]+dx/n*b.metres;ys[i]=ys[i-1]+dy/n*b.metres;
+   if(!Double.isFinite(xs[i])||!Double.isFinite(ys[i]))return false;
+   minX=Math.min(minX,xs[i]);maxX=Math.max(maxX,xs[i]);minY=Math.min(minY,ys[i]);maxY=Math.max(maxY,ys[i]);
+  }
+  double span=Math.max(maxX-minX,maxY-minY);if(!Double.isFinite(span)||span<=0)return false;
+  for(int i=0;i<vertices.size();i++)vertices.get(i).point.set((float)(.5+.8*((xs[i]-minX)-(maxX-minX)/2)/span),(float)(.5+.8*((ys[i]-minY)-(maxY-minY)/2)/span));
+  zoom=1;centerX=.5f;centerY=.5f;if(changed!=null)changed.run();invalidate();return true;
+ }
  String measurements(){
   StringBuilder text=new StringBuilder();
   for(int i=1;i<vertices.size();i++){
