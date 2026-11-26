@@ -1803,6 +1803,44 @@ public class MainActivity extends Activity {
     if(total<=0||maxDepth<=0)return;
     float left=dp(12),top=dp(32),width=getWidth()-dp(24),height=getHeight()-dp(76);
     if(width<=0||height<=0)return;
+    if(surveyedProfile[0]!=null){
+     ElevationProfile ep=surveyedProfile[0];
+     java.util.TreeSet<Double> stations=new java.util.TreeSet<>();
+     double cursor=0;stations.add(0.0);
+     for(double[] v:profileData){cursor+=v[0];stations.add(cursor);}
+     for(double[] point:ep.stations())if(point[0]<=total)stations.add(point[0]);
+     double low=Double.POSITIVE_INFINITY,high=Double.NEGATIVE_INFINITY;
+     for(double st:stations){double z=ep.elevation(st);if(Double.isFinite(z)){low=Math.min(low,z-maxDepth);high=Math.max(high,z);}}
+     if(Double.isFinite(low)&&high>low){
+      double range=high-low;double st0=0;
+      for(double[] v:profileData){
+       double st1=st0+v[0];
+       java.util.TreeSet<Double> cuts=new java.util.TreeSet<>();cuts.add(st0);cuts.add(st1);
+       for(double st:stations)if(st>st0&&st<st1)cuts.add(st);
+       Double prev=null;
+       for(double st:cuts){
+        if(prev!=null){
+         double za=ep.elevation(prev),zb=ep.elevation(st);
+         if(Double.isFinite(za)&&Double.isFinite(zb)){
+          float x1=left+(float)(prev/total*width),x2=left+(float)(st/total*width);
+          float y1=top+(float)((high-za)/range*height),y2=top+(float)((high-zb)/range*height),h=(float)(v[1]/range*height);
+          android.graphics.Path shape=new android.graphics.Path();shape.moveTo(x1,y1);shape.lineTo(x2,y2);shape.lineTo(x2,y2+h);shape.lineTo(x1,y1+h);shape.close();
+          p.setColor(0xffb79b70);c.drawPath(shape,p);
+          p.setColor(0xff68945d);p.setStrokeWidth(dp(2));c.drawLine(x1,y1,x2,y2,p);
+          p.setColor(0xff555555);c.drawLine(x1,y1+h,x2,y2+h,p);
+         }
+        }
+        prev=st;
+       }
+       st0=st1;
+      }
+      p.setColor(0xff777777);c.drawText("Längsschnitt – vermessene GOK / Grabensohle",left,dp(16),p);
+      c.drawText("0,00 m",left,getHeight()-dp(12),p);
+      String end=String.format(java.util.Locale.GERMANY,"%.2f m",total);c.drawText(end,left+width-p.measureText(end),getHeight()-dp(12),p);
+      return;
+     }
+    }
+
     p.setColor(0xff68945d);p.setStrokeWidth(dp(2));c.drawLine(left,top,left+width,top,p);
     double station=0;
     for(double[] v:profileData){
