@@ -3030,14 +3030,30 @@ public class MainActivity extends Activity {
     warningCuts.add(0.0);
     for(int k=1;k<route.vertices.size();k++){warningStation+=route.vertices.get(k).metres;warningCuts.add(warningStation);}
     for(int k=0;k<widthSections.length();k++){org.json.JSONObject section=widthSections.optJSONObject(k);if(section!=null)for(String key:new String[]{"from","to"}){double value=section.optDouble(key);if(value>0&&value<warningTotal)warningCuts.add(value);}}
+    java.util.ArrayList<double[]> warningDepths=new java.util.ArrayList<>();
+    double warningDefaultDepth=d;
+    try{
+     String raw=getPreferences(0).getString("metricMainExcavationDepth","").trim();
+     if(!raw.isEmpty()){warningDefaultDepth=Double.parseDouble(raw.replace(',','.'));if(!Double.isFinite(warningDefaultDepth)||warningDefaultDepth<=0)throw new IllegalArgumentException();}
+     for(String line:getPreferences(0).getString("metricDepthSections","").split("\\n")){
+      if(line.trim().isEmpty())continue;
+      String[] parts=line.trim().split(";",-1);if(parts.length!=3)throw new IllegalArgumentException();
+      double[] v=new double[3];for(int k=0;k<3;k++){v[k]=Double.parseDouble(parts[k].trim().replace(',','.'));if(!Double.isFinite(v[k]))throw new IllegalArgumentException();}
+      if(v[0]<0||v[1]<=v[0]||v[1]>warningTotal+1e-8||v[2]<=0)throw new IllegalArgumentException();
+      for(double[] old:warningDepths)if(v[0]<old[1]&&v[1]>old[0])throw new IllegalArgumentException();
+      warningDepths.add(v);
+     }
+    }catch(Exception ex){warningDepths.clear();warningDefaultDepth=Double.NaN;pen.setColor(0xffb3261e);pen.setTextSize(dp(11));c.drawText("Tiefenabschnitte ungültig",dp(12),dp(16),pen);}
+    for(double[] section:warningDepths){warningCuts.add(section[0]);warningCuts.add(Math.min(warningTotal,section[1]));}
     org.json.JSONArray warningUtilities=extraUtilities();
     for(int k=0;k<warningUtilities.length();k++){org.json.JSONObject u=warningUtilities.optJSONObject(k);if(u!=null)for(String key:new String[]{"routeFrom","routeTo"}){double value=u.optDouble(key);if(value>0&&value<warningTotal)warningCuts.add(value);}}
     Double warningPrevious=null;
     for(double stop:warningCuts){
      if(warningPrevious==null){warningPrevious=stop;continue;}
      double begin=warningPrevious;warningPrevious=stop;double mid=(begin+stop)/2;
+     double warningDepth=warningDefaultDepth;for(double[] section:warningDepths)if(mid>=section[0]&&mid<section[1]){warningDepth=section[2];break;}
      boolean invalid=false;
-     for(int k=0;k<warningUtilities.length();k++){org.json.JSONObject u=warningUtilities.optJSONObject(k);if(u!=null&&mid>=u.optDouble("routeFrom",0)&&mid<u.optDouble("routeTo",Double.POSITIVE_INFINITY)&&utilityOutsideProfile(u,widthAt(mid),Double.NaN)){invalid=true;break;}}
+     for(int k=0;k<warningUtilities.length();k++){org.json.JSONObject u=warningUtilities.optJSONObject(k);if(u!=null&&mid>=u.optDouble("routeFrom",0)&&mid<u.optDouble("routeTo",Double.POSITIVE_INFINITY)&&utilityOutsideProfile(u,widthAt(mid),warningDepth)){invalid=true;break;}}
      if(invalid){double[] u=model.station(begin),v=model.station(stop);if(u!=null&&v!=null){pen.setColor(0xffb3261e);pen.setStrokeWidth(dp(4));c.drawLine((float)(ox+u[0]*scale),(float)(oy-u[1]*scale),(float)(ox+v[0]*scale),(float)(oy-v[1]*scale),pen);}}
     }
     pen.setColor(0xffe6a23c);
