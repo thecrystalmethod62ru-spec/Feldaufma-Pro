@@ -195,6 +195,43 @@ class MainActivity : ComponentActivity() {
                             result[0].toDouble()
                         }
                         Text("GPS-Strecke: " + fmt(gpsLength) + " m")
+                        if (gps.isNotEmpty()) {
+                            Text("GPS-Lageplan · Norden oben")
+                            Canvas(Modifier.fillMaxWidth().height(260.dp)) {
+                                drawRect(Color(0xFFF0F2F3))
+                                val origin = gps.first()
+                                val cosLat = kotlin.math.cos(Math.toRadians(origin.lat)).coerceAtLeast(0.000001)
+                                val xy = gps.map {
+                                    Pair((it.lon-origin.lon)*111320.0*cosLat, (it.lat-origin.lat)*111320.0)
+                                }
+                                val minX = xy.minOf { it.first }
+                                val maxX = xy.maxOf { it.first }
+                                val minY = xy.minOf { it.second }
+                                val maxY = xy.maxOf { it.second }
+                                val scale = minOf((size.width-48f).coerceAtLeast(1f)/(maxX-minX).coerceAtLeast(1.0), (size.height-48f).coerceAtLeast(1f)/(maxY-minY).coerceAtLeast(1.0))
+                                val projected = xy.map { (x,y) ->
+                                    Offset((size.width/2+(x-(minX+maxX)/2)*scale).toFloat(), (size.height/2-(y-(minY+maxY)/2)*scale).toFloat())
+                                }
+                                projected.zipWithNext().forEach { (a,b) -> drawLine(Color(0xFF174C65),a,b,4f) }
+                                projected.forEachIndexed { i, pos ->
+                                    drawCircle(Color(0x33174C65), (gps[i].accuracy*scale).toFloat().coerceIn(3f, size.maxDimension*2), pos)
+                                    drawCircle(if (i==0) Color(0xFF27834A) else Color(0xFF174C65),6f,pos)
+                                }
+                                drawLine(Color.DarkGray, Offset(size.width-20f,40f),Offset(size.width-20f,12f),3f)
+                                drawLine(Color.DarkGray, Offset(size.width-20f,12f),Offset(size.width-26f,20f),3f)
+                                drawLine(Color.DarkGray, Offset(size.width-20f,12f),Offset(size.width-14f,20f),3f)
+                            }
+                            Text("Grün: Startpunkt · Kreise: GPS-Genauigkeit")
+                            OutlinedButton(onClick = {
+                                val point = gps.last()
+                                val uri = android.net.Uri.parse("geo:" + point.lat + "," + point.lon + "?q=" + point.lat + "," + point.lon)
+                                try {
+                                    startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri))
+                                } catch (e: Exception) {
+                                    gpsStatus = "Keine Karten-App verfügbar."
+                                }
+                            }) { Text("Letzten Punkt in Karten-App öffnen") }
+                        }
                         gps.forEachIndexed { i, point ->
                             Text("Punkt " + (i+1) + ": " + String.format(Locale.US, "%.6f, %.6f", point.lat, point.lon) + " · ±" + fmt(point.accuracy) + " m")
                         }
