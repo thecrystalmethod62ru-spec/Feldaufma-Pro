@@ -605,17 +605,26 @@ public class MainActivity extends Activity {
   android.location.LocationManager manager=(android.location.LocationManager)getSystemService(LOCATION_SERVICE);
   if(!manager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)){notice("Bitte GPS aktivieren.");return;}
   if(android.os.Build.VERSION.SDK_INT<30){notice("GPS-Zuordnung benötigt Android 11 oder neuer.");return;}
-  collectGps(id,manager);
+  int[] durations={10,20,30,60};
+  int saved=getPreferences(0).getInt("gpsDurationSeconds",20);
+  int selected=1;for(int i=0;i<durations.length;i++)if(durations[i]==saved)selected=i;
+  final int[] choice={selected};
+  new android.app.AlertDialog.Builder(this).setTitle("GPS-Messdauer")
+   .setSingleChoiceItems(new String[]{"10 Sekunden","20 Sekunden","30 Sekunden","60 Sekunden"},selected,(d,w)->choice[0]=w)
+   .setNegativeButton("Abbrechen",null).setPositiveButton("Messung starten",(d,w)->{
+    int seconds=durations[choice[0]];getPreferences(0).edit().putInt("gpsDurationSeconds",seconds).apply();collectGps(id,manager,seconds);
+   }).show();
  }
- void collectGps(String id,android.location.LocationManager manager){
+ void collectGps(String id,android.location.LocationManager manager,int seconds){
   final java.util.ArrayList<android.location.Location> samples=new java.util.ArrayList<>();
   final android.os.Handler handler=new android.os.Handler(android.os.Looper.getMainLooper());
-  final android.app.AlertDialog progress=new android.app.AlertDialog.Builder(this).setTitle("GPS-Messung · 20 Sekunden").setMessage("Bitte am Messpunkt stehen bleiben.").setNegativeButton("Abbrechen",null).create();
+  final android.app.AlertDialog progress=new android.app.AlertDialog.Builder(this).setTitle("GPS-Messung · "+seconds+" Sekunden").setMessage("Bitte am Messpunkt stehen bleiben.").setNegativeButton("Abbrechen",null).create();
+  final long started=android.os.SystemClock.elapsedRealtime();
   final android.location.LocationListener listener=new android.location.LocationListener(){
    public void onLocationChanged(android.location.Location fix){
     if(!fix.hasAccuracy()||fix.getAccuracy()<=0||android.os.SystemClock.elapsedRealtimeNanos()-fix.getElapsedRealtimeNanos()>3000000000L)return;
     samples.add(new android.location.Location(fix));
-    progress.setMessage(String.format(java.util.Locale.GERMANY,"%d Messungen · aktuell ± %.2f m",samples.size(),fix.getAccuracy()));
+    progress.setMessage(String.format(java.util.Locale.GERMANY,"%d/%d Sekunden · %d Messungen\nAktuell ± %.2f m",Math.min(seconds,(android.os.SystemClock.elapsedRealtime()-started)/1000),seconds,samples.size(),fix.getAccuracy()));
    }
    public void onProviderDisabled(String provider){progress.dismiss();}
    public void onProviderEnabled(String provider){}
@@ -636,7 +645,7 @@ public class MainActivity extends Activity {
   };
   progress.setOnDismissListener(d->{handler.removeCallbacks(finish);manager.removeUpdates(listener);});
   progress.show();
-  try{manager.requestLocationUpdates(android.location.LocationManager.GPS_PROVIDER,1000L,0f,listener);handler.postDelayed(finish,20000L);}
+  try{manager.requestLocationUpdates(android.location.LocationManager.GPS_PROVIDER,1000L,0f,listener);handler.postDelayed(finish,seconds*1000L);}
   catch(RuntimeException ex){progress.dismiss();notice("GPS konnte nicht gestartet werden.");}
  }
  void offerGpsFix(String id,android.location.Location fix){
