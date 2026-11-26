@@ -15,6 +15,8 @@ import java.util.Locale;
 
 /** Coordinates describe a schematic only. Metres are entered in the field. */
 final class RouteSketch extends View {
+ static final double GPS_MOVE_ACCURACY_METRES=0.5;
+ static boolean preciseGps(double accuracy){return Double.isFinite(accuracy)&&accuracy>0&&accuracy<=GPS_MOVE_ACCURACY_METRES;}
  static final class Vertex {
   final PointF point;
   String id=java.util.UUID.randomUUID().toString();
@@ -87,7 +89,7 @@ final class RouteSketch extends View {
  }
  private static double longitudeDelta(double lon,double origin){return ((lon-origin+540)%360)-180;}
  private static boolean gpsAnchor(Vertex v){
-  return Double.isFinite(v.latitude)&&Math.abs(v.latitude)<=85&&Double.isFinite(v.longitude)&&Math.abs(v.longitude)<=180&&Double.isFinite(v.accuracy)&&v.accuracy>0&&v.accuracy<=5;
+  return Double.isFinite(v.latitude)&&Math.abs(v.latitude)<=85&&Double.isFinite(v.longitude)&&Math.abs(v.longitude)<=180&&preciseGps(v.accuracy);
  }
  double measuredLength(){
   if(vertices.size()<2)return Double.NaN;
