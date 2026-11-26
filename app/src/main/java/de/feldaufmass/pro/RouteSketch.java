@@ -39,6 +39,7 @@ final class RouteSketch extends View {
  private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
  boolean editable,dimensioning;
  Runnable changed;
+ SegmentListener strokeAdded;
  interface SegmentListener {void select(int endpoint);}
  SegmentListener selected;
 
@@ -350,12 +351,14 @@ final class RouteSketch extends View {
   return result;
  }
  private void appendStroke(ArrayList<PointF> points){
+  int before=vertices.size();
   for(int i=vertices.isEmpty()?0:1;i<points.size();i++){
    PointF p=points.get(i);
    if(!vertices.isEmpty()&&distance(vertices.get(vertices.size()-1).point,p)<.00001)continue;
    vertices.add(new Vertex(new PointF(p.x,p.y),Double.NaN));
   }
   stroke.clear();if(changed!=null)changed.run();invalidate();
+  if(vertices.size()>Math.max(1,before)&&strokeAdded!=null){int first=Math.max(1,before);post(()->strokeAdded.select(first));}
  }
  private void finishStroke(){
   if(stroke.size()<2)return;
