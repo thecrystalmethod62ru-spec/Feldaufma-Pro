@@ -4180,6 +4180,12 @@ public class MainActivity extends Activity {
     try{
      page.getCanvas().drawText("Trassenskizze – schematisch",36,44,pen);
      drawReportView(page.getCanvas(),route,80,523,523);
+     double factor=route.uniformMetresPerUnit();
+     if(Double.isFinite(factor)){
+      Canvas c=page.getCanvas();pen.setTextSize(11);
+      c.drawText("Proportionale Trassengeometrie – kein fester Druckmaßstab",36,640,pen);
+     }
+
     }finally{pdf.finishPage(page);}
    }
    pageNumber=appendLongitudinalPdf(pdf,pageNumber,route);
