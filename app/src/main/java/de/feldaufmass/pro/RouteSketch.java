@@ -263,8 +263,14 @@ final class RouteSketch extends View {
  }
  private DimensionHit activeDimension;
  private float dimensionStartX,dimensionStartY;
+ private long dimensionDownTime; private boolean dimensionMoved;
  private Float previousDimensionOffset,previousRouteX,previousRouteY;
  private void restoreDimensionDrag(){String k=activeDimension.key;if(k.startsWith("route:")){if(previousRouteX==null)dimensionOffsets.remove(k+":x");else dimensionOffsets.put(k+":x",previousRouteX);if(previousRouteY==null)dimensionOffsets.remove(k+":y");else dimensionOffsets.put(k+":y",previousRouteY);}else if(previousDimensionOffset==null)dimensionOffsets.remove(k);else dimensionOffsets.put(k,previousDimensionOffset);}
+ private void showDimensionRotation(String key){
+  android.widget.PopupMenu menu=new android.widget.PopupMenu(getContext(),this);
+  for(int angle:new int[]{0,15,30,45,60,75,90,-15,-30,-45,-60,-75,-90})menu.getMenu().add(0,angle+100,0,angle+"°");
+  menu.setOnMenuItemClickListener(item->{String k=key+":angle";Float old=dimensionOffsets.put(k,(float)(item.getItemId()-100));if(!saveDimensionLayout()){if(old==null)dimensionOffsets.remove(k);else dimensionOffsets.put(k,old);}invalidate();return true;});menu.show();
+ }
  private void drawSurfaceDimensions(Canvas c,float d){
   if(!layerVisible(LAYER_SURFACES)||!layerVisible(LAYER_SURFACE_DIMENSIONS))return;
   java.util.TreeSet<Double> boundaries=new java.util.TreeSet<>();
@@ -584,10 +590,14 @@ final class RouteSketch extends View {
    String label=Double.isFinite(metres)?String.format(Locale.GERMANY,"%.2f m",metres):"Maß fehlt";
    float tx=left()+(a.x+b.x)*scale()/2,ty=top()+(a.y+b.y)*scale()/2-6*density;
    String key="route:"+i;tx+=density*dimensionOffsets.getOrDefault(key+":x",0f);ty+=density*dimensionOffsets.getOrDefault(key+":y",0f);
-   dimensionHits.add(new DimensionHit(key,new android.graphics.RectF(tx-4*density,ty-16*density,tx+paint.measureText(label)+4*density,ty+5*density),0,0,0));
+   float angle=dimensionOffsets.getOrDefault(key+":angle",0f);
+   android.graphics.RectF bounds=new android.graphics.RectF(-4*density,-16*density,paint.measureText(label)+4*density,5*density);
+   android.graphics.Matrix transform=new android.graphics.Matrix();transform.setRotate(angle);transform.postTranslate(tx,ty);transform.mapRect(bounds);
+   dimensionHits.add(new DimensionHit(key,bounds,0,0,0));
+   c.save();c.translate(tx,ty);c.rotate(angle);
    paint.setColor(Double.isFinite(metres)?Color.WHITE:0xffffcf73);
-   c.drawRoundRect(tx-2*density,ty-14*density,tx+paint.measureText(label)+2*density,ty+3*density,4,4,paint);
-   paint.setColor(0xff173c42);c.drawText(label,tx,ty,paint);
+   c.drawRoundRect(-2*density,-14*density,paint.measureText(label)+2*density,3*density,4,4,paint);
+   paint.setColor(0xff173c42);c.drawText(label,0,0,paint);c.restore();
   }
   for(int i=0;i<vertices.size();i++){
    PointF p=vertices.get(i).point;
@@ -677,12 +687,14 @@ final class RouteSketch extends View {
    for(int i=dimensionHits.size()-1;i>=0;i--){
     DimensionHit hit=dimensionHits.get(i);
     if(hit.bounds.contains(event.getX(),event.getY())){
-     activeDimension=hit;previousDimensionOffset=dimensionOffsets.get(hit.key);previousRouteX=dimensionOffsets.get(hit.key+":x");previousRouteY=dimensionOffsets.get(hit.key+":y");dimensionStartX=event.getX();dimensionStartY=event.getY();getParent().requestDisallowInterceptTouchEvent(true);return true;
+     activeDimension=hit;previousDimensionOffset=dimensionOffsets.get(hit.key);previousRouteX=dimensionOffsets.get(hit.key+":x");previousRouteY=dimensionOffsets.get(hit.key+":y");dimensionStartX=event.getX();dimensionStartY=event.getY();dimensionDownTime=event.getEventTime();dimensionMoved=false;getParent().requestDisallowInterceptTouchEvent(true);return true;
     }
    }
   }
   if(activeDimension!=null){
    if(action==MotionEvent.ACTION_MOVE){
+    if(Math.hypot(event.getX()-dimensionStartX,event.getY()-dimensionStartY)>android.view.ViewConfiguration.get(getContext()).getScaledTouchSlop())dimensionMoved=true;
+    if(!dimensionMoved)return true;
     float d=getResources().getDisplayMetrics().density;
     if(activeDimension.key.startsWith("route:")){dimensionOffsets.put(activeDimension.key+":x",Math.max(-1000,Math.min(1000,(previousRouteX==null?0:previousRouteX)+(event.getX()-dimensionStartX)/d)));dimensionOffsets.put(activeDimension.key+":y",Math.max(-1000,Math.min(1000,(previousRouteY==null?0:previousRouteY)+(event.getY()-dimensionStartY)/d)));invalidate();return true;}
     float delta=((event.getX()-dimensionStartX)*activeDimension.nx+(event.getY()-dimensionStartY)*activeDimension.ny)/d;
@@ -691,7 +703,8 @@ final class RouteSketch extends View {
    if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL){
     if(action==MotionEvent.ACTION_CANCEL){restoreDimensionDrag();}
     if(action==MotionEvent.ACTION_UP&&!saveDimensionLayout()){restoreDimensionDrag();}
-    activeDimension=null;getParent().requestDisallowInterceptTouchEvent(false);invalidate();return true;
+    String key=activeDimension.key;boolean rotate=action==MotionEvent.ACTION_UP&&!dimensionMoved&&key.startsWith("route:")&&event.getEventTime()-dimensionDownTime>=android.view.ViewConfiguration.getLongPressTimeout();
+    activeDimension=null;getParent().requestDisallowInterceptTouchEvent(false);invalidate();if(rotate)showDimensionRotation(key);return true;
    }
    return true;
   }
