@@ -177,6 +177,28 @@ final class RouteSketch extends View {
   if(n.contains("wassergebunden"))return 0xffC7B49B;
   return 0xffD58AB4;
  }
+ static int surfacePattern(String name){
+  int color=surfaceColor(name);
+  int[] colors={0xff646B73,0xffBFC5CB,0xffD39B60,0xff9670AC,0xffC5A3D9,0xffE7D5B0,0xff76B5E5,0xffC66D56,0xffA49B89,0xffE3C96A,0xffF5E9A8,0xff916B49,0xff79BC65,0xff367D46,0xffC7B49B,0xffD58AB4};
+  for(int i=0;i<colors.length;i++)if(colors[i]==color)return i;
+  return 15;
+ }
+ private void surfaceHatch(Canvas c,PointF a,PointF b,float density,int pattern){
+  float ax=left()+scale()*a.x,ay=top()+scale()*a.y,bx=left()+scale()*b.x,by=top()+scale()*b.y;
+  float length=(float)Math.hypot(bx-ax,by-ay);if(length<1)return;
+  c.save();c.translate(ax,ay);c.rotate((float)Math.toDegrees(Math.atan2(by-ay,bx-ax)));c.clipRect(0,-6*density,length,6*density);
+  Paint hatch=new Paint(Paint.ANTI_ALIAS_FLAG);hatch.setColor(0xAA202020);hatch.setStrokeWidth(.8f*density);
+  float step=(5+pattern%4*3)*density;
+  for(float x=-12*density;x<length+12*density;x+=step){
+   switch(pattern/4){
+    case 0:c.drawLine(x,-6*density,x+6*density,6*density,hatch);break;
+    case 1:c.drawLine(x,-6*density,x,6*density,hatch);c.drawLine(x,0,x+step,0,hatch);break;
+    case 2:c.drawCircle(x,-3*density,density,hatch);c.drawCircle(x+step/2,3*density,density,hatch);break;
+    default:c.drawLine(x,6*density,x+6*density,-6*density,hatch);c.drawLine(x,-6*density,x+6*density,6*density,hatch);break;
+   }
+  }
+  c.restore();
+ }
  void drawSurfaceSections(Canvas c,float density){
   if(!layerVisible(LAYER_SURFACES))return;
   for(int j=0;j<surfaceSections.length();j++){
@@ -187,7 +209,7 @@ final class RouteSketch extends View {
    double start=0;
    for(int i=1;i<vertices.size();i++){
     double end=start+vertices.get(i).metres,lo=Math.max(from,start),hi=Math.min(to,end);
-    if(hi>lo){PointF a=stationPoint(lo),b=stationPoint(hi);if(a!=null&&b!=null)line(c,a,b);}
+    if(hi>lo){PointF a=stationPoint(lo),b=stationPoint(hi);if(a!=null&&b!=null){line(c,a,b);surfaceHatch(c,a,b,density,surfacePattern(section.optString("surface")));}}
     start=end;
    }
   }
