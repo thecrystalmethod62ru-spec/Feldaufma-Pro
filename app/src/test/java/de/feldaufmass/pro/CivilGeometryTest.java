@@ -21,4 +21,12 @@ public class CivilGeometryTest {
         assertTrue(Double.isNaN(CivilGeometry.overlapArea(Double.NaN, 2, 2, 2, a, a)));
         assertTrue(Double.isNaN(CivilGeometry.overlapArea(2, 2, 2, 2, null, a)));
     }
+    @Test public void rectangularQuantities() {
+        assertEquals(92.0, CivilGeometry.rectangularArea(100, 0.92), 1e-9);
+        assertEquals(136.16, CivilGeometry.rectangularVolume(100, 0.92, 1.48), 1e-9);
+        assertEquals(46.0, CivilGeometry.rectangularArea(100, 0.23 + 0.23), 1e-9);
+        assertEquals(9.66, CivilGeometry.rectangularVolume(100, 1.38, 0.07), 1e-9);
+        assertEquals(27.6, CivilGeometry.rectangularVolume(100, 0.92, 0.30), 1e-9);
+        assertTrue(Double.isNaN(CivilGeometry.rectangularVolume(100, 0.92, Double.NaN)));
+    }
 }
