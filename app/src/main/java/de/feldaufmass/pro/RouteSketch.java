@@ -121,6 +121,20 @@ final class RouteSketch extends View {
  }
  JSONArray stationObjects=new JSONArray(),surfaceSections=new JSONArray();
  void setStationLayers(JSONArray objects,JSONArray sections){stationObjects=objects;surfaceSections=sections;invalidate();}
+ boolean editingObjects;
+ java.util.function.Consumer<java.util.ArrayList<Integer>> objectSelected;
+ java.util.ArrayList<Integer> objectCandidates(double x,double y,double tolerance){
+  java.util.ArrayList<Integer> hits=new java.util.ArrayList<>();
+  if(!layerVisible(LAYER_OBJECTS))return hits;
+  for(int j=0;j<stationObjects.length();j++){
+   org.json.JSONObject o=stationObjects.optJSONObject(j);if(o==null)continue;
+   ObjectFootprint f=objectFootprint(o);if(f==null)continue;
+   double dx=x-f.center.x,dy=y-f.center.y,angle=Math.toRadians(f.angle);
+   double u=dx*Math.cos(angle)+dy*Math.sin(angle),v=-dx*Math.sin(angle)+dy*Math.cos(angle);
+   double distance=f.measured?Math.hypot(Math.max(0,Math.abs(u)-f.length/2),Math.max(0,Math.abs(v)-f.width/2)):Math.hypot(dx,dy);
+   if(distance<=tolerance)hits.add(j);
+  }return hits;
+ }
  boolean placingObject;
  java.util.function.Consumer<java.util.ArrayList<StationHit>> stationSelected;
  static final class StationHit{
@@ -567,18 +581,19 @@ final class RouteSketch extends View {
    case MotionEvent.ACTION_DOWN:
     getParent().requestDisallowInterceptTouchEvent(true);
     stroke.clear();
-    if(placingObject){dragged=-1;return true;}
+    if(placingObject||editingObjects){dragged=-1;return true;}
     if(moving || !editable)dragged=layerVisible(LAYER_ROUTE)?nearestPoint(event.getX(),event.getY()):-1;
     else if(!dimensioning)stroke.add(vertices.isEmpty()?p:vertices.get(vertices.size()-1).point);
     return true;
    case MotionEvent.ACTION_MOVE:
     if(Math.hypot(event.getX()-touchStartX,event.getY()-touchStartY)>android.view.ViewConfiguration.get(getContext()).getScaledTouchSlop())touchMoved=true;
-    if(placingObject)return true;
+    if(placingObject||editingObjects)return true;
     if(moving && dragged>=0&&touchMoved)movePoint(dragged,p);
     if(!dimensioning && !stroke.isEmpty() && distance(stroke.get(stroke.size()-1),p)>.008){stroke.add(p);invalidate();}
     return true;
    case MotionEvent.ACTION_UP:
     getParent().requestDisallowInterceptTouchEvent(false);
+    if(editingObjects){if(!touchMoved&&objectSelected!=null){double tolerance=20*getResources().getDisplayMetrics().density/scale();objectSelected.accept(objectCandidates((event.getX()-left())/scale(),(event.getY()-top())/scale(),tolerance));}performClick();invalidate();return true;}
     if(placingObject){if(!touchMoved&&stationSelected!=null){double tolerance=24*getResources().getDisplayMetrics().density/scale();stationSelected.accept(stationCandidates((event.getX()-left())/scale(),(event.getY()-top())/scale(),tolerance));}performClick();invalidate();return true;}
     if(editable&&tappedPoint>=0&&!touchMoved&&pointSelected!=null){
      stroke.clear();dragged=-1;pointSelected.select(tappedPoint);tappedPoint=-1;performClick();invalidate();return true;
