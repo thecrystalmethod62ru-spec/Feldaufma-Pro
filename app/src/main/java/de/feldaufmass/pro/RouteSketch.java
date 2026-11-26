@@ -574,10 +574,6 @@ final class RouteSketch extends View {
  boolean darkEditor=false;
  @Override protected void onDraw(Canvas c){
   c.drawColor(darkEditor?Color.BLACK:Color.WHITE);
-  paint.setStrokeWidth(1);paint.setColor(darkEditor?0xff222b2b:0xffe5eceb);
-  for(int i=0;i<=10;i++){
-   float f=i/10f;line(c,new PointF(f,0),new PointF(f,1));line(c,new PointF(0,f),new PointF(1,f));
-  }
   drawUnderlay(c);
   float density=getResources().getDisplayMetrics().density;
   paint.setTextSize(13*density);
