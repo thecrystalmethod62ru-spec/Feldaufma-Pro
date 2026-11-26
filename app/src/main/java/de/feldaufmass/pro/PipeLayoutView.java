@@ -111,7 +111,7 @@ public final class PipeLayoutView extends View {
                     if(moving){
                         double o=Math.round((original.offset+dx/dragScale)*1000)/1000.0;
                         double b=Math.max(0,Math.round((original.bedding-dy/dragScale)*1000)/1000.0);
-                        pipes.set(dragged,new PipeLayout.Pipe(original.name,o,original.diameter,original.wall,b));invalidate();
+                        pipes.set(dragged,new PipeLayout.Pipe(original.name,o,original.diameter,original.wall,b,original.minGap,original.minCover));invalidate();
                     }
                 }
                 return true;
