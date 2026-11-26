@@ -1685,6 +1685,15 @@ public class MainActivity extends Activity {
    .setItems(new String[]{"Formstückkatalog","Projekt-Formstücke","Gesamtplan – Stationierung","Materialliste (eingebaut)","Verbindungsregister","Prüfprotokolle","Projektleitungen"},(d,w)->{if(w==0)showMontageCatalog();else if(w==1)showMontageInventory();else if(w==2)showMontageStationPlan();else if(w==3)showMontageMaterials();else if(w==4)new MontageConnections(this).show();else if(w==5)new MontageProtocols(this).show();else editUtilities();})
    .setNegativeButton("Schließen",null).show();
  }
+ final java.util.Map<String,String[]> montageStationHistory=new java.util.HashMap<>();
+ void restoreMontageStation(android.app.AlertDialog dialog,String project,boolean redo){
+  String[] history=montageStationHistory.get(project);
+  if(history==null||!project.equals(activeProject)){notice("Keine Änderung verfügbar.");return;}
+  String current=getPreferences(0).getString("montageFittings","[]");
+  if(!current.equals(history[redo?0:1])){notice("Montagedaten wurden inzwischen geändert.");return;}
+  if(!getPreferences(0).edit().putString("montageFittings",history[redo?1:0]).commit()){notice("Speichern fehlgeschlagen.");return;}
+  recordProjectEvent(redo?"Montageposition wiederholt":"Montageposition rückgängig");if(sketch!=null)sketch.invalidate();if(livePreview!=null)livePreview.invalidate();dialog.dismiss();showMontageStationPlan();
+ }
  void showMontageStationPlan(){
   try{
    double total=Double.parseDouble(getPreferences(0).getString("length","").trim().replace(',','.'));
@@ -1725,6 +1734,13 @@ public class MainActivity extends Activity {
     intent.putExtra(android.content.Intent.EXTRA_TITLE,"Montageplan.pdf");pendingPlanProject=activeProject;startActivityForResult(intent,431);
    });
    android.app.AlertDialog dialog=builder.create();
+   String[] history=montageStationHistory.get(stationProject);
+   if(history!=null){
+    String current=getPreferences(0).getString("montageFittings","[]");
+    LinearLayout actions=new LinearLayout(this);
+    Button undo=new Button(this);undo.setText("Rückgängig");undo.setEnabled(current.equals(history[1]));actions.addView(undo,new LinearLayout.LayoutParams(0,-2,1));undo.setOnClickListener(v->restoreMontageStation(dialog,stationProject,false));
+    Button redo=new Button(this);redo.setText("Wiederholen");redo.setEnabled(current.equals(history[0]));actions.addView(redo,new LinearLayout.LayoutParams(0,-2,1));redo.setOnClickListener(v->restoreMontageStation(dialog,stationProject,true));panel.addView(actions);
+   }
    if(map!=null){
     map.setOnTouchListener(new View.OnTouchListener(){
      float startX,startY;int dragged=-1;
@@ -1747,8 +1763,10 @@ public class MainActivity extends Activity {
         if(!Double.isFinite(currentLength)||Math.abs(currentLength-total)>0.000001)throw new IllegalStateException();
         org.json.JSONArray latest=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));
         int idx=findMontageItem(latest,rows.getJSONObject(j));
+        String before=latest.toString();
         latest.getJSONObject(idx).put("station",chosen).put("stationLinked",true);
         if(!getPreferences(0).edit().putString("montageFittings",latest.toString()).commit())throw new java.io.IOException();
+        montageStationHistory.put(stationProject,new String[]{before,latest.toString()});
         recordProjectEvent("Formstück im Montageplan stationiert");if(sketch!=null)sketch.invalidate();if(livePreview!=null)livePreview.invalidate();
         dialog.dismiss();showMontageStationPlan();
        }catch(Exception ex){notice("Projektdaten geändert oder Speichern fehlgeschlagen.");}
