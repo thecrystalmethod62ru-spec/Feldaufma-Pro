@@ -1708,6 +1708,7 @@ public class MainActivity extends Activity {
   TextView overlapLegend=new TextView(this);overlapLegend.setText("Orange: Überlappung bemaßter Abschnittsstreifen (ohne Eckergänzungen) · Grün: gewählte Eckergänzung (Kontrollmodell)");panel.addView(overlapLegend);
   final SharedPreferences overlapPrefs=projectStorage(activeProject);
   final RouteBranchStore branchStore=new RouteBranchStore(overlapPrefs);
+  final double[] requestedBranchStation={Double.NaN};
   Button branchEditor=new Button(this);branchEditor.setText("Abzweigungen verwalten");panel.addView(branchEditor);
   branchEditor.setOnClickListener(v->{
    try{
@@ -1715,12 +1716,14 @@ public class MainActivity extends Activity {
     String[] labels=new String[branches.size()+1];
     labels[0]="Abzweigung hinzufügen";
     for(int j=0;j<branches.size();j++)labels[j+1]=branches.get(j).name+" · "+branches.get(j).station+" m";
-    new android.app.AlertDialog.Builder(this).setTitle("Trassenverzweigungen").setItems(labels,(dialog,index)->{
+    android.content.DialogInterface.OnClickListener chooseBranch=(dialog,index)->{
      final RouteBranch existing=index>0?branches.get(index-1):null;
      android.widget.LinearLayout fields=new android.widget.LinearLayout(this);fields.setOrientation(android.widget.LinearLayout.VERTICAL);
      String[] hints={"Bezeichnung","Anschlussstation (m)","Abschnittslängen (m; mit ; trennen)","Richtungen (Grad; mit ; trennen; +X = 0°)","Grabenbreite (m)","Grabentiefe (m)","Oberfläche"};
      EditText[] inputs=new EditText[hints.length];
      for(int j=0;j<hints.length;j++){inputs[j]=new EditText(this);inputs[j].setSingleLine(true);inputs[j].setHint(hints[j]);fields.addView(inputs[j]);}
+     if(existing==null&&Double.isFinite(requestedBranchStation[0]))inputs[1].setText(String.format(java.util.Locale.GERMANY,"%.3f",requestedBranchStation[0]));
+     requestedBranchStation[0]=Double.NaN;
      if(existing!=null){
       try{
        org.json.JSONObject data=existing.toJson();
@@ -1748,7 +1751,9 @@ public class MainActivity extends Activity {
        java.util.List<RouteBranch> updated=branchStore.load();if(existing==null)updated.add(branch);else{int found=-1;for(int j=0;j<updated.size();j++)if(updated.get(j).id.equals(existing.id)){found=j;break;}if(found<0)throw new IllegalStateException("Abzweigung nicht gefunden");updated.set(found,branch);}branchStore.save(updated);entry.dismiss();notice("Abzweigung gespeichert");for(int k=0;k<panel.getChildCount();k++)panel.getChildAt(k).invalidate();
       }catch(Exception ex){notice("Eingaben prüfen: "+ex.getMessage());}
      }));entry.show();
-    }).setNegativeButton("Schließen",null).show();
+    };
+    if(Double.isFinite(requestedBranchStation[0]))chooseBranch.onClick(null,0);
+    else new android.app.AlertDialog.Builder(this).setTitle("Trassenverzweigungen").setItems(labels,chooseBranch).setNegativeButton("Schließen",null).show();
    }catch(Exception ex){notice("Abzweigungen konnten nicht geladen werden: "+ex.getMessage());}
   });
   int storedOverlapMode=0;
@@ -1897,12 +1902,25 @@ public class MainActivity extends Activity {
    final java.util.List<float[]> branchHits=new java.util.ArrayList<>();
    final java.util.List<String> branchHitIds=new java.util.ArrayList<>();
    double touchScale,touchOx,touchOy;
+   double mainTapStation=Double.NaN;
    int downHit=-1;float downX,downY,previewX,previewY;boolean previewActive=false;
    @Override public boolean onTouchEvent(android.view.MotionEvent event){
     if(event.getAction()==android.view.MotionEvent.ACTION_DOWN){
      previewActive=false;downX=event.getX();downY=event.getY();downHit=-1;double distance=dp(18);
      for(int i=0;i<branchHits.size();i++){float[] p=branchHits.get(i);double d=Math.hypot(downX-p[0],downY-p[1]);if(d<distance){distance=d;downHit=i;}}
-     if(downHit<0)return false;
+     mainTapStation=Double.NaN;
+     if(downHit<0&&touchScale>0){
+      double x=(downX-touchOx)/touchScale,y=(touchOy-downY)/touchScale,station=0,best=dp(18)/touchScale;
+      for(int k=1;k<model.vertices.size();k++){
+       double[] p=model.vertices.get(k-1),q=model.vertices.get(k);double dx=q[0]-p[0],dy=q[1]-p[1],n=Math.hypot(dx,dy);
+       if(n<=0)continue;
+       double f=Math.max(0,Math.min(1,((x-p[0])*dx+(y-p[1])*dy)/(n*n)));
+       double dist=Math.hypot(x-p[0]-f*dx,y-p[1]-f*dy);
+       if(dist<best){best=dist;mainTapStation=station+f*n;}
+       station+=n;
+      }
+     }
+     if(downHit<0&&!Double.isFinite(mainTapStation))return false;
      getParent().requestDisallowInterceptTouchEvent(true);return true;
     }
     if(event.getAction()==android.view.MotionEvent.ACTION_CANCEL){downHit=-1;previewActive=false;invalidate();getParent().requestDisallowInterceptTouchEvent(false);return true;}
@@ -1915,6 +1933,13 @@ public class MainActivity extends Activity {
     previewActive=false;invalidate();
     getParent().requestDisallowInterceptTouchEvent(false);
     int best=downHit;downHit=-1;
+    if(best<0&&Double.isFinite(mainTapStation)){
+     double station=mainTapStation;mainTapStation=Double.NaN;
+     if(Math.hypot(event.getX()-downX,event.getY()-downY)<=dp(8)){
+      new android.app.AlertDialog.Builder(MainActivity.this).setTitle(String.format(java.util.Locale.GERMANY,"Station %.3f m",station)).setItems(new String[]{"Abzweigung hinzufügen"},(dialog,which)->{requestedBranchStation[0]=station;branchEditor.performClick();}).setNegativeButton("Abbrechen",null).show();
+     }
+     return true;
+    }
     if(best>=0&&best<branchHits.size()&&Math.hypot(event.getX()-downX,event.getY()-downY)>dp(8)){
      final String moveId=branchHitIds.get(best);final int moveIndex=(int)branchHits.get(best)[2];
      if(moveIndex==0||touchScale<=0){notice("Anschlussstation über Abzweigungen verwalten ändern");return true;}
