@@ -1711,10 +1711,11 @@ public class MainActivity extends Activity {
   try{storedOverlapMode=overlapPrefs.getInt("metricOverlapMode",0);}catch(ClassCastException ignored){}
   final int[] savedOverlapMode={Math.max(0,Math.min(2,storedOverlapMode))};
   overlapMode.setSelection(savedOverlapMode[0]);
-  final CheckBox includeCorners=new CheckBox(this);
-  includeCorners.setText("Abgeschrägte Außenecken im Kontrollwert berücksichtigen");
-  includeCorners.setChecked(overlapPrefs.getBoolean("metricIncludeCorners",false));
-  panel.addView(includeCorners);
+  final Spinner cornerMode=new Spinner(this);
+  final String[] cornerLabels={"Ohne Eckergänzung","Abgeschrägte Außenecken","Gehrung (mit Begrenzung)"};
+  cornerMode.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,cornerLabels));
+  final int[] savedCornerMode={Math.max(0,Math.min(2,overlapPrefs.getInt("metricCornerMode",overlapPrefs.getBoolean("metricIncludeCorners",false)?1:0)))};
+  cornerMode.setSelection(savedCornerMode[0]);panel.addView(cornerMode);
   final EditText correction=new EditText(this);correction.setSingleLine(true);correction.setHint("Flächenkorrektur (+/− m²)");correction.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL|android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);
   final EditText correctionReason=new EditText(this);correctionReason.setHint("Begründung der Korrektur");correctionReason.setSingleLine(true);
   correction.setText(overlapPrefs.getString("metricAreaCorrection","0"));
@@ -1792,9 +1793,10 @@ public class MainActivity extends Activity {
      result.append("\nGerade Abschnittsstreifen ohne Eckergänzungen; keine automatische Abrechnung.");
      int mode=overlapMode.getSelectedItemPosition();
      if(mode==1||mode==2){
-      StripOverlap.Result selected=includeCorners.isChecked()?withCorners:geometric;
+      int corner=cornerMode.getSelectedItemPosition();
+      StripOverlap.Result selected=corner==2?StripOverlap.calculateWithMiter(strips):corner==1?withCorners:geometric;
       double base=mode==1?selected.gross:selected.net;
-      result.append(includeCorners.isChecked()?"\nGewähltes Eckmodell: abgeschrägt":"\nGewähltes Eckmodell: ohne Eckergänzung");
+      result.append("\nGewähltes Eckmodell: "+cornerLabels[Math.max(0,Math.min(2,corner))]);
       result.append(String.format(java.util.Locale.GERMANY,"\nGewählter Kontrollwert: %.2f m²",base));
       double delta=Double.parseDouble(overlapPrefs.getString("metricAreaCorrection","0"));
       if(Double.isFinite(delta)&&Double.isFinite(base+delta)&&base+delta>=0){
@@ -1806,11 +1808,18 @@ public class MainActivity extends Activity {
    }
    nominalArea.setText(result.toString());
   };
-  includeCorners.setOnCheckedChangeListener((button,checked)->{
-   if(!overlapPrefs.edit().putBoolean("metricIncludeCorners",checked).commit()){
-    notice("Eckmodell konnte nicht gespeichert werden.");
+  cornerMode.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
+   @Override public void onItemSelected(android.widget.AdapterView<?> parent,android.view.View view,int position,long id){
+    if(position<0||position>2)return;
+    if(position!=savedCornerMode[0]){
+     if(!overlapPrefs.edit().putInt("metricCornerMode",position).commit()){
+      cornerMode.setSelection(savedCornerMode[0]);notice("Eckmodell konnte nicht gespeichert werden.");return;
+     }
+     savedCornerMode[0]=position;
+    }
+    refreshNominalArea.run();
    }
-   refreshNominalArea.run();
+   @Override public void onNothingSelected(android.widget.AdapterView<?> parent){}
   });
   saveCorrection.setOnClickListener(v->{
    try{
