@@ -1738,8 +1738,16 @@ public class MainActivity extends Activity {
    java.util.ArrayList<org.json.JSONObject> linked=new java.util.ArrayList<>();int missing=0;
    for(int i=0;i<rows.length();i++){org.json.JSONObject o=rows.getJSONObject(i);double st=o.optDouble("station",Double.NaN);if(!Double.isFinite(st)||st<0||st>total)missing++;else linked.add(o);}
    linked.sort((x,y)->Double.compare(x.optDouble("station"),y.optDouble("station")));
+   int outside=0;
+   double nominalWidth=Double.NaN;
+   try{nominalWidth=Double.parseDouble(getPreferences(0).getString("width","").trim().replace(',','.'));}catch(NumberFormatException ignored){}
+   boolean widthKnown=Double.isFinite(nominalWidth)&&nominalWidth>0;
+   for(org.json.JSONObject fitting:linked){double lateral=fitting.optDouble("offset",0);if(widthKnown&&Double.isFinite(lateral)&&Math.abs(lateral)>nominalWidth/2)outside++;}
+
    LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(dp(12),dp(8),dp(12),dp(8));
    TextView hint=new TextView(this);hint.setText("Lineare Stationsübersicht – keine maßstäbliche Montagegeometrie. Ohne gültige Station: "+missing);panel.addView(hint);
+   if(widthKnown&&outside>0)panel.addView(sheetText("Hinweis: "+outside+" Formstück-Mittelpunkte außerhalb der nominalen Grabenbreite. Örtliche Breite und Bauteilabmessungen prüfen.",14,true));
+   if(!widthKnown)panel.addView(sheetText("Grabenbreite fehlt – seitliche Lage nicht prüfbar.",14,false));
    android.view.View axis=new android.view.View(this){
     final android.graphics.Paint paint=new android.graphics.Paint(3);
     @Override protected void onDraw(android.graphics.Canvas c){
