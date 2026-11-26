@@ -156,15 +156,59 @@ final class RouteSketch extends View {
    }
   }
  }
+ double trenchWidth=Double.NaN;
+ void setTrenchWidth(double width){trenchWidth=width;invalidate();}
+ static double positiveDimension(org.json.JSONObject o,String key){
+  try{double v=Double.parseDouble(o.optString(key).replace(',','.'));return Double.isFinite(v)&&v>0?v:Double.NaN;}catch(Exception e){return Double.NaN;}
+ }
+ static final class ObjectFootprint{
+  final PointF anchor,center;final float angle,length,width;final boolean measured,sideLocated;
+  ObjectFootprint(PointF anchor,PointF center,float angle,float length,float width,boolean measured,boolean sideLocated){
+   this.anchor=anchor;this.center=center;this.angle=angle;this.length=length;this.width=width;this.measured=measured;this.sideLocated=sideLocated;
+  }
+ }
+ ObjectFootprint objectFootprint(org.json.JSONObject o){
+  double station=o.optDouble("station");PointF anchor=stationPoint(station);if(anchor==null)return null;
+  double start=0;
+  for(int i=1;i<vertices.size();i++){
+   Vertex a=vertices.get(i-1),b=vertices.get(i);double end=start+b.metres;
+   if(station<=end+1e-8){
+    double dx=b.point.x-a.point.x,dy=b.point.y-a.point.y,n=Math.hypot(dx,dy);
+    if(n<=1e-8)return new ObjectFootprint(anchor,anchor,0,0,0,false,false);
+    double unit=n/b.metres,len=positiveDimension(o,"detailLength"),wid=positiveDimension(o,"detailWidth");
+    String side=o.optString("side");int sign="links".equals(side)?1:"rechts".equals(side)?-1:0;
+    boolean measured=Double.isFinite(len)&&Double.isFinite(wid)&&Double.isFinite(unit*len)&&Double.isFinite(unit*wid)&&unit*len<=Float.MAX_VALUE&&unit*wid<=Float.MAX_VALUE;
+    boolean located=sign==0?"mittig".equals(side):measured&&Double.isFinite(trenchWidth)&&trenchWidth>0;
+    double shift=located&&sign!=0?sign*(trenchWidth+wid)*unit/2:0;
+    double cx=anchor.x+dy/n*shift,cy=anchor.y-dx/n*shift;
+    if(!Double.isFinite(cx)||!Double.isFinite(cy)||Math.abs(cx)>Float.MAX_VALUE||Math.abs(cy)>Float.MAX_VALUE){cx=anchor.x;cy=anchor.y;located=false;}
+    return new ObjectFootprint(anchor,new PointF((float)cx,(float)cy),(float)Math.toDegrees(Math.atan2(dy,dx)),measured?(float)(len*unit):0,measured?(float)(wid*unit):0,measured,located);
+   }
+   start=end;
+  }
+  return null;
+ }
  void drawStationObjects(Canvas c,float density){
   if(!layerVisible(LAYER_OBJECTS))return;
   paint.setTextSize(11*density);
   for(int j=0;j<stationObjects.length();j++){
    org.json.JSONObject o=stationObjects.optJSONObject(j);if(o==null)continue;
-   double station=o.optDouble("station");PointF p=stationPoint(station);if(p==null)continue;
-   float x=left()+scale()*p.x,y=top()+scale()*p.y;
-   paint.setColor(0xffa65e19);c.drawRect(x-4*density,y-4*density,x+4*density,y+4*density,paint);
-   String label=o.optString("type","Objekt")+" · "+String.format(Locale.GERMANY,"%.2f m",station);
+   ObjectFootprint f=objectFootprint(o);if(f==null)continue;
+   float x=left()+scale()*f.center.x,y=top()+scale()*f.center.y;
+   float ax=left()+scale()*f.anchor.x,ay=top()+scale()*f.anchor.y;
+   paint.setColor(0xffa65e19);paint.setStrokeWidth(density);c.drawLine(ax,ay,x,y,paint);
+   if(f.measured){
+    float hw=f.length*scale()/2,hh=f.width*scale()/2;
+    if(Float.isFinite(hw)&&Float.isFinite(hh)){
+     c.save();c.translate(x,y);c.rotate(f.angle);
+     paint.setColor(0x66d38a35);c.drawRect(-hw,-hh,hw,hh,paint);
+     paint.setColor(0xffa65e19);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(density);c.drawRect(-hw,-hh,hw,hh,paint);paint.setStyle(Paint.Style.FILL);c.restore();
+    }
+   }
+   paint.setColor(0xffa65e19);c.drawCircle(x,y,3*density,paint);
+   String label=o.optString("type","Objekt")+" · "+String.format(Locale.GERMANY,"%.2f m",o.optDouble("station"));
+   String side=o.optString("side");if("links".equals(side)||"rechts".equals(side))label+=" · "+side+(f.sideLocated?"*":" (Lage offen)");
+   if(f.measured)label+=String.format(Locale.GERMANY," · %.2f × %.2f m",positiveDimension(o,"detailLength"),positiveDimension(o,"detailWidth"));
    float tx=x+6*density,ty=y-13*density;
    paint.setColor(Color.WHITE);c.drawRect(tx-2*density,ty-11*density,tx+paint.measureText(label)+2*density,ty+3*density,paint);
    paint.setColor(0xff7c4514);c.drawText(label,tx,ty,paint);
