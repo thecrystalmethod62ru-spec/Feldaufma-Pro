@@ -1820,7 +1820,23 @@ public class MainActivity extends Activity {
      cross.setSelection(index->{
       PipeLayout.Pipe pipe=pipes.get(index);
       new android.app.AlertDialog.Builder(this).setTitle(pipe.name).setItems(new String[]{"Bearbeiten","Duplizieren","Löschen"},(menu,action)->{
-       if(action==0){multiPipeButton.performClick();return;}
+       if(action==0){
+        final android.widget.LinearLayout fields=new android.widget.LinearLayout(this);fields.setOrientation(1);
+        final EditText offset=new EditText(this), bedding=new EditText(this);
+        offset.setHint("Achslage zur Grabenmitte (m)");offset.setText(String.valueOf(pipe.offset));
+        bedding.setHint("Rohrunterkante über Grabensohle (m)");bedding.setText(String.valueOf(pipe.bedding));
+        fields.addView(offset);fields.addView(bedding);
+        final android.app.AlertDialog edit=new android.app.AlertDialog.Builder(this).setTitle("Rohrlage bearbeiten").setView(fields).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
+        edit.setOnShowListener(ignored->edit.getButton(-1).setOnClickListener(button->{
+         try{
+          double o=Double.parseDouble(offset.getText().toString().trim().replace(',','.'));
+          double b=Double.parseDouble(bedding.getText().toString().trim().replace(',','.'));
+          java.util.List<PipeLayout.Pipe> next=new java.util.ArrayList<>(pipes);
+          next.set(index,new PipeLayout.Pipe(pipe.name,o,pipe.diameter,pipe.wall,b));
+          multiPipeStore.save(next);pipes.clear();pipes.addAll(next);refresh.run();edit.dismiss();
+         }catch(Exception ex){bedding.setError("Ungültige Lage oder Speicherfehler: "+ex.getMessage());}
+        }));edit.show();return;
+       }
        Runnable change=()->{
         java.util.List<PipeLayout.Pipe> next=new java.util.ArrayList<>(pipes);
         if(action==1)next.add(new PipeLayout.Pipe(pipe.name+" (Kopie)",pipe.offset,pipe.diameter,pipe.wall,pipe.bedding));else next.remove(index);
