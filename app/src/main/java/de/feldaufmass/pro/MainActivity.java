@@ -5273,13 +5273,13 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
    final Paint pen=new Paint(3);
    double read(EditText field){try{return Double.parseDouble(field.getText().toString().trim().replace(',','.'));}catch(Exception ex){return Double.NaN;}}
    double dragScale,dragLeft,dragTop,grabX,grabY;boolean dragging; int dragPointer=-1;
-   double profileZoom=1, pinchSpan, pinchZoom; boolean pinching;
+   double profileZoom=1, pinchSpan, pinchZoom, panX, panY, pinchWorldX, pinchWorldY, pinchBaseScale, pinchWidth; boolean pinching;
    double span(android.view.MotionEvent e){return Math.hypot(e.getX(0)-e.getX(1),e.getY(0)-e.getY(1));}
    @Override public boolean onTouchEvent(android.view.MotionEvent e){
     if(dragScale<=0)return false;
     int action=e.getActionMasked();
-    if(action==android.view.MotionEvent.ACTION_POINTER_DOWN&&e.getPointerCount()==2){pinching=true;dragging=false;dragPointer=-1;pinchSpan=span(e);pinchZoom=profileZoom;getParent().requestDisallowInterceptTouchEvent(true);return true;}
-    if(pinching){if(action==android.view.MotionEvent.ACTION_MOVE&&e.getPointerCount()==2&&pinchSpan>0){profileZoom=Math.max(1,Math.min(5,pinchZoom*span(e)/pinchSpan));invalidate();}if(action==android.view.MotionEvent.ACTION_UP||action==android.view.MotionEvent.ACTION_CANCEL){pinching=false;getParent().requestDisallowInterceptTouchEvent(false);}return true;}
+    if(action==android.view.MotionEvent.ACTION_POINTER_DOWN&&e.getPointerCount()==2){pinching=true;dragging=false;dragPointer=-1;pinchSpan=span(e);pinchZoom=profileZoom;pinchBaseScale=dragScale/profileZoom;pinchWidth=(getWidth()-2*(dragLeft-panX))/dragScale;pinchWorldX=((e.getX(0)+e.getX(1))/2-dragLeft)/dragScale;pinchWorldY=((e.getY(0)+e.getY(1))/2-dragTop)/dragScale;getParent().requestDisallowInterceptTouchEvent(true);return true;}
+    if(pinching){if(action==android.view.MotionEvent.ACTION_MOVE&&e.getPointerCount()==2&&pinchSpan>0){double next=Math.max(1,Math.min(5,pinchZoom*span(e)/pinchSpan));double nextScale=pinchBaseScale*next;panX=(e.getX(0)+e.getX(1))/2-pinchWorldX*nextScale-(getWidth()-pinchWidth*nextScale)/2;panY=(e.getY(0)+e.getY(1))/2-pinchWorldY*nextScale-dp(12);profileZoom=next;if(next==1){panX=0;panY=0;}invalidate();}if(action==android.view.MotionEvent.ACTION_UP||action==android.view.MotionEvent.ACTION_CANCEL){pinching=false;getParent().requestDisallowInterceptTouchEvent(false);}return true;}
     double x=read(offset),y=read(depth);
     switch(e.getActionMasked()){
      case android.view.MotionEvent.ACTION_DOWN:
@@ -5348,7 +5348,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     dragScale=0;c.drawColor(0xff171717);
     if(!Double.isFinite(width)||!Double.isFinite(height)||width<=0||height<=0)return;
     double scale=Math.min((getWidth()-dp(32))/width,(getHeight()-dp(32))/height)*profileZoom;if(scale<=0)return;
-    float left=(float)((getWidth()-width*scale)/2),top=(float)(dp(12)-(profileZoom-1)*height*scale/(2*profileZoom));
+    float left=(float)((getWidth()-width*scale)/2+panX),top=(float)(dp(12)+panY);
     dragScale=scale;dragLeft=left;dragTop=top;
     pen.setStyle(Paint.Style.FILL);pen.setColor(0xff303030);c.drawRect(left,top,(float)(left+width*scale),(float)(top+height*scale),pen);
     pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth(dp(1));pen.setColor(0xffaaaaaa);c.drawRect(left,top,(float)(left+width*scale),(float)(top+height*scale),pen);pen.setStyle(Paint.Style.FILL);
