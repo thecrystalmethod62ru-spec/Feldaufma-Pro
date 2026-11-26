@@ -878,7 +878,12 @@ public class MainActivity extends Activity {
   Button clearScale=new Button(this);clearScale.setAllCaps(false);clearScale.setText("Kalibrierung entfernen");form.addView(clearScale);
   LinearLayout list=page();form.addView(list);
   route.selected=i->measureSegment(route,i);
-  route.strokeAdded=first->offerNewRouteMeasurements(route,first);
+  route.strokeAdded=first->{
+   if(route.darkEditor){
+    route.highlight=first;route.invalidate();
+    android.widget.Toast.makeText(this,"Maße offen – über Maße eintragen.",android.widget.Toast.LENGTH_SHORT).show();
+   }else offerNewRouteMeasurements(route,first);
+  };
   route.pointSelected=i->{
    if(i<0||i>=route.vertices.size())return;
    route.highlight=i;route.invalidate();
