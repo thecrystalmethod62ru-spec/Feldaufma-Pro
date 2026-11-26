@@ -3281,6 +3281,28 @@ public class MainActivity extends Activity {
  root=planPage;
  sketch=new Sketch();sketch.setBackgroundColor(Color.WHITE);root.addView(sketch,new LinearLayout.LayoutParams(-1,dp(280))); LinearLayout historyBar=new LinearLayout(this);root.addView(historyBar);undoObjectsButton=new Button(this);undoObjectsButton.setText("Rückgängig");historyBar.addView(undoObjectsButton,new LinearLayout.LayoutParams(0,-2,1));redoObjectsButton=new Button(this);redoObjectsButton.setText("Wiederholen");historyBar.addView(redoObjectsButton,new LinearLayout.LayoutParams(0,-2,1));undoObjectsButton.setOnClickListener(v->restoreObjectHistory(false));redoObjectsButton.setOnClickListener(v->restoreObjectHistory(true));updateHistoryButtons();
  Button edit=new Button(this);edit.setText("Trassenmaße bearbeiten");root.addView(edit);edit.setOnClickListener(v->showPage(measurePage));
+ actionButtonSingle(planPage,"Erdmengen nach Abschnitt",()->{
+  try{
+   org.json.JSONArray rows=new PipeLayoutStore(getPreferences(0)).sections();
+   if(rows.length()==0){notice("Keine Abschnittsprofile vorhanden.");return;}
+   java.util.List<org.json.JSONObject> sorted=new java.util.ArrayList<>();
+   for(int i=0;i<rows.length();i++)sorted.add(rows.getJSONObject(i));
+   sorted.sort((a,b)->Double.compare(a.optDouble("from"),b.optDouble("from")));
+   double total=0,covered=0,last=0;
+   StringBuilder report=new StringBuilder("Aushub – rechteckig, brutto\n\n");
+   for(org.json.JSONObject row:sorted){
+    double from=row.getDouble("from"),to=row.getDouble("to"),bw=row.getDouble("width"),bd=row.getDouble("depth");
+    if(!Double.isFinite(from)||!Double.isFinite(to)||!Double.isFinite(bw)||!Double.isFinite(bd)||from<last||to<=from||bw<=0||bd<=0)throw new IllegalArgumentException("Ungültige oder überlappende Abschnittsprofile");
+    double length=to-from,volume=length*bw*bd;total+=volume;covered+=length;last=to;
+    report.append(String.format(java.util.Locale.GERMANY,"Station %.2f – %.2f m\n%.2f × %.2f × %.2f = %.3f m³\n\n",from,to,length,bw,bd,volume));
+   }
+   report.append(String.format(java.util.Locale.GERMANY,"Summe: %.3f m³\nErfasste Länge: %.2f m",total,covered));
+   if(l>0){if(last>l)report.append("\nAchtung: Profil endet außerhalb der Trasse.");else report.append(String.format(java.util.Locale.GERMANY,"\nNicht erfasste Länge: %.2f m",Math.max(0,l-covered)));}
+   report.append("\n\nNur gespeicherte Abschnittsprofile; keine Abzüge oder Böschungen. Nicht zusätzlich zum allgemeinen Aushub addieren.");
+   TextView resultText=new TextView(this);resultText.setPadding(dp(16),dp(12),dp(16),dp(12));resultText.setText(report.toString());ScrollView scroll=new ScrollView(this);scroll.addView(resultText);
+   new android.app.AlertDialog.Builder(this).setTitle("Mengenermittlung – Abschnittsprofile").setView(scroll).setPositiveButton("Schließen",null).show();
+  }catch(Exception ex){notice("Mengenermittlung: "+ex.getMessage());}
+ });
  actionButtonSingle(planPage,"Abschnittsprofile anzeigen",()->{
   try{
    org.json.JSONArray profiles=new PipeLayoutStore(getPreferences(0)).sections();
