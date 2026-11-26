@@ -267,9 +267,20 @@ final class RouteSketch extends View {
  private Float previousDimensionOffset,previousRouteX,previousRouteY;
  private void restoreDimensionDrag(){String k=activeDimension.key;if(k.startsWith("route:")){if(previousRouteX==null)dimensionOffsets.remove(k+":x");else dimensionOffsets.put(k+":x",previousRouteX);if(previousRouteY==null)dimensionOffsets.remove(k+":y");else dimensionOffsets.put(k+":y",previousRouteY);}else if(previousDimensionOffset==null)dimensionOffsets.remove(k);else dimensionOffsets.put(k,previousDimensionOffset);}
  private void showDimensionRotation(String key){
-  android.widget.PopupMenu menu=new android.widget.PopupMenu(getContext(),this);
-  for(int angle:new int[]{0,15,30,45,60,75,90,-15,-30,-45,-60,-75,-90})menu.getMenu().add(0,angle+100,0,angle+"°");
-  menu.setOnMenuItemClickListener(item->{String k=key+":angle";Float old=dimensionOffsets.put(k,(float)(item.getItemId()-100));if(!saveDimensionLayout()){if(old==null)dimensionOffsets.remove(k);else dimensionOffsets.put(k,old);}invalidate();return true;});menu.show();
+  String k=key+":angle";Float old=dimensionOffsets.get(k);
+  android.widget.LinearLayout panel=new android.widget.LinearLayout(getContext());panel.setOrientation(1);int d=(int)(12*getResources().getDisplayMetrics().density);panel.setPadding(d,d,d,d);
+  android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();bg.setColor(0xff202827);bg.setCornerRadius(d);panel.setBackground(bg);
+  android.widget.TextView label=new android.widget.TextView(getContext());label.setTextColor(0xffe3f0ed);panel.addView(label);
+  android.widget.SeekBar slider=new android.widget.SeekBar(getContext());slider.setMax(12);slider.setProgress(Math.max(0,Math.min(12,Math.round(((old==null?0:old)+90)/15))));label.setText("Beschriftungswinkel: "+(slider.getProgress()*15-90)+"°");panel.addView(slider);
+  android.widget.PopupWindow popup=new android.widget.PopupWindow(panel,Math.min(getWidth(),d*25),android.view.ViewGroup.LayoutParams.WRAP_CONTENT,true);popup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));popup.setOutsideTouchable(true);
+  slider.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener(){
+   public void onProgressChanged(android.widget.SeekBar bar,int progress,boolean user){int angle=progress*15-90;label.setText("Beschriftungswinkel: "+angle+"°");dimensionOffsets.put(k,(float)angle);invalidate();}
+   public void onStartTrackingTouch(android.widget.SeekBar bar){}
+   public void onStopTrackingTouch(android.widget.SeekBar bar){}
+  });
+  android.widget.Button done=new android.widget.Button(getContext());done.setText("Übernehmen");done.setAllCaps(false);panel.addView(done);done.setOnClickListener(v->popup.dismiss());
+  popup.setOnDismissListener(()->{if(!saveDimensionLayout()){if(old==null)dimensionOffsets.remove(k);else dimensionOffsets.put(k,old);}invalidate();});
+  popup.showAtLocation(this,android.view.Gravity.BOTTOM|android.view.Gravity.CENTER_HORIZONTAL,0,d);
  }
  private void drawSurfaceDimensions(Canvas c,float d){
   if(!layerVisible(LAYER_SURFACES)||!layerVisible(LAYER_SURFACE_DIMENSIONS))return;
