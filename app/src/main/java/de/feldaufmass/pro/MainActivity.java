@@ -8,7 +8,7 @@ import android.content.SharedPreferences;
 
 public class MainActivity extends Activity {
  EditText project,length,width,depth; TextView result; Sketch sketch;
- double l,w,d,asphalt,left,right; EditText asphaltInput,leftInput,rightInput; Profile profile; Spinner surface; EditText baseInput,pipeInput; double base=Double.NaN,pipe=Double.NaN; String covering="Unbekannt";
+ double l,w,d,asphalt,left,right; EditText asphaltInput,leftInput,rightInput; Profile profile; Spinner surface; EditText stoneLength,stoneWidth,stoneDepth,stoneColor,pattern,bedding,underlying; Spinner handling; EditText baseInput,pipeInput; double base=Double.NaN,pipe=Double.NaN; String covering="Unbekannt";
  EditText field(LinearLayout root,String label,String key,boolean numeric){
  TextView t=new TextView(this);t.setText(label);root.addView(t);
  EditText e=new EditText(this);e.setSingleLine(true);
@@ -27,6 +27,16 @@ public class MainActivity extends Activity {
  surface=new Spinner(this);String[] types={"Unbekannt","Asphalt","Pflaster","Gehwegplatten","Unbefestigt","Betonpflaster – Rechteck","Betonpflaster – Quadrat","Doppel-T-Pflaster","Wellenverbundpflaster","Sechseckpflaster","Achteckpflaster","Verbundpflaster – sonstige","Betonpflaster – Mehrformat","Ökopflaster / Sickerpflaster","Rasengittersteine","Rasenfugenpflaster","Natursteinpflaster – Großpflaster","Natursteinpflaster – Kleinpflaster","Natursteinpflaster – Mosaikpflaster","Natursteinpflaster – sonstige","Klinkerpflaster","Ziegelpflaster","Beton-Gehwegplatten","Natursteinplatten","Waschbetonplatten","Taktilplatten – Rippen","Taktilplatten – Noppen","Rinnenpflaster","Schlackenpflaster","Holzpflaster","Sonstiges"};
  surface.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,types));root.addView(surface);
  surface.setSelection(Math.min(types.length-1,Math.max(0,getPreferences(0).getInt("surface",0))));
+ stoneLength=field(root,"Steinlänge (cm, optional)","stoneLength",true);
+ stoneWidth=field(root,"Steinbreite (cm, optional)","stoneWidth",true);
+ stoneDepth=field(root,"Belagsstärke (cm, optional)","stoneDepth",true);
+ stoneColor=field(root,"Farbe (optional)","stoneColor",false);
+ pattern=field(root,"Verlegemuster (optional)","pattern",false);
+ bedding=field(root,"Bettung – Material / Stärke (optional)","bedding",false);
+ underlying=field(root,"Unterliegender Altbelag (z. B. Großpflaster)","underlying",false);
+ TextView handlingLabel=new TextView(this);handlingLabel.setText("Umgang mit Altbelag");root.addView(handlingLabel);
+ handling=new Spinner(this);String[] options={"Nicht erfasst","Aufnahme","Aufnahme und Entsorgung","Aufnahme und Wiederverwendung","Wiederherstellung"};
+ handling.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,options));root.addView(handling);handling.setSelection(Math.min(4,Math.max(0,getPreferences(0).getInt("handling",0))));
  baseInput=field(root,"Tragschichtstärke (m, optional)","base",true);
  pipeInput=field(root,"Rohr-Außendurchmesser (mm, optional)","pipe",true);
  asphaltInput=field(root,"Asphaltstärke (m, optional)","asphalt",true);
@@ -40,10 +50,11 @@ public class MainActivity extends Activity {
  save.setOnClickListener(v->calculate());if(length.length()>0&&width.length()>0&&depth.length()>0)calculate();
  }
  void calculate(){try{l=number(length);w=number(width);d=number(depth);if(!Double.isFinite(l*w*d)||l<=0||w<=0||d<=0)throw new Exception();
+ optional(stoneLength);optional(stoneWidth);optional(stoneDepth);
  covering=surface.getSelectedItem().toString();base=optional(baseInput);pipe=optional(pipeInput);if(Double.isFinite(pipe)&&(pipe<=0||pipe/1000>w||pipe/1000>d))throw new Exception();
  asphalt=optional(asphaltInput);left=optional(leftInput);right=optional(rightInput);if(Double.isFinite(asphalt)&&asphalt>d)throw new Exception();
  if(Double.isFinite(base)&&base+(Double.isFinite(asphalt)?asphalt:0)>d)throw new Exception();
- getPreferences(0).edit().putInt("surface",surface.getSelectedItemPosition()).putString("base",baseInput.getText().toString()).putString("pipe",pipeInput.getText().toString()).putString("asphalt",asphaltInput.getText().toString()).putString("left",leftInput.getText().toString()).putString("right",rightInput.getText().toString()).putString("project",project.getText().toString()).putString("length",length.getText().toString()).putString("width",width.getText().toString()).putString("depth",depth.getText().toString()).apply();
+ getPreferences(0).edit().putString("stoneLength",stoneLength.getText().toString()).putString("stoneWidth",stoneWidth.getText().toString()).putString("stoneDepth",stoneDepth.getText().toString()).putString("stoneColor",stoneColor.getText().toString()).putString("pattern",pattern.getText().toString()).putString("bedding",bedding.getText().toString()).putString("underlying",underlying.getText().toString()).putInt("handling",handling.getSelectedItemPosition()).putInt("surface",surface.getSelectedItemPosition()).putString("base",baseInput.getText().toString()).putString("pipe",pipeInput.getText().toString()).putString("asphalt",asphaltInput.getText().toString()).putString("left",leftInput.getText().toString()).putString("right",rightInput.getText().toString()).putString("project",project.getText().toString()).putString("length",length.getText().toString()).putString("width",width.getText().toString()).putString("depth",depth.getText().toString()).apply();
  result.setText(String.format(java.util.Locale.GERMANY,"Aushub: %.2f m³\nGrundfläche: %.2f m²",l*w*d,l*w));sketch.invalidate();profile.invalidate();
  }catch(Exception e){result.setText("Bitte gültige positive Maße eingeben.");}}
  double optional(EditText e)throws Exception{if(e.length()==0)return Double.NaN;double v=number(e);if(!Double.isFinite(v)||v<0)throw new Exception();return v;}
