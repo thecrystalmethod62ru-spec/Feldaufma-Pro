@@ -2046,7 +2046,7 @@ public class MainActivity extends Activity {
   });
   mirror.setOnCheckedChangeListener((button,checked)->updatePreview.run());updatePreview.run();
   android.widget.ScrollView scroll=new android.widget.ScrollView(this);scroll.addView(panel);
-  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(fitting.label).setView(scroll).setNegativeButton("Zurück",(d,w)->{if(reviewResult!=null)reviewResult.accept(false);else if(original==null)showMontageCatalog();else showMontageInventory();}).setPositiveButton(original==null?"Zum Projekt hinzufügen":"Änderungen speichern",null).create();
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(fitting.label).setView(scroll).setNegativeButton("Zurück",(d,w)->{if(reviewResult!=null)reviewResult.accept(false);else if(original==null)showMontageCatalog();else showMontageInventory();}).setPositiveButton(original==null?"Hinzufügen":"Speichern",null).create();
   if(reviewResult!=null)dialog.setOnCancelListener(d->reviewResult.accept(false));
   if(original!=null)dialog.setButton(android.app.AlertDialog.BUTTON_NEUTRAL,"Entfernen",(android.content.DialogInterface.OnClickListener)(d,w)->
    new android.app.AlertDialog.Builder(this).setTitle("Formstück entfernen?")
