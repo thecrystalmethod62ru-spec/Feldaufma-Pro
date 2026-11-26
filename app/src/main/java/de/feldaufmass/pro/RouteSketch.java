@@ -406,11 +406,12 @@ final class RouteSketch extends View {
     String side=o.optString("side");int sign="links".equals(side)?1:"rechts".equals(side)?-1:0;
     boolean measured=Double.isFinite(len)&&Double.isFinite(wid)&&Double.isFinite(unit*len)&&Double.isFinite(unit*wid)&&unit*len<=Float.MAX_VALUE&&unit*wid<=Float.MAX_VALUE;
     boolean located=sign==0?"mittig".equals(side):measured&&Double.isFinite(trenchWidth)&&trenchWidth>0;
+    double rotation=o.optDouble("detailRotation",0);if(!Double.isFinite(rotation))rotation=0;double rad=Math.toRadians(rotation);double projectedWidth=Math.abs(len*Math.sin(rad))+Math.abs(wid*Math.cos(rad));
     double gap=lateralGap(o);
-    double shift=located&&sign!=0?sign*((trenchWidth+wid)/2+(Double.isFinite(gap)?gap:0))*unit:0;
+    double shift=located&&sign!=0?sign*((trenchWidth+projectedWidth)/2+(Double.isFinite(gap)?gap:0))*unit:0;
     double cx=anchor.x+dy/n*shift,cy=anchor.y-dx/n*shift;
     if(!Double.isFinite(cx)||!Double.isFinite(cy)||Math.abs(cx)>Float.MAX_VALUE||Math.abs(cy)>Float.MAX_VALUE){cx=anchor.x;cy=anchor.y;located=false;}
-    return new ObjectFootprint(anchor,new PointF((float)cx,(float)cy),(float)Math.toDegrees(Math.atan2(dy,dx)),measured?(float)(len*unit):0,measured?(float)(wid*unit):0,measured,located);
+    return new ObjectFootprint(anchor,new PointF((float)cx,(float)cy),(float)(Math.toDegrees(Math.atan2(dy,dx))+rotation),measured?(float)(len*unit):0,measured?(float)(wid*unit):0,measured,located);
    }
    start=end;
   }
@@ -421,6 +422,7 @@ final class RouteSketch extends View {
   org.json.JSONObject o=stationObjects.optJSONObject(draggedObject);if(o==null)return;
   try{org.json.JSONObject original=new org.json.JSONObject(objectBefore);ObjectFootprint f=objectFootprint(original);if(f==null||!f.measured)return;
    double angle=Math.toRadians(f.angle),dx=x-f.center.x,dy=y-f.center.y;
+   if(resizeAxis==3){double base=f.angle-original.optDouble("detailRotation",0);double target=Math.toDegrees(Math.atan2(dy,dx))+90-base;target=((target+180)%360+360)%360-180;o.put("detailRotation",Math.round(target));o.remove("acceptedOverlap");invalidate();return;}
    double span=resizeAxis==1?f.length:f.width,metres=positiveDimension(original,resizeAxis==1?"detailLength":"detailWidth");
    if(span<=0||!Double.isFinite(metres))return;
    double projected=resizeAxis==1?dx*Math.cos(angle)+dy*Math.sin(angle):-dx*Math.sin(angle)+dy*Math.cos(angle);
@@ -431,6 +433,7 @@ final class RouteSketch extends View {
  int resizeHandle(ObjectFootprint f,float x,float y){
   if(f==null||!f.measured)return 0;double angle=Math.toRadians(f.angle),dx=x-f.center.x,dy=y-f.center.y;
   double u=dx*Math.cos(angle)+dy*Math.sin(angle),v=-dx*Math.sin(angle)+dy*Math.cos(angle),tol=12*getResources().getDisplayMetrics().density/scale();
+  if(Math.hypot(u,v+f.width/2+24*getResources().getDisplayMetrics().density/scale())<tol)return 3;
   if(Math.hypot(Math.abs(u)-f.length/2,v)<tol)return 1;
   if(Math.hypot(u,Math.abs(v)-f.width/2)<tol)return 2;return 0;
  }
@@ -448,7 +451,7 @@ final class RouteSketch extends View {
     if(Float.isFinite(hw)&&Float.isFinite(hh)){
      c.save();c.translate(x,y);c.rotate(f.angle);
      paint.setColor(0x66d38a35);c.drawRect(-hw,-hh,hw,hh,paint);
-     paint.setColor(0xffa65e19);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(density);c.drawRect(-hw,-hh,hw,hh,paint);paint.setStyle(Paint.Style.FILL);if(j==selectedResizeObject&&(moving||editingObjects)){paint.setColor(0xff69cdbb);for(int sign:new int[]{-1,1}){c.drawCircle(sign*hw,0,4*density,paint);c.drawCircle(0,sign*hh,4*density,paint);}}c.restore();
+     paint.setColor(0xffa65e19);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(density);c.drawRect(-hw,-hh,hw,hh,paint);paint.setStyle(Paint.Style.FILL);if(j==selectedResizeObject&&(moving||editingObjects)){paint.setColor(0xff69cdbb);for(int sign:new int[]{-1,1}){c.drawCircle(sign*hw,0,4*density,paint);c.drawCircle(0,sign*hh,4*density,paint);}paint.setStrokeWidth(density);c.drawLine(0,-hh,0,-hh-24*density,paint);c.drawCircle(0,-hh-24*density,5*density,paint);}c.restore();
     }
    }
    paint.setColor(0xffa65e19);c.drawCircle(x,y,3*density,paint);
