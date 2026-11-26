@@ -1822,7 +1822,7 @@ public class MainActivity extends Activity {
      limits.setText(requirements[0]+";"+requirements[1]);content.addView(limits);
      final Button applyLimits=new Button(this);applyLimits.setText("Grenzwerte übernehmen");content.addView(applyLimits);
      final TextView warnings=new TextView(this);content.addView(warnings);
-     Runnable refresh=()->{cross.setLayoutData(pipes,bw,bd);warnings.setText(android.text.TextUtils.join("\n",PipeLayout.dimensions(pipes,bw,bd))+"\n"+android.text.TextUtils.join("\n",PipeLayout.warnings(pipes,bw,bd,requirements[0],requirements[1])));};
+     Runnable refresh=()->{cross.setLayoutData(pipes,bw,bd);cross.setRequirements(requirements[0],requirements[1]);warnings.setText(android.text.TextUtils.join("\n",PipeLayout.dimensions(pipes,bw,bd))+"\n"+android.text.TextUtils.join("\n",PipeLayout.warnings(pipes,bw,bd,requirements[0],requirements[1])));};
      applyLimits.setOnClickListener(button->{
       try{
        String[] values=limits.getText().toString().split(";",-1);
