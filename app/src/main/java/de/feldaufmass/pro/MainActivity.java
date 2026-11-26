@@ -777,6 +777,24 @@ public class MainActivity extends Activity {
   if(selectVoicePoint(text)){if(undo)undoGps(selectedPoint);else assignGps(selectedPoint);}
   return true;
  }
+ boolean offerVoiceSegment(String text){
+  java.util.regex.Matcher m=java.util.regex.Pattern.compile("(?iu)^(?:измени\\s+|установи\\s+|ändere\\s+|setze\\s+)?(?:длин[ау]\\s+участка|(?:länge\\s+(?:von\\s+)?(?:abschnitt|des\\s+abschnitts))|abschnitt|участок)\\s+(\\d+)\\s*(?:на\\s+|auf\\s+|ist\\s+|[:=]\\s*)?(\\d+(?:[.,]\\d+)?)\\s*(м|метр[а-я]*|m|meter|см|сантиметр[а-я]*|cm|zentimeter)[.!]?$").matcher(text.trim());
+  if(!m.matches())return false;
+  int i;double value;
+  try{i=Integer.parseInt(m.group(1));value=Double.parseDouble(m.group(2).replace(',','.'));}catch(NumberFormatException e){notice("Ungültiges Maß.");return true;}
+  String unit=m.group(3).toLowerCase(java.util.Locale.ROOT);
+  if(unit.equals("cm")||unit.equals("см")||unit.startsWith("сантиметр")||unit.equals("zentimeter"))value/=100;
+  RouteSketch route=new RouteSketch(this,routeData());
+  if(i<1||i>=route.vertices.size()||!Double.isFinite(value)||value<=0){notice("Abschnitt oder Maß ungültig.");return true;}
+  final double metres=value;final String from=route.vertices.get(i-1).id,to=route.vertices.get(i).id;
+  new android.app.AlertDialog.Builder(this).setTitle("Abschnitt "+i+" bemaßen")
+   .setMessage(String.format(java.util.Locale.GERMANY,"Neue Länge: %.3f m",metres))
+   .setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",(d,w)->{
+    RouteSketch latest=new RouteSketch(this,routeData());int j=findPoint(latest,to);
+    if(j<1||!from.equals(latest.vertices.get(j-1).id)){notice("Abschnitt wurde geändert. Bitte erneut wählen.");return;}
+    latest.vertices.get(j).metres=metres;if(saveRoute(latest)){refreshRoute();notice("Abschnitt gespeichert.");}
+   }).show();return true;
+ }
  void handleSpeech(String text){
   int version=++speechVersion;
   String normalized=text.toLowerCase(java.util.Locale.ROOT);
@@ -784,14 +802,14 @@ public class MainActivity extends Activity {
      normalized.matches(".*(?:сфотографируй|fotografier|foto aufnehmen|foto machen|foto erstellen|foto anhängen|foto hinzufügen|foto aufnehmen).*")){
    if(selectVoicePoint(text))capturePhoto();return;
   }
-  if(offerVoicePointAction(text))return;
+  if(offerVoiceSegment(text)||offerVoicePointAction(text))return;
   showPage(voicePage);
   if(voiceLanguage.getSelectedItemPosition()==0){voiceText.setText(text);offerVoiceRename(text);return;}
   if(translator==null)translator=com.google.mlkit.nl.translate.Translation.getClient(
    new com.google.mlkit.nl.translate.TranslatorOptions.Builder().setSourceLanguage("ru").setTargetLanguage("de").build());
   voiceText.setText("");notice("Diktat wird ins Deutsche übersetzt …");
   translator.downloadModelIfNeeded().onSuccessTask(ignored->translator.translate(text))
-   .addOnSuccessListener(this,german->{if(version==speechVersion){voiceText.setText(german);offerVoiceRename(german);}})
+   .addOnSuccessListener(this,german->{if(version==speechVersion){voiceText.setText(german);if(!offerVoiceSegment(german))offerVoiceRename(german);}})
    .addOnFailureListener(this,error->{if(version==speechVersion)notice("Übersetzung fehlgeschlagen. Für den ersten Modellabruf wird Internet benötigt.");});
  }
  @Override protected void onDestroy(){if(translator!=null)translator.close();super.onDestroy();}
