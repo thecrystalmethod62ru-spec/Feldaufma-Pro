@@ -4012,9 +4012,15 @@ public class MainActivity extends Activity {
   double x=a.optDouble("station"),y=b.optDouble("station");
   if(!Double.isFinite(x)||!Double.isFinite(y))return false;
   double lenA=RouteSketch.positiveDimension(a,"detailLength"),lenB=RouteSketch.positiveDimension(b,"detailLength");
+  double distance=Math.abs(x-y);
   if(Double.isFinite(lenA)&&Double.isFinite(lenB)){
-   if(Math.abs(x-y)>=(lenA+lenB)/2)return false;
-  }else if(Math.abs(x-y)>=.01)return false;
+   if(distance>=lenA/2+lenB/2)return false;
+  }else{
+   // A station inside the measured footprint is enough to request a field check.
+   double measuredLength=Double.isFinite(lenA)?lenA:lenB;
+   boolean insideMeasuredExtent=Double.isFinite(measuredLength)&&distance<=measuredLength/2;
+   if(!insideMeasuredExtent&&distance>=.01)return false;
+  }
   double[] u=lateralInterval(a,trenchWidth),v=lateralInterval(b,trenchWidth);
   if(u!=null&&v!=null)return Math.min(u[1],v[1])>Math.max(u[0],v[0]);
   String sideA=a.optString("side"),sideB=b.optString("side");
