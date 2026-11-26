@@ -1686,13 +1686,14 @@ public class MainActivity extends Activity {
    }
    java.util.ArrayList<Double> stations=new java.util.ArrayList<>(cuts);
    java.util.TreeMap<String,Double> bySurface=new java.util.TreeMap<>();
-   double area=0,unmeasured=0,unknownSurface=0,nachschnittArea=0;int surfaceConflicts=0;
+   double area=0,unmeasured=0,unknownSurface=0,nachschnittArea=0;boolean missingCuts=false;int surfaceConflicts=0;
    for(int i=1;i<stations.size();i++){
     double from=stations.get(i-1),to=stations.get(i),mid=(from+to)/2,w=widths[0];
     for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o!=null&&mid>=o.optDouble("from",Double.NaN)&&mid<o.optDouble("to",Double.NaN))w=o.optDouble("width",Double.NaN);}
     if(!Double.isFinite(w)||w<=0){unmeasured+=to-from;continue;}
     double part=(to-from)*w;area+=part;
-    if(Double.isFinite(widths[1])&&Double.isFinite(widths[2]))nachschnittArea+=(to-from)*(widths[1]+widths[2]);
+    double cutLeft=widths[1],cutRight=widths[2];for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o!=null&&mid>=o.optDouble("from",Double.NaN)&&mid<o.optDouble("to",Double.NaN)){if(o.has("left"))cutLeft=o.optDouble("left",Double.NaN);if(o.has("right"))cutRight=o.optDouble("right",Double.NaN);}}
+    if(Double.isFinite(cutLeft)&&Double.isFinite(cutRight))nachschnittArea+=(to-from)*(cutLeft+cutRight);else missingCuts=true;
     String surface=null;int matches=0;
     for(int j=0;j<surfaces.length();j++){org.json.JSONObject o=surfaces.optJSONObject(j);if(o==null)continue;
      double lo=o.optDouble("from",Double.NaN),hi=o.optDouble("to",Double.NaN);String name=o.optString("surface","").trim();
@@ -1702,9 +1703,9 @@ public class MainActivity extends Activity {
     else{unknownSurface+=part;if(matches>1)surfaceConflicts++;}
    }
    StringBuilder result=new StringBuilder(String.format(java.util.Locale.GERMANY,"Rechnerische Grabenfläche (Länge × Breite): %.2f m²",area));
-   if(Double.isFinite(widths[1])&&Double.isFinite(widths[2]))result.append(String.format(java.util.Locale.GERMANY,"\\nNachschnitt-Zusatzfläche links + rechts: %.2f m²",nachschnittArea));
+   if(!missingCuts)result.append(String.format(java.util.Locale.GERMANY,"\\nNachschnitt-Zusatzfläche links + rechts: %.2f m²",nachschnittArea));
    else result.append("\\nNachschnitt-Zusatzfläche: unvollständig bemaßt (links/rechts).");
-   if(Double.isFinite(widths[1])&&Double.isFinite(widths[2]))result.append(String.format(java.util.Locale.GERMANY,"\\nRechnerische Gesamtfläche inkl. Nachschnitt: %.2f m²",area+nachschnittArea));
+   if(!missingCuts)result.append(String.format(java.util.Locale.GERMANY,"\\nRechnerische Gesamtfläche inkl. Nachschnitt: %.2f m²",area+nachschnittArea));
    for(java.util.Map.Entry<String,Double> item:bySurface.entrySet())result.append(String.format(java.util.Locale.GERMANY,"\\n%s: %.2f m²",item.getKey(),item.getValue()));
    if(unknownSurface>0)result.append(String.format(java.util.Locale.GERMANY,"\\nOberfläche unklar / nicht zugeordnet: %.2f m²",unknownSurface));
    if(unmeasured>0)result.append(String.format(java.util.Locale.GERMANY,"\\nNicht bemaßte Länge: %.2f m",unmeasured));
@@ -1719,6 +1720,10 @@ public class MainActivity extends Activity {
   TextView montageHint=new TextView(this);montageHint.setText("Montage: "+montagePoints.size()+" darstellbare Stationspunkte. Fehlender Versatz = Achse (Vorschau); Eckversatz nicht dargestellt.");panel.addView(montageHint);
   android.view.View drawing=new android.view.View(this){
    final android.graphics.Paint pen=new android.graphics.Paint(3);
+   double cutAt(double station,String side,double fallback){
+    for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o==null)continue;if(station>=o.optDouble("from",Double.NaN)&&station<o.optDouble("to",Double.NaN)&&o.has(side)){double v=o.optDouble(side,Double.NaN);if(Double.isFinite(v)&&v>=0)return v;}}
+    return fallback;
+   }
    double widthAt(double station){
     for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o==null)continue;double from=o.optDouble("from"),to=o.optDouble("to"),w=o.optDouble("width");if(from>=0&&to<=route.measuredLength()&&station>=from&&station<to&&Double.isFinite(w)&&w>0)return w;}
     return widths[0];
@@ -1789,7 +1794,7 @@ public class MainActivity extends Activity {
       double from=stations.get(i-1),to=stations.get(i),mid=(from+to)/2,w=widthAt(mid);if(!Double.isFinite(w)||w<=0)continue;
       double[] u=model.station(from),v=model.station(to);if(u==null||v==null)continue;
       double dx=v[0]-u[0],dy=v[1]-u[1],n=Math.hypot(dx,dy);if(n<=0)continue;
-      double nx=-dy/n,ny=dx/n,lo=-w/2-(pass==0?right:0),hi=w/2+(pass==0?left:0);
+      double nx=-dy/n,ny=dx/n,lo=-w/2-(pass==0?cutAt(mid,"right",right):0),hi=w/2+(pass==0?cutAt(mid,"left",left):0);
       android.graphics.Path shape=new android.graphics.Path();double[][] points={{u[0]+nx*lo,u[1]+ny*lo},{v[0]+nx*lo,v[1]+ny*lo},{v[0]+nx*hi,v[1]+ny*hi},{u[0]+nx*hi,u[1]+ny*hi}};
       for(int k=0;k<4;k++){float x=(float)(ox+points[k][0]*scale),y=(float)(oy-points[k][1]*scale);if(k==0)shape.moveTo(x,y);else shape.lineTo(x,y);}shape.close();
       int color=pass==0?0xff777e86:0xffb79b70;
@@ -1807,8 +1812,8 @@ public class MainActivity extends Activity {
       double before=widthAt(Math.max(0,bendStation-0.000001)),after=widthAt(Math.min(total-0.000001,bendStation+0.000001));
       if(!Double.isFinite(before)||!Double.isFinite(after))continue;
       for(int pass=0;pass<2;pass++){
-       double lo1=-before/2-(pass==0?right:0),hi1=before/2+(pass==0?left:0);
-       double lo2=-after/2-(pass==0?right:0),hi2=after/2+(pass==0?left:0);
+       double lo1=-before/2-(pass==0?cutAt(Math.max(0,bendStation-0.000001),"right",right):0),hi1=before/2+(pass==0?cutAt(Math.max(0,bendStation-0.000001),"left",left):0);
+       double lo2=-after/2-(pass==0?cutAt(Math.min(total-0.000001,bendStation+0.000001),"right",right):0),hi2=after/2+(pass==0?cutAt(Math.min(total-0.000001,bendStation+0.000001),"left",left):0);
        android.graphics.Path patch=new android.graphics.Path();
        double[][] q={{corner[0]+ax*lo1,corner[1]+ay*lo1},{corner[0]+bx*lo2,corner[1]+by*lo2},{corner[0]+bx*hi2,corner[1]+by*hi2},{corner[0]+ax*hi1,corner[1]+ay*hi1}};
        for(int k=0;k<4;k++){float x=(float)(ox+q[k][0]*scale),y=(float)(oy-q[k][1]*scale);if(k==0)patch.moveTo(x,y);else patch.lineTo(x,y);}patch.close();
@@ -1873,15 +1878,17 @@ public class MainActivity extends Activity {
   Button addWidth=new Button(this);addWidth.setText("Grabenbreite abschnittsweise");panel.addView(addWidth);
   addWidth.setOnClickListener(v->{
    LinearLayout fields=new LinearLayout(this);fields.setOrientation(1);
-   EditText[] inputs=new EditText[3];String[] hints={"Station von (m)","Station bis (m)","Grabenbreite (m)"};
+   EditText[] inputs=new EditText[5];String[] hints={"Station von (m)","Station bis (m)","Grabenbreite (m)","Nachschnitt links (m, optional)","Nachschnitt rechts (m, optional)"};
    for(int i=0;i<3;i++){inputs[i]=new EditText(this);inputs[i].setHint(hints[i]);inputs[i].setInputType(8194);fields.addView(inputs[i]);}
    android.app.AlertDialog edit=new android.app.AlertDialog.Builder(this).setTitle("Breitenabschnitt hinzufügen").setView(fields).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
    edit.setOnShowListener(vv->edit.getButton(-1).setOnClickListener(vvv->{
-    try{double[] values=new double[3];for(int i=0;i<3;i++)values[i]=Double.parseDouble(inputs[i].getText().toString().trim().replace(',','.'));
+    try{double[] values=new double[5];for(int i=0;i<3;i++)values[i]=Double.parseDouble(inputs[i].getText().toString().trim().replace(',','.'));
+     for(int i=3;i<5;i++){String raw=inputs[i].getText().toString().trim();values[i]=raw.isEmpty()?Double.NaN:Double.parseDouble(raw.replace(',','.'));if(!Double.isNaN(values[i])&&(!Double.isFinite(values[i])||values[i]<0)){notice("Nachschnitt muss mindestens 0 m betragen.");return;}}
      double from=values[0],to=values[1],width=values[2];
      if(!Double.isFinite(from)||!Double.isFinite(to)||!Double.isFinite(width)||from<0||to<=from||to>route.measuredLength()||width<=0){notice("Ungültige Stationen oder Breite.");return;}
      for(int i=0;i<widthSections.length();i++){org.json.JSONObject o=widthSections.optJSONObject(i);if(o!=null&&from<o.optDouble("to")&&to>o.optDouble("from")){notice("Breitenabschnitte dürfen sich nicht überschneiden.");return;}}
-     org.json.JSONArray next=new org.json.JSONArray(widthSections.toString());next.put(new org.json.JSONObject().put("from",from).put("to",to).put("width",width));
+     org.json.JSONArray next=new org.json.JSONArray(widthSections.toString());org.json.JSONObject entry=new org.json.JSONObject().put("from",from).put("to",to).put("width",width);
+     if(Double.isFinite(values[3]))entry.put("left",values[3]);if(Double.isFinite(values[4]))entry.put("right",values[4]);next.put(entry);
      if(!getPreferences(0).edit().putString("metricWidthSections",next.toString()).commit()){notice("Speichern fehlgeschlagen.");return;}
      widthSections.put(next.getJSONObject(next.length()-1));refreshNominalArea.run();drawing.invalidate();edit.dismiss();notice("Breitenabschnitt gespeichert.");
     }catch(Exception e){notice("Bitte gültige Maße eingeben.");}
@@ -1889,7 +1896,7 @@ public class MainActivity extends Activity {
   });
   Button listWidths=new Button(this);listWidths.setText("Breitenabschnitte verwalten");panel.addView(listWidths);
   listWidths.setOnClickListener(v->{
-   String[] labels=new String[widthSections.length()];for(int i=0;i<labels.length;i++){org.json.JSONObject o=widthSections.optJSONObject(i);labels[i]=o==null?"Ungültig":String.format(java.util.Locale.GERMANY,"%.2f – %.2f m · B %.2f m",o.optDouble("from"),o.optDouble("to"),o.optDouble("width"));}
+   String[] labels=new String[widthSections.length()];for(int i=0;i<labels.length;i++){org.json.JSONObject o=widthSections.optJSONObject(i);labels[i]=o==null?"Ungültig":String.format(java.util.Locale.GERMANY,"%.2f – %.2f m · B %.2f m · L %s · R %s",o.optDouble("from"),o.optDouble("to"),o.optDouble("width"),o.has("left")?String.format(java.util.Locale.GERMANY,"%.2f",o.optDouble("left")):"Standard",o.has("right")?String.format(java.util.Locale.GERMANY,"%.2f",o.optDouble("right")):"Standard");}
    if(labels.length==0){notice("Keine Breitenabschnitte.");return;}
    new android.app.AlertDialog.Builder(this).setTitle("Abschnitt zum Löschen wählen").setItems(labels,(d,i)->new android.app.AlertDialog.Builder(this).setMessage(labels[i]+" löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(dd,ww)->{
     try{org.json.JSONArray next=new org.json.JSONArray(widthSections.toString());next.remove(i);if(getPreferences(0).edit().putString("metricWidthSections",next.toString()).commit()){widthSections.remove(i);refreshNominalArea.run();drawing.invalidate();}else notice("Speichern fehlgeschlagen.");}catch(Exception e){notice("Löschen fehlgeschlagen.");}
