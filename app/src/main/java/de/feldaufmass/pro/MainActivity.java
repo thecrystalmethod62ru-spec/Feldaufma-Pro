@@ -898,20 +898,20 @@ public class MainActivity extends Activity {
   if(pendingAssistantField<0)return false;
   if(text.trim().matches("(?iu)^(не знаю|уточню позже|weiß nicht|später)[.!]?$")){pendingAssistantField=-1;notice("Хорошо, оставим это поле незаполненным.");return true;}
   if(!text.trim().matches("(?iu)^\\d+(?:[.,]\\d+)?\\s*(?:м|метр[а-я]*|см|сантиметр[а-я]*|мм|m|meter|cm|zentimeter|mm|millimeter)[.!]?$"))return false;
-  String[] prefixes={"длина трассы ","ширина траншеи ","глубина траншеи "};
+  String[] prefixes={"длина трассы ","ширина траншеи ","глубина траншеи ","толщина асфальта ","nachschnitt слева ","nachschnitt справа "};
   return offerProfileBatch(prefixes[pendingAssistantField]+text,false);
  }
  void showMissingAssistantData(){
   StringBuilder b=new StringBuilder();
   pendingAssistantField=-1;
-  EditText[] fields={length,width,depth};String[] questions={"Какова общая длина трассы?","Какая ширина траншеи?","Какая глубина траншеи?"};
+  EditText[] fields={length,width,depth};String[] questions={"Какова общая длина трассы?","Какая ширина траншеи?","Какая глубина траншеи?","Какая толщина асфальта?","Какой Nachschnitt слева?","Какой Nachschnitt справа?"};
   for(int i=0;i<fields.length;i++){double n=assistantNumber(fields[i]);if(!Double.isFinite(n)||n<=0){if(pendingAssistantField<0)pendingAssistantField=i;b.append("• ").append(questions[i]).append("\n");}}
   String covering=surface.getSelectedItem().toString();
   if(covering.equals("Unbekannt"))b.append("• Какой тип поверхности?\n");
   if(covering.equals("Asphalt")){
-   if(!Double.isFinite(assistantNumber(asphaltInput))||assistantNumber(asphaltInput)<=0)b.append("• Какая толщина асфальта?\n");
-   if(!Double.isFinite(assistantNumber(leftInput)))b.append("• Какой Nachschnitt слева?\n");
-   if(!Double.isFinite(assistantNumber(rightInput)))b.append("• Какой Nachschnitt справа?\n");
+   if(!Double.isFinite(assistantNumber(asphaltInput))||assistantNumber(asphaltInput)<=0){if(pendingAssistantField<0)pendingAssistantField=3;b.append("• ").append(questions[3]).append("\n");}
+   if(!Double.isFinite(assistantNumber(leftInput))){if(pendingAssistantField<0)pendingAssistantField=4;b.append("• ").append(questions[4]).append("\n");}
+   if(!Double.isFinite(assistantNumber(rightInput))){if(pendingAssistantField<0)pendingAssistantField=5;b.append("• ").append(questions[5]).append("\n");}
   }
   for(int i=0;i<objects.length();i++){org.json.JSONObject o=objects.optJSONObject(i);if(o==null||!o.optString("type").equals("Hindernis"))continue;
    String[] keys={"detailLength","detailWidth","detailDepth"},labels={"длина","ширина","глубина"};StringBuilder missing=new StringBuilder();
@@ -920,7 +920,7 @@ public class MainActivity extends Activity {
   }
   new android.app.AlertDialog.Builder(this).setTitle("Ассистент — недостающие данные").setMessage(b.length()==0?"Основные проверяемые размеры заполнены.":b.toString()).setNegativeButton("Уточню позже",(d,w)->pendingAssistantField=-1).setPositiveButton("Ответить",(d,w)->{showPage(voicePage);voiceText.setText("");voiceText.setHint(pendingAssistantField>=0?questions[pendingAssistantField]:"Напиши уточнение");voiceText.requestFocus();}).show();
  }
- void applyDictation(){offerProfileBatch(voiceText.getText().toString(),true);}
+ void applyDictation(){String text=voiceText.getText().toString();if(!offerAssistantAnswer(text))offerProfileBatch(text,true);}
  boolean offerProfileBatch(String message,boolean warn){
   String t=message.toLowerCase(java.util.Locale.ROOT);
   String[] names={"(?:grabenbreite|ширин[аой]\\s+траншеи|траншея\\s+шириной)","(?:grabentiefe|глубин[аой]\\s+траншеи|траншея\\s+глубиной)","(?:trassenlänge|длина\\s+трассы)","(?:asphaltstärke|asphaltdicke|толщина\\s+асфальта|асфальт)","(?:nachschnitt\\s+links|nachschnitt\\s+слева|подрезка\\s+слева)","(?:nachschnitt\\s+rechts|nachschnitt\\s+справа|подрезка\\s+справа)"};
