@@ -4139,7 +4139,8 @@ public class MainActivity extends Activity {
   double minX=Double.POSITIVE_INFINITY,minY=minX,maxX=Double.NEGATIVE_INFINITY,maxY=maxX;
   for(RouteSketch.Vertex v:route.vertices){minX=Math.min(minX,v.point.x);minY=Math.min(minY,v.point.y);maxX=Math.max(maxX,v.point.x);maxY=Math.max(maxY,v.point.y);}
   double trenchWidth=Double.isFinite(w)&&w>0?w:0;
-  double margin=trenchWidth/(2*factor);minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
+  double cutL=Double.isFinite(left)&&left>=0?left:0,cutR=Double.isFinite(right)&&right>=0?right:0;
+  double margin=(trenchWidth/2+Math.max(cutL,cutR))/factor;minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
   int denominator=0,width=595,height=842,format=4;double unit=0;
   int[][] formats={{595,842},{842,1191},{1191,1684},{1684,2384},{2384,3370}};
   search:for(int candidate:new int[]{100,200,500,1000,2000,5000}){
@@ -4154,6 +4155,19 @@ public class MainActivity extends Activity {
   try{
    Canvas c=page.getCanvas();Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);p.setColor(INK);p.setTextSize(16);c.drawText("Trassenachse – Maßstab 1:"+denominator,36,40,p);
    p.setTextSize(10);c.drawText("A"+format+" · Druckgröße 100 % · "+(trenchWidth>0?"Grabenbreite "+reportMeasure(trenchWidth):"nur Trassenachse"),36,58,p);
+   if(trenchWidth>0&&(cutL>0||cutR>0)){
+    p.setColor(0xffaeb9c2);p.setStyle(Paint.Style.FILL);
+    for(int i=1;i<route.vertices.size();i++){
+     RouteSketch.Vertex a=route.vertices.get(i-1),b=route.vertices.get(i);
+     double dx=b.point.x-a.point.x,dy=b.point.y-a.point.y,n=Math.hypot(dx,dy);
+     if(n<=0)continue;
+     double nx=dy/n,ny=-dx/n;
+     double ax=40+(a.point.x-minX)*unit,ay=85+(a.point.y-minY)*unit,bx=40+(b.point.x-minX)*unit,by=85+(b.point.y-minY)*unit;
+     double L=(trenchWidth/2+cutL)*unit/factor,R=(trenchWidth/2+cutR)*unit/factor;
+     android.graphics.Path cut=new android.graphics.Path();cut.moveTo((float)(ax+nx*L),(float)(ay+ny*L));cut.lineTo((float)(bx+nx*L),(float)(by+ny*L));cut.lineTo((float)(bx-nx*R),(float)(by-ny*R));cut.lineTo((float)(ax-nx*R),(float)(ay-ny*R));cut.close();c.drawPath(cut,p);
+    }
+    p.setColor(INK);p.setTextSize(10);c.drawText("Nachschnitt L/R: "+reportMeasure(left)+" / "+reportMeasure(right)+" · ohne Eckergänzung",36,72,p);
+   }
    if(trenchWidth>0){
     p.setColor(0xffded4c3);p.setStrokeWidth((float)(trenchWidth/factor*unit));p.setStrokeJoin(Paint.Join.ROUND);p.setStrokeCap(Paint.Cap.BUTT);p.setStyle(Paint.Style.STROKE);
     android.graphics.Path trench=new android.graphics.Path();
