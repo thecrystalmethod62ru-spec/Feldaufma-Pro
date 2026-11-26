@@ -1725,6 +1725,34 @@ public class MainActivity extends Activity {
     intent.putExtra(android.content.Intent.EXTRA_TITLE,"Montageplan.pdf");pendingPlanProject=activeProject;startActivityForResult(intent,431);
    });
    android.app.AlertDialog dialog=builder.create();
+   if(map!=null){
+    map.setOnTouchListener(new View.OnTouchListener(){
+     float startX,startY;
+     public boolean onTouch(View v,android.view.MotionEvent e){
+      if(e.getActionMasked()==android.view.MotionEvent.ACTION_DOWN){startX=e.getX();startY=e.getY();return true;}
+      if(e.getActionMasked()!=android.view.MotionEvent.ACTION_UP)return true;
+      if(Math.hypot(e.getX()-startX,e.getY()-startY)>dp(12))return true;
+      double pos=map.stationAt(e.getX(),e.getY());if(!Double.isFinite(pos))return true;
+      final double chosen=Math.min(total,Math.round(pos*1000)/1000.0);
+      if(rows.length()==0){notice("Zuerst Formstück hinzufügen.");return true;}
+      String[] labels=new String[rows.length()];
+      for(int j=0;j<labels.length;j++){try{labels[j]=planFittingLabel(rows.getJSONObject(j),j,map);}catch(Exception ex){labels[j]="Formstück "+(j+1);}}
+      new android.app.AlertDialog.Builder(MainActivity.this).setTitle(String.format(java.util.Locale.GERMANY,"Station %.3f m – Formstück wählen",chosen)).setItems(labels,(dd,j)->{
+       try{
+        if(!stationProject.equals(activeProject))throw new IllegalStateException();
+        double currentLength=Double.parseDouble(getPreferences(0).getString("length","").trim().replace(',','.'));
+        if(!Double.isFinite(currentLength)||Math.abs(currentLength-total)>0.000001)throw new IllegalStateException();
+        org.json.JSONArray latest=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));
+        int idx=findMontageItem(latest,rows.getJSONObject(j));
+        latest.getJSONObject(idx).put("station",chosen).put("stationLinked",true);
+        if(!getPreferences(0).edit().putString("montageFittings",latest.toString()).commit())throw new java.io.IOException();
+        recordProjectEvent("Formstück im Montageplan stationiert");if(sketch!=null)sketch.invalidate();if(livePreview!=null)livePreview.invalidate();
+        dialog.dismiss();showMontageStationPlan();
+       }catch(Exception ex){notice("Projektdaten geändert oder Speichern fehlgeschlagen.");}
+      }).setNegativeButton("Abbrechen",null).show();return true;
+     }
+    });
+   }
    for(int i=0;i<rows.length();i++){
     org.json.JSONObject row=rows.getJSONObject(i);Button item=new Button(this);item.setAllCaps(false);
     item.setText(planFittingLabel(row,i,map));item.setOnClickListener(v->{dialog.dismiss();showMontageFitting(MontageCatalog.Fitting.valueOf(row.optString("type")),row);});panel.addView(item);
