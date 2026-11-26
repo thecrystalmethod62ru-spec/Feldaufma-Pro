@@ -884,7 +884,7 @@ public class MainActivity extends Activity {
  boolean offerVoiceSave(String text){
   if(!text.trim().matches("(?iu)^(?:сохрани(?:\\s+(?:проект|всё|все|данные))?|(?:projekt|alles|daten)\\s+speichern|speichere(?:\\s+(?:das\\s+)?projekt|\\s+alles)?)[.!]?$"))return false;
   new android.app.AlertDialog.Builder(this).setTitle("Projekt speichern").setMessage("Aktuelle Profilmaße prüfen und speichern? Trasse, Objekte und Fotos bleiben erhalten.").setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",(d,w)->{
-   if(calculate())notice("Projekt gespeichert.");else notice("Projekt nicht gespeichert. Bitte Maße prüfen.");
+   if(calculate()){notice("Projekt gespeichert.");speakAssistant("Проект сохранён.");}else{notice("Projekt nicht gespeichert. Bitte Maße prüfen.");speakAssistant("Проект не сохранён. Проверь размеры.");}
   }).show();return true;
  }
  void handleSpeech(String text){
@@ -906,8 +906,9 @@ public class MainActivity extends Activity {
    .addOnSuccessListener(this,german->{if(version==speechVersion){voiceText.setText(german);if(!offerVoiceSave(german)&&!offerVoiceNewPoint(german)&&!offerVoiceObjectDimensions(german)&&!offerVoiceSurface(german)&&!offerVoiceObject(german)&&!offerVoiceSegment(german))offerVoiceRename(german);}})
    .addOnFailureListener(this,error->{if(version==speechVersion)notice("Übersetzung fehlgeschlagen. Für den ersten Modellabruf wird Internet benötigt.");});
  }
- @Override protected void onDestroy(){if(translator!=null)translator.close();super.onDestroy();}
+ @Override protected void onDestroy(){if(translator!=null)translator.close();if(assistantTts!=null){assistantTts.stop();assistantTts.shutdown();assistantTts=null;}super.onDestroy();}
  void startDictation(){
+ if(assistantTts!=null)assistantTts.stop();
  android.content.Intent i=new android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
  i.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
  i.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE,voiceLanguage.getSelectedItemPosition()==0?"de-DE":"ru-RU");
@@ -919,6 +920,25 @@ public class MainActivity extends Activity {
  if(request==412&&result==RESULT_OK&&data!=null&&data.getData()!=null){writePdf(data.getData());return;}
  if(request==411&&result==RESULT_OK&&data!=null){if(data.getClipData()!=null){for(int j=0;j<data.getClipData().getItemCount();j++)attachDocument(data.getClipData().getItemAt(j).getUri(),data.getFlags());}else attachDocument(data.getData(),data.getFlags());showDocuments();return;}
  if(request==410&&result==RESULT_OK&&data!=null){java.util.ArrayList<String> values=data.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS);if(values!=null&&!values.isEmpty())handleSpeech(values.get(0));}}
+ android.speech.tts.TextToSpeech assistantTts;
+ boolean assistantTtsReady;
+ String pendingSpoken;
+ void speakAssistant(String russian){
+  if(assistantTts==null){
+   pendingSpoken=russian;
+   assistantTts=new android.speech.tts.TextToSpeech(this,status->{
+    if(isDestroyed()||assistantTts==null)return;
+    if(status==android.speech.tts.TextToSpeech.SUCCESS){
+     int language=assistantTts.setLanguage(new java.util.Locale("ru","RU"));
+     assistantTtsReady=language>=android.speech.tts.TextToSpeech.LANG_AVAILABLE;
+    }
+    String next=pendingSpoken;pendingSpoken=null;
+    if(assistantTtsReady&&next!=null)speakAssistant(next);
+    else if(!assistantTtsReady)notice("Russische Sprachausgabe nicht verfügbar.");
+   });return;
+  }
+  if(assistantTtsReady)assistantTts.speak(russian,android.speech.tts.TextToSpeech.QUEUE_FLUSH,null,"assistant");
+ }
  int pendingAssistantField=-1;
  double assistantNumber(EditText field){try{return optional(field);}catch(Exception e){return Double.NaN;}}
  boolean offerAssistantAnswer(String text){
@@ -945,6 +965,7 @@ public class MainActivity extends Activity {
    for(int j=0;j<keys.length;j++){double n=detailNumber(o,keys[j]);if(!Double.isFinite(n)||n<=0){if(missing.length()>0)missing.append(", ");missing.append(labels[j]);}}
    if(missing.length()>0)b.append("• Hindernis, Station ").append(o.optString("station")).append(" m: уточни ").append(missing).append(".\n");
   }
+  speakAssistant(pendingAssistantField>=0?questions[pendingAssistantField]:"Основные размеры заполнены.");
   new android.app.AlertDialog.Builder(this).setTitle("Ассистент — недостающие данные").setMessage(b.length()==0?"Основные проверяемые размеры заполнены.":b.toString()).setNegativeButton("Уточню позже",(d,w)->pendingAssistantField=-1).setPositiveButton("Ответить",(d,w)->{showPage(voicePage);voiceText.setText("");voiceText.setHint(pendingAssistantField>=0?questions[pendingAssistantField]:"Напиши уточнение");voiceText.requestFocus();}).show();
  }
  void applyDictation(){String text=voiceText.getText().toString();if(!offerAssistantAnswer(text))offerProfileBatch(text,true);}
