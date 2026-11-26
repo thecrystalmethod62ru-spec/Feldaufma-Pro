@@ -958,7 +958,8 @@ public class MainActivity extends Activity {
   menu.getMenu().add(0,106,Menu.NONE,"DXF exportieren");
   menu.getMenu().add(0,107,Menu.NONE,"Mengen als CSV exportieren");
   menu.getMenu().add(0,108,Menu.NONE,"Leistungsverzeichnis");
-  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
+  menu.getMenu().add(0,109,Menu.NONE,"DA11 exportieren (Test)");
+  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==109)exportReb();else if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
   menu.show();
  }
  LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(dp(12),dp(8),dp(12),dp(8));return p;}
@@ -1348,6 +1349,73 @@ public class MainActivity extends Activity {
  static void csvRow(java.io.Writer out,String project,String group,String label,double from,double to,double len,double width,double depth,double quantity,String unit,String note)throws java.io.IOException{
   String[] fields={csvText(project),csvText(group),csvText(label),csvNumber(from),csvNumber(to),csvNumber(len),csvNumber(width),csvNumber(depth),csvNumber(quantity),csvText(unit),csvText(note)};
   out.write(String.join(";",fields));out.write("\r\n");
+ }
+ String rebAnsatzFormula(org.json.JSONObject row)throws Exception{
+  String kind=row.optString("kind"),mode=row.optString("mode"),snapshot=row.optString("snapshot");
+  double quantity=row.optDouble("quantity"),a,b,h;
+  if(!ansatzSourceCurrent(row))throw new java.io.IOException("Mengenansatz: Quelle geändert");
+  if("object".equals(kind)){
+   org.json.JSONArray o=new org.json.JSONArray(snapshot);
+   a=Double.parseDouble(o.optString(3).replace(',','.'));
+   if("length".equals(mode))return RebExport.product(a);
+   b=Double.parseDouble(o.optString(4).replace(',','.'));
+   if("area".equals(mode))return RebExport.product(a,b);
+   if("volume".equals(mode)){h=Double.parseDouble(o.optString(5).replace(',','.'));return RebExport.product(a,b,h);}
+  }
+  if("segment".equals(kind)){
+   org.json.JSONObject o=new org.json.JSONObject(snapshot);
+   a=o.getDouble("to")-o.getDouble("from");
+   if("length".equals(mode))return RebExport.product(a);
+   if("area".equals(mode))return RebExport.product(a,o.getDouble("width"));
+   if("cut".equals(mode))return RebExport.product(a,o.getDouble("cutWidth"));
+  }
+  return RebExport.product(quantity);
+ }
+ String rebData()throws Exception{
+  StringBuilder out=new StringBuilder(RebExport.header(projectHeader.getText().toString())).append("\r\n");
+  org.json.JSONArray lv=lvPositions();int address=0;
+  for(int j=0;j<lv.length();j++){
+   org.json.JSONObject o=lv.optJSONObject(j);if(o==null)continue;String oz=o.optString("oz"),source=o.optString("source","manual");
+   double qty=lvQuantity(o);if(!Double.isFinite(qty)){
+    if("manual".equals(source)&&!o.has("quantity"))continue;
+    if("ansatz".equals(source)&&(o.optJSONArray("ansatz")==null||o.optJSONArray("ansatz").length()==0))continue;
+    throw new java.io.IOException("Menge fehlt oder ungültig: "+oz);
+   }
+   if("ansatz".equals(source)){
+    org.json.JSONArray rows=o.getJSONArray("ansatz");
+    for(int k=0;k<rows.length();k++){
+     org.json.JSONObject row=rows.getJSONObject(k);
+     if(!Double.isFinite(ansatzQuantity(row,o.optString("unit"))))throw new java.io.IOException("Einheit prüfen: "+oz);
+     String formula="count".equals(row.optString("mode"))?RebExport.product(row.getDouble("quantity")):rebAnsatzFormula(row);
+     if(!ansatzSourceCurrent(row))throw new java.io.IOException("Quelle geändert: "+oz);
+     out.append(RebExport.record(oz,formula,address++)).append("\r\n");
+    }
+   }else{
+    String formula="length".equals(source)?RebExport.product(l):"area".equals(source)?RebExport.product(l,w):"volume".equals(source)?RebExport.product(l,w,d):"cut".equals(source)?RebExport.product(l,w+left+right):RebExport.product(qty);
+    out.append(RebExport.record(oz,formula,address++)).append("\r\n");
+   }
+  }
+  if(address==0)throw new java.io.IOException("Keine abrechenbaren Mengenansätze vorhanden");
+  return out.toString();
+ }
+ String pendingRebData;
+ void exportReb(){
+  if(!calculate()){showPage(measurePage);return;}
+  try{
+   String data=rebData();
+   new android.app.AlertDialog.Builder(this).setTitle("DA11 exportieren – Testformat")
+    .setMessage((data.split("\r\n").length-1)+" Rechenansätze · REB 23.003 (2009), Formel 91, OZ 00.00.0000. Positionen ohne manuelle Istmenge werden ausgelassen. Keine Mengenabzüge. Import in Ziel-AVA vor Abrechnung prüfen.")
+    .setNegativeButton("Abbrechen",null).setPositiveButton("Testdatei speichern",(d,w)->{
+     pendingRebData=data;android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.setType("application/octet-stream");i.putExtra(android.content.Intent.EXTRA_TITLE,"Feldaufmass.d11");startActivityForResult(i,420);
+    }).show();
+  }catch(Exception e){notice("DA11 nicht exportiert: "+e.getMessage());}
+ }
+ void writeReb(android.net.Uri uri){
+  String data=pendingRebData;pendingRebData=null;if(data==null){notice("Export erneut starten.");return;}
+  try(java.io.OutputStream stream=getContentResolver().openOutputStream(uri,"wt")){
+   if(stream==null)throw new java.io.IOException();
+   stream.write(data.getBytes(java.nio.charset.StandardCharsets.US_ASCII));stream.flush();notice("DA11-Testdatei gespeichert.");
+  }catch(Exception e){notice("DA11 konnte nicht gespeichert werden.");}
  }
  void exportCsv(){
   if(!calculate()){showPage(measurePage);return;}
@@ -1848,6 +1916,7 @@ public class MainActivity extends Activity {
  try{startActivityForResult(i,410);}catch(android.content.ActivityNotFoundException e){Toast.makeText(this,"Keine Spracherkennung verfügbar.",Toast.LENGTH_LONG).show();}
  }
  @Override protected void onActivityResult(int request,int result,android.content.Intent data){super.onActivityResult(request,result,data);
+ if(request==420){if(result==RESULT_OK&&data!=null&&data.getData()!=null)writeReb(data.getData());else pendingRebData=null;return;}
  if(request==419&&result==RESULT_OK&&data!=null&&data.getData()!=null){importGaeb(data.getData());return;}
  if(request==418&&result==RESULT_OK&&data!=null&&data.getData()!=null){writeCsv(data.getData());return;}
  if((request==416||request==417)&&result==RESULT_OK&&data!=null&&data.getData()!=null){writeDxf(data.getData(),request==416);return;}
