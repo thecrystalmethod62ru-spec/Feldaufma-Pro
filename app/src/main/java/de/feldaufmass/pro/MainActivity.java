@@ -1627,6 +1627,7 @@ public class MainActivity extends Activity {
   }catch(Exception e){notice("Montage-Zuordnung konnte nicht vollständig gelesen werden.");}
   final org.json.JSONArray surfaces;
   org.json.JSONArray loadedSurfaces;try{loadedSurfaces=new org.json.JSONArray(getPreferences(0).getString("segments","[]"));}catch(Exception e){loadedSurfaces=new org.json.JSONArray();notice("Oberflächen konnten nicht gelesen werden.");}surfaces=loadedSurfaces;
+  route.bindDimensionProject(activeProject);route.setStationLayers(new org.json.JSONArray(),surfaces);
   final double[] widths={Double.NaN,Double.NaN,Double.NaN};
   String[] widthKeys={"width","left","right"};
   for(int i=0;i<widthKeys.length;i++){try{double v=Double.parseDouble(getPreferences(0).getString(widthKeys[i],"").trim().replace(',','.'));if(Double.isFinite(v)&&v>=0&&(i!=0||v>0))widths[i]=v;}catch(Exception ignored){}}
@@ -1684,7 +1685,7 @@ public class MainActivity extends Activity {
       for(int i=1;i<model.vertices.size();i++){
        double end=start+route.vertices.get(i).metres,lo=Math.max(start,from),hi=Math.min(end,to);
        if(hi>lo){double[] u=model.station(lo),v=model.station(hi);if(u!=null&&v!=null){
-        pen.setColor(RouteSketch.surfaceColor(name));pen.setStrokeWidth((float)(widths[0]*scale));pen.setStrokeCap(android.graphics.Paint.Cap.BUTT);
+        pen.setColor(route.configuredSurfaceColor(name,route.legendSettings()));pen.setStrokeWidth((float)(widths[0]*scale));pen.setStrokeCap(android.graphics.Paint.Cap.BUTT);
         c.drawLine((float)(ox+u[0]*scale),(float)(oy-u[1]*scale),(float)(ox+v[0]*scale),(float)(oy-v[1]*scale),pen);
        }}start=end;
       }
@@ -1725,7 +1726,27 @@ public class MainActivity extends Activity {
     if(Double.isFinite(bar)&&bar>0){float end=dp(12)+(float)(bar*scale);pen.setColor(0xff777777);pen.setStrokeWidth(dp(2));c.drawLine(dp(12),getHeight()-dp(12),end,getHeight()-dp(12),pen);pen.setTextSize(dp(11));c.drawText(String.format(java.util.Locale.GERMANY,"%.3g m",bar),dp(12),getHeight()-dp(18),pen);}
    }
   };panel.addView(drawing,new LinearLayout.LayoutParams(-1,dp(300)));
-  new android.app.AlertDialog.Builder(this).setTitle("Tiefbau – Maßstäbliche Vorschau").setView(panel).setPositiveButton("Schließen",null).show();
+  LinearLayout legendPanel=new LinearLayout(this);legendPanel.setOrientation(1);panel.addView(legendPanel);
+  Runnable refreshLegend=()->{
+   legendPanel.removeAllViews();
+   org.json.JSONObject settings=route.legendSettings();
+   java.util.LinkedHashSet<String> names=new java.util.LinkedHashSet<>();
+   for(int j=0;j<surfaces.length();j++){org.json.JSONObject o=surfaces.optJSONObject(j);if(o==null)continue;double from=o.optDouble("from"),to=o.optDouble("to");String name=o.optString("surface").trim();if(Double.isFinite(from)&&Double.isFinite(to)&&from>=0&&to<=route.measuredLength()&&to>from&&!name.isEmpty()&&Double.isFinite(widths[0]))names.add(name);}
+   java.util.ArrayList<String> ordered=new java.util.ArrayList<>(names);
+   ordered.sort((u,v)->Integer.compare(settings.optJSONObject(u)==null?1000:settings.optJSONObject(u).optInt("order",1000),settings.optJSONObject(v)==null?1000:settings.optJSONObject(v).optInt("order",1000)));
+   if(!ordered.isEmpty()){TextView heading=new TextView(this);heading.setText("Oberflächenlegende");legendPanel.addView(heading);}
+   for(String name:ordered){org.json.JSONObject item=settings.optJSONObject(name);if(item!=null&&!item.optBoolean("visible",true))continue;
+    LinearLayout row=new LinearLayout(this);row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+    android.view.View swatch=new android.view.View(this);swatch.setBackgroundColor(route.configuredSurfaceColor(name,settings));row.addView(swatch,new LinearLayout.LayoutParams(dp(20),dp(14)));
+    TextView label=new TextView(this);label.setText("  "+(item==null?name:item.optString("name",name)));row.addView(label);legendPanel.addView(row);
+   }
+   drawing.invalidate();
+  };
+  refreshLegend.run();
+  Button editLegend=new Button(this);editLegend.setText("Legende bearbeiten");panel.addView(editLegend);editLegend.setOnClickListener(v->route.editLegend());
+  Button reloadLegend=new Button(this);reloadLegend.setText("Legende aktualisieren");panel.addView(reloadLegend);reloadLegend.setOnClickListener(v->refreshLegend.run());
+  ScrollView scroll=new ScrollView(this);scroll.addView(panel);
+  new android.app.AlertDialog.Builder(this).setTitle("Tiefbau – Maßstäbliche Vorschau").setView(scroll).setPositiveButton("Schließen",null).show();
  }
  void showTools(){
   String[] names={"Maße","Beläge","Objekte","Unterlagen / PDF","Sprachassistent"};
