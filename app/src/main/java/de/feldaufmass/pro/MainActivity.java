@@ -5330,6 +5330,12 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   ScrollView positionScroll=new ScrollView(this);positionScroll.setFillViewport(false);positionScroll.addView(form);
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(source.optString("name",source.optString("type"))+" – Lage").setView(positionScroll).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
   Button fullscreen=new Button(this);fullscreen.setText("Vollbild");form.addView(fullscreen,2);
+  Button toggleControls=new Button(this);toggleControls.setText("Maße ausblenden");form.addView(toggleControls,3);
+  toggleControls.setOnClickListener(v->{
+   boolean hide=toggleControls.getText().toString().equals("Maße ausblenden");
+   for(int k=4;k<form.getChildCount();k++)form.getChildAt(k).setVisibility(hide?View.GONE:View.VISIBLE);
+   toggleControls.setText(hide?"Maße einblenden":"Maße ausblenden");
+  });
   fullscreen.setOnClickListener(v->{
    android.view.Window window=dialog.getWindow();if(window==null)return;
    boolean full=fullscreen.getText().toString().equals("Vollbild");
