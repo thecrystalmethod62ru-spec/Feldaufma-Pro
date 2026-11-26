@@ -35,6 +35,29 @@ final class MontagePlanView extends View {
 
     boolean hasPosition(int index) { return positions.get(index) != null; }
 
+    /** Nearest station on the measured polyline, in metres; NaN for an invalid view. */
+    double stationAt(float x, float y) {
+        int width=getWidth(), height=getHeight();
+        float pad=20*Math.min(width,height)/240f;
+        double dx=maxX-minX,dy=maxY-minY;
+        double scale=Math.min(dx==0?Double.POSITIVE_INFINITY:(width-2*pad)/dx,
+                              dy==0?Double.POSITIVE_INFINITY:(height-2*pad)/dy);
+        if(!Double.isFinite(scale)||scale<=0)return Double.NaN;
+        double wx=minX+(x-(width-dx*scale)/2)/scale;
+        double wy=maxY-(y-(height-dy*scale)/2)/scale;
+        double best=Double.POSITIVE_INFINITY, station=Double.NaN, accumulated=0;
+        for(int i=1;i<model.vertices.size();i++){
+            double[] a=model.vertices.get(i-1),b=model.vertices.get(i);
+            double vx=b[0]-a[0],vy=b[1]-a[1],length=Math.hypot(vx,vy);
+            if(length<=0||!Double.isFinite(length))continue;
+            double t=Math.max(0,Math.min(1,((wx-a[0])*vx+(wy-a[1])*vy)/(length*length)));
+            double distance=Math.hypot(wx-a[0]-t*vx,wy-a[1]-t*vy);
+            if(distance<best){best=distance;station=accumulated+t*length;}
+            accumulated+=length;
+        }
+        return best*scale<=24*getResources().getDisplayMetrics().density?station:Double.NaN;
+    }
+
     @Override protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         render(canvas, getWidth(), getHeight());
