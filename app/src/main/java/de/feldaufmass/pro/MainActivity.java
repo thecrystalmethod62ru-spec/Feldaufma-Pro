@@ -4138,16 +4138,23 @@ public class MainActivity extends Activity {
   double factor=route.uniformMetresPerUnit();if(!Double.isFinite(factor))return pageNumber;
   double minX=Double.POSITIVE_INFINITY,minY=minX,maxX=Double.NEGATIVE_INFINITY,maxY=maxX;
   for(RouteSketch.Vertex v:route.vertices){minX=Math.min(minX,v.point.x);minY=Math.min(minY,v.point.y);maxX=Math.max(maxX,v.point.x);maxY=Math.max(maxY,v.point.y);}
-  int denominator=0;double unit=0;
-  for(int candidate:new int[]{100,200,500,1000,2000,5000}){double u=factor*1000*72/25.4/candidate;if((maxX-minX)*u<=515&&(maxY-minY)*u<=690){denominator=candidate;unit=u;break;}}
+  int denominator=0,width=595,height=842,format=4;double unit=0;
+  int[][] formats={{595,842},{842,1191},{1191,1684},{1684,2384},{2384,3370}};
+  search:for(int candidate:new int[]{100,200,500,1000,2000,5000}){
+   double u=factor*1000*72/25.4/candidate;
+   for(int f=0;f<formats.length;f++)for(int orientation=0;orientation<2;orientation++){
+    int pw=formats[f][orientation],ph=formats[f][1-orientation];
+    if((maxX-minX)*u<=pw-80&&(maxY-minY)*u<=ph-152){denominator=candidate;unit=u;width=pw;height=ph;format=4-f;break search;}
+   }
+  }
   if(denominator==0)return pageNumber;
-  android.graphics.pdf.PdfDocument.Page page=pdf.startPage(new android.graphics.pdf.PdfDocument.PageInfo.Builder(595,842,pageNumber++).create());
+  android.graphics.pdf.PdfDocument.Page page=pdf.startPage(new android.graphics.pdf.PdfDocument.PageInfo.Builder(width,height,pageNumber++).create());
   try{
    Canvas c=page.getCanvas();Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);p.setColor(INK);p.setTextSize(16);c.drawText("Trassenachse – Maßstab 1:"+denominator,36,40,p);
-   p.setTextSize(10);c.drawText("A4 · Druck in tatsächlicher Größe (100 %) · nur Trassenachse",36,58,p);
+   p.setTextSize(10);c.drawText("A"+format+" · Druck in tatsächlicher Größe (100 %) · nur Trassenachse",36,58,p);
    p.setColor(TEAL);p.setStrokeWidth(1.5f);
    for(int i=1;i<route.vertices.size();i++){RouteSketch.Vertex a=route.vertices.get(i-1),b=route.vertices.get(i);c.drawLine((float)(40+(a.point.x-minX)*unit),(float)(85+(a.point.y-minY)*unit),(float)(40+(b.point.x-minX)*unit),(float)(85+(b.point.y-minY)*unit),p);}
-   p.setColor(INK);p.setStrokeWidth(1);float bar=(float)(50*72/25.4);c.drawLine(40,795,40+bar,795,p);c.drawLine(40,791,40,799,p);c.drawLine(40+bar,791,40+bar,799,p);c.drawText("50 mm Kontrollmaß",40,812,p);
+   p.setColor(INK);p.setStrokeWidth(1);float bar=(float)(50*72/25.4);float by=height-47;c.drawLine(40,by,40+bar,by,p);c.drawLine(40,by-4,40,by+4,p);c.drawLine(40+bar,by-4,40+bar,by+4,p);c.drawText("50 mm Kontrollmaß",40,by+17,p);
   }finally{pdf.finishPage(page);}
   return pageNumber;
  }
