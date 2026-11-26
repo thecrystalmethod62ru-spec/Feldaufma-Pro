@@ -151,7 +151,7 @@ public class MainActivity extends Activity {
       org.json.JSONArray row=rows.getJSONArray(j);double x=row.getDouble(0),y=row.getDouble(1);
       if(!Double.isFinite(x)||!Double.isFinite(y)||x<0||x>1||y<0||y>1)throw new java.io.IOException("Ungültiger Trassenpunkt");
       org.json.JSONArray items=row.optJSONArray(4);if(items==null)continue;
-      for(int k=0;k<items.length();k++){String old=items.getString(k),replacement=photos.get(old);if(replacement==null)throw new java.io.IOException("Foto fehlt");used.add(old);items.put(k,replacement);}
+      for(int k=0;k<items.length();k++){String old=items.getString(k),replacement=photos.get(old);if(replacement==null)throw new java.io.IOException("Foto fehlt");used.add(old);items.put(k,replacement);org.json.JSONObject meta=row.optJSONObject(10);if(meta!=null&&meta.has(old)){Object value=meta.remove(old);meta.put(replacement,value);}}
      }v=rows.toString();
     }else if(key.equals("documents")){
      org.json.JSONArray docs=new org.json.JSONArray(v);for(int j=0;j<docs.length();j++){org.json.JSONObject doc=docs.getJSONObject(j);doc.remove("uri");doc.put("name",doc.optString("name")+" (neu verknüpfen)");}v=docs.toString();
@@ -1717,6 +1717,48 @@ public class MainActivity extends Activity {
    if(i>=0&&route.vertices.get(i).undoGpsMove()&&saveRoute(route)){refreshRoute();notice("Vorherige Position wiederhergestellt.");}
   }).show();
  }
+ double photoStation(RouteSketch route,int index){
+  double station=0;for(int j=1;j<=index;j++){double m=route.vertices.get(j).metres;if(!Double.isFinite(m)||m<=0)return Double.NaN;station+=m;}return station;
+ }
+ org.json.JSONObject newPhotoMetadata(java.io.File file,RouteSketch route,int index){
+  org.json.JSONObject meta=new org.json.JSONObject();
+  try{
+   meta.put("capturedAt",System.currentTimeMillis()).put("timeSource","cameraReturn");
+   double station=photoStation(route,index);if(Double.isFinite(station))meta.put("station",station);
+   android.media.ExifInterface exif=new android.media.ExifInterface(file.getAbsolutePath());
+   String date=exif.getAttribute(android.media.ExifInterface.TAG_DATETIME_ORIGINAL);
+   if(date!=null&&!date.isEmpty())meta.put("exifDate",date);
+   float[] coords=new float[2];
+   if(exif.getLatLong(coords)&&Float.isFinite(coords[0])&&Float.isFinite(coords[1]))meta.put("latitude",(double)coords[0]).put("longitude",(double)coords[1]).put("gpsSource","EXIF");
+  }catch(Exception ignored){}
+  return meta;
+ }
+ String photoInfo(org.json.JSONObject m){
+  if(m==null)return "Keine Fotometadaten erfasst.";
+  StringBuilder b=new StringBuilder();
+  if(m.has("exifDate"))b.append("Aufnahme (EXIF): ").append(m.optString("exifDate"));
+  else if(m.has("capturedAt"))b.append("Kamera beendet: ").append(new java.text.SimpleDateFormat("dd.MM.yyyy HH:mm:ss",java.util.Locale.GERMANY).format(new java.util.Date(m.optLong("capturedAt"))));
+  if(m.has("station"))b.append("\nStation bei Zuordnung: ").append(reportMeasure(m.optDouble("station")));
+  if(m.has("latitude")&&m.has("longitude"))b.append(String.format(java.util.Locale.GERMANY,"\nFoto-GPS (%s): %.7f / %.7f",m.optString("gpsSource"),m.optDouble("latitude"),m.optDouble("longitude")));
+  else b.append("\nKeine Foto-GPS-Koordinaten verfügbar.");
+  if(m.has("accuracy"))b.append("\nGPS-Genauigkeit: ± ").append(reportMeasure(m.optDouble("accuracy")));
+  return b.toString();
+ }
+ void showPhotoDetails(String id,String filename){
+  RouteSketch route=new RouteSketch(this,routeData());int index=findPoint(route,id);if(index<0)return;
+  org.json.JSONObject meta=route.vertices.get(index).photoMetadata.optJSONObject(filename);
+  LinearLayout form=page();form.addView(sheetText(photoInfo(meta),14,false));
+  EditText description=new EditText(this);description.setHint("Beschreibung / Bemerkung");description.setText(meta==null?"":meta.optString("description"));form.addView(description);
+  new android.app.AlertDialog.Builder(this).setTitle("Fotodokumentation – Punkt "+(index+1)).setView(form).setNeutralButton("Foto öffnen",(d,w)->{
+   android.content.Intent view=new android.content.Intent(android.content.Intent.ACTION_VIEW);view.setDataAndType(photoUri(filename),"image/jpeg");view.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+   try{startActivity(view);}catch(Exception e){notice("Keine Bildanzeige verfügbar.");}
+  }).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",(d,w)->{
+   RouteSketch latest=new RouteSketch(this,routeData());int j=findPoint(latest,id);if(j<0)return;RouteSketch.Vertex v=latest.vertices.get(j);boolean attached=false;
+   for(int k=0;k<v.photos.length();k++)if(filename.equals(v.photos.optString(k)))attached=true;
+   if(!attached){notice("Foto nicht mehr zugeordnet.");return;}
+   try{org.json.JSONObject m=v.photoMetadata.optJSONObject(filename);if(m==null)m=new org.json.JSONObject();m.put("description",description.getText().toString());v.photoMetadata.put(filename,m);if(saveRoute(latest))refreshRoute();}catch(Exception e){notice("Beschreibung konnte nicht gespeichert werden.");}
+  }).show();
+ }
  void pointMenu(){
   RouteSketch route=new RouteSketch(this,routeData());int index=findPoint(route,selectedPoint);
   if(index<0)return;
@@ -1724,13 +1766,10 @@ public class MainActivity extends Activity {
   boolean canUndo=route.vertices.get(index).gpsUndo!=null;int photoStart=canUndo?4:3;
   String[] labels=new String[photoStart+photos.length()];labels[0]="Foto aufnehmen";labels[1]="GPS-Punkt zuordnen";labels[2]="Punkt umbenennen";
   if(canUndo)labels[3]="GPS-Verschiebung rückgängig machen";
-  for(int i=0;i<photos.length();i++)labels[i+photoStart]="Foto "+(i+1)+" öffnen";
+  for(int i=0;i<photos.length();i++)labels[i+photoStart]="Foto "+(i+1)+" · Details";
   new android.app.AlertDialog.Builder(this).setTitle(route.vertices.get(index).name.isEmpty()?"Trassenpunkt "+(index+1):route.vertices.get(index).name).setItems(labels,(dialog,i)->{
    if(i==0)capturePhoto();else if(i==1)assignGps(route.vertices.get(index).id);else if(i==2)renamePoint(route.vertices.get(index).id,null);else if(canUndo&&i==3)undoGps(route.vertices.get(index).id);else {
-    android.content.Intent view=new android.content.Intent(android.content.Intent.ACTION_VIEW);
-    view.setDataAndType(photoUri(photos.optString(i-photoStart)),"image/jpeg");
-    view.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
-    try{startActivity(view);}catch(android.content.ActivityNotFoundException e){notice("Keine Bildanzeige verfügbar.");}
+    showPhotoDetails(route.vertices.get(index).id,photos.optString(i-photoStart));
    }
   }).show();
  }
@@ -1764,7 +1803,9 @@ public class MainActivity extends Activity {
   java.io.File file=new java.io.File(getFilesDir(),"photos/"+pendingPhoto);
   RouteSketch route=new RouteSketch(this,routeData());int index=findPoint(route,pendingPoint);
   if(success && index>=0 && file.length()>0){
-   route.vertices.get(index).photos.put(pendingPhoto);saveRoute(route);refreshRoute();notice("Foto an Trassenpunkt "+(index+1)+" angehängt.");
+   RouteSketch.Vertex v=route.vertices.get(index);v.photos.put(pendingPhoto);
+   try{v.photoMetadata.put(pendingPhoto,newPhotoMetadata(file,route,index));}catch(Exception ignored){}
+   if(saveRoute(route)){refreshRoute();notice("Foto an Trassenpunkt "+(index+1)+" angehängt.");showPhotoDetails(v.id,pendingPhoto);}else notice("Foto gespeichert, aber Zuordnung fehlgeschlagen.");
   }else{file.delete();if(success)notice("Foto konnte nicht zugeordnet werden.");}
   pendingPoint=null;pendingPhoto=null;
  }
