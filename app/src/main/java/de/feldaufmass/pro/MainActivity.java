@@ -1537,6 +1537,9 @@ public class MainActivity extends Activity {
   EditText material=new EditText(this);material.setHint("Werkstoff (optional)");panel.addView(material);
   EditText rotation=new EditText(this);rotation.setHint("Drehwinkel (°)");rotation.setInputType(8194|4096);rotation.setText("0");panel.addView(rotation);
   android.widget.CheckBox mirror=new android.widget.CheckBox(this);mirror.setText("Spiegeln");panel.addView(mirror);
+  EditText station=new EditText(this);station.setHint("Station Tiefbau (m, optional)");station.setInputType(8194);panel.addView(station);
+  EditText offset=new EditText(this);offset.setHint("Seitlicher Versatz (m, + rechts / − links)");offset.setInputType(8194|4096);panel.addView(offset);
+  EditText cover=new EditText(this);cover.setHint("Überdeckung bis Rohroberkante (m, optional)");cover.setInputType(8194);panel.addView(cover);
   android.widget.ScrollView scroll=new android.widget.ScrollView(this);scroll.addView(panel);
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(fitting.label).setView(scroll).setNegativeButton("Zurück",(d,w)->showMontageCatalog()).setPositiveButton("Zum Projekt hinzufügen",null).create();
   dialog.setOnShowListener(x->dialog.getButton(-1).setOnClickListener(v->{
@@ -1546,14 +1549,22 @@ public class MainActivity extends Activity {
    double angle;try{angle=MontageCatalog.normalizeRotation(Double.parseDouble(rotation.getText().toString().trim().replace(',','.')));}catch(Exception e){rotation.setError("Ungültiger Winkel");return;}
    try{
     org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));
-    rows.put(new org.json.JSONObject().put("id",java.util.UUID.randomUUID().toString()).put("type",fitting.name()).put("dn",diameter).put("material",material.getText().toString().trim()).put("rotation",angle).put("mirrored",mirror.isChecked()).put("placed",false));
+    org.json.JSONObject item=new org.json.JSONObject().put("id",java.util.UUID.randomUUID().toString()).put("type",fitting.name()).put("dn",diameter).put("material",material.getText().toString().trim()).put("rotation",angle).put("mirrored",mirror.isChecked()).put("placed",false);
+    EditText[] coordinates={station,offset,cover};String[] keys={"station","offset","cover"};
+    if(station.length()==0&&(offset.length()>0||cover.length()>0)){station.setError("Station für die Zuordnung erforderlich");return;}
+    for(int i=0;i<coordinates.length;i++){String raw=coordinates[i].getText().toString().trim();if(raw.isEmpty())continue;double value;
+     try{value=Double.parseDouble(raw.replace(',','.'));if(!Double.isFinite(value)||(i!=1&&value<0))throw new IllegalArgumentException();}catch(Exception e){coordinates[i].setError("Ungültiges Maß");return;}
+     if(i==0){String routeLength=getPreferences(0).getString("length","").trim();try{double max=Double.parseDouble(routeLength.replace(',','.'));if(!Double.isFinite(max)||max<=0||value>max)throw new IllegalArgumentException();}catch(Exception e){station.setError("Station innerhalb einer gültigen Tiefbau-Trassenlänge erforderlich");return;}}
+     item.put(keys[i],value);
+    }
+    item.put("stationLinked",item.has("station"));rows.put(item);
     if(!getPreferences(0).edit().putString("montageFittings",rows.toString()).commit()){notice("Speichern fehlgeschlagen.");return;}
     dialog.dismiss();notice("Formstück gespeichert – noch nicht platziert.");showMontageCatalog();
    }catch(Exception e){notice("Formstück konnte nicht gespeichert werden.");}
   }));dialog.show();
  }
  void showMontageInventory(){
-  try{org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));StringBuilder out=new StringBuilder();for(int i=0;i<rows.length();i++){org.json.JSONObject row=rows.getJSONObject(i);out.append(MontageCatalog.Fitting.valueOf(row.getString("type")).label).append(" · DN ").append(row.optString("dn").isEmpty()?"unbekannt":row.optString("dn")).append(" · ").append(row.optString("material")).append(" · nicht platziert\n");}new android.app.AlertDialog.Builder(this).setTitle("Projekt-Formstücke").setMessage(out.length()==0?"Keine Formstücke gespeichert.":out.toString()).setPositiveButton("Zurück",(d,w)->showMontage()).show();}catch(Exception e){notice("Formstücke konnten nicht gelesen werden.");}
+  try{org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));StringBuilder out=new StringBuilder();for(int i=0;i<rows.length();i++){org.json.JSONObject row=rows.getJSONObject(i);out.append(MontageCatalog.Fitting.valueOf(row.getString("type")).label).append(" · DN ").append(row.optString("dn").isEmpty()?"unbekannt":row.optString("dn")).append(" · ").append(row.optString("material")).append(row.has("station")?" · Station "+row.optDouble("station")+" m":" · ohne Station").append(" · nicht platziert\n");}new android.app.AlertDialog.Builder(this).setTitle("Projekt-Formstücke").setMessage(out.length()==0?"Keine Formstücke gespeichert.":out.toString()).setPositiveButton("Zurück",(d,w)->showMontage()).show();}catch(Exception e){notice("Formstücke konnten nicht gelesen werden.");}
  }
  void showTools(){
   String[] names={"Maße","Beläge","Objekte","Unterlagen / PDF","Sprachassistent"};
