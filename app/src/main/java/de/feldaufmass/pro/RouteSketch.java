@@ -15,7 +15,7 @@ import java.util.Locale;
 
 /** Coordinates describe a schematic only. Metres are entered in the field. */
 final class RouteSketch extends View {
- static final int LAYER_ROUTE=1,LAYER_DIMENSIONS=2,LAYER_NAMES=4,LAYER_GPS=8,LAYER_PHOTOS=16,LAYER_OBJECTS=32,LAYER_SURFACES=64,ALL_LAYERS=127;
+ static final int LAYER_ROUTE=1,LAYER_DIMENSIONS=2,LAYER_NAMES=4,LAYER_GPS=8,LAYER_PHOTOS=16,LAYER_OBJECTS=32,LAYER_SURFACES=64,LAYER_SURFACE_DIMENSIONS=128,ALL_LAYERS=255;
  int visibleLayers=ALL_LAYERS;
  boolean layerVisible(int layer){return (visibleLayers&layer)!=0;}
  void setVisibleLayers(int layers){visibleLayers=layers&ALL_LAYERS;invalidate();}
@@ -214,7 +214,7 @@ final class RouteSketch extends View {
   c.restore();
  }
  private void drawSurfaceDimensions(Canvas c,float d){
-  if(!layerVisible(LAYER_SURFACES)||!layerVisible(LAYER_DIMENSIONS))return;
+  if(!layerVisible(LAYER_SURFACES)||!layerVisible(LAYER_SURFACE_DIMENSIONS))return;
   java.util.TreeSet<Double> boundaries=new java.util.TreeSet<>();
   for(int j=0;j<surfaceSections.length();j++){
    org.json.JSONObject o=surfaceSections.optJSONObject(j);if(o==null)continue;
