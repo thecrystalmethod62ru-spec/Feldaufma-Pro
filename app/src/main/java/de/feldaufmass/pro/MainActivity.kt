@@ -1,6 +1,12 @@
 package de.feldaufmass.pro
 
 import android.os.Bundle
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import java.io.File
+import java.util.UUID
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
 import android.Manifest
 import android.content.pm.PackageManager
 import android.location.Location
@@ -40,6 +46,22 @@ class MainActivity : ComponentActivity() {
                 var depth by remember { mutableStateOf("") }
                 var surface by remember { mutableStateOf("") }
                 var asphalt by remember { mutableStateOf("") }
+                var photos by remember { mutableStateOf(listOf<SitePhoto>()) }
+                var photoStation by remember { mutableStateOf("") }
+                var photoNote by remember { mutableStateOf("") }
+                var photoStatus by remember { mutableStateOf("") }
+                val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
+                    if (bitmap != null) {
+                        try {
+                            val file = File(filesDir, UUID.randomUUID().toString() + ".jpg")
+                            file.outputStream().use { stream ->
+                                check(bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream))
+                            }
+                            photos = photos + SitePhoto(file.name, photoStation, photoNote)
+                            photoStatus = "Foto hinzugefügt. Bitte Projekt speichern."
+                        } catch (e: Exception) { photoStatus = "Foto konnte nicht gespeichert werden." }
+                    }
+                }
                 var gps by remember { mutableStateOf(listOf<GpsPoint>()) }
                 var gpsStatus by remember { mutableStateOf("") }
                 var gpsBusy by remember { mutableStateOf(false) }
@@ -179,6 +201,24 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         Text("Zusatzmengen separat; Überschneidungen nicht automatisch abgezogen.")
+                        Text("Fotodokumentation", style = MaterialTheme.typography.titleLarge)
+                        OutlinedTextField(photoStation, { photoStation = it }, label = { Text("Fotostation (m)") }, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(photoNote, { photoNote = it }, label = { Text("Fotobeschreibung") }, modifier = Modifier.fillMaxWidth())
+                        Button(enabled = name.isNotBlank() && l != null && number(photoStation)?.let { it <= l } == true, onClick = {
+                            try { camera.launch(null) } catch (e: Exception) { photoStatus = "Keine Kamera verfügbar." }
+                        }) { Text("Foto aufnehmen") }
+                        Text(photoStatus)
+                        photos.forEachIndexed { index, photo ->
+                            Card(Modifier.fillMaxWidth()) {
+                                Column(Modifier.padding(12.dp)) {
+                                    val bitmap = remember(photo.file) { BitmapFactory.decodeFile(File(filesDir, photo.file).absolutePath)?.asImageBitmap() }
+                                    if (bitmap != null) Image(bitmap, contentDescription = photo.note, modifier = Modifier.fillMaxWidth().height(160.dp))
+                                    Text("Station " + photo.station + " m · " + photo.note)
+                                    TextButton(onClick = { photos = photos.filterIndexed { i, _ -> i != index } }) { Text("Aus Projekt entfernen") }
+                                }
+                            }
+                        }
+                        Text("Vorschaufotos; Originalauflösung folgt.")
                         Text("Mengenberechnung", style = MaterialTheme.typography.titleLarge)
                         if (valid) {
                             val ll = l!!; val ww = w!!; val dd = d!!; val ss = s!!; val aa = a!!
@@ -189,18 +229,18 @@ class MainActivity : ComponentActivity() {
                             Text("Geometrische Richtwerte, keine geprüfte Abrechnung.")
                         } else Text("Bitte gültige Maße eingeben. Aufbruchbreite ≥ Grabenbreite; Asphaltstärke ≤ Grabentiefe.")
                         Button(enabled = !gpsBusy && valid && name.isNotBlank(), onClick = {
-                            val data = JSONObject().put("l", length).put("w", width).put("d", depth).put("s", surface).put("a", asphalt).put("gps", JSONArray().apply { gps.forEach { put(JSONObject().put("lat", it.lat).put("lon", it.lon).put("accuracy", it.accuracy)) } }).put("points", JSONArray().apply { points.forEach { put(JSONObject().put("x", it.x.toDouble()).put("y", it.y.toDouble())) } }).put("extras", JSONArray().apply { extras.forEach { put(it.json()) } })
+                            val data = JSONObject().put("l", length).put("w", width).put("d", depth).put("s", surface).put("a", asphalt).put("photos", JSONArray().apply { photos.forEach { put(JSONObject().put("file", it.file).put("station", it.station).put("note", it.note)) } }).put("gps", JSONArray().apply { gps.forEach { put(JSONObject().put("lat", it.lat).put("lon", it.lon).put("accuracy", it.accuracy)) } }).put("points", JSONArray().apply { points.forEach { put(JSONObject().put("x", it.x.toDouble()).put("y", it.y.toDouble())) } }).put("extras", JSONArray().apply { extras.forEach { put(it.json()) } })
                             prefs.edit().putString(name.trim(), data.toString()).apply()
                             projects = prefs.all.keys.sorted()
                             message = "Projekt gespeichert"
                         }, modifier = Modifier.fillMaxWidth()) { Text("Projekt speichern") }
-                        OutlinedButton(enabled = !gpsBusy, onClick = { name = ""; length = ""; width = ""; depth = ""; surface = ""; asphalt = ""; extras = emptyList(); points = emptyList(); gps = emptyList(); message = "" }) { Text("Neues Projekt") }
+                        OutlinedButton(enabled = !gpsBusy, onClick = { name = ""; length = ""; width = ""; depth = ""; surface = ""; asphalt = ""; extras = emptyList(); points = emptyList(); gps = emptyList(); photos = emptyList(); photoStation = ""; photoNote = ""; message = "" }) { Text("Neues Projekt") }
                         Text(message)
                         Text("Gespeicherte Projekte", style = MaterialTheme.typography.titleLarge)
                         projects.forEach { key ->
                             OutlinedButton(enabled = !gpsBusy, onClick = {
                                 val obj = JSONObject(prefs.getString(key, "{}") ?: "{}")
-                                name = key; length = obj.optString("l"); width = obj.optString("w"); depth = obj.optString("d"); surface = obj.optString("s"); asphalt = obj.optString("a"); gps = obj.optJSONArray("gps")?.let { arr -> (0 until arr.length()).map { i -> arr.getJSONObject(i).let { GpsPoint(it.getDouble("lat"), it.getDouble("lon"), it.getDouble("accuracy")) } } } ?: emptyList(); points = obj.optJSONArray("points")?.let { arr -> (0 until arr.length()).map { i -> arr.getJSONObject(i).let { Offset(it.getDouble("x").toFloat(), it.getDouble("y").toFloat()) } } } ?: emptyList(); extras = obj.optJSONArray("extras")?.let { arr -> (0 until arr.length()).map { Extra.read(arr.getJSONObject(it)) } } ?: emptyList(); message = "Projekt geladen"
+                                name = key; length = obj.optString("l"); width = obj.optString("w"); depth = obj.optString("d"); surface = obj.optString("s"); asphalt = obj.optString("a"); photos = obj.optJSONArray("photos")?.let { arr -> (0 until arr.length()).map { i -> arr.getJSONObject(i).let { SitePhoto(it.getString("file"), it.optString("station"), it.optString("note")) } } } ?: emptyList(); gps = obj.optJSONArray("gps")?.let { arr -> (0 until arr.length()).map { i -> arr.getJSONObject(i).let { GpsPoint(it.getDouble("lat"), it.getDouble("lon"), it.getDouble("accuracy")) } } } ?: emptyList(); points = obj.optJSONArray("points")?.let { arr -> (0 until arr.length()).map { i -> arr.getJSONObject(i).let { Offset(it.getDouble("x").toFloat(), it.getDouble("y").toFloat()) } } } ?: emptyList(); extras = obj.optJSONArray("extras")?.let { arr -> (0 until arr.length()).map { Extra.read(arr.getJSONObject(it)) } } ?: emptyList(); message = "Projekt geladen"
                             }, modifier = Modifier.fillMaxWidth()) { Text(key) }
                         }
                     }
@@ -223,3 +263,5 @@ private data class Extra(val kind: String, val station: Double, val length: Doub
 }
 
 private data class GpsPoint(val lat: Double, val lon: Double, val accuracy: Double)
+
+private data class SitePhoto(val file: String, val station: String, val note: String)
