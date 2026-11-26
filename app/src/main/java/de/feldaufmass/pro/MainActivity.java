@@ -20,6 +20,90 @@ public class MainActivity extends Activity {
  EditText sollLength,sollWidth,sollDepth,sollAsphalt,sollSource; TextView sollComparison;
  LinearLayout documentsPage; TextView documentsList; org.json.JSONArray documents=new org.json.JSONArray();
  LinearLayout shell,body,planPage,measurePage,voicePage,profilePage,segmentPage,objectPage,quantityPage; TextView projectHeader; TextView detailQuantities; Button undoObjectsButton,redoObjectsButton; java.util.ArrayDeque<String> undoObjects=new java.util.ArrayDeque<>(),redoObjects=new java.util.ArrayDeque<>();
+ TextView surfaceLayers,routeSummary;
+ double topThickness=Double.NaN;
+ LinearLayout routePreviewBox;
+ String routeData(){return getPreferences(0).getString("routeSketch","[]");}
+
+ void refreshRoute(){
+  routePreviewBox.removeAllViews();
+  RouteSketch preview=new RouteSketch(this,routeData());
+  if(preview.vertices.size()<2){routeSummary.setText("Noch keine Trasse skizziert.");return;}
+  routePreviewBox.addView(preview,new LinearLayout.LayoutParams(-1,dp(200)));
+  double total=preview.measuredLength();
+  routeSummary.setText((preview.vertices.size()-1)+" Abschnitte · "+
+    (Double.isFinite(total)?"Bemaßte Länge: "+reportMeasure(total):"Bemaßung unvollständig"));
+ }
+
+ void measureSegment(RouteSketch route,int i){
+  EditText metres=new EditText(this);
+  metres.setSingleLine(true);metres.setKeyListener(android.text.method.DigitsKeyListener.getInstance("0123456789,."));
+  metres.setHint("Länge in m");
+  double old=route.vertices.get(i).metres;
+  if(Double.isFinite(old))metres.setText(String.valueOf(old).replace('.',','));
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this)
+    .setTitle("Abschnitt "+i+" bemaßen").setView(metres)
+    .setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",null).create();
+  dialog.setOnShowListener(ignored->dialog.getButton(-1).setOnClickListener(v->{
+   try{
+    double value=metres.length()==0?Double.NaN:number(metres);
+    if(metres.length()>0 && (!Double.isFinite(value)||value<=0))throw new NumberFormatException();
+    route.vertices.get(i).metres=value;route.changed.run();route.invalidate();dialog.dismiss();
+   }catch(NumberFormatException e){metres.setError("Positive Länge in Metern eingeben");}
+  }));
+  dialog.show();
+ }
+
+ void editRoute(){
+  LinearLayout form=page();
+  ScrollView scroll=new ScrollView(this);scroll.addView(form);
+  RouteSketch route=new RouteSketch(this,routeData());route.editable=true;
+  TextView hint=sheetText("Trasse mit dem Finger zeichnen. Weitere Striche verlängern das Ende.",15,false);
+  form.addView(hint);
+  form.addView(route,new LinearLayout.LayoutParams(-1,dp(260)));
+  Switch mode=new Switch(this);mode.setText("Abschnitte bemaßen");form.addView(mode);
+  mode.setOnCheckedChangeListener((button,checked)->{
+   route.dimensioning=checked;
+   hint.setText(checked?"Eine Linie oder einen Abschnitt unten antippen.":"Trasse mit dem Finger zeichnen. Weitere Striche verlängern das Ende.");
+  });
+  Button remove=new Button(this);remove.setText("Letzten Abschnitt entfernen");form.addView(remove);
+  LinearLayout list=page();form.addView(list);
+  route.selected=i->measureSegment(route,i);
+  route.changed=()->{
+   remove.setEnabled(route.vertices.size()>1);
+   list.removeAllViews();
+   String[] lines=route.measurements().split("\n");
+   for(int i=1;i<route.vertices.size();i++){
+    int index=i;
+    Button measure=new Button(this);measure.setAllCaps(false);measure.setText(lines[i-1]);
+    measure.setOnClickListener(v->measureSegment(route,index));list.addView(measure);
+   }
+  };
+  remove.setOnClickListener(v->{
+   route.vertices.remove(route.vertices.size()-1);
+   if(route.vertices.size()==1)route.vertices.clear();
+   route.changed.run();route.invalidate();
+  });
+  route.changed.run();
+  new android.app.AlertDialog.Builder(this).setTitle("Trasse skizzieren").setView(scroll)
+   .setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",(dialog,which)->{
+    getPreferences(0).edit().putString("routeSketch",route.encode()).apply();refreshRoute();
+   }).show();
+ }
+
+ void showSurfaceLayers(){
+  SharedPreferences data=getPreferences(0);
+  String material=covering.equals("Unbekannt")?"Material nicht erfasst":covering;
+  String thickness=covering.equals("Asphalt")?data.getString("asphalt",""):data.getString("stoneDepth","");
+  String unit=covering.equals("Asphalt")?" m":" cm";
+  StringBuilder layers=new StringBuilder("Deckschicht · ").append(material).append(" · ")
+   .append(thickness.isEmpty()?"Stärke nicht erfasst":thickness+unit);
+  String bed=data.getString("bedding",""),old=data.getString("underlying",""),baseValue=data.getString("base","");
+  layers.append("\nBettung · ").append(bed.isEmpty()?"nicht erfasst":bed);
+  if(!old.isEmpty())layers.append("\nUnterliegender Altbelag · ").append(old);
+  layers.append("\nTragschicht · ").append(baseValue.isEmpty()?"Stärke nicht erfasst":baseValue+" m");
+  surfaceLayers.setText(layers.toString());
+ }
  static final int INK=0xff193747, TEAL=0xff12665f;
  TextView[] overviewValues=new TextView[4];
  LinearLayout stationRows;
@@ -141,7 +225,12 @@ public class MainActivity extends Activity {
  body=new LinearLayout(this);shell.addView(body,new LinearLayout.LayoutParams(-1,0,1));
  sheetHeading(planPage,"Gesamtübersicht");
  addOverview();
- sheetHeading(planPage,"Trassenübersicht");
+ sheetHeading(planPage,"Trassenverlauf");
+ routePreviewBox=page();planPage.addView(routePreviewBox);
+ routeSummary=sheetText("",15,false);planPage.addView(routeSummary);
+ Button drawRoute=new Button(this);drawRoute.setText("Trasse skizzieren / bemaßen");planPage.addView(drawRoute);
+ drawRoute.setOnClickListener(v->editRoute());refreshRoute();
+ sheetHeading(planPage,"Lineare Stationierung");
  sheetHeading(quantityPage,"Mengenermittlung");
  sheetHeading(measurePage,"Trassenmaße");
  documentsPage=page();TextView dh=new TextView(this);dh.setText("Ausführungsunterlagen – Soll");dh.setTextSize(22);documentsPage.addView(dh);
@@ -170,6 +259,12 @@ public class MainActivity extends Activity {
  root=measurePage;
  project=field(root,"Projekt / Baustelle","project",false);
  length=field(root,"Trassenlänge (m)","length",true);
+ Button adopt=new Button(this);adopt.setText("Bemaßte Skizzenlänge übernehmen");root.addView(adopt);
+ adopt.setOnClickListener(v->{
+  double total=new RouteSketch(this,routeData()).measuredLength();
+  if(Double.isFinite(total))length.setText(java.math.BigDecimal.valueOf(total).stripTrailingZeros().toPlainString());
+  else Toast.makeText(this,"Zuerst alle Skizzenabschnitte bemaßen.",Toast.LENGTH_LONG).show();
+ });
  width=field(root,"Grabenbreite (m)","width",true);
  depth=field(root,"Grabentiefe (m)","depth",true);
  TextView surfaceLabel=new TextView(this);surfaceLabel.setText("Oberfläche");root.addView(surfaceLabel);
@@ -203,6 +298,10 @@ public class MainActivity extends Activity {
  planPage.addView(stationRows);
  root=profilePage;
  TextView heading=new TextView(this);heading.setText("Regelprofil – Grabenquerschnitt");heading.setTextSize(20);root.addView(heading);
+ sheetHeading(root,"Oberflächenaufbau");
+ surfaceLayers=sheetText("",16,false);surfaceLayers.setLineSpacing(dp(6),1);root.addView(surfaceLayers);showSurfaceLayers();
+ Button editLayers=new Button(this);editLayers.setText("Oberflächenaufbau bearbeiten");root.addView(editLayers);
+ editLayers.setOnClickListener(v->{showPage(measurePage);surface.post(()->surface.requestRectangleOnScreen(new android.graphics.Rect(0,0,surface.getWidth(),surface.getHeight()),true));});
  legend=new TextView(this);legend.setTextSize(14);root.addView(legend);
  root=segmentPage;
  Button editSurface=new Button(this);editSurface.setText("Belagsdetails bearbeiten");root.addView(editSurface);editSurface.setOnClickListener(v->showPage(measurePage));
@@ -248,12 +347,13 @@ public class MainActivity extends Activity {
  sync.run();
  }
  boolean calculate(){try{double l=number(length),w=number(width),d=number(depth);if(!Double.isFinite(l*w*d)||l<=0||w<=0||d<=0)throw new Exception();
- optional(stoneLength);optional(stoneWidth);optional(stoneDepth);
+ optional(stoneLength);optional(stoneWidth);double stoneMetres=optional(stoneDepth)/100;
  String covering=surface.getSelectedItem().toString();double base=optional(baseInput),pipe=optional(pipeInput);if(Double.isFinite(pipe)&&(pipe<=0||pipe/1000>w||pipe/1000>d))throw new Exception();
- double asphalt=optional(asphaltInput),left=optional(leftInput),right=optional(rightInput);if(Double.isFinite(asphalt)&&asphalt>d)throw new Exception();
- if(Double.isFinite(base)&&base+(Double.isFinite(asphalt)?asphalt:0)>d)throw new Exception();
+ double asphalt=optional(asphaltInput),left=optional(leftInput),right=optional(rightInput);double topLayer=covering.equals("Asphalt")?asphalt:stoneMetres;
+ if(Double.isFinite(topLayer)&&topLayer>d)throw new Exception();
+ if(Double.isFinite(base)&&base+(Double.isFinite(topLayer)?topLayer:0)>d)throw new Exception();
  this.l=l; this.w=w; this.d=d; this.covering=covering;
- this.base=base; this.pipe=pipe; this.asphalt=asphalt; this.left=left; this.right=right;
+ topThickness=topLayer; this.base=base; this.pipe=pipe; this.asphalt=asphalt; this.left=left; this.right=right;
  getPreferences(0).edit().putString("stoneLength",stoneLength.getText().toString()).putString("stoneWidth",stoneWidth.getText().toString()).putString("stoneDepth",stoneDepth.getText().toString()).putString("stoneColor",stoneColor.getText().toString()).putString("pattern",pattern.getText().toString()).putString("bedding",bedding.getText().toString()).putString("underlying",underlying.getText().toString()).putInt("handling",handling.getSelectedItemPosition()).putInt("surface",surface.getSelectedItemPosition()).putString("base",baseInput.getText().toString()).putString("pipe",pipeInput.getText().toString()).putString("asphalt",asphaltInput.getText().toString()).putString("left",leftInput.getText().toString()).putString("right",rightInput.getText().toString()).putString("project",project.getText().toString()).putString("length",length.getText().toString()).putString("width",width.getText().toString()).putString("depth",depth.getText().toString()).apply();
  projectHeader.setText(project.length()>0?project.getText().toString():"Feldaufmaß Pro");
  result.setText(String.format(java.util.Locale.GERMANY,"Aushub: %.2f m³\nGrundfläche: %.2f m²",l*w*d,l*w));StringBuilder details=new StringBuilder("Legende\nOberfläche: "+covering);
@@ -264,7 +364,7 @@ public class MainActivity extends Activity {
  if(bedding.length()>0)details.append("\nBettung: "+bedding.getText());
  if(underlying.length()>0)details.append("\nAltbelag darunter: "+underlying.getText());
  if(handling.getSelectedItemPosition()>0)details.append("\n"+handling.getSelectedItem());
- compareSoll();showObjects();refreshDetailQuantities();legend.setText(details.toString());sketch.invalidate();profile.invalidate();return true;
+ compareSoll();showObjects();refreshDetailQuantities();legend.setText(details.toString());showSurfaceLayers();sketch.invalidate();profile.invalidate();return true;
  }catch(Exception e){Toast.makeText(this,"Maße prüfen. Stand wurde nicht gespeichert.",Toast.LENGTH_SHORT).show();return false;}}
  void detailObject(int index){org.json.JSONObject o=objects.optJSONObject(index);if(o==null)return;LinearLayout form=page();Spinner mode=new Spinner(this);mode.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Draufsicht","Querschnitt","Längsschnitt"}));form.addView(mode);EditText a=new EditText(this),b=new EditText(this),h=new EditText(this);EditText[] es={a,b,h};String[] keys={"detailLength","detailWidth","detailDepth"},labels={"Länge (m)","Breite (m)","Tiefe (m)"};for(int j=0;j<3;j++){es[j].setInputType(8194);es[j].setHint(labels[j]);es[j].setText(o.optString(keys[j],""));form.addView(es[j]);}View preview=new View(this){Paint p=new Paint(3);protected void onDraw(Canvas c){float x=getWidth()/2f,y=getHeight()/2f; p.setColor(0xffdce9f4);c.drawRect(x-85,y-45,x+85,y+45,p);p.setColor(0xff203849);p.setStyle(Paint.Style.STROKE);c.drawRect(x-85,y-45,x+85,y+45,p);p.setStyle(Paint.Style.FILL);p.setTextSize(18);c.drawText(mode.getSelectedItem().toString()+" – schematisch",12,24,p);c.drawText((mode.getSelectedItemPosition()==1?b:a).getText()+" m",x-35,y-55,p);c.drawText((mode.getSelectedItemPosition()==0?b:h).getText()+" m",x+90,y,p);}};form.addView(preview,new LinearLayout.LayoutParams(-1,dp(180)));for(EditText e:es)e.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int count,int after){}public void onTextChanged(CharSequence s,int st,int before,int count){preview.invalidate();}public void afterTextChanged(android.text.Editable e){}});mode.setSelection(Math.max(0,Math.min(2,o.optInt("detailMode",0))));mode.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onItemSelected(android.widget.AdapterView<?> p,View v,int pos,long id){preview.invalidate();}public void onNothingSelected(android.widget.AdapterView<?> p){}});android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Detailzeichnung – "+o.optString("type")+" / "+o.optString("station")+" m").setView(form).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(btn->{try{for(EditText e:es){if(e.length()>0){double n=number(e);if(!Double.isFinite(n)||n<=0){e.setError("Positives Maß erforderlich");return;}}}for(int j=0;j<3;j++)o.put(keys[j],es[j].getText().toString());o.put("detailMode",mode.getSelectedItemPosition());saveObjects();dialog.dismiss();}catch(Exception e){Toast.makeText(this,"Detail konnte nicht gespeichert werden",Toast.LENGTH_LONG).show();}}));dialog.show();}
  void editObject(int index){org.json.JSONObject o=objects.optJSONObject(index);if(o==null)return;LinearLayout form=page();EditText st=new EditText(this);st.setInputType(8194);st.setHint("Station (m)");st.setText(o.optString("station"));form.addView(st);EditText note=new EditText(this);note.setHint("Bemerkung");note.setText(o.optString("note"));form.addView(note);android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(o.optString("type")+" bearbeiten").setView(form).setNeutralButton("Detailzeichnung",(v,j)->detailObject(index)).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(b->{try{double x=number(st),total=l;if(!Double.isFinite(x)||!Double.isFinite(total)||x<0||x>total)throw new Exception();o.put("station",x);o.put("note",note.getText().toString());saveObjects();dialog.dismiss();}catch(Exception e){st.setError("Station außerhalb der Trasse");}}));dialog.show();}
@@ -334,7 +434,8 @@ public class MainActivity extends Activity {
     drawReportView(canvas,new Profile(),408,360,300);
     canvas.drawText("Vorläufige Maße – vor Abrechnung prüfen.",36,786,pen);
    } finally {pdf.finishPage(page);}
-   String report=result.getText()+"\n"+legend.getText()+"\n"+
+   RouteSketch route=new RouteSketch(this,routeData());
+   String report=(route.vertices.size()>1?"Trassenskizze – Abschnittsmaße\n"+route.measurements()+"\n\n":"")+"Oberflächenaufbau\n"+surfaceLayers.getText()+"\n\n"+result.getText()+"\n"+legend.getText()+"\n"+
     "Nachschnitt links: "+reportMeasure(left)+" | rechts: "+reportMeasure(right)+"\n"+
     "Asphaltstärke: "+reportMeasure(asphalt)+"\nTragschicht: "+reportMeasure(base)+"\n\n"+
     "Trassenobjekte\n"+objectList.getText()+detailQuantities.getText()+"\n\n"+segmentsView.getText();
@@ -355,6 +456,13 @@ public class MainActivity extends Activity {
      layout.draw(canvas);
     } finally {pdf.finishPage(page);}
     line=end;
+   }
+   if(route.vertices.size()>1){
+    page=pdf.startPage(new android.graphics.pdf.PdfDocument.PageInfo.Builder(595,842,pageNumber).create());
+    try{
+     page.getCanvas().drawText("Trassenskizze – schematisch",36,44,pen);
+     drawReportView(page.getCanvas(),route,80,523,523);
+    }finally{pdf.finishPage(page);}
    }
    pdf.writeTo(out);
   } catch(Exception e) {
@@ -419,7 +527,7 @@ public class MainActivity extends Activity {
  p.setColor(0xffb7a48a);c.drawRect(20,top,340,bottom,p);
  p.setColor(0xffeee2cc);c.drawRect(x,top,z,bottom,p);
  float layerTop=top;
- if(Double.isFinite(asphalt)&&covering.equals("Asphalt")){p.setColor(0xff454950);layerTop=top+(float)(asphalt*scale);c.drawRect(20,top,340,layerTop,p);}
+ if(Double.isFinite(topThickness)){p.setColor(covering.equals("Asphalt")?0xff454950:0xff85796d);layerTop=top+(float)(topThickness*scale);c.drawRect(20,top,340,layerTop,p);}
  if(Double.isFinite(base)){p.setColor(0xffa6a6a6);c.drawRect(20,layerTop,340,layerTop+(float)(base*scale),p);}
  if(!covering.equals("Asphalt")&&!covering.equals("Unbekannt")&&!covering.equals("Unbefestigt")&&!covering.equals("Sonstiges")){p.setColor(0xff777777);c.drawLine(20,top,340,top,p);for(int i=20;i<340;i+=covering.contains("platten")||covering.contains("Platten")?28:12)c.drawLine(i,top-4,i,top,p);}
  if(Double.isFinite(pipe)){float radius=(float)(pipe/2000*scale);p.setColor(0xff3686bc);c.drawCircle(180,bottom-radius,radius,p);}
@@ -431,7 +539,7 @@ public class MainActivity extends Activity {
  if(Double.isFinite(left)&&Double.isFinite(right)){float a=x-(float)(nl*scale),b=z+(float)(nr*scale);c.drawLine(a,35,b,35,p);c.drawLine(a,30,a,45,p);c.drawLine(b,30,b,45,p);label(c,m(w+nl+nr),145,27);}
  else label(c,"Nachschnitt: nicht vollständig erfasst",20,27);
  label(c,"Oberfläche: "+covering,20,238);
- label(c,covering.equals("Asphalt")?(Double.isFinite(asphalt)?"Asphalt: "+m(asphalt):"Asphaltstärke: unbekannt"):"Belagsstärke: nicht erfasst",20,252);
+ label(c,Double.isFinite(topThickness)?"Belagsstärke: "+m(topThickness):"Belagsstärke: nicht erfasst",20,252);
  label(c,Double.isFinite(pipe)?"Rohr Ø "+pipe+" mm (Lage symbolisch)":"Rohrmaße: unbekannt",20,266);
  label(c,"Schematisch – keine Ausführungsplanung",20,282);c.restore();
  }}

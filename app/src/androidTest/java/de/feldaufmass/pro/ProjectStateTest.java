@@ -56,11 +56,40 @@ public class ProjectStateTest {
    });
   }
  }
+ private void touch(RouteSketch route,int action,float x,float y){
+  android.view.MotionEvent e=android.view.MotionEvent.obtain(0,10,action,x,y,0);
+  try{route.onTouchEvent(e);}finally{e.recycle();}
+ }
  private void verifyProjectState(MainActivity activity) throws Exception {
   activity.length.setText("20");
   activity.width.setText("1");
   activity.depth.setText("2");
   assertTrue(activity.calculate());
+  activity.surface.setSelection(2);
+  activity.stoneDepth.setText("8");
+  activity.bedding.setText("Splitt");
+  activity.baseInput.setText("0.20");
+  assertTrue(activity.calculate());
+  assertTrue(activity.surfaceLayers.getText().toString().contains("Pflaster · 8 cm"));
+  assertTrue(activity.surfaceLayers.getText().toString().contains("Bettung · Splitt"));
+  assertEquals(.08,activity.topThickness,.0001);
+  RouteSketch route=new RouteSketch(activity,"[]");
+  android.widget.FrameLayout holder=new android.widget.FrameLayout(activity);
+  holder.addView(route);
+  route.layout(0,0,300,300);
+  route.editable=true;
+  touch(route,android.view.MotionEvent.ACTION_DOWN,40,40);
+  touch(route,android.view.MotionEvent.ACTION_MOVE,40,200);
+  touch(route,android.view.MotionEvent.ACTION_UP,200,200);
+  assertEquals(3,route.vertices.size());
+  assertTrue(Double.isNaN(route.measuredLength()));
+  route.vertices.get(1).metres=3.25;
+  assertTrue(Double.isNaN(route.measuredLength()));
+  route.vertices.get(2).metres=6.5;
+  activity.getPreferences(0).edit().putString("routeSketch",route.encode()).apply();
+  activity.refreshRoute();
+  assertTrue(activity.routeSummary.getText().toString().contains("9,75 m"));
+  assertEquals(20,activity.l,0);
   activity.objectStation.setText("5");
   activity.addObject();
   assertEquals(1, activity.objects.length());
@@ -82,7 +111,7 @@ public class ProjectStateTest {
   activity.writePdf(Uri.fromFile(report));
   try (ParcelFileDescriptor fd = ParcelFileDescriptor.open(report, ParcelFileDescriptor.MODE_READ_ONLY);
        PdfRenderer renderer = new PdfRenderer(fd)) {
-   assertTrue(renderer.getPageCount() >= 2);
+   assertTrue(renderer.getPageCount() >= 3);
   }
   activity.undoObjectsButton.performClick();
   activity.objectStation.setText("8");
