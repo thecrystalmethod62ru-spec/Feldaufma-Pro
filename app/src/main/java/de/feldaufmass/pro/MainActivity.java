@@ -4248,6 +4248,22 @@ minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
     }
     if(rows.length()>0){p.setTextSize(10);c.drawText("Braun: Verbau an Grabenkante (symbolisch)",36,height-65,p);}
    }catch(Exception ignored){}
+   if(trenchWidth>0&&widths.length()==0){
+    org.json.JSONArray utilities=extraUtilities();
+    for(int j=0;j<utilities.length();j++){
+     org.json.JSONObject row=utilities.optJSONObject(j);if(row==null)continue;
+     double diameter=row.optDouble("diameter")/1000,offset=row.optDouble("offset");
+     if(!Double.isFinite(diameter)||diameter<=0||!Double.isFinite(offset)||offset<diameter/2||offset>trenchWidth-diameter/2)continue;
+     String type=row.optString("type");p.setColor(type.equals("Gas")?0xffe9b63c:type.equals("Trinkwasser")?0xff3686bc:0xffc66d56);
+     p.setStrokeWidth((float)(diameter*unit/factor));
+     for(int i=1;i<route.vertices.size();i++){
+      RouteSketch.Vertex a=route.vertices.get(i-1),b=route.vertices.get(i);double dx=b.point.x-a.point.x,dy=b.point.y-a.point.y,n=Math.hypot(dx,dy);if(n<=0)continue;
+      double shift=(trenchWidth/2-offset)/factor,nx=dy/n*shift,ny=-dx/n*shift;
+      c.drawLine((float)(40+(a.point.x+nx-minX)*unit),(float)(85+(a.point.y+ny-minY)*unit),(float)(40+(b.point.x+nx-minX)*unit),(float)(85+(b.point.y+ny-minY)*unit),p);
+     }
+    }
+    if(utilities.length()>0){p.setColor(INK);p.setTextSize(9);c.drawText("Zusatzleitungen: nur gültige gespeicherte Profilversätze, durchgehend angenommen",36,height-110,p);}
+   }
    p.setColor(INK);p.setStrokeWidth(1);float bar=(float)(50*72/25.4);float by=height-47;c.drawLine(40,by,40+bar,by,p);c.drawLine(40,by-4,40,by+4,p);c.drawLine(40+bar,by-4,40+bar,by+4,p);c.drawText("50 mm Kontrollmaß",40,by+17,p);
   }finally{pdf.finishPage(page);}
   return pageNumber;
