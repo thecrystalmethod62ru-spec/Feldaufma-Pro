@@ -626,7 +626,7 @@ public class MainActivity extends Activity {
   EditText station=new EditText(this);station.setInputType(8194);station.setHint("Station in m (0 – "+csvNumber(total)+")");if(Double.isFinite(suggestedStation)){station.setText(java.math.BigDecimal.valueOf(suggestedStation).stripTrailingZeros().toPlainString().replace('.',','));}if(old!=null)station.setText(old.optString("station"));form.addView(station);
   String[] sides={"Unbekannt","links","rechts","mittig"};Spinner side=choices(form,sides);if(old!=null)side.setSelection(Math.max(0,java.util.Arrays.asList(sides).indexOf(old.optString("side"))));
   String[] keys={"detailLength","detailWidth","detailDepth","detailOffset"},labels={"Länge (m)","Breite (m)","Tiefe (m)","Abstand zum Grabenrand (m)"};
-  EditText[] fields=new EditText[keys.length];for(int j=0;j<fields.length;j++){fields[j]=new EditText(this);fields[j].setInputType(8194);fields[j].setHint(labels[j]+" – optional");if(old!=null)fields[j].setText(old.optString(keys[j],""));form.addView(fields[j]);}
+  EditText[] fields=new EditText[keys.length];for(int j=0;j<fields.length;j++){fields[j]=new EditText(this);fields[j].setInputType(8194);fields[j].setHint(labels[j]+" – optional");if(old!=null)fields[j].setText(old.optString(keys[j],""));form.addView(fields[j]);addObjectMeasureSlider(form,fields[j],j==3?5:10,j==3?0:1);}
   EditText note=new EditText(this);note.setHint("Bemerkung");if(old!=null)note.setText(old.optString("note"));form.addView(note);
   LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(dp(12),dp(10),dp(12),dp(10));panel.setBackground(editorShape(0xff202827,16));
   TextView heading=sheetText(old==null?"Objekt hinzufügen":"Objekt bearbeiten",17,true);heading.setTextColor(0xffe3f0ed);panel.addView(heading);
@@ -643,6 +643,17 @@ public class MainActivity extends Activity {
     if(old==null)draft.put(o);else if(draft.optJSONObject(index)==old){if(!overlapGeometry(old).equals(overlapGeometry(o)))o.remove("acceptedOverlap");draft.put(index,o);}else{notice("Objekt wurde geändert.");return;}refresh.run();dialog.dismiss();
    }catch(Exception e){notice("Station und Maße prüfen.");}
   });dialog.showAtLocation(route,Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL,0,dp(8));
+ }
+ void addObjectMeasureSlider(LinearLayout form,EditText field,int defaultMax,int minimumCm){
+  android.widget.SeekBar bar=new android.widget.SeekBar(this);bar.setProgressTintList(android.content.res.ColorStateList.valueOf(0xff55c7b5));bar.setThumbTintList(android.content.res.ColorStateList.valueOf(0xff69cdbb));form.addView(bar,new LinearLayout.LayoutParams(-1,dp(36)));
+  Runnable sync=()->{try{double value=number(field);if(!Double.isFinite(value)||value<0||value>100000)return;int cm=(int)Math.round(value*100);bar.setMax(Math.max(defaultMax*100,cm)-minimumCm);bar.setProgress(Math.max(0,cm-minimumCm));}catch(Exception ignored){}};
+  bar.setMax(defaultMax*100-minimumCm);sync.run();
+  bar.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener(){
+   public void onProgressChanged(android.widget.SeekBar seek,int progress,boolean user){if(user)field.setText(String.format(java.util.Locale.GERMANY,"%.2f",(progress+minimumCm)/100.0));}
+   public void onStartTrackingTouch(android.widget.SeekBar seek){}
+   public void onStopTrackingTouch(android.widget.SeekBar seek){}
+  });
+  field.setOnFocusChangeListener((v,focused)->{if(!focused)sync.run();});
  }
  android.graphics.drawable.GradientDrawable editorShape(int color,int radius){
   android.graphics.drawable.GradientDrawable shape=new android.graphics.drawable.GradientDrawable();shape.setColor(color);shape.setCornerRadius(dp(radius));return shape;
