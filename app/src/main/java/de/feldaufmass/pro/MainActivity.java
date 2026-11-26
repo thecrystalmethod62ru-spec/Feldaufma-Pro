@@ -320,10 +320,25 @@ public class MainActivity extends Activity {
   if(liveManager!=null){liveManager.removeUpdates(liveListener);liveManager=null;}
   liveFix=null;if(livePreview!=null)livePreview.setLiveFix(null);super.onPause();
  }
+ int drawingLayers(){return getSharedPreferences("drawing_view",MODE_PRIVATE).getInt(activeProject,RouteSketch.ALL_LAYERS)&RouteSketch.ALL_LAYERS;}
+ void showDrawingLayers(){
+  String[] labels={"Leitungsverlauf / Punkte","Bemaßung","Punktnamen","GPS / Standort","Fotodokumentation"};
+  int[] masks={RouteSketch.LAYER_ROUTE,RouteSketch.LAYER_DIMENSIONS,RouteSketch.LAYER_NAMES,RouteSketch.LAYER_GPS,RouteSketch.LAYER_PHOTOS};
+  boolean[] checked=new boolean[labels.length];int current=drawingLayers();
+  for(int j=0;j<labels.length;j++)checked[j]=(current&masks[j])!=0;
+  new android.app.AlertDialog.Builder(this).setTitle("Zeichnungsebenen")
+   .setMultiChoiceItems(labels,checked,(d,j,on)->checked[j]=on)
+   .setNegativeButton("Abbrechen",null).setNeutralButton("Alle anzeigen",(d,w)->applyDrawingLayers(RouteSketch.ALL_LAYERS))
+   .setPositiveButton("Übernehmen",(d,w)->{int mask=0;for(int j=0;j<checked.length;j++)if(checked[j])mask|=masks[j];applyDrawingLayers(mask);}).show();
+ }
+ void applyDrawingLayers(int mask){
+  if(!getSharedPreferences("drawing_view",MODE_PRIVATE).edit().putInt(activeProject,mask).commit()){notice("Ebenen konnten nicht gespeichert werden.");return;}
+  if(livePreview!=null)livePreview.setVisibleLayers(mask);
+ }
  void refreshRoute(){
   routePreviewBox.removeAllViews();
   RouteSketch preview=new RouteSketch(this,routeData());
-  livePreview=preview;preview.setLiveFix(liveFix);
+  livePreview=preview;preview.setVisibleLayers(drawingLayers());preview.setLiveFix(liveFix);
   preview.pointSelected=i->{selectedPoint=preview.vertices.get(i).id;refreshRoute();pointMenu();};
   preview.selected=i->measureSegment(preview,i);
   preview.changed=()->{saveRoute(preview);refreshRoute();};
@@ -636,6 +651,7 @@ public class MainActivity extends Activity {
  assistant.setContentDescription("Sprachassistent starten");dock.addView(assistant,new LinearLayout.LayoutParams(dp(52),dp(48)));
  assistant.setOnClickListener(v->startDictation());
  actionButtonSingle(dock,"Assistent",()->showPage(voicePage));
+ actionButtonSingle(planPage,"Zeichnungsebenen",()->showDrawingLayers());
  routePreviewBox=page();planPage.addView(routePreviewBox);
  routeSummary=sheetText("",15,false);planPage.addView(routeSummary);
  LinearLayout actions=new LinearLayout(this);planPage.addView(actions);
