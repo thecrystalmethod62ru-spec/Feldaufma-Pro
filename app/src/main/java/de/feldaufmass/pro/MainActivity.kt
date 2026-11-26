@@ -82,6 +82,17 @@ class MainActivity : ComponentActivity() {
                 var ew by remember { mutableStateOf("") }
                 var ed by remember { mutableStateOf("") }
                 var note by remember { mutableStateOf("") }
+                var pendingExcel by remember { mutableStateOf<ByteArray?>(null) }
+                val excelPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) { uri ->
+                    if (uri != null) {
+                        try {
+                            val bytes = pendingExcel ?: error("Keine Excel-Daten")
+                            contentResolver.openOutputStream(uri)?.use { it.write(bytes) } ?: error("Datei nicht verfügbar")
+                            android.widget.Toast.makeText(this@MainActivity, "Excel gespeichert", android.widget.Toast.LENGTH_SHORT).show()
+                        } catch (e: Exception) { android.widget.Toast.makeText(this@MainActivity, "Excel-Export fehlgeschlagen", android.widget.Toast.LENGTH_LONG).show() }
+                    }
+                    pendingExcel = null
+                }
                 var pendingPdf by remember { mutableStateOf<ByteArray?>(null) }
                 var exportStatus by remember { mutableStateOf("") }
                 val pdfPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
@@ -272,6 +283,28 @@ class MainActivity : ComponentActivity() {
                                 pdfPicker.launch("Feldaufmass.pdf")
                             } catch (e: Exception) { exportStatus = "PDF-Erstellung fehlgeschlagen." }
                         }, modifier = Modifier.fillMaxWidth()) { Text("PDF exportieren") }
+                        Button(enabled = valid && name.isNotBlank(), onClick = {
+                            try {
+                                val main = listOf<List<Any?>>(
+                                    listOf("Projekt", name),
+                                    listOf("Position", "Menge", "Einheit"),
+                                    listOf("Trassenlänge", l!!, "m"),
+                                    listOf("Grabenbreite", w!!, "m"),
+                                    listOf("Grabentiefe", d!!, "m"),
+                                    listOf("Aufbruchbreite", s!!, "m"),
+                                    listOf("Asphaltstärke", a!!, "m"),
+                                    listOf("Grabenvolumen brutto", l!! * w!! * d!!, "m³"),
+                                    listOf("Oberflächenaufbruch", l!! * s!!, "m²"),
+                                    listOf("Asphaltaufbruch", l!! * s!! * a!!, "m³"),
+                                    listOf("Hinweis", "Geometrische Richtwerte; keine geprüfte Abrechnung")
+                                )
+                                val additional = listOf<List<Any?>>(listOf("Position", "Station (m)", "Länge (m)", "Breite (m)", "Tiefe (m)", "Fläche (m²)", "Volumen (m³)", "Bemerkung")) + extras.map { listOf(it.kind,it.station,it.length,it.width,it.depth,it.area(),it.volume(),it.note) }
+                                val coordinates = listOf<List<Any?>>(listOf("Punkt", "Breitengrad", "Längengrad", "Genauigkeit (m)")) + gps.mapIndexed { i, it -> listOf(i+1,it.lat,it.lon,it.accuracy) }
+                                val photoRows = listOf<List<Any?>>(listOf("Station (m)", "Beschreibung", "Dateiname (lokal)")) + photos.map { listOf(number(it.station),it.note,it.file) }
+                                pendingExcel = excelReport(listOf("Aufmaß" to main, "Zusatzpositionen" to additional, "GPS" to coordinates, "Fotos" to photoRows))
+                                excelPicker.launch("Feldaufmass.xlsx")
+                            } catch (e: Exception) { exportStatus = "Excel-Erstellung fehlgeschlagen." }
+                        }, modifier = Modifier.fillMaxWidth()) { Text("Excel exportieren") }
                         Text(exportStatus)
                         Button(enabled = !gpsBusy && valid && name.isNotBlank(), onClick = {
                             val data = JSONObject().put("l", length).put("w", width).put("d", depth).put("s", surface).put("a", asphalt).put("photos", JSONArray().apply { photos.forEach { put(JSONObject().put("file", it.file).put("station", it.station).put("note", it.note)) } }).put("gps", JSONArray().apply { gps.forEach { put(JSONObject().put("lat", it.lat).put("lon", it.lon).put("accuracy", it.accuracy)) } }).put("points", JSONArray().apply { points.forEach { put(JSONObject().put("x", it.x.toDouble()).put("y", it.y.toDouble())) } }).put("extras", JSONArray().apply { extras.forEach { put(it.json()) } })
