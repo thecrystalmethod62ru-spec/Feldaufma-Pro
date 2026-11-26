@@ -19,6 +19,7 @@ final class RouteSketch extends View {
   final PointF point;
   String id=java.util.UUID.randomUUID().toString();
   JSONArray photos=new JSONArray();
+  double latitude=Double.NaN,longitude=Double.NaN,accuracy=Double.NaN;
   double metres; // Length of the incoming segment, NaN if unmeasured.
   Vertex(PointF point,double metres){this.point=point;this.metres=metres;}
  }
@@ -39,6 +40,7 @@ final class RouteSketch extends View {
     Vertex v=new Vertex(new PointF((float)row.getDouble(0),(float)row.getDouble(1)),row.optDouble(2,Double.NaN));
     v.id=row.optString(3,v.id);
     if(row.optJSONArray(4)!=null)v.photos=row.optJSONArray(4);
+    v.latitude=row.optDouble(5,Double.NaN);v.longitude=row.optDouble(6,Double.NaN);v.accuracy=row.optDouble(7,Double.NaN);
     vertices.add(v);
    }
   }catch(JSONException e){vertices.clear();}
@@ -51,6 +53,7 @@ final class RouteSketch extends View {
     JSONArray row=new JSONArray().put((double)v.point.x).put((double)v.point.y);
     row.put(Double.isFinite(v.metres)?(Object)v.metres:org.json.JSONObject.NULL);
     row.put(v.id).put(v.photos);
+    for(double n:new double[]{v.latitude,v.longitude,v.accuracy})row.put(Double.isFinite(n)?(Object)n:org.json.JSONObject.NULL);
     rows.put(row);
    }
   }catch(JSONException e){throw new IllegalStateException(e);}
