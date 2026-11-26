@@ -605,8 +605,41 @@ public class MainActivity extends Activity {
   android.location.LocationManager manager=(android.location.LocationManager)getSystemService(LOCATION_SERVICE);
   if(!manager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)){notice("Bitte GPS aktivieren.");return;}
   if(android.os.Build.VERSION.SDK_INT<30){notice("GPS-Zuordnung benötigt Android 11 oder neuer.");return;}
-  notice("GPS-Position wird ermittelt …");
-  try{manager.getCurrentLocation(android.location.LocationManager.GPS_PROVIDER,null,getMainExecutor(),fix->{
+  collectGps(id,manager);
+ }
+ void collectGps(String id,android.location.LocationManager manager){
+  final java.util.ArrayList<android.location.Location> samples=new java.util.ArrayList<>();
+  final android.os.Handler handler=new android.os.Handler(android.os.Looper.getMainLooper());
+  final android.app.AlertDialog progress=new android.app.AlertDialog.Builder(this).setTitle("GPS-Messung · 20 Sekunden").setMessage("Bitte am Messpunkt stehen bleiben.").setNegativeButton("Abbrechen",null).create();
+  final android.location.LocationListener listener=new android.location.LocationListener(){
+   public void onLocationChanged(android.location.Location fix){
+    if(!fix.hasAccuracy()||fix.getAccuracy()<=0||android.os.SystemClock.elapsedRealtimeNanos()-fix.getElapsedRealtimeNanos()>3000000000L)return;
+    samples.add(new android.location.Location(fix));
+    progress.setMessage(String.format(java.util.Locale.GERMANY,"%d Messungen · aktuell ± %.2f m",samples.size(),fix.getAccuracy()));
+   }
+   public void onProviderDisabled(String provider){progress.dismiss();}
+   public void onProviderEnabled(String provider){}
+   public void onStatusChanged(String provider,int status,android.os.Bundle extras){}
+  };
+  Runnable finish=()->{
+   if(!progress.isShowing())return;progress.dismiss();
+   if(isFinishing()||isDestroyed()||!hasWindowFocus()&&isChangingConfigurations())return;
+   if(samples.isEmpty()){notice("Keine GPS-Messung verfügbar.");return;}
+   android.location.Location best=samples.get(0);
+   for(android.location.Location f:samples)if(f.getAccuracy()<best.getAccuracy())best=f;
+   double sum=0,lat=0,lon=0;
+   for(android.location.Location f:samples){double w=1/Math.pow(Math.max(.1,f.getAccuracy()),2);sum+=w;lat+=w*f.getLatitude();lon+=w*(((f.getLongitude()-best.getLongitude()+540)%360)-180);}
+   android.location.Location mean=new android.location.Location(best);mean.setLatitude(lat/sum);mean.setLongitude(((best.getLongitude()+lon/sum+540)%360)-180);
+   float conservative=best.getAccuracy();
+   for(android.location.Location f:samples)conservative=Math.max(conservative,mean.distanceTo(f)+f.getAccuracy());
+   mean.setAccuracy(conservative);offerGpsFix(id,mean);
+  };
+  progress.setOnDismissListener(d->{handler.removeCallbacks(finish);manager.removeUpdates(listener);});
+  progress.show();
+  try{manager.requestLocationUpdates(android.location.LocationManager.GPS_PROVIDER,1000L,0f,listener);handler.postDelayed(finish,20000L);}
+  catch(RuntimeException ex){progress.dismiss();notice("GPS konnte nicht gestartet werden.");}
+ }
+ void offerGpsFix(String id,android.location.Location fix){
    if(isFinishing()||isDestroyed())return;
    if(fix==null){notice("Keine GPS-Position verfügbar. Bitte erneut versuchen.");return;}
    RouteSketch route=new RouteSketch(this,routeData());int index=findPoint(route,id);if(index<0)return;
@@ -619,7 +652,7 @@ public class MainActivity extends Activity {
     .setNegativeButton("Abbrechen",null).setPositiveButton("Manuellen Punkt beibehalten",(d,w)->storeGps(id,fix,false));
    if(target!=null)choice.setNeutralButton("Auf GPS verschieben",(d,w)->storeGps(id,fix,true));
    choice.show();
-  });}catch(RuntimeException e){notice("GPS konnte nicht gestartet werden.");}
+
  }
  void storeGps(String id,android.location.Location fix,boolean move){
   RouteSketch latest=new RouteSketch(this,routeData());int i=findPoint(latest,id);if(i<0)return;
