@@ -1,7 +1,6 @@
 package de.feldaufmass.pro;
 
 import android.graphics.Path;
-import android.graphics.PathMeasure;
 import java.util.List;
 
 /** Geometric control values for flat-ended strips; excludes corner fillers. */
@@ -14,6 +13,28 @@ public final class StripOverlap {
             this.net = net;
             this.overlap = Math.max(0, gross - net);
         }
+    }
+    /** Bevel filler on the outside of a connected bend, in metre coordinates.
+     * Returns null for straight, disconnected or reversing segments.
+     * Does not change the original strip calculation or billing selection.
+     */
+    public static double[][] cornerFiller(double[] a,double[] b) {
+        if(a==null||b==null||a.length!=6||b.length!=6) throw new IllegalArgumentException("Ungültiger Abschnitt");
+        for(double[] s:new double[][]{a,b}) {
+            for(double v:s) if(!Double.isFinite(v)) throw new IllegalArgumentException("Fehlende Maße");
+            if(s[4]<0||s[5]<0) throw new IllegalArgumentException("Ungültige Breite");
+        }
+        if(Math.hypot(a[2]-b[0],a[3]-b[1])>1e-7)return null;
+        double ax=a[2]-a[0],ay=a[3]-a[1],bx=b[2]-b[0],by=b[3]-b[1];
+        double al=Math.hypot(ax,ay),bl=Math.hypot(bx,by);
+        if(al<=0||bl<=0)throw new IllegalArgumentException("Ungültige Länge");
+        ax/=al;ay/=al;bx/=bl;by/=bl;
+        double cross=ax*by-ay*bx;
+        if(Math.abs(cross)<1e-9)return null;
+        double wa=cross>0?-a[5]:a[4],wb=cross>0?-b[5]:b[4];
+        if(wa==0||wb==0)return null;
+        double x=a[2],y=a[3];
+        return new double[][]{{x,y},{x-ay*wa,y+ax*wa},{x-by*wb,y+bx*wb}};
     }
     /** Each strip: x1,y1,x2,y2,leftExtent,rightExtent, in metres. */
     public static Result calculate(List<double[]> strips) {
