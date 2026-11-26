@@ -3473,8 +3473,8 @@ public class MainActivity extends Activity {
       EditText newWidth=new EditText(this),newDepth=new EditText(this);
       newWidth.setHint("Grabenbreite (m)");newDepth.setHint("Grabentiefe (m)");
       newWidth.setInputType(8194);newDepth.setInputType(8194);newWidth.setText(String.valueOf(bw));newDepth.setText(String.valueOf(bd));fields.addView(newWidth);fields.addView(newDepth);
-      utilitySlider(fields,newWidth,"Grabenbreite (m)",0.1,Math.max(6,bw),0.01,false);
-      utilitySlider(fields,newDepth,"Grabentiefe (m)",0.1,Math.max(8,bd),0.01,false);
+      utilitySlider(fields,newWidth,"Grabenbreite (m)",0.1,Math.max(6,bw),0.01,true);
+      utilitySlider(fields,newDepth,"Grabentiefe (m)",0.1,Math.max(8,bd),0.01,true);
       PipeLayoutView draftView=new PipeLayoutView(this);draftView.setLayoutData(pipes,bw,bd);fields.addView(draftView,new LinearLayout.LayoutParams(-1,dp(180)));
       TextView volumePreview=new TextView(this);fields.addView(volumePreview);
       Runnable updateDraft=()->{try{double ww=number(newWidth),dd=number(newDepth);if(!Double.isFinite(ww)||!Double.isFinite(dd)||ww<=0||dd<=0)return;draftView.setLayoutData(pipes,ww,dd);volumePreview.setText(String.format(java.util.Locale.GERMANY,"Aushub (rechteckig, brutto): %.3f m³",ww*dd*(p.optDouble("to")-p.optDouble("from"))));}catch(Exception ignored){}};
@@ -3564,7 +3564,7 @@ public class MainActivity extends Activity {
   field.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL|(min<0?android.text.InputType.TYPE_NUMBER_FLAG_SIGNED:0));
   Runnable sync=()->{try{double value=Double.parseDouble(field.getText().toString().replace(',','.'));if(Double.isFinite(value))bar.setProgress((int)Math.round((value-min)/step));}catch(Exception ignored){}};
   field.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){sync.run();}public void afterTextChanged(android.text.Editable e){}});
-  bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onStartTrackingTouch(SeekBar b){}public void onStopTrackingTouch(SeekBar b){}public void onProgressChanged(SeekBar b,int p,boolean user){if(user)field.setText(String.format(java.util.Locale.GERMANY,step>=1?"%.0f":"%.2f",Math.min(max,min+p*step)));}});
+  bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onStartTrackingTouch(SeekBar b){}public void onStopTrackingTouch(SeekBar b){}public void onProgressChanged(SeekBar b,int p,boolean user){if(user)field.setText(String.format(java.util.Locale.GERMANY,step>=1?"%.0f":step>=0.01?"%.2f":"%.3f",Math.min(max,min+p*step)));}});
   sync.run();
  }
  void profileSlider(LinearLayout page,String name,EditText target,int min,int max){
