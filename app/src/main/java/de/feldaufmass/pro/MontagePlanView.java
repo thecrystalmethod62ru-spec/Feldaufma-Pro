@@ -14,6 +14,15 @@ final class MontagePlanView extends View {
     private final DxfExport model;
     private final ArrayList<double[]> positions = new ArrayList<>();
     private double minX, maxX, minY, maxY;
+    private int previewIndex=-1;
+    private double[] previewPoint;
+    void previewStation(int index,double station,double offset){
+        previewIndex=index;
+        previewPoint=Double.isFinite(station)?model.mountingPoint(station,offset):null;
+        invalidate();
+    }
+    void clearPreview(){previewIndex=-1;previewPoint=null;invalidate();}
+
 
     MontagePlanView(Context context, DxfExport model, JSONArray fittings) {
         super(context);
@@ -91,7 +100,7 @@ final class MontagePlanView extends View {
         }
         paint.setTextSize(11*unit); paint.setTextAlign(Paint.Align.CENTER);
         for (int i = 0; i < positions.size(); i++) {
-            double[] p = positions.get(i);
+            double[] p = i==previewIndex&&previewPoint!=null?previewPoint:positions.get(i);
             if (p == null) continue;
             float x = (float)(left+(p[0]-minX)*scale), y = (float)(top+(maxY-p[1])*scale);
             String label = String.valueOf(i+1);
