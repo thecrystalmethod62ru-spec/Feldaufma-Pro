@@ -12,6 +12,9 @@ import org.json.JSONArray;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import static androidx.test.espresso.Espresso.onView;
+import static androidx.test.espresso.Espresso.onData;
+import static androidx.test.espresso.matcher.RootMatchers.isDialog;
+import static org.hamcrest.Matchers.equalTo;
 import static androidx.test.espresso.action.ViewActions.*;
 import static androidx.test.espresso.matcher.ViewMatchers.*;
 import static org.junit.Assert.*;
@@ -43,10 +46,10 @@ public class MontageProtocolsTest {
                     activity.activeProject=id;
                     activity.showMontage();
                 });
-                onView(withText("Prüfprotokolle")).perform(click());
-                onView(withText("Neues Protokoll")).perform(click());
-                onView(labelledField("Leitungsabschnitt")).perform(scrollTo(),replaceText("Hausanschluss 4"),closeSoftKeyboard());
-                onView(withText("Speichern")).perform(click());
+                onData(equalTo("Prüfprotokolle")).inRoot(isDialog()).perform(click());
+                onView(withText("Neues Protokoll")).inRoot(isDialog()).perform(click());
+                onView(labelledField("Leitungsabschnitt")).inRoot(isDialog()).perform(scrollTo(),replaceText("Hausanschluss 4"),closeSoftKeyboard());
+                onView(withText("Speichern")).inRoot(isDialog()).perform(click());
                 scenario.onActivity(activity->{
                     File file=null;
                     try{
