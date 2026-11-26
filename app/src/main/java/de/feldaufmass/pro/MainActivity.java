@@ -589,11 +589,16 @@ public class MainActivity extends Activity {
  }
  void chooseEditorObject(RouteSketch route,org.json.JSONArray draft,Runnable refresh,int index){
   org.json.JSONObject o=draft.optJSONObject(index);if(o==null)return;
-  new android.app.AlertDialog.Builder(this).setTitle(o.optString("type")+" · "+csvNumber(o.optDouble("station"))+" m")
-   .setItems(new String[]{"Bearbeiten / verschieben","Objekt entfernen"},(d,w)->{
-    if(w==0)editEditorObject(route,draft,refresh,index,Double.NaN);
-    else new android.app.AlertDialog.Builder(this).setTitle("Objekt entfernen?").setMessage("Die Trasse und andere Objekte bleiben unverändert.").setNegativeButton("Abbrechen",null).setPositiveButton("Entfernen",(x,y)->{if(draft.optJSONObject(index)==o){draft.remove(index);refresh.run();}}).show();
-   }).setNegativeButton("Schließen",null).show();
+  android.widget.PopupMenu menu=new android.widget.PopupMenu(this,route);
+  menu.getMenu().add(0,0,0,o.optString("type")+" · "+csvNumber(o.optDouble("station"))+" m").setEnabled(false);
+  menu.getMenu().add(0,1,1,"Eigenschaften");
+  menu.getMenu().add(0,2,2,"Objekt entfernen");
+  menu.setOnMenuItemClickListener(item->{
+   if(draft.optJSONObject(index)!=o)return false;
+   if(item.getItemId()==1)editEditorObject(route,draft,refresh,index,Double.NaN);
+   else if(item.getItemId()==2)new android.app.AlertDialog.Builder(this).setTitle("Objekt entfernen?").setMessage("Die Trasse und andere Objekte bleiben unverändert.").setNegativeButton("Abbrechen",null).setPositiveButton("Entfernen",(x,y)->{if(draft.optJSONObject(index)==o){draft.remove(index);refresh.run();}}).show();
+   return true;
+  });menu.show();
  }
  void pickEditorObject(RouteSketch route,org.json.JSONArray draft,Runnable refresh,java.util.ArrayList<Integer> hits){
   if(hits.isEmpty()){notice("Bitte ein Objekt auf der Zeichnung antippen.");return;}
@@ -775,9 +780,11 @@ public class MainActivity extends Activity {
    if(i<0||i>=route.vertices.size())return;
    route.highlight=i;route.invalidate();
    RouteSketch.Vertex p=route.vertices.get(i);
-   android.app.AlertDialog.Builder menu=new android.app.AlertDialog.Builder(this).setTitle("Punkt "+(i+1)+(p.name.isEmpty()?"":" · "+p.name)).setNegativeButton("Schließen",null);
-   if(i>0&&i<route.vertices.size()-1)menu.setItems(new String[]{"Punkt löschen und verbinden"},(d,w)->confirmDeleteRoutePoint(route,i));
-   else menu.setMessage("Start- oder Endpunkt. Kein Verbinden zweier Nachbarpunkte möglich.");
+   android.widget.PopupMenu menu=new android.widget.PopupMenu(this,route);
+   menu.getMenu().add(0,0,0,"Punkt "+(i+1)+(p.name.isEmpty()?"":" · "+p.name)).setEnabled(false);
+   if(i>0&&i<route.vertices.size()-1)menu.getMenu().add(0,1,1,"Löschen und verbinden");
+   else menu.getMenu().add(0,2,1,"Start- oder Endpunkt").setEnabled(false);
+   menu.setOnMenuItemClickListener(item->{if(item.getItemId()==1){confirmDeleteRoutePoint(route,i);return true;}return false;});
    menu.show();
   };
   Runnable refreshEditor=()->{
