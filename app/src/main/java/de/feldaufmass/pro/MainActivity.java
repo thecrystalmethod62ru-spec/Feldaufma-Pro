@@ -5268,6 +5268,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   final java.util.Set<Integer> group=new java.util.HashSet<>();
   final boolean[] groupMode={false};
   Button groupButton=new Button(this);groupButton.setText("Gruppe");
+  final boolean[] showDimensions={false};
   View preview=new View(this){
    final Paint pen=new Paint(3);
    double read(EditText field){try{return Double.parseDouble(field.getText().toString().trim().replace(',','.'));}catch(Exception ex){return Double.NaN;}}
@@ -5316,6 +5317,12 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
    }
    @Override public boolean performClick(){super.performClick();return true;}
 
+   void dimension(Canvas c,float ax,float ay,float bx,float by,double value){
+    pen.setColor(value<0?0xffff7777:0xffeeeeee);pen.setStrokeWidth(dp(1));pen.setTextSize(dp(10));
+    c.drawLine(ax,ay,bx,by,pen);float dx=bx-ax,dy=by-ay;double len=Math.hypot(dx,dy);
+    if(len>0){float tx=(float)(-dy/len*dp(3)),ty=(float)(dx/len*dp(3));c.drawLine(ax-tx,ay-ty,ax+tx,ay+ty,pen);c.drawLine(bx-tx,by-ty,bx+tx,by+ty,pen);}
+    String label=String.format(java.util.Locale.GERMANY,"%.2f m",value);float lx=Math.max(dp(2),Math.min(getWidth()-pen.measureText(label)-dp(2),(ax+bx)/2-pen.measureText(label)/2)),ly=Math.max(dp(12),(ay+by)/2-dp(4));c.drawText(label,lx,ly,pen);
+   }
    @Override protected void onDraw(Canvas c){
     super.onDraw(c);
     double width=w, height=d, x=read(offset), y=read(depth),radius=current[0].optDouble("diameter")/2000;
@@ -5347,6 +5354,19 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
      c.drawCircle((float)(left+nx*scale),(float)(top+ny*scale),(float)(nr*scale),pen);
     }
     c.save();c.clipRect(0,0,getWidth(),getHeight());pen.setColor(outside||collision?0xffef5350:clearance||coverWarning?0xffffb74d:0xff42a5f5);c.drawCircle((float)(left+x*scale),(float)(top+y*scale),(float)(radius*scale),pen);c.restore();
+    if(showDimensions[0]){
+     float cx=(float)(left+x*scale),cy=(float)(top+y*scale),rr=(float)(radius*scale),right=(float)(left+width*scale);
+     dimension(c,left,cy,cx-rr,cy,x-radius);
+     dimension(c,cx+rr,cy,right,cy,width-x-radius);
+     dimension(c,cx,top,cx,cy-rr,y-radius);
+     dimension(c,left,top,right,top,width);
+     for(int k=0;k<rows.length();k++){if(k==selected[0])continue;org.json.JSONObject n=rows.optJSONObject(k);if(n==null||station<n.optDouble("routeFrom",0)||station>=n.optDouble("routeTo",Double.POSITIVE_INFINITY))continue;
+      double nx=n.optDouble("offset"),ny=n.optDouble("axisDepth"),nr=n.optDouble("diameter")/2000,dist=Math.hypot(nx-x,ny-y);
+      if(!Double.isFinite(dist)||!Double.isFinite(nr)||nr<=0||dist<=0)continue;
+      double ux=(nx-x)/dist,uy=(ny-y)/dist;
+      dimension(c,(float)(left+(x+ux*radius)*scale),(float)(top+(y+uy*radius)*scale),(float)(left+(nx-ux*nr)*scale),(float)(top+(ny-uy*nr)*scale),dist-radius-nr);
+     }
+    }
     if(clearance||coverWarning){pen.setColor(0xffffb74d);pen.setTextSize(dp(11));c.drawText(clearance&&coverWarning?"Mindestabstand / Überdeckung":clearance?"Mindestabstand unterschritten":"Mindestüberdeckung unterschritten",dp(8),dp(11),pen);}
     if(outside||collision){pen.setColor(0xffff7777);pen.setTextSize(dp(11));c.drawText(outside&&collision?"Profilgrenze und Leitungskollision":outside?"Außerhalb des Grabenprofils":"Leitungskollision",dp(8),getHeight()-dp(4),pen);}
    }
@@ -5399,6 +5419,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   sideClearance.setOnClickListener(v->{EditText input=new EditText(this);input.setInputType(8194);input.setText(getPreferences(0).getString("metricUtilitySideClearance","0"));android.app.AlertDialog dd=new android.app.AlertDialog.Builder(this).setTitle("Randabstand je Seite (m)").setView(input).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();dd.setOnShowListener(q->dd.getButton(-1).setOnClickListener(z->{try{double m=Double.parseDouble(input.getText().toString().replace(',','.'));if(!Double.isFinite(m)||m<0)throw new IllegalArgumentException();getPreferences(0).edit().putString("metricUtilitySideClearance",String.valueOf(m)).apply();dd.dismiss();}catch(Exception ex){input.setError("Gültiges Maß eingeben");}}));dd.show();});
   form.addView(sideClearance);
   form.addView(distribute);
+  Button dimensions=new Button(this);dimensions.setText("Bemaßung anzeigen");dimensions.setOnClickListener(v->{showDimensions[0]=!showDimensions[0];dimensions.setText(showDimensions[0]?"Bemaßung ausblenden":"Bemaßung anzeigen");preview.invalidate();});form.addView(dimensions);
   form.addView(alignGroup);
   form.addView(groupBack);form.addView(groupForward);
   form.addView(preview,0,new LinearLayout.LayoutParams(-1,dp(160)));
