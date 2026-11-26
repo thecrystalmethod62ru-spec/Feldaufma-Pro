@@ -1839,7 +1839,7 @@ public class MainActivity extends Activity {
       try{
        PipeLayout.Pipe pipe=pipes.get(index);
        java.util.List<PipeLayout.Pipe> next=new java.util.ArrayList<>(pipes);
-       next.set(index,new PipeLayout.Pipe(pipe.name,offset,pipe.diameter,pipe.wall,bedding));
+       next.set(index,new PipeLayout.Pipe(pipe.name,offset,pipe.diameter,pipe.wall,bedding,pipe.minGap,pipe.minCover));
        multiPipeStore.save(next);pipes.clear();pipes.addAll(next);refresh.run();
       }catch(Exception ex){refresh.run();warnings.setText("Speichern fehlgeschlagen: "+ex.getMessage());}
      });
@@ -1852,20 +1852,24 @@ public class MainActivity extends Activity {
         offset.setHint("Achslage zur Grabenmitte (m)");offset.setText(String.valueOf(pipe.offset));
         bedding.setHint("Rohrunterkante über Grabensohle (m)");bedding.setText(String.valueOf(pipe.bedding));
         fields.addView(offset);fields.addView(bedding);
+        final EditText gapInput=new EditText(this),coverInput=new EditText(this);
+        gapInput.setHint("Rohr-Mindestabstand (m)");gapInput.setText(String.valueOf(pipe.minGap));
+        coverInput.setHint("Rohr-Mindestüberdeckung (m)");coverInput.setText(String.valueOf(pipe.minCover));
+        fields.addView(gapInput);fields.addView(coverInput);
         final android.app.AlertDialog edit=new android.app.AlertDialog.Builder(this).setTitle("Rohrlage bearbeiten").setView(fields).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
         edit.setOnShowListener(ignored->edit.getButton(-1).setOnClickListener(button->{
          try{
           double o=Double.parseDouble(offset.getText().toString().trim().replace(',','.'));
           double b=Double.parseDouble(bedding.getText().toString().trim().replace(',','.'));
           java.util.List<PipeLayout.Pipe> next=new java.util.ArrayList<>(pipes);
-          next.set(index,new PipeLayout.Pipe(pipe.name,o,pipe.diameter,pipe.wall,b));
+          next.set(index,new PipeLayout.Pipe(pipe.name,o,pipe.diameter,pipe.wall,b,Double.parseDouble(gapInput.getText().toString().trim().replace(',','.')),Double.parseDouble(coverInput.getText().toString().trim().replace(',','.'))));
           multiPipeStore.save(next);pipes.clear();pipes.addAll(next);refresh.run();edit.dismiss();
          }catch(Exception ex){bedding.setError("Ungültige Lage oder Speicherfehler: "+ex.getMessage());}
         }));edit.show();return;
        }
        Runnable change=()->{
         java.util.List<PipeLayout.Pipe> next=new java.util.ArrayList<>(pipes);
-        if(action==1)next.add(new PipeLayout.Pipe(pipe.name+" (Kopie)",pipe.offset,pipe.diameter,pipe.wall,pipe.bedding));else next.remove(index);
+        if(action==1)next.add(new PipeLayout.Pipe(pipe.name+" (Kopie)",pipe.offset,pipe.diameter,pipe.wall,pipe.bedding,pipe.minGap,pipe.minCover));else next.remove(index);
         try{multiPipeStore.save(next);pipes.clear();pipes.addAll(next);refresh.run();multiPipeButton.setText("Mehrfachbelegung ("+pipes.size()+") bearbeiten");}
         catch(Exception ex){warnings.setText(ex.getMessage());}
        };
