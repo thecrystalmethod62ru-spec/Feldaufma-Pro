@@ -5264,6 +5264,9 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     Button undoPosition=new Button(this);undoPosition.setText("Verschieben rückgängig");undoPosition.setEnabled(false);
   undoPosition.setOnClickListener(v->{if(positionHistory.isEmpty())return;redoHistory.push(new String[]{offset.getText().toString(),depth.getText().toString()});redoPosition.setEnabled(true);String[] previous=positionHistory.pop();offset.setText(previous[0]);depth.setText(previous[1]);undoPosition.setEnabled(!positionHistory.isEmpty());});
   redoPosition.setOnClickListener(v->{if(redoHistory.isEmpty())return;positionHistory.push(new String[]{offset.getText().toString(),depth.getText().toString()});String[] next=redoHistory.pop();offset.setText(next[0]);depth.setText(next[1]);undoPosition.setEnabled(true);redoPosition.setEnabled(!redoHistory.isEmpty());});
+  final java.util.Set<Integer> group=new java.util.HashSet<>();
+  final boolean[] groupMode={false};
+  Button groupButton=new Button(this);groupButton.setText("Gruppe");
   View preview=new View(this){
    final Paint pen=new Paint(3);
    double read(EditText field){try{return Double.parseDouble(field.getText().toString().trim().replace(',','.'));}catch(Exception ex){return Double.NaN;}}
@@ -5282,6 +5285,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
         if(Double.isFinite(nr)&&nr>0&&distance<=Math.max(dp(20),nr*dragScale)&&distance<best){hit=k;best=distance;}
        }
        if(hit<0)return false;
+       if(groupMode[0]){if(!group.add(hit))group.remove(hit);invalidate();return true;}
        if(!Double.isFinite(x)||!Double.isFinite(y)||x<0||y<0){notice("Zuerst gültige Maße eingeben");return true;}
        try{current[0].put("offset",x);current[0].put("axisDepth",y);}catch(Exception ex){return true;}
        undoByUtility.put(selected[0],new java.util.ArrayDeque<>(positionHistory));redoByUtility.put(selected[0],new java.util.ArrayDeque<>(redoHistory));
@@ -5330,7 +5334,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
      double nx=neighbor.optDouble("offset"),ny=neighbor.optDouble("axisDepth"),nr=neighbor.optDouble("diameter")/2000;
      if(!Double.isFinite(nx)||!Double.isFinite(ny)||!Double.isFinite(nr)||nr<=0)continue;
      double distance=Math.hypot(x-nx,y-ny)-radius-nr;boolean overlap=distance<0;collision|=overlap;clearance|=distance<gap;
-     pen.setColor(overlap?0xffef5350:distance<gap?0xffffb74d:0xff9e9e9e);
+     pen.setColor(overlap?0xffef5350:distance<gap?0xffffb74d:group.contains(k)?0xff42a5f5:0xff9e9e9e);
      c.drawCircle((float)(left+nx*scale),(float)(top+ny*scale),(float)(nr*scale),pen);
     }
     c.save();c.clipRect(0,0,getWidth(),getHeight());pen.setColor(outside||collision?0xffef5350:clearance||coverWarning?0xffffb74d:0xff42a5f5);c.drawCircle((float)(left+x*scale),(float)(top+y*scale),(float)(radius*scale),pen);c.restore();
@@ -5338,6 +5342,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     if(outside||collision){pen.setColor(0xffff7777);pen.setTextSize(dp(11));c.drawText(outside&&collision?"Profilgrenze und Leitungskollision":outside?"Außerhalb des Grabenprofils":"Leitungskollision",dp(8),getHeight()-dp(4),pen);}
    }
   };
+  groupButton.setOnClickListener(v->{groupMode[0]=!groupMode[0];group.clear();if(groupMode[0])group.add(selected[0]);groupButton.setText(groupMode[0]?"Gruppe ✓":"Gruppe");preview.invalidate();});
   form.addView(preview,0,new LinearLayout.LayoutParams(-1,dp(160)));
   Button expandPreview=new Button(this);expandPreview.setText("Querschnitt vergrößern");form.addView(expandPreview,1);
 
@@ -5364,7 +5369,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   preview.setContentDescription("Leitungsquerschnitt. Ausgewählte Leitung zum Verschieben ziehen.");
 
   android.widget.FrameLayout.LayoutParams barParams=new android.widget.FrameLayout.LayoutParams(Math.min(dp(280),Math.max(dp(160),getResources().getDisplayMetrics().widthPixels-dp(96))),-2,android.view.Gravity.TOP|android.view.Gravity.LEFT);
-  workspace.addView(toolbar,barParams);toolbar.setBackgroundColor(0xff303030);
+  workspace.addView(toolbar,barParams);toolbar.addView(groupButton,new LinearLayout.LayoutParams(0,-2,1));groupButton.setMinWidth(0);groupButton.setMinimumWidth(0);groupButton.setPadding(0,0,0,0);groupButton.setTextSize(10);toolbar.setBackgroundColor(0xff303030);
   fullscreen.setTextSize(10);toggleControls.setTextSize(10);
   fullscreen.setPadding(dp(2),0,dp(2),0);toggleControls.setPadding(dp(2),0,dp(2),0);
   undoPosition.setPadding(0,0,0,0);redoPosition.setPadding(0,0,0,0);
