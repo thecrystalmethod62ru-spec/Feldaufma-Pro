@@ -1754,7 +1754,20 @@ public class MainActivity extends Activity {
     }
     if(localWidths==null||matches>1||!Double.isFinite(width)||width<=0||!Double.isFinite(lateral)){unknownWidth++;continue;}
     if(Math.abs(lateral)>width/2)outside++;
-    double envelope=fitting.optDouble("lateralEnvelope");if(!Double.isFinite(envelope)||envelope<=0)envelopeUnknown++;else if(Math.abs(lateral)+envelope/2>width/2)envelopeOutside++;
+    double envelope=fitting.optDouble("lateralEnvelope");
+    if(!Double.isFinite(envelope)||envelope<=0){envelopeUnknown++;continue;}
+    double requiredWidth=2*Math.abs(lateral)+envelope;
+    boolean exceeds=requiredWidth>width;
+    double longitudinal=fitting.optDouble("longitudinalEnvelope");
+    if(Double.isFinite(longitudinal)&&longitudinal>0){
+     double start=Math.max(0,station-longitudinal/2),end=Math.min(total,station+longitudinal/2);
+     for(int k=0;k<localWidths.length();k++){
+      org.json.JSONObject section=localWidths.optJSONObject(k);if(section==null)continue;
+      double from=section.optDouble("from"),to=section.optDouble("to"),sectionWidth=section.optDouble("width");
+      if(Double.isFinite(from)&&Double.isFinite(to)&&from<to&&from<end&&to>start&&Double.isFinite(sectionWidth)&&sectionWidth>0&&requiredWidth>sectionWidth)exceeds=true;
+     }
+    }
+    if(exceeds)envelopeOutside++;
    }
 
    LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(dp(12),dp(8),dp(12),dp(8));
