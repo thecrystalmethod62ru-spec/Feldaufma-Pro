@@ -5255,6 +5255,9 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   EditText offset=new EditText(this),depth=new EditText(this);
   EditText[] fields={offset,depth};String[] keys={"offset","axisDepth"},labels={"Abstand vom linken Grabenrand (m)","Achstiefe (m)"};
   for(int i=0;i<2;i++){fields[i].setInputType(8194);fields[i].setHint(labels[i]);fields[i].setText(source.optString(keys[i],""));form.addView(fields[i]);double existing=source.optDouble(keys[i],0);utilitySlider(form,fields[i],labels[i],0,Math.max(10,Double.isFinite(existing)?existing:0),0.01,true);}
+  final java.util.ArrayDeque<String[]> positionHistory=new java.util.ArrayDeque<>();
+  Button undoPosition=new Button(this);undoPosition.setText("Verschieben rückgängig");undoPosition.setEnabled(false);
+  undoPosition.setOnClickListener(v->{if(positionHistory.isEmpty())return;String[] previous=positionHistory.pop();offset.setText(previous[0]);depth.setText(previous[1]);undoPosition.setEnabled(!positionHistory.isEmpty());});
   View preview=new View(this){
    final Paint pen=new Paint(3);
    double read(EditText field){try{return Double.parseDouble(field.getText().toString().trim().replace(',','.'));}catch(Exception ex){return Double.NaN;}}
@@ -5266,6 +5269,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
      case android.view.MotionEvent.ACTION_DOWN:
       double radius=source.optDouble("diameter")/2000;
       if(!Double.isFinite(x)||!Double.isFinite(y)||!Double.isFinite(radius)||Math.hypot(e.getX()-dragLeft-x*dragScale,e.getY()-dragTop-y*dragScale)>Math.max(dp(20),radius*dragScale))return false;
+      positionHistory.push(new String[]{offset.getText().toString(),depth.getText().toString()});if(positionHistory.size()>50)positionHistory.removeLast();undoPosition.setEnabled(true);
       grabX=e.getX()-dragLeft-x*dragScale;grabY=e.getY()-dragTop-y*dragScale;dragging=true;getParent().requestDisallowInterceptTouchEvent(true);return true;
      case android.view.MotionEvent.ACTION_MOVE:
       if(!dragging)return false;
@@ -5330,10 +5334,10 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   ScrollView positionScroll=new ScrollView(this);positionScroll.setFillViewport(false);positionScroll.addView(form);
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(source.optString("name",source.optString("type"))+" – Lage").setView(positionScroll).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
   Button fullscreen=new Button(this);fullscreen.setText("Vollbild");form.addView(fullscreen,2);
-  Button toggleControls=new Button(this);toggleControls.setText("Maße ausblenden");form.addView(toggleControls,3);
+  Button toggleControls=new Button(this);toggleControls.setText("Maße ausblenden");form.addView(toggleControls,3);form.addView(undoPosition,4);
   toggleControls.setOnClickListener(v->{
    boolean hide=toggleControls.getText().toString().equals("Maße ausblenden");
-   for(int k=4;k<form.getChildCount();k++)form.getChildAt(k).setVisibility(hide?View.GONE:View.VISIBLE);
+   for(int k=5;k<form.getChildCount();k++)form.getChildAt(k).setVisibility(hide?View.GONE:View.VISIBLE);
    toggleControls.setText(hide?"Maße einblenden":"Maße ausblenden");
   });
   fullscreen.setOnClickListener(v->{
