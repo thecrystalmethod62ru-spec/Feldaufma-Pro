@@ -5258,6 +5258,27 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   View preview=new View(this){
    final Paint pen=new Paint(3);
    double read(EditText field){try{return Double.parseDouble(field.getText().toString().trim().replace(',','.'));}catch(Exception ex){return Double.NaN;}}
+   double dragScale,dragLeft,dragTop,grabX,grabY;boolean dragging;
+   @Override public boolean onTouchEvent(android.view.MotionEvent e){
+    if(dragScale<=0)return false;
+    double x=read(offset),y=read(depth);
+    switch(e.getActionMasked()){
+     case android.view.MotionEvent.ACTION_DOWN:
+      double radius=source.optDouble("diameter")/2000;
+      if(!Double.isFinite(x)||!Double.isFinite(y)||!Double.isFinite(radius)||Math.hypot(e.getX()-dragLeft-x*dragScale,e.getY()-dragTop-y*dragScale)>Math.max(dp(20),radius*dragScale))return false;
+      grabX=e.getX()-dragLeft-x*dragScale;grabY=e.getY()-dragTop-y*dragScale;dragging=true;getParent().requestDisallowInterceptTouchEvent(true);return true;
+     case android.view.MotionEvent.ACTION_MOVE:
+      if(!dragging)return false;
+      offset.setText(String.format(java.util.Locale.US,"%.2f",Math.max(0,(e.getX()-dragLeft-grabX)/dragScale)));
+      depth.setText(String.format(java.util.Locale.US,"%.2f",Math.max(0,(e.getY()-dragTop-grabY)/dragScale)));return true;
+     case android.view.MotionEvent.ACTION_UP:
+     case android.view.MotionEvent.ACTION_CANCEL:
+      boolean handled=dragging;dragging=false;getParent().requestDisallowInterceptTouchEvent(false);if(handled&&e.getActionMasked()==android.view.MotionEvent.ACTION_UP)performClick();return handled;
+     default:return dragging;
+    }
+   }
+   @Override public boolean performClick(){super.performClick();return true;}
+
    @Override protected void onDraw(Canvas c){
     super.onDraw(c);
     double width=w, height=d, x=read(offset), y=read(depth),radius=source.optDouble("diameter")/2000;
@@ -5268,10 +5289,11 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     try{double value=Double.parseDouble(prefs.getString("metricPipeMinGap","0").replace(',','.'));if(Double.isFinite(value)&&value>=0)gap=value;}catch(Exception ignored){}
     try{double value=Double.parseDouble(prefs.getString("metricPipeMinCover","0").replace(',','.'));if(Double.isFinite(value)&&value>=0)cover=value;}catch(Exception ignored){}
 
-    c.drawColor(0xff171717);
+    dragScale=0;c.drawColor(0xff171717);
     if(!Double.isFinite(width)||!Double.isFinite(height)||width<=0||height<=0)return;
     double scale=Math.min((getWidth()-dp(32))/width,(getHeight()-dp(32))/height);if(scale<=0)return;
     float left=(float)((getWidth()-width*scale)/2),top=dp(12);
+    dragScale=scale;dragLeft=left;dragTop=top;
     pen.setStyle(Paint.Style.FILL);pen.setColor(0xff303030);c.drawRect(left,top,(float)(left+width*scale),(float)(top+height*scale),pen);
     pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth(dp(1));pen.setColor(0xffaaaaaa);c.drawRect(left,top,(float)(left+width*scale),(float)(top+height*scale),pen);pen.setStyle(Paint.Style.FILL);
     if(!Double.isFinite(x)||!Double.isFinite(y)||!Double.isFinite(radius)||radius<=0)return;
