@@ -567,9 +567,23 @@ public class MainActivity extends Activity {
  }
  void showEditorObjects(RouteSketch route,org.json.JSONArray draft,Runnable refresh){
   LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
-  form.addView(sheetText("Neue Objekte werden erst mit der Trasse gespeichert. Überlappungen bleiben erhalten. Bestehende Objekte werden nicht geändert.",14,false));
-  for(int j=0;j<draft.length();j++){final int index=j;org.json.JSONObject o=draft.optJSONObject(j);if(o==null)continue;Button b=new Button(this);b.setAllCaps(false);b.setText(o.optString("type")+" · "+o.optString("station")+" m"+detailSummary(o));b.setOnClickListener(v->new android.app.AlertDialog.Builder(this).setTitle("Neues Objekt entfernen?").setNegativeButton("Abbrechen",null).setPositiveButton("Entfernen",(d,w)->{draft.remove(index);refresh.run();}).show());form.addView(b);}
+  form.addView(sheetText("Änderungen werden erst mit der Trasse gespeichert. Überlappungen bleiben erhalten. Eintrag antippen, um ihn zu bearbeiten.",14,false));
+  for(int j=0;j<draft.length();j++){final int index=j;org.json.JSONObject o=draft.optJSONObject(j);if(o==null)continue;Button b=new Button(this);b.setAllCaps(false);b.setText(o.optString("type")+" · "+o.optString("station")+" m"+detailSummary(o));b.setOnClickListener(v->chooseEditorObject(route,draft,refresh,index));form.addView(b);}
   new android.app.AlertDialog.Builder(this).setTitle("Trassenobjekte – Entwurf").setView(scroll).setNegativeButton("Schließen",null).setPositiveButton("Objekt hinzufügen",(d,w)->addEditorObject(route,draft,refresh)).show();
+ }
+ void chooseEditorObject(RouteSketch route,org.json.JSONArray draft,Runnable refresh,int index){
+  org.json.JSONObject o=draft.optJSONObject(index);if(o==null)return;
+  new android.app.AlertDialog.Builder(this).setTitle(o.optString("type")+" · "+csvNumber(o.optDouble("station"))+" m")
+   .setItems(new String[]{"Bearbeiten / verschieben","Objekt entfernen"},(d,w)->{
+    if(w==0)editEditorObject(route,draft,refresh,index,Double.NaN);
+    else new android.app.AlertDialog.Builder(this).setTitle("Objekt entfernen?").setMessage("Die Trasse und andere Objekte bleiben unverändert.").setNegativeButton("Abbrechen",null).setPositiveButton("Entfernen",(x,y)->{if(draft.optJSONObject(index)==o){draft.remove(index);refresh.run();}}).show();
+   }).setNegativeButton("Schließen",null).show();
+ }
+ void pickEditorObject(RouteSketch route,org.json.JSONArray draft,Runnable refresh,java.util.ArrayList<Integer> hits){
+  if(hits.isEmpty()){notice("Bitte ein Objekt auf der Zeichnung antippen.");return;}
+  if(hits.size()==1){chooseEditorObject(route,draft,refresh,hits.get(0));return;}
+  String[] labels=new String[hits.size()];for(int j=0;j<hits.size();j++){org.json.JSONObject o=draft.optJSONObject(hits.get(j));labels[j]=(hits.get(j)+1)+" · "+o.optString("type")+" · "+csvNumber(o.optDouble("station"))+" m";}
+  new android.app.AlertDialog.Builder(this).setTitle("Überlappende Objekte auswählen").setItems(labels,(d,w)->chooseEditorObject(route,draft,refresh,hits.get(w))).setNegativeButton("Abbrechen",null).show();
  }
  void pickEditorObjectStation(RouteSketch route,org.json.JSONArray draft,Runnable refresh,java.util.ArrayList<RouteSketch.StationHit> hits){
   if(hits.isEmpty()){notice("Bitte nahe an einer vollständig bemaßten Trasse antippen.");return;}
@@ -579,24 +593,26 @@ public class MainActivity extends Activity {
   new android.app.AlertDialog.Builder(this).setTitle("Mehrere mögliche Stationen").setItems(labels,(d,w)->addEditorObject(route,draft,refresh,hits.get(w).station)).setNegativeButton("Abbrechen",null).show();
  }
  void addEditorObject(RouteSketch route,org.json.JSONArray draft,Runnable refresh){addEditorObject(route,draft,refresh,Double.NaN);}
- void addEditorObject(RouteSketch route,org.json.JSONArray draft,Runnable refresh,double suggestedStation){
+ void addEditorObject(RouteSketch route,org.json.JSONArray draft,Runnable refresh,double suggestedStation){editEditorObject(route,draft,refresh,-1,suggestedStation);}
+ void editEditorObject(RouteSketch route,org.json.JSONArray draft,Runnable refresh,int index,double suggestedStation){
+  org.json.JSONObject old=index<0?null:draft.optJSONObject(index);if(index>=0&&old==null)return;
   double total=route.measuredLength();
   if(!Double.isFinite(total)||total<=0){notice("Zuerst die Trasse vollständig bemaßen, damit Stationen eindeutig sind.");return;}
   LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
-  Spinner type=choices(form,new String[]{"Hausanschluss","Suchschachtung","Hindernis","Startgrube","Zielgrube","KVS","Knickpunkt"});
-  EditText station=new EditText(this);station.setInputType(8194);station.setHint("Station in m (0 – "+csvNumber(total)+")");if(Double.isFinite(suggestedStation)){station.setText(java.math.BigDecimal.valueOf(suggestedStation).stripTrailingZeros().toPlainString().replace('.',','));}form.addView(station);
-  Spinner side=choices(form,new String[]{"Unbekannt","links","rechts","mittig"});
+  java.util.ArrayList<String> types=new java.util.ArrayList<>(java.util.Arrays.asList("Hausanschluss","Suchschachtung","Hindernis","Startgrube","Zielgrube","KVS","Knickpunkt"));if(old!=null&&!types.contains(old.optString("type")))types.add(old.optString("type"));Spinner type=choices(form,types.toArray(new String[0]));if(old!=null)type.setSelection(types.indexOf(old.optString("type")));
+  EditText station=new EditText(this);station.setInputType(8194);station.setHint("Station in m (0 – "+csvNumber(total)+")");if(Double.isFinite(suggestedStation)){station.setText(java.math.BigDecimal.valueOf(suggestedStation).stripTrailingZeros().toPlainString().replace('.',','));}if(old!=null)station.setText(old.optString("station"));form.addView(station);
+  String[] sides={"Unbekannt","links","rechts","mittig"};Spinner side=choices(form,sides);if(old!=null)side.setSelection(Math.max(0,java.util.Arrays.asList(sides).indexOf(old.optString("side"))));
   String[] keys={"detailLength","detailWidth","detailDepth","detailOffset"},labels={"Länge (m)","Breite (m)","Tiefe (m)","Abstand zum Grabenrand (m)"};
-  EditText[] fields=new EditText[keys.length];for(int j=0;j<fields.length;j++){fields[j]=new EditText(this);fields[j].setInputType(8194);fields[j].setHint(labels[j]+" – optional");form.addView(fields[j]);}
-  EditText note=new EditText(this);note.setHint("Bemerkung");form.addView(note);
-  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Objekt an Station hinzufügen").setView(scroll).setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",null).create();
+  EditText[] fields=new EditText[keys.length];for(int j=0;j<fields.length;j++){fields[j]=new EditText(this);fields[j].setInputType(8194);fields[j].setHint(labels[j]+" – optional");if(old!=null)fields[j].setText(old.optString(keys[j],""));form.addView(fields[j]);}
+  EditText note=new EditText(this);note.setHint("Bemerkung");if(old!=null)note.setText(old.optString("note"));form.addView(note);
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(old==null?"Objekt an Station hinzufügen":"Objekt bearbeiten / verschieben").setView(scroll).setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",null).create();
   dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(b->{
    try{
     double st=number(station),limit=route.measuredLength();if(!Double.isFinite(st)||!Double.isFinite(limit)||st<0||st>limit){station.setError("Station außerhalb der bemaßten Trasse");return;}
     String chosen=side.getSelectedItem().toString();
-    org.json.JSONObject o=new org.json.JSONObject().put("station",st).put("type",type.getSelectedItem().toString()).put("side",chosen).put("note",note.getText().toString());
-    for(int j=0;j<fields.length;j++){if(fields[j].length()==0)continue;double value=number(fields[j]);if(!Double.isFinite(value)||value<0||(j<3&&value==0)||(j==3&&!chosen.equals("links")&&!chosen.equals("rechts"))){fields[j].setError("Maß / Seite prüfen");return;}o.put(keys[j],fields[j].getText().toString());}
-    draft.put(o);refresh.run();dialog.dismiss();
+    org.json.JSONObject o=(old==null?new org.json.JSONObject():new org.json.JSONObject(old.toString())).put("station",st).put("type",type.getSelectedItem().toString()).put("side",chosen).put("note",note.getText().toString());
+    for(int j=0;j<fields.length;j++){if(fields[j].length()==0){o.remove(keys[j]);continue;}double value=number(fields[j]);if(!Double.isFinite(value)||value<0||(j<3&&value==0)||(j==3&&!chosen.equals("links")&&!chosen.equals("rechts"))){fields[j].setError("Maß / Seite prüfen");return;}o.put(keys[j],fields[j].getText().toString());}
+    if(old==null)draft.put(o);else if(draft.optJSONObject(index)==old){if(!overlapGeometry(old).equals(overlapGeometry(o)))o.remove("acceptedOverlap");draft.put(index,o);}else{notice("Objekt wurde geändert.");return;}refresh.run();dialog.dismiss();
    }catch(Exception e){notice("Station und Maße prüfen.");}
   }));dialog.show();
  }
@@ -706,21 +722,22 @@ public class MainActivity extends Activity {
    }else form.addView(sheetText("Zeichenvorlage fehlt oder ist nicht lesbar.",13,false));
   }
 
-  Spinner mode=choices(form,new String[]{"Zeichnen","Maß eintragen","Punkte verschieben","Objekt platzieren"});
+  Spinner mode=choices(form,new String[]{"Zeichnen","Maß eintragen","Punkte verschieben","Objekt platzieren","Objekt bearbeiten"});
   Spinner angles=choices(form,new String[]{"Freier Winkel","0°","15°","30°","45°","60°","75°","90°"});
   angles.setVisibility(View.GONE);
   onChoice(angles,index->route.angle=index==0?-1:(index-1)*15);
   onChoice(mode,index->{
-   route.dimensioning=index==1;route.moving=index==2;route.placingObject=index==3;
+   route.dimensioning=index==1;route.moving=index==2;route.placingObject=index==3;route.editingObjects=index==4;
    angles.setVisibility(route.moving?View.VISIBLE:View.GONE);
-   hint.setText(new String[]{"Mit einem Finger zeichnen, mit zwei Fingern zoomen oder verschieben.","Abschnitt zum Bemaßen antippen.","Punkt ziehen. Der Winkel gilt zur Waagerechten am benachbarten Punkt.","Trasse antippen, um ein Objekt an einer Station zu platzieren."}[index]);
+   hint.setText(new String[]{"Mit einem Finger zeichnen, mit zwei Fingern zoomen oder verschieben.","Abschnitt zum Bemaßen antippen.","Punkt ziehen. Der Winkel gilt zur Waagerechten am benachbarten Punkt.","Trasse antippen, um ein Objekt an einer Station zu platzieren.","Objekt auf dem Plan antippen."}[index]);
   });
   mode.setSelection(measure?1:0);
   final String initialSaved=routeData();
-  final String initialObjects=objects.toString();final org.json.JSONArray draftObjects=new org.json.JSONArray();
-  Runnable refreshObjects=()->{org.json.JSONArray merged=new org.json.JSONArray();for(int j=0;j<objects.length();j++)merged.put(objects.optJSONObject(j));for(int j=0;j<draftObjects.length();j++)merged.put(draftObjects.optJSONObject(j));route.setTrenchWidth(w);route.setStationLayers(merged,segments);route.invalidate();};
+  final String initialObjects=objects.toString();final org.json.JSONArray draftObjects=copyEditorObjects(initialObjects);
+  Runnable refreshObjects=()->{route.setTrenchWidth(w);route.setStationLayers(draftObjects,segments);route.invalidate();};
   Runnable openObjects=()->showEditorObjects(route,draftObjects,refreshObjects);
   route.stationSelected=hits->pickEditorObjectStation(route,draftObjects,refreshObjects,hits);
+  route.objectSelected=hits->pickEditorObject(route,draftObjects,refreshObjects,hits);
   Button objectTools=new Button(this);objectTools.setAllCaps(false);objectTools.setText("Objekte hinzufügen");form.addView(objectTools);objectTools.setOnClickListener(v->openObjects.run());refreshObjects.run();
   RouteEditHistory history=loadRouteHistory(route.encode());
   LinearLayout historyBar=new LinearLayout(this);form.addView(historyBar);
@@ -778,7 +795,7 @@ public class MainActivity extends Activity {
   editor.setOnShowListener(ignored->editor.getButton(-1).setOnClickListener(v->{
    if(!initialSaved.equals(routeData())){notice("Trasse wurde zwischenzeitlich geändert. Editor neu öffnen.");return;}
    history.record(route.encode());
-   if(draftObjects.length()>0){double total=route.measuredLength();if(!initialObjects.equals(objects.toString())){notice("Objekte zwischenzeitlich geändert. Editor neu öffnen.");return;}for(int j=0;j<draftObjects.length();j++){double st=draftObjects.optJSONObject(j).optDouble("station");if(!Double.isFinite(total)||!Double.isFinite(st)||st<0||st>total){notice("Objektstation außerhalb der bemaßten Trasse. Bitte korrigieren.");return;}}}
+   if(!initialObjects.equals(draftObjects.toString())){double total=route.measuredLength();if(!initialObjects.equals(objects.toString())){notice("Objekte zwischenzeitlich geändert. Editor neu öffnen.");return;}for(int j=0;j<draftObjects.length();j++){org.json.JSONObject entry=draftObjects.optJSONObject(j);if(unchangedEditorObject(initialObjects,entry))continue;double st=entry.optDouble("station");if(!Double.isFinite(total)||!Double.isFinite(st)||st<0||st>total){notice("Objektstation außerhalb der bemaßten Trasse. Bitte korrigieren.");return;}}}
    if(persistEditorRoute(history,draftObjects)){boolean saved=getPreferences(0).edit().putString("sketchCalibration",calibration[0].toString()).commit();refreshRoute();editor.dismiss();notice(saved?"Trasse gespeichert.":"Trasse gespeichert, Kalibrierung nicht gespeichert.");}
   }));
   fullscreen.setOnClickListener(v->showFullscreenRoute(editor,form,route,mode,angles,historyBar,openObjects));
@@ -786,15 +803,19 @@ public class MainActivity extends Activity {
   if(startFullscreen)fullscreen.performClick();
  }
 
+ static org.json.JSONArray copyEditorObjects(String source){try{return new org.json.JSONArray(source);}catch(Exception e){throw new IllegalStateException(e);}}
+ static boolean unchangedEditorObject(String initial,org.json.JSONObject object){
+  if(object==null)return false;org.json.JSONArray original=copyEditorObjects(initial);
+  for(int j=0;j<original.length();j++){org.json.JSONObject old=original.optJSONObject(j);if(old!=null&&old.toString().equals(object.toString()))return true;}return false;
+ }
  boolean persistEditorRoute(RouteEditHistory history,org.json.JSONArray draft){
-  if(draft.length()==0)return persistRouteHistory(history);
+  if(draft.toString().equals(objects.toString()))return persistRouteHistory(history);
   try{
-   String before=routeData(),old=objects.toString();org.json.JSONArray merged=new org.json.JSONArray(old);
-   for(int j=0;j<draft.length();j++)merged.put(draft.getJSONObject(j));
+   String before=routeData(),old=objects.toString();org.json.JSONArray merged=new org.json.JSONArray(draft.toString());
    java.util.ArrayDeque<String> nextUndo=new java.util.ArrayDeque<>(undoObjects);nextUndo.push(old);while(nextUndo.size()>HISTORY_LIMIT)nextUndo.removeLast();
    if(!getPreferences(0).edit().putString("routeSketch",history.current).putString("routeHistoryHead",history.current).putString("routeUndo",new org.json.JSONArray(history.undo).toString()).putString("routeRedo",new org.json.JSONArray(history.redo).toString()).putString("objects",merged.toString()).putString("objectUndo",new org.json.JSONArray(nextUndo).toString()).putString("objectRedo","[]").commit()){notice("Trasse und Objekte konnten nicht gespeichert werden.");return false;}
    objects=merged;undoObjects.clear();undoObjects.addAll(nextUndo);redoObjects.clear();
-   if(!before.equals(history.current))recordProjectEvent("Trasse geändert");recordProjectEvent("Objekte hinzugefügt · "+draft.length());
+   if(!before.equals(history.current))recordProjectEvent("Trasse geändert");recordProjectEvent("Objekte bearbeitet · "+draft.length());
    showObjects();refreshDetailQuantities();sketch.invalidate();updateHistoryButtons();return true;
   }catch(Exception e){notice("Trasse und Objekte konnten nicht gespeichert werden.");return false;}
  }
