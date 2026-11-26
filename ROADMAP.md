@@ -48,3 +48,10 @@ Jede Funktion benötigt Build, Tests und Geräteprüfung. Geometrische Mengen si
 - [ ] Leitungsverlauf, Abzweige, Standardformstücke, Verbindungen und handschriftliche Maße als überprüfbare Vorschläge erkennen.
 - [ ] Unbekannte Maße als 'Maß fehlt' kennzeichnen; keine erfundenen Maße oder automatische Ist-Abrechnung.
 - [ ] Bestätigte Vorschläge in editierbare Montagezeichnung mit Bemaßung, Legende und Materialliste überführen; Originalskizze als Quelle behalten.
+
+### Gemeinsames Datenmodell Tiefbau / Rohrleitungsbau
+- [ ] Gemeinsame stabile Trassen- und Stations-IDs; Montageobjekte mit Trassenabschnitt, Station, seitlichem Versatz und Höhenlage verknüpfen.
+- [ ] Gemeinsame GPS-Referenz und gegenseitige Objektauswahl in Tiefbauzeichnung, Montagezeichnung und Regelprofil.
+- [ ] Bei Geometrieänderungen abhängige Positionen neu berechnen; Konflikte und verlorene Referenzen zur Prüfung markieren, bestätigte Ist-Maße nicht stillschweigend ändern.
+- [ ] Mehrere Leitungen je Graben unterstützen; getrennte Erdbaumengen und Montagemateriallisten ohne Doppelzählung.
+- [ ] Gemeinsame Projektpersistenz, Sicherung und kombinierter oder separater Planexport.
