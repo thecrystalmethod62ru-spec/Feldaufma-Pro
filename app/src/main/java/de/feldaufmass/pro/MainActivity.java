@@ -960,7 +960,8 @@ public class MainActivity extends Activity {
   menu.getMenu().add(0,108,Menu.NONE,"Leistungsverzeichnis");
   menu.getMenu().add(0,109,Menu.NONE,"DA11 exportieren (Test)");
   menu.getMenu().add(0,110,Menu.NONE,"GAEB X31 exportieren (Test)");
-  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==110)exportX31();else if(item.getItemId()==109)exportReb();else if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
+  menu.getMenu().add(0,111,Menu.NONE,"Fotobericht als PDF");
+  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==111)exportPhotoReport();else if(item.getItemId()==110)exportX31();else if(item.getItemId()==109)exportReb();else if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
   menu.show();
  }
  LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(dp(12),dp(8),dp(12),dp(8));return p;}
@@ -1510,6 +1511,96 @@ public class MainActivity extends Activity {
   canvas.restore();
  }
 
+ int photoCount(RouteSketch route){
+  int count=0;for(RouteSketch.Vertex v:route.vertices)count+=v.photos.length();return count;
+ }
+ void exportPhotoReport(){
+  RouteSketch route=new RouteSketch(this,routeData());
+  if(photoCount(route)==0){notice("Noch keine Fotos zugeordnet.");return;}
+  new android.app.AlertDialog.Builder(this).setTitle("Fotobericht als PDF")
+   .setMessage(photoCount(route)+" Fotos im aktuellen Projekt. Der Bericht enthält vorhandene Foto-GPS-Koordinaten und Beschreibungen.")
+   .setNegativeButton("Abbrechen",null).setPositiveButton("Exportieren",(d,w)->{
+    android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);
+    i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.setType("application/pdf");i.putExtra(android.content.Intent.EXTRA_TITLE,"Feldaufmass_Fotobericht.pdf");startActivityForResult(i,422);
+   }).show();
+ }
+ android.graphics.Bitmap reportPhoto(String name){
+  if(name==null||!name.matches("[A-Za-z0-9._-]+")||name.equals(".")||name.equals(".."))return null;
+  java.io.File file=new java.io.File(getFilesDir(),"photos/"+name);if(!file.isFile())return null;
+  android.graphics.BitmapFactory.Options options=new android.graphics.BitmapFactory.Options();options.inJustDecodeBounds=true;
+  android.graphics.BitmapFactory.decodeFile(file.getAbsolutePath(),options);
+  if(options.outWidth<=0||options.outHeight<=0)return null;
+  options.inSampleSize=1;while(Math.max(options.outWidth,options.outHeight)/options.inSampleSize>1600)options.inSampleSize*=2;
+  options.inJustDecodeBounds=false;
+  android.graphics.Bitmap bitmap=android.graphics.BitmapFactory.decodeFile(file.getAbsolutePath(),options);
+  if(bitmap==null)return null;
+  try{
+   int orientation=new android.media.ExifInterface(file.getAbsolutePath()).getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION,1);
+   android.graphics.Matrix m=new android.graphics.Matrix();
+   switch(orientation){
+    case 2:m.setScale(-1,1);break;
+    case 3:m.setRotate(180);break;
+    case 4:m.setScale(1,-1);break;
+    case 5:m.setRotate(90);m.postScale(-1,1);break;
+    case 6:m.setRotate(90);break;
+    case 7:m.setRotate(-90);m.postScale(-1,1);break;
+    case 8:m.setRotate(-90);break;
+    default:break;
+   }
+   if(!m.isIdentity()){
+    android.graphics.Bitmap rotated=android.graphics.Bitmap.createBitmap(bitmap,0,0,bitmap.getWidth(),bitmap.getHeight(),m,true);
+    if(rotated!=bitmap)bitmap.recycle();bitmap=rotated;
+   }
+  }catch(Exception ignored){}
+  return bitmap;
+ }
+ int appendPhotoPdf(android.graphics.pdf.PdfDocument pdf,int pageNumber,RouteSketch route,String projectName){
+  int photoNumber=0,total=photoCount(route);
+  Paint pen=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
+  android.text.TextPaint tp=new android.text.TextPaint(Paint.ANTI_ALIAS_FLAG);tp.setTextSize(12);tp.setColor(INK);
+  for(int j=0;j<route.vertices.size();j++){
+   RouteSketch.Vertex vertex=route.vertices.get(j);
+   for(int k=0;k<vertex.photos.length();k++){
+    String filename=vertex.photos.optString(k);photoNumber++;
+    org.json.JSONObject meta=vertex.photoMetadata.optJSONObject(filename);
+    String info=projectName+"\nTrassenpunkt "+(j+1)+(vertex.name.isEmpty()?"":" – "+vertex.name)+"\nAktuelle Station: "+reportMeasure(photoStation(route,j))+"\n"+photoInfo(meta);
+    if(meta!=null&&!meta.optString("description").isEmpty())info+="\n\nBeschreibung:\n"+meta.optString("description");
+    android.text.StaticLayout layout=android.text.StaticLayout.Builder.obtain(info,0,info.length(),tp,523).build();
+    android.graphics.Bitmap bitmap=reportPhoto(filename);
+    int line=0;boolean first=true;
+    do{
+     android.graphics.pdf.PdfDocument.Page page=pdf.startPage(new android.graphics.pdf.PdfDocument.PageInfo.Builder(595,842,pageNumber++).create());
+     int textY=first?452:76,end=line+1;
+     int top=layout.getLineTop(line);
+     while(end<layout.getLineCount()&&layout.getLineBottom(end)-top<=780-textY)end++;
+     try{
+      Canvas c=page.getCanvas();pen.setColor(INK);pen.setTextSize(18);
+      c.drawText("Fotodokumentation – Foto "+photoNumber+" / "+total,36,40,pen);
+      pen.setTextSize(11);c.drawText("Seite "+(pageNumber-1),500,808,pen);
+      if(first){
+       if(bitmap!=null){
+        float factor=Math.min(523f/bitmap.getWidth(),370f/bitmap.getHeight()),bw=bitmap.getWidth()*factor,bh=bitmap.getHeight()*factor;
+        float x=36+(523-bw)/2,y=63+(370-bh)/2;
+        c.drawBitmap(bitmap,null,new android.graphics.RectF(x,y,x+bw,y+bh),pen);
+       }else{pen.setColor(0xff982f20);c.drawText("Bilddatei fehlt oder konnte nicht gelesen werden.",36,85,pen);pen.setColor(INK);}
+      }
+      c.save();c.translate(36,textY);c.clipRect(0,0,523,layout.getLineTop(end)-top);c.translate(0,-top);layout.draw(c);c.restore();
+     }finally{pdf.finishPage(page);}
+     line=end;first=false;
+    }while(line<layout.getLineCount());
+   }
+  }
+  return pageNumber;
+ }
+ void writePhotoReport(android.net.Uri uri){
+  RouteSketch route=new RouteSketch(this,routeData());if(photoCount(route)==0){notice("Keine Fotos vorhanden.");return;}
+  android.graphics.pdf.PdfDocument pdf=new android.graphics.pdf.PdfDocument();
+  try(java.io.OutputStream out=getContentResolver().openOutputStream(uri,"wt")){
+   if(out==null)throw new java.io.IOException();
+   appendPhotoPdf(pdf,1,route,projectHeader.getText().toString());pdf.writeTo(out);notice("Fotobericht gespeichert.");
+  }catch(Exception e){notice("Fotobericht konnte nicht gespeichert werden.");}
+  finally{pdf.close();}
+ }
  int appendLongitudinalPdf(android.graphics.pdf.PdfDocument pdf,int pageNumber,RouteSketch route){
   double measured=route.measuredLength(),total=Double.isFinite(measured)&&measured>0?measured:l;
   if(!Double.isFinite(total)||total<=0)return pageNumber;
@@ -1602,7 +1693,8 @@ public class MainActivity extends Activity {
      drawReportView(page.getCanvas(),route,80,523,523);
     }finally{pdf.finishPage(page);}
    }
-   appendLongitudinalPdf(pdf,pageNumber,route);
+   pageNumber=appendLongitudinalPdf(pdf,pageNumber,route);
+   appendPhotoPdf(pdf,pageNumber,route,projectHeader.getText().toString());
    pdf.writeTo(out);
   } catch(Exception e) {
    Toast.makeText(this,"PDF konnte nicht gespeichert werden.",Toast.LENGTH_LONG).show();
@@ -1977,6 +2069,7 @@ public class MainActivity extends Activity {
  try{startActivityForResult(i,410);}catch(android.content.ActivityNotFoundException e){Toast.makeText(this,"Keine Spracherkennung verfügbar.",Toast.LENGTH_LONG).show();}
  }
  @Override protected void onActivityResult(int request,int result,android.content.Intent data){super.onActivityResult(request,result,data);
+ if(request==422&&result==RESULT_OK&&data!=null&&data.getData()!=null){writePhotoReport(data.getData());return;}
  if(request==421){if(result==RESULT_OK&&data!=null&&data.getData()!=null)writeX31(data.getData());else pendingX31Data=null;return;}
  if(request==420){if(result==RESULT_OK&&data!=null&&data.getData()!=null)writeReb(data.getData());else pendingRebData=null;return;}
  if(request==419&&result==RESULT_OK&&data!=null&&data.getData()!=null){importGaeb(data.getData());return;}
