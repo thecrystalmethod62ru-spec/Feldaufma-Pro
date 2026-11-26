@@ -627,6 +627,18 @@ public class MainActivity extends Activity {
   String[] sides={"Unbekannt","links","rechts","mittig"};Spinner side=choices(form,sides);if(old!=null)side.setSelection(Math.max(0,java.util.Arrays.asList(sides).indexOf(old.optString("side"))));
   String[] keys={"detailLength","detailWidth","detailDepth","detailOffset"},labels={"Länge (m)","Breite (m)","Tiefe (m)","Abstand zum Grabenrand (m)"};
   EditText[] fields=new EditText[keys.length];for(int j=0;j<fields.length;j++){fields[j]=new EditText(this);fields[j].setInputType(8194);fields[j].setHint(labels[j]+" – optional");if(old!=null)fields[j].setText(old.optString(keys[j],""));form.addView(fields[j]);addObjectMeasureSlider(form,fields[j],j==3?5:10,j==3?0:1);}
+  TextView quantities=sheetText("",14,false);quantities.setTextColor(0xff9edbd2);form.addView(quantities);
+  Runnable updateQuantities=()->{
+   double[] values={Double.NaN,Double.NaN,Double.NaN};
+   for(int k=0;k<3;k++)try{double n=number(fields[k]);if(Double.isFinite(n)&&n>0)values[k]=n;}catch(Exception ignored){}
+   double area=values[0]*values[1],volume=area*values[2];
+   quantities.setText("Fläche: "+(Double.isFinite(area)?csvNumber(area)+" m²":"—")+"   |   Volumen: "+(Double.isFinite(volume)?csvNumber(volume)+" m³":"—")+"\nGeometrische Detailmengen – nicht zur Trasse addiert.");
+  };
+  for(int k=0;k<3;k++)fields[k].addTextChangedListener(new android.text.TextWatcher(){
+   public void beforeTextChanged(CharSequence value,int start,int count,int after){}
+   public void onTextChanged(CharSequence value,int start,int before,int count){updateQuantities.run();}
+   public void afterTextChanged(android.text.Editable value){}
+  });updateQuantities.run();
   EditText note=new EditText(this);note.setHint("Bemerkung");if(old!=null)note.setText(old.optString("note"));form.addView(note);
   LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(dp(12),dp(10),dp(12),dp(10));panel.setBackground(editorShape(0xff202827,16));
   TextView heading=sheetText(old==null?"Objekt hinzufügen":"Objekt bearbeiten",17,true);heading.setTextColor(0xffe3f0ed);panel.addView(heading);
