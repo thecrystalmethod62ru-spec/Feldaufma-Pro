@@ -1891,12 +1891,10 @@ public class MainActivity extends Activity {
       if(!lengthsKnown&&delta>0.001){incompleteLongitudinalChecks++;continue;}
       double c1=first.optDouble("cover"),c2=second.optDouble("cover"),h1=first.optDouble("verticalEnvelope"),h2=second.optDouble("verticalEnvelope");
       // Cover is measured from the local surface; different stations may have different surface elevations.
-      boolean comparable=delta<=0.001&&Double.isFinite(c1)&&c1>=0&&Double.isFinite(c2)&&c2>=0&&Double.isFinite(h1)&&h1>0&&Double.isFinite(h2)&&h2>0;
       double z1=first.optDouble("topElevation"),z2=second.optDouble("topElevation");
       if(!Double.isFinite(z1)&&derivedTops.containsKey(first))z1=derivedTops.get(first);
       if(!Double.isFinite(z2)&&derivedTops.containsKey(second))z2=derivedTops.get(second);
-      boolean absolute=Double.isFinite(z1)&&Double.isFinite(z2)&&Double.isFinite(h1)&&h1>0&&Double.isFinite(h2)&&h2>0;
-      boolean separated=absolute?(z1-h1>=z2||z2-h2>=z1):(comparable&&(c1+h1<=c2||c2+h2<=c1));
+      boolean separated=MontageGeometry.verticallySeparated(delta,c1,c2,h1,h2,z1,z2);
       if(separated)verticallySeparated++;else possibleConflicts++;
      }
     }
