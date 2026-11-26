@@ -5357,6 +5357,21 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   groupBack.setOnClickListener(v->{if(groupUndo.isEmpty())return;try{current[0].put("offset",Double.parseDouble(offset.getText().toString().replace(',','.')));current[0].put("axisDepth",Double.parseDouble(depth.getText().toString().replace(',','.')));org.json.JSONArray previous=new org.json.JSONArray(groupUndo.peek());groupRedo.push(rows.toString());groupUndo.pop();for(int k=0;k<rows.length();k++)rows.put(k,previous.getJSONObject(k));current[0]=rows.optJSONObject(selected[0]);offset.setText(current[0].optString("offset"));depth.setText(current[0].optString("axisDepth"));restoreGroup.run();}catch(Exception ex){notice("Ungültige Maße");}});
   groupForward.setOnClickListener(v->{if(groupRedo.isEmpty())return;try{current[0].put("offset",Double.parseDouble(offset.getText().toString().replace(',','.')));current[0].put("axisDepth",Double.parseDouble(depth.getText().toString().replace(',','.')));org.json.JSONArray next=new org.json.JSONArray(groupRedo.peek());groupUndo.push(rows.toString());groupRedo.pop();for(int k=0;k<rows.length();k++)rows.put(k,next.getJSONObject(k));current[0]=rows.optJSONObject(selected[0]);offset.setText(current[0].optString("offset"));depth.setText(current[0].optString("axisDepth"));restoreGroup.run();}catch(Exception ex){notice("Ungültige Maße");}});
     groupButton.setOnClickListener(v->{groupMode[0]=!groupMode[0];group.clear();if(groupMode[0])group.add(selected[0]);groupButton.setText(groupMode[0]?"Gruppe ✓":"Gruppe");preview.invalidate();});
+  Button alignGroup=new Button(this);alignGroup.setText("Gruppe ausrichten");
+  alignGroup.setOnClickListener(v->{
+   if(!groupMode[0]||group.size()<2){notice("Mindestens zwei Leitungen auswählen");return;}
+   new android.app.AlertDialog.Builder(this).setTitle("Gruppe ausrichten").setItems(new String[]{"Gleiche Achstiefe","Gleicher Seitenabstand"},(dd,choice)->{
+    try{
+     double x=Double.parseDouble(offset.getText().toString().replace(',','.')),y=Double.parseDouble(depth.getText().toString().replace(',','.'));
+     if(!Double.isFinite(x)||!Double.isFinite(y)||x<0||y<0)throw new IllegalArgumentException();
+     current[0].put("offset",x);current[0].put("axisDepth",y);
+     groupUndo.push(rows.toString());if(groupUndo.size()>50)groupUndo.removeLast();groupRedo.clear();
+     for(int k:group){org.json.JSONObject n=rows.optJSONObject(k);if(n!=null)n.put(choice==0?"axisDepth":"offset",choice==0?y:x);}
+     restoreGroup.run();
+    }catch(Exception ex){notice("Gültige Maße eingeben");}
+   }).setNegativeButton("Abbrechen",null).show();
+  });
+  form.addView(alignGroup);
   form.addView(groupBack);form.addView(groupForward);
   form.addView(preview,0,new LinearLayout.LayoutParams(-1,dp(160)));
   Button expandPreview=new Button(this);expandPreview.setText("Querschnitt vergrößern");form.addView(expandPreview,1);
