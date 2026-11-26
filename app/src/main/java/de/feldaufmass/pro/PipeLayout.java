@@ -8,11 +8,16 @@ public final class PipeLayout {
     private static final double EPS = 1e-9;
     public static final class Pipe {
         public final String name;
+        public final boolean fixed;
         public final double offset, diameter, wall, bedding, minGap, minCover;
         public Pipe(String name,double offset,double diameter,double wall,double bedding){
             this(name,offset,diameter,wall,bedding,0,0);
         }
         public Pipe(String name,double offset,double diameter,double wall,double bedding,double minGap,double minCover){
+            this(name,offset,diameter,wall,bedding,minGap,minCover,false);
+        }
+        public Pipe(String name,double offset,double diameter,double wall,double bedding,double minGap,double minCover,boolean fixed){
+            this.fixed=fixed;
             if(!Double.isFinite(minGap)||minGap<0||!Double.isFinite(minCover)||minCover<0)throw new IllegalArgumentException("Ungültige Rohrgrenzwerte");
             this.minGap=minGap;this.minCover=minCover;
             if(name==null||name.trim().isEmpty()||!Double.isFinite(offset))
@@ -73,6 +78,7 @@ public final class PipeLayout {
      */
     public static List<Pipe> proposeRow(List<Pipe> pipes,double width,double depth,double clearance,double minCover){
         warnings(pipes,width,depth,clearance,minCover);
+        for(Pipe a:pipes)if(a.fixed)return warnings(pipes,width,depth,clearance,minCover).isEmpty()?new ArrayList<>(pipes):new ArrayList<>();
         List<Pipe> result=new ArrayList<>();
         double total=0;
         for(int i=0;i<pipes.size();i++){
@@ -95,6 +101,7 @@ public final class PipeLayout {
     /** Conservative shelf layout; existing bedding is a lower bound, never reduced. */
     public static List<Pipe> proposeLayers(List<Pipe> pipes,double width,double depth,double clearance,double minCover){
         warnings(pipes,width,depth,clearance,minCover);
+        for(Pipe a:pipes)if(a.fixed)return warnings(pipes,width,depth,clearance,minCover).isEmpty()?new ArrayList<>(pipes):new ArrayList<>();
         List<Pipe> result=new ArrayList<>();
         double gap=clearance;
         for(Pipe a:pipes)gap=Math.max(gap,a.minGap);
