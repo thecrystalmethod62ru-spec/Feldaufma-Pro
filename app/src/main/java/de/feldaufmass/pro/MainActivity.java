@@ -95,13 +95,15 @@ public class MainActivity extends Activity {
    route.changed.run();route.invalidate();
   });
   route.changed.run();
-  new android.app.AlertDialog.Builder(this).setTitle("Trasse skizzieren").setView(scroll)
-   .setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",(dialog,which)->{
-    saveRoute(route);refreshRoute();
-   }).show();
+  android.app.AlertDialog editor=new android.app.AlertDialog.Builder(this).setTitle("Trasse skizzieren").setView(scroll)
+   .setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
+  editor.setOnShowListener(ignored->editor.getButton(-1).setOnClickListener(v->{
+   if(saveRoute(route)){refreshRoute();editor.dismiss();notice("Trasse gespeichert.");}
+  }));
+  editor.show();
  }
 
- void saveRoute(RouteSketch route){getPreferences(0).edit().putString("routeSketch",route.encode()).apply();}
+ boolean saveRoute(RouteSketch route){try{if(getPreferences(0).edit().putString("routeSketch",route.encode()).commit())return true;}catch(RuntimeException ignored){}notice("Trasse konnte nicht gespeichert werden. Bitte erneut versuchen.");return false;}
  Spinner choices(LinearLayout parent,String[] labels){
   Spinner spinner=new Spinner(this);
   spinner.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,labels));
