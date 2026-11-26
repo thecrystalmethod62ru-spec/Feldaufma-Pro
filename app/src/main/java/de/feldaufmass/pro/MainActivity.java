@@ -1708,6 +1708,7 @@ public class MainActivity extends Activity {
   TextView overlapLegend=new TextView(this);overlapLegend.setText("Orange: Überlappung bemaßter Abschnittsstreifen (ohne Eckergänzungen) · Grün: gewählte Eckergänzung (Kontrollmodell)");panel.addView(overlapLegend);
   final SharedPreferences overlapPrefs=projectStorage(activeProject);
   final RouteBranchStore branchStore=new RouteBranchStore(overlapPrefs);
+  final Runnable[] branchChanged={()->{}};
   final double[] requestedBranchStation={Double.NaN};
   Button branchEditor=new Button(this);branchEditor.setText("Abzweigungen verwalten");panel.addView(branchEditor);
   branchEditor.setOnClickListener(v->{
@@ -1736,7 +1737,7 @@ public class MainActivity extends Activity {
      android.widget.ScrollView scroll=new android.widget.ScrollView(this);scroll.addView(fields);
      android.app.AlertDialog.Builder builder=new android.app.AlertDialog.Builder(this).setTitle(existing==null?"Abzweigung hinzufügen":"Abzweigung bearbeiten").setView(scroll).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null);
      if(existing!=null)builder.setNeutralButton("Löschen",(d,w)->new android.app.AlertDialog.Builder(this).setMessage("Abzweigung wirklich löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(dd,ww)->{
-      try{java.util.List<RouteBranch> updated=branchStore.load();updated.removeIf(item->item.id.equals(existing.id));branchStore.save(updated);for(int k=0;k<panel.getChildCount();k++)panel.getChildAt(k).invalidate();notice("Abzweigung gelöscht");}catch(Exception ex){notice("Speichern fehlgeschlagen: "+ex.getMessage());}
+      try{java.util.List<RouteBranch> updated=branchStore.load();updated.removeIf(item->item.id.equals(existing.id));branchStore.save(updated);branchChanged[0].run();for(int k=0;k<panel.getChildCount();k++)panel.getChildAt(k).invalidate();notice("Abzweigung gelöscht");}catch(Exception ex){notice("Speichern fehlgeschlagen: "+ex.getMessage());}
      }).show());
      android.app.AlertDialog entry=builder.create();
      entry.setOnShowListener(d->entry.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(b->{
@@ -1748,7 +1749,7 @@ public class MainActivity extends Activity {
        for(int j=0;j<l.length;j++){lengths[j]=Double.parseDouble(l[j].trim().replace(',','.'));directions[j]=Double.parseDouble(d[j].trim().replace(',','.'));}
        if(n[0]>route.measuredLength())throw new IllegalArgumentException("Station außerhalb der Haupttrasse");
        RouteBranch branch=new RouteBranch(existing==null?java.util.UUID.randomUUID().toString():existing.id,inputs[0].getText().toString(),n[0],n[3],n[4],inputs[6].getText().toString(),lengths,directions);
-       java.util.List<RouteBranch> updated=branchStore.load();if(existing==null)updated.add(branch);else{int found=-1;for(int j=0;j<updated.size();j++)if(updated.get(j).id.equals(existing.id)){found=j;break;}if(found<0)throw new IllegalStateException("Abzweigung nicht gefunden");updated.set(found,branch);}branchStore.save(updated);entry.dismiss();notice("Abzweigung gespeichert");for(int k=0;k<panel.getChildCount();k++)panel.getChildAt(k).invalidate();
+       java.util.List<RouteBranch> updated=branchStore.load();if(existing==null)updated.add(branch);else{int found=-1;for(int j=0;j<updated.size();j++)if(updated.get(j).id.equals(existing.id)){found=j;break;}if(found<0)throw new IllegalStateException("Abzweigung nicht gefunden");updated.set(found,branch);}branchStore.save(updated);branchChanged[0].run();entry.dismiss();notice("Abzweigung gespeichert");for(int k=0;k<panel.getChildCount();k++)panel.getChildAt(k).invalidate();
       }catch(Exception ex){notice("Eingaben prüfen: "+ex.getMessage());}
      }));entry.show();
     };
@@ -1948,7 +1949,7 @@ public class MainActivity extends Activity {
       try{java.util.List<RouteBranch> branches=branchStore.load();boolean found=false;
        for(int j=0;j<branches.size();j++)if(branches.get(j).id.equals(moveId)){branches.set(j,BranchPointEditor.move(branches.get(j),model.vertices,moveIndex,x,y,which==0));found=true;break;}
        if(!found)throw new IllegalStateException("Abzweigung nicht gefunden");
-       branchStore.save(branches);invalidate();notice("Punkt verschoben");
+       branchStore.save(branches);branchChanged[0].run();invalidate();notice("Punkt verschoben");
       }catch(Exception ex){notice("Verschieben fehlgeschlagen: "+ex.getMessage());}
      }).setNegativeButton("Abbrechen",null).show();return true;
     }
@@ -1966,7 +1967,7 @@ public class MainActivity extends Activity {
         branches.set(j,BranchPointEditor.insert(branch,model.vertices,index,(a[0]+b[0])/2,(a[1]+b[1])/2));found=true;break;
        }
        if(!found)throw new IllegalStateException("Abzweigung nicht gefunden");
-       branchStore.save(branches);invalidate();notice("Knickpunkt eingefügt – zum Verschieben ziehen");
+       branchStore.save(branches);branchChanged[0].run();invalidate();notice("Knickpunkt eingefügt – zum Verschieben ziehen");
       }catch(Exception ex){notice("Einfügen fehlgeschlagen: "+ex.getMessage());}
       return;
      }
@@ -1974,7 +1975,7 @@ public class MainActivity extends Activity {
       try{java.util.List<RouteBranch> branches=branchStore.load();boolean found=false;
        for(int j=0;j<branches.size();j++)if(branches.get(j).id.equals(id)){branches.set(j,BranchPointEditor.remove(branches.get(j),model.vertices,index));found=true;break;}
        if(!found)throw new IllegalStateException("Abzweigung nicht gefunden");
-       branchStore.save(branches);invalidate();notice("Punkt gelöscht");
+       branchStore.save(branches);branchChanged[0].run();invalidate();notice("Punkt gelöscht");
       }catch(Exception ex){notice("Punkt konnte nicht gelöscht werden: "+ex.getMessage());}
      }).show();
     }).show();performClick();return true;
@@ -2199,6 +2200,7 @@ public class MainActivity extends Activity {
    org.json.JSONObject settings=route.legendSettings();
    java.util.LinkedHashSet<String> names=new java.util.LinkedHashSet<>();
    for(int j=0;j<surfaces.length();j++){org.json.JSONObject o=surfaces.optJSONObject(j);if(o==null)continue;double from=o.optDouble("from"),to=o.optDouble("to");String name=o.optString("surface").trim();if(Double.isFinite(from)&&Double.isFinite(to)&&from>=0&&to<=route.measuredLength()&&to>from&&!name.isEmpty()&&Double.isFinite(widths[0]))names.add(name);}
+   try{for(RouteBranch branch:branchStore.load())if(!branch.surface.trim().isEmpty())names.add(branch.surface);}catch(Exception ex){TextView warning=new TextView(this);warning.setText("Abzweiglegende konnte nicht vollständig geladen werden");legendPanel.addView(warning);}
    java.util.ArrayList<String> ordered=new java.util.ArrayList<>(names);
    ordered.sort((u,v)->Integer.compare(settings.optJSONObject(u)==null?1000:settings.optJSONObject(u).optInt("order",1000),settings.optJSONObject(v)==null?1000:settings.optJSONObject(v).optInt("order",1000)));
    if(!ordered.isEmpty()){TextView heading=new TextView(this);heading.setText("Oberflächenlegende");legendPanel.addView(heading);}
@@ -2209,6 +2211,7 @@ public class MainActivity extends Activity {
    }
    drawing.invalidate();
   };
+  branchChanged[0]=refreshLegend;
   refreshLegend.run();
   Button addWidth=new Button(this);addWidth.setText("Grabenbreite abschnittsweise");panel.addView(addWidth);
   addWidth.setOnClickListener(v->{
