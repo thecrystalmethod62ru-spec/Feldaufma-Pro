@@ -94,6 +94,33 @@ public class ProjectStateTest {
    });
   }
  }
+ @Test public void routePersistsAcrossActivityRecreation(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   final String[] expected=new String[1];
+   scenario.onActivity(activity->{
+    RouteSketch route=new RouteSketch(activity,"[[0.2,0.2],[0.6,0.4,12.5],[0.8,0.8]]");
+    route.vertices.get(1).photos.put("test_photo.jpg");
+    route.angle=45;
+    route.movePoint(1,new android.graphics.PointF(.5f,.5f));
+    expected[0]=route.encode();
+    assertTrue(activity.saveRoute(route));
+    activity.refreshRoute();
+   });
+   scenario.recreate();
+   scenario.onActivity(activity->{
+    assertEquals(expected[0],activity.routeData());
+    RouteSketch reopened=new RouteSketch(activity,activity.routeData());
+    assertEquals(3,reopened.vertices.size());
+    assertEquals(12.5,reopened.vertices.get(1).metres,0);
+    assertTrue(Double.isNaN(reopened.vertices.get(2).metres));
+    assertEquals("test_photo.jpg",reopened.vertices.get(1).photos.optString(0));
+    reopened.vertices.get(2).metres=7.5;
+    assertTrue(activity.saveRoute(reopened));
+    assertEquals(20,new RouteSketch(activity,activity.routeData()).measuredLength(),0);
+    activity.getPreferences(0).edit().remove("routeSketch").commit();
+   });
+  }
+ }
  private void touch(RouteSketch route,int action,float x,float y){
   android.view.MotionEvent e=android.view.MotionEvent.obtain(0,10,action,x,y,0);
   try{route.onTouchEvent(e);}finally{e.recycle();}
