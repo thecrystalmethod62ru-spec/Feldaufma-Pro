@@ -1798,6 +1798,17 @@ public class MainActivity extends Activity {
      @Override protected void onDraw(android.graphics.Canvas c){
       super.onDraw(c);float pad=24*getResources().getDisplayMetrics().density;
       float w=getWidth()-2*pad,h=getHeight()-2*pad;if(w<=0||h<=0)return;
+      p.setTextSize(10*getResources().getDisplayMetrics().scaledDensity);
+      p.setStrokeWidth(1);
+      for(int i=0;i<=4;i++){
+       float x=pad+w*i/4f,y=pad+h*i/4f;
+       p.setColor(0xff444444);c.drawLine(x,pad,x,pad+h,p);c.drawLine(pad,y,pad+w,y,p);
+       p.setColor(0xffcccccc);p.setTextAlign(android.graphics.Paint.Align.CENTER);
+       c.drawText(String.format(java.util.Locale.GERMANY,"%.2f",total*i/4),x,pad+h+14*getResources().getDisplayMetrics().density,p);
+       p.setTextAlign(android.graphics.Paint.Align.LEFT);
+       c.drawText(String.format(java.util.Locale.GERMANY,"%.2f",base+range*(1-i/4.0)),2,y-2,p);
+      }
+      p.setTextAlign(android.graphics.Paint.Align.LEFT);
       p.setColor(0xffad987c);p.setStrokeWidth(3);
       for(int i=1;i<ground.size();i++){double[] a=ground.get(i-1),b=ground.get(i);c.drawLine(pad+(float)(a[0]/total*w),pad+(float)((1-(a[1]-base)/range)*h),pad+(float)(b[0]/total*w),pad+(float)((1-(b[1]-base)/range)*h),p);}
       p.setColor(0xffaaaaaa);p.setStrokeWidth(1);p.setTextSize(10*getResources().getDisplayMetrics().scaledDensity);
