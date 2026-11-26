@@ -1791,7 +1791,9 @@ public class MainActivity extends Activity {
      boxes.add(new double[]{st,z,bottom,Double.isFinite(len)&&len>0?len:0});
      low=Math.min(low,bottom);high=Math.max(high,z);
     }
-    final double base=low,range=Math.max(0.1,high-low);
+    // Keep flat profiles centered and leave vertical clearance for symbols and labels.
+    final double elevationSpan=Math.max(0.1,high-low);
+    final double base=low-(elevationSpan-(high-low))/2-elevationSpan*0.1,range=elevationSpan*1.2;
     panel.addView(sheetText("Längsschnitt – Formstücke und GOK (schematisch, überhöht)",16,true));
     android.view.View longitudinalView=new android.view.View(this){
      final android.graphics.Paint p=new android.graphics.Paint(3);
