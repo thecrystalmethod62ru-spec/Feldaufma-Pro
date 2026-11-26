@@ -1711,6 +1711,12 @@ public class MainActivity extends Activity {
   try{storedOverlapMode=overlapPrefs.getInt("metricOverlapMode",0);}catch(ClassCastException ignored){}
   final int[] savedOverlapMode={Math.max(0,Math.min(2,storedOverlapMode))};
   overlapMode.setSelection(savedOverlapMode[0]);
+  final EditText correction=new EditText(this);correction.setSingleLine(true);correction.setHint("Flächenkorrektur (+/− m²)");correction.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL|android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);
+  final EditText correctionReason=new EditText(this);correctionReason.setHint("Begründung der Korrektur");correctionReason.setSingleLine(true);
+  correction.setText(overlapPrefs.getString("metricAreaCorrection","0"));
+  correctionReason.setText(overlapPrefs.getString("metricAreaCorrectionReason",""));
+  panel.addView(correction);panel.addView(correctionReason);
+  Button saveCorrection=new Button(this);saveCorrection.setText("Flächenkorrektur speichern");panel.addView(saveCorrection);
   TextView nominalArea=new TextView(this);panel.addView(nominalArea);
   Runnable refreshNominalArea=()->{
    double total=route.measuredLength();
@@ -1778,11 +1784,28 @@ public class MainActivity extends Activity {
      result.append(String.format(java.util.Locale.GERMANY,"\nGeometrische Kontrollwerte (inkl. Nachschnitt):\nBruttofläche: %.2f m²\nÜberlappungsfläche: %.2f m²\nNettofläche: %.2f m²",geometric.gross,geometric.overlap,geometric.net));
      result.append("\nGerade Abschnittsstreifen ohne Eckergänzungen; keine automatische Abrechnung.");
      int mode=overlapMode.getSelectedItemPosition();
-     if(mode==1||mode==2)result.append(String.format(java.util.Locale.GERMANY,"\nGewählter Kontrollwert: %.2f m²",mode==1?geometric.gross:geometric.net));
+     if(mode==1||mode==2){
+      double base=mode==1?geometric.gross:geometric.net;
+      result.append(String.format(java.util.Locale.GERMANY,"\nGewählter Kontrollwert: %.2f m²",base));
+      double delta=Double.parseDouble(overlapPrefs.getString("metricAreaCorrection","0"));
+      if(Double.isFinite(delta)&&Double.isFinite(base+delta)&&base+delta>=0){
+       result.append(String.format(java.util.Locale.GERMANY,"\nManuelle Korrektur: %+.2f m²\nKorrigierter Kontrollwert: %.2f m²",delta,base+delta));
+       if(delta!=0)result.append("\nBegründung: "+overlapPrefs.getString("metricAreaCorrectionReason",""));
+      }else result.append("\nKorrektur ungültig für aktuelle Fläche.");
+     }
     }catch(RuntimeException e){result.append("\nGeometrische Flächenprüfung nicht verfügbar.");}
    }
    nominalArea.setText(result.toString());
   };
+  saveCorrection.setOnClickListener(v->{
+   try{
+    double delta=Double.parseDouble(correction.getText().toString().trim().replace(',','.'));
+    String reason=correctionReason.getText().toString().trim();
+    if(!Double.isFinite(delta)||(delta!=0&&reason.isEmpty())){notice("Gültige Korrektur und Begründung erforderlich.");return;}
+    if(!overlapPrefs.edit().putString("metricAreaCorrection",Double.toString(delta)).putString("metricAreaCorrectionReason",reason).commit()){notice("Speichern fehlgeschlagen.");return;}
+    refreshNominalArea.run();notice("Korrektur gespeichert; Kontrollwert prüfen.");
+   }catch(NumberFormatException e){notice("Bitte gültige Fläche eingeben.");}
+  });
   overlapMode.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
    @Override public void onItemSelected(android.widget.AdapterView<?> parent,android.view.View view,int position,long id){
     if(position<0||position>2)return;
