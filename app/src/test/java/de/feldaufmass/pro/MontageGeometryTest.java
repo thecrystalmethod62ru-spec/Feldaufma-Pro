@@ -29,4 +29,18 @@ public class MontageGeometryTest {
         assertFalse(MontageGeometry.positive(Double.NaN));
         assertFalse(MontageGeometry.positive(Double.POSITIVE_INFINITY));
     }
+    @Test public void absoluteElevationsDetectOverlapAndContact() {
+        assertTrue(MontageGeometry.verticallySeparated(2, 0, 0, 0.5, 0.5, 100, 99.5));
+        assertFalse(MontageGeometry.verticallySeparated(2, 0, 0, 0.5, 0.5, 100, 99.8));
+        assertTrue(MontageGeometry.verticallySeparated(2, 0, 0, 0.5, 0.5, 99, 100));
+    }
+
+    @Test public void relativeCoverRequiresSameStation() {
+        double n = Double.NaN;
+        assertTrue(MontageGeometry.verticallySeparated(0, 0.5, 1, 0.5, 0.5, n, n));
+        assertFalse(MontageGeometry.verticallySeparated(0, 0.5, 0.7, 0.5, 0.5, n, n));
+        assertFalse(MontageGeometry.verticallySeparated(2, 0.5, 1, 0.5, 0.5, n, n));
+        assertFalse(MontageGeometry.verticallySeparated(0, n, 1, 0.5, 0.5, n, n));
+        assertFalse(MontageGeometry.verticallySeparated(0, 0.5, 1, 0, 0.5, 100, 99));
+    }
 }
