@@ -1815,7 +1815,7 @@ public class MainActivity extends Activity {
      android.widget.LinearLayout content=new android.widget.LinearLayout(this);content.setOrientation(1);
      content.addView(cross,new android.widget.LinearLayout.LayoutParams(-1,dp(300)));
      final TextView warnings=new TextView(this);content.addView(warnings);
-     Runnable refresh=()->{cross.setLayoutData(pipes,bw,bd);warnings.setText(android.text.TextUtils.join("\n",PipeLayout.warnings(pipes,bw,bd,0)));};
+     Runnable refresh=()->{cross.setLayoutData(pipes,bw,bd);warnings.setText(android.text.TextUtils.join("\n",PipeLayout.dimensions(pipes,bw,bd))+"\n"+android.text.TextUtils.join("\n",PipeLayout.warnings(pipes,bw,bd,0)));};
      refresh.run();
      cross.setMove((index,offset,bedding)->{
       try{
