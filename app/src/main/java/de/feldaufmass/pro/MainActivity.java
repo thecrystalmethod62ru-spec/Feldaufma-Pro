@@ -694,6 +694,21 @@ public class MainActivity extends Activity {
   Button restoreTools=new Button(this);restoreTools.setText("☰");restoreTools.setContentDescription("Werkzeuge anzeigen");styleEditorButton(restoreTools,false);
   android.widget.FrameLayout.LayoutParams floating=new android.widget.FrameLayout.LayoutParams(dp(44),dp(44),Gravity.TOP|Gravity.RIGHT);floating.setMargins(dp(4),dp(4),dp(4),dp(4));canvasFrame.addView(restoreTools,floating);restoreTools.setVisibility(View.GONE);
   canvasToggle.setOnClickListener(v->{for(View bar:new View[]{header,controls,historyBar,tools,save})bar.setVisibility(View.GONE);restoreTools.setVisibility(View.VISIBLE);});
+  restoreTools.setOnTouchListener(new View.OnTouchListener(){
+   float startX,startY,baseX,baseY;boolean moved;
+   public boolean onTouch(View v,android.view.MotionEvent e){
+    switch(e.getActionMasked()){
+     case android.view.MotionEvent.ACTION_DOWN:startX=e.getRawX();startY=e.getRawY();baseX=v.getX();baseY=v.getY();moved=false;return true;
+     case android.view.MotionEvent.ACTION_MOVE:
+      float dx=e.getRawX()-startX,dy=e.getRawY()-startY;
+      if(Math.hypot(dx,dy)>android.view.ViewConfiguration.get(MainActivity.this).getScaledTouchSlop())moved=true;
+      if(moved){v.setX(Math.max(0,Math.min(canvasFrame.getWidth()-v.getWidth(),baseX+dx)));v.setY(Math.max(0,Math.min(canvasFrame.getHeight()-v.getHeight(),baseY+dy)));}return true;
+     case android.view.MotionEvent.ACTION_UP:if(!moved)v.performClick();return true;
+     case android.view.MotionEvent.ACTION_CANCEL:return true;
+    }return true;
+   }
+  });
+  canvasFrame.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(restoreTools.getVisibility()==View.VISIBLE){restoreTools.setX(Math.max(0,Math.min(canvasFrame.getWidth()-restoreTools.getWidth(),restoreTools.getX())));restoreTools.setY(Math.max(0,Math.min(canvasFrame.getHeight()-restoreTools.getHeight(),restoreTools.getY())));}});
   restoreTools.setOnClickListener(v->{for(View bar:new View[]{header,controls,historyBar,tools,save})bar.setVisibility(View.VISIBLE);restoreTools.setVisibility(View.GONE);});
   full.setContentView(root);
   full.setOnDismissListener(d->{
