@@ -21,7 +21,8 @@ public final class PipeLayoutView extends View {
     private Selection selection;
     public interface Move { void move(int index,double offset,double bedding); }
     private Move move;
-    private int dragged=-1;
+    private int dragged=-1, selectedPipe=-1;
+    public void setSelectedPipe(int index){selectedPipe=index;invalidate();}
     private float startX,startY,dragScale,dragCx,dragBottom;
     private PipeLayout.Pipe original;
     private boolean moving;
@@ -62,10 +63,11 @@ public final class PipeLayoutView extends View {
             p.setColor(conflict?0xffd32f2f:0xff777777);String label=pipe.name+(pipe.fixed?" [fix]":"");c.drawText(label,x-p.measureText(label)/2,y-r-4,p);
         }
         // Dimension the selected pipe while dragging, or the only pipe in the section.
-        int selected=dragged>=0?dragged:(pipes.size()==1?0:-1);
+        int selected=dragged>=0?dragged:(selectedPipe>=0?selectedPipe:(pipes.size()==1?0:-1));
         if(selected>=0&&selected<pipes.size()){
             PipeLayout.Pipe a=pipes.get(selected);
             float x=cx+(float)(a.offset*scale),y=bottom-(float)(a.centerHeight()*scale),r=(float)(a.diameter*scale/2);
+            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2);p.setColor(0xff55c7b5);c.drawCircle(x,y,r+4,p);p.setStyle(Paint.Style.FILL);
             dimension(c,left,y,x-r,y,width/2+a.offset-a.diameter/2);
             dimension(c,x+r,y,right,y,width/2-a.offset-a.diameter/2);
             dimension(c,x,top,x,y-r,depth-a.bedding-a.diameter);
