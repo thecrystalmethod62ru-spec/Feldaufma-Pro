@@ -3281,6 +3281,31 @@ public class MainActivity extends Activity {
  root=planPage;
  sketch=new Sketch();sketch.setBackgroundColor(Color.WHITE);root.addView(sketch,new LinearLayout.LayoutParams(-1,dp(280))); LinearLayout historyBar=new LinearLayout(this);root.addView(historyBar);undoObjectsButton=new Button(this);undoObjectsButton.setText("Rückgängig");historyBar.addView(undoObjectsButton,new LinearLayout.LayoutParams(0,-2,1));redoObjectsButton=new Button(this);redoObjectsButton.setText("Wiederholen");historyBar.addView(redoObjectsButton,new LinearLayout.LayoutParams(0,-2,1));undoObjectsButton.setOnClickListener(v->restoreObjectHistory(false));redoObjectsButton.setOnClickListener(v->restoreObjectHistory(true));updateHistoryButtons();
  Button edit=new Button(this);edit.setText("Trassenmaße bearbeiten");root.addView(edit);edit.setOnClickListener(v->showPage(measurePage));
+ actionButtonSingle(planPage,"Oberflächenmengen nach Abschnitt",()->{
+  try{
+   java.util.TreeMap<String,double[]> totals=new java.util.TreeMap<>();
+   StringBuilder report=new StringBuilder();double covered=0;
+   for(int i=0;i<segments.length();i++){
+    org.json.JSONObject row=segments.getJSONObject(i);
+    double from=row.getDouble("from"),to=row.getDouble("to"),bw=row.getDouble("width");
+    if(!Double.isFinite(from+to+bw)||from<0||to<=from||bw<=0||(l>0&&to>l))throw new IllegalArgumentException("Ungültige Abschnittsmaße");
+    for(int j=0;j<i;j++){org.json.JSONObject prev=segments.getJSONObject(j);if(from<prev.getDouble("to")&&to>prev.getDouble("from"))throw new IllegalArgumentException("Überlappende Oberflächenabschnitte");}
+    String type=row.optString("surface","Unbekannt");double len=to-from,area=len*bw;covered+=len;
+    double[] sum=totals.computeIfAbsent(type,k->new double[3]);sum[0]+=area;
+    report.append(String.format(java.util.Locale.GERMANY,"%.2f – %.2f m | %s\nAufbruch (Graben): %.3f m²\n",from,to,type,area));
+    if(row.has("cutWidth")){
+     double cut=row.getDouble("cutWidth");if(!Double.isFinite(cut)||cut<bw)throw new IllegalArgumentException("Ungültige Nachschnittbreite");
+     double extra=len*(cut-bw);sum[1]+=extra;
+     report.append(String.format(java.util.Locale.GERMANY,"Nachschnitt zusätzlich: %.3f m² | Gesamt: %.3f m²\n",extra,area+extra));
+    }else{sum[2]+=len;report.append("Nachschnitt nicht erfasst\n");}
+   }
+   report.append("\nSummen nach Oberfläche\n");
+   for(java.util.Map.Entry<String,double[]> entry:totals.entrySet()){double[] v=entry.getValue();report.append(String.format(java.util.Locale.GERMANY,"%s: %.3f m² Graben + %.3f m² Nachschnitt%s\n",entry.getKey(),v[0],v[1],v[2]>0?" (unvollständig)":""));}
+   if(l>0)report.append(String.format(java.util.Locale.GERMANY,"\nNicht erfasste Trassenlänge: %.2f m",Math.max(0,l-covered)));
+   TextView resultText=new TextView(this);resultText.setPadding(dp(16),dp(12),dp(16),dp(12));resultText.setText(report.toString());ScrollView scroll=new ScrollView(this);scroll.addView(resultText);
+   new android.app.AlertDialog.Builder(this).setTitle("Oberflächenmengen").setView(scroll).setPositiveButton("Schließen",null).show();
+  }catch(Exception ex){notice("Oberflächenmengen: "+ex.getMessage());}
+ });
  actionButtonSingle(planPage,"Erdmengen nach Abschnitt",()->{
   try{
    org.json.JSONArray rows=new PipeLayoutStore(getPreferences(0)).sections();
