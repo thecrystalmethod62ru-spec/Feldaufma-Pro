@@ -1841,6 +1841,7 @@ public class MainActivity extends Activity {
       java.util.List<RouteBranch> branches=branchStore.load();
       double branchLength=0,branchArea=0;
       double branchVolume=0;
+      java.util.List<double[]> branchVolumeStrips=new java.util.ArrayList<>();
       java.util.Map<String,double[]> branchQuantities=new java.util.TreeMap<>();
 
       for(RouteBranch branch:branches){
@@ -1854,6 +1855,7 @@ public class MainActivity extends Activity {
        for(int k=1;k<points.size();k++){
         double[] p=points.get(k-1),q=points.get(k);
         combined.add(new double[]{p[0],p[1],q[0],q[1],branch.width/2,branch.width/2});
+        branchVolumeStrips.add(new double[]{p[0],p[1],q[0],q[1],branch.width/2,branch.width/2,branch.depth});
        }
       }
       if(!branches.isEmpty()){
@@ -1866,6 +1868,11 @@ public class MainActivity extends Activity {
        }
        result.append("\nAushub brutto (Länge × Breite × Tiefe); räumliche Überschneidungen nicht abgezogen.");
        int combinedMode=overlapMode.getSelectedItemPosition();
+       StripVolume.Result branchVolumes=StripVolume.calculate(branchVolumeStrips);
+       result.append(String.format(java.util.Locale.GERMANY,"\nAushub nur Abzweigungen (gemeinsame Bezugshöhe):\nBrutto: %.2f m³\nVolumenüberschneidung: %.2f m³\nNetto: %.2f m³",branchVolumes.gross,branchVolumes.overlap,branchVolumes.net));
+       if(combinedMode==1||combinedMode==2)result.append(String.format(java.util.Locale.GERMANY,"\nAushub-Kontrollwert Abzweigungen: %.2f m³",combinedMode==1?branchVolumes.gross:branchVolumes.net));
+       result.append("\nHauptgraben nicht in dieser Volumenprüfung enthalten; keine Abrechnungsfreigabe.");
+
        if(combinedMode==1||combinedMode==2)result.append(String.format(java.util.Locale.GERMANY,"\nKontrollwert Gesamttrasse: %.2f m²",combinedMode==1?total.gross:total.net));
        result.append("\nAbzweige ohne Nachschnitt und Eckergänzungen; keine automatische Abrechnung.");
       }
