@@ -1823,6 +1823,24 @@ public class MainActivity extends Activity {
      final Button applyLimits=new Button(this);applyLimits.setText("Grenzwerte übernehmen");content.addView(applyLimits);
      final TextView warnings=new TextView(this);content.addView(warnings);
      Runnable refresh=()->{cross.setLayoutData(pipes,bw,bd);cross.setRequirements(requirements[0],requirements[1]);warnings.setText(android.text.TextUtils.join("\n",PipeLayout.dimensions(pipes,bw,bd))+"\n"+android.text.TextUtils.join("\n",PipeLayout.warnings(pipes,bw,bd,requirements[0],requirements[1])));};
+     final Button optimizePipes=new Button(this);optimizePipes.setText("Rohranordnung optimieren");content.addView(optimizePipes,content.indexOfChild(warnings));
+     optimizePipes.setOnClickListener(button->{
+      try{
+       if(pipes.isEmpty()){warnings.setText("Keine Leitungen vorhanden.");return;}
+       final java.util.List<PipeLayout.Pipe> proposal=PipeLayout.proposeRow(pipes,bw,bd,requirements[0],requirements[1]);
+       if(proposal.isEmpty()){new android.app.AlertDialog.Builder(this).setMessage("Keine passende einreihige Anordnung gefunden. Grabenmaße und Grenzwerte prüfen.").setPositiveButton("OK",null).show();return;}
+       PipeLayoutView preview=new PipeLayoutView(this);
+       preview.setLayoutData(proposal,bw,bd);preview.setRequirements(requirements[0],requirements[1]);
+       android.widget.LinearLayout previewContent=new android.widget.LinearLayout(this);previewContent.setOrientation(1);
+       previewContent.addView(preview,new android.widget.LinearLayout.LayoutParams(-1,dp(240)));
+       TextView previewInfo=new TextView(this);previewInfo.setText("Vorschlag: einreihig, Bettung unverändert.\n"+android.text.TextUtils.join("\n",PipeLayout.dimensions(proposal,bw,bd)));
+       android.widget.ScrollView previewScroll=new android.widget.ScrollView(this);previewScroll.addView(previewInfo);previewContent.addView(previewScroll,new android.widget.LinearLayout.LayoutParams(-1,dp(140)));
+       new android.app.AlertDialog.Builder(this).setTitle("Rohranordnung – Vorschau").setView(previewContent).setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",(dialog,which)->{
+        try{multiPipeStore.save(proposal);pipes.clear();pipes.addAll(proposal);refresh.run();}
+        catch(Exception ex){warnings.setText("Speichern fehlgeschlagen: "+ex.getMessage());}
+       }).show();
+      }catch(Exception ex){warnings.setText("Optimierung: "+ex.getMessage());}
+     });
      applyLimits.setOnClickListener(button->{
       try{
        String[] values=limits.getText().toString().split(";",-1);
