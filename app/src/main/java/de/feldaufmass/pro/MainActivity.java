@@ -1188,7 +1188,8 @@ public class MainActivity extends Activity {
   menu.getMenu().add(0,111,Menu.NONE,"Fotobericht als PDF");
   menu.getMenu().add(0,112,Menu.NONE,"Bautagesbericht");
   menu.getMenu().add(0,113,Menu.NONE,"Nachtragsmanagement");
-  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==113)showNachtraege();else if(item.getItemId()==112)showDailyReports();else if(item.getItemId()==111)exportPhotoReport();else if(item.getItemId()==110)exportX31();else if(item.getItemId()==109)exportReb();else if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
+  menu.getMenu().add(0,114,Menu.NONE,"PDF-Unterlagen analysieren");
+  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==114)choosePdfAnalysis();else if(item.getItemId()==113)showNachtraege();else if(item.getItemId()==112)showDailyReports();else if(item.getItemId()==111)exportPhotoReport();else if(item.getItemId()==110)exportX31();else if(item.getItemId()==109)exportReb();else if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
   menu.show();
  }
  LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(dp(12),dp(8),dp(12),dp(8));return p;}
@@ -1933,6 +1934,82 @@ public class MainActivity extends Activity {
  String reportMeasure(double value){
   return Double.isFinite(value)?String.format(java.util.Locale.GERMANY,"%.2f m",value):"nicht erfasst";
  }
+ static final String[] DOC_KEYS={"sollLength","sollWidth","sollDepth","sollAsphalt"};
+ static final String[] DOC_LABELS={"Trassenlänge","Grabenbreite","Grabentiefe","Asphaltstärke"};
+ static final String[] DOC_PATTERNS={"(?:trassenlänge|leitungslänge|gesamtlänge\\s+der\\s+trasse)","(?:grabenbreite|rohrgrabenbreite)","(?:grabentiefe|rohrgrabentiefe)","(?:asphaltstärke|asphaltdicke|asphalt\\s*[- ]?dicke)"};
+ static final class DocMeasure{
+  final int field,page;final double metres;final String evidence;
+  DocMeasure(int field,int page,double metres,String evidence){this.field=field;this.page=page;this.metres=metres;this.evidence=evidence;}
+ }
+ static java.util.ArrayList<DocMeasure> findDocumentMeasures(String text,int page){
+  java.util.ArrayList<DocMeasure> result=new java.util.ArrayList<>();
+  for(int j=0;j<DOC_PATTERNS.length;j++){
+   java.util.regex.Matcher m=java.util.regex.Pattern.compile("(?iu)\\b"+DOC_PATTERNS[j]+"\\s*(?:\\(soll\\))?\\s*[:=]?\\s*(?:beträgt\\s+|ist\\s+)?(\\d{1,6}(?:[.,]\\d{1,6})?)\\s*(mm|cm|m|millimeter|zentimeter|meter)(?![\\p{L}\\p{N}²³])").matcher(text);
+   while(m.find()&&result.size()<100){double value=Double.parseDouble(m.group(1).replace(',','.'));String unit=m.group(2).toLowerCase(java.util.Locale.ROOT);
+    if(unit.equals("mm")||unit.equals("millimeter"))value/=1000;else if(unit.equals("cm")||unit.equals("zentimeter"))value/=100;
+    if(Double.isFinite(value)&&value>0)result.add(new DocMeasure(j,page,value,m.group().replaceAll("\\s+"," ")));
+   }
+  }return result;
+ }
+ void choosePdfAnalysis(){
+  if(android.os.Build.VERSION.SDK_INT<35){notice("PDF-Textanalyse benötigt Android 15 oder neuer.");return;}
+  java.util.ArrayList<org.json.JSONObject> pdfs=new java.util.ArrayList<>();java.util.ArrayList<String> labels=new java.util.ArrayList<>();
+  for(int j=0;j<documents.length();j++){org.json.JSONObject o=documents.optJSONObject(j);if(o==null||o.optString("uri").isEmpty())continue;
+   if(o.optString("name").toLowerCase(java.util.Locale.ROOT).endsWith(".pdf")){pdfs.add(o);labels.add(o.optString("name"));}
+  }
+  labels.add("Andere PDF-Datei auswählen");
+  new android.app.AlertDialog.Builder(this).setTitle("PDF-Unterlage analysieren").setItems(labels.toArray(new String[0]),(d,w)->{
+   if(w<pdfs.size()){org.json.JSONObject o=pdfs.get(w);analyzePdfDocument(android.net.Uri.parse(o.optString("uri")),o.optString("name"));}
+   else{android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.setType("application/pdf");startActivityForResult(i,425);}
+  }).show();
+ }
+ void analyzePdfDocument(android.net.Uri uri,String name){
+  if(android.os.Build.VERSION.SDK_INT<35){notice("PDF-Textanalyse benötigt Android 15 oder neuer.");return;}
+  String projectId=activeProject;notice("PDF-Text wird lokal ausgewertet …");
+  new Thread(()->{
+   java.util.ArrayList<DocMeasure> results=new java.util.ArrayList<>();
+   int pages=0,read=0,chars=0;boolean limited=false;
+   try(android.os.ParcelFileDescriptor fd=getContentResolver().openFileDescriptor(uri,"r")){
+    if(fd==null)throw new java.io.IOException("Datei nicht lesbar");
+    try(android.graphics.pdf.PdfRenderer renderer=new android.graphics.pdf.PdfRenderer(fd)){
+     pages=renderer.getPageCount();int max=Math.min(pages,100);
+     for(int j=0;j<max;j++){
+      if(chars>=500000||results.size()>=200){limited=true;break;}
+      try(android.graphics.pdf.PdfRenderer.Page page=renderer.openPage(j)){
+       StringBuilder text=new StringBuilder();for(android.graphics.pdf.content.PdfPageTextContent part:page.getTextContents()){if(text.length()>=100000)break;text.append(part.getText()).append("\n");}
+       chars+=text.length();if(!text.toString().trim().isEmpty())read++;
+       results.addAll(findDocumentMeasures(text.toString(),j+1));
+      }
+     }limited|=pages>max;
+    }
+    final String summary=read+" Seiten mit Text · "+pages+" Seiten insgesamt"+(limited?" · Analyse begrenzt":"");
+    runOnUiThread(()->{if(!isFinishing()&&!isDestroyed()&&projectId.equals(activeProject))previewDocumentMeasures(name,summary,results);});
+   }catch(Exception e){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())notice("PDF konnte nicht gelesen werden: "+e.getMessage());});}
+  },"pdf-analysis").start();
+ }
+ void previewDocumentMeasures(String name,String summary,java.util.ArrayList<DocMeasure> found){
+  LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
+  form.addView(sheetText(name+"\n"+summary,15,true));
+  form.addView(sheetText("Regelbasierte Textsuche, keine KI-/Zeichnungsinterpretation. Nur geprüfte Werte als Soll übernehmen. Istmaße bleiben unverändert.",14,false));
+  Spinner[] picks=new Spinner[DOC_KEYS.length];
+  java.util.ArrayList<java.util.ArrayList<DocMeasure>> choicesByField=new java.util.ArrayList<>();
+  for(int j=0;j<DOC_KEYS.length;j++){
+   java.util.ArrayList<DocMeasure> options=new java.util.ArrayList<>();java.util.ArrayList<String> labels=new java.util.ArrayList<>();
+   labels.add("Nicht übernehmen");
+   for(DocMeasure m:found)if(m.field==j){options.add(m);labels.add(csvNumber(m.metres)+" m · S. "+m.page+" · "+m.evidence);}
+   choicesByField.add(options);form.addView(sheetText(DOC_LABELS[j]+" (bisher Soll: "+getPreferences(0).getString(DOC_KEYS[j],"offen")+")",14,true));
+   picks[j]=choices(form,labels.toArray(new String[0]));
+  }
+  if(found.isEmpty())form.addView(sheetText("Keine eindeutigen Maßangaben gefunden. Bildscans benötigen eine separate Texterkennung.",14,false));
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("PDF – Maßvorschläge prüfen").setView(scroll).setNegativeButton("Schließen",null).setPositiveButton("Als Soll speichern",null).create();
+  dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(b->{
+   android.content.SharedPreferences.Editor ed=getPreferences(0).edit();StringBuilder source=new StringBuilder(name);int count=0;
+   for(int j=0;j<picks.length;j++){int k=picks[j].getSelectedItemPosition()-1;if(k<0)continue;DocMeasure m=choicesByField.get(j).get(k);ed.putString(DOC_KEYS[j],java.math.BigDecimal.valueOf(m.metres).stripTrailingZeros().toPlainString());source.append("\n").append(DOC_LABELS[j]).append(": S. ").append(m.page).append(" · ").append(m.evidence);count++;}
+   if(count==0){notice("Bitte mindestens einen Wert auswählen.");return;}
+   ed.putString("sollSource",source.toString());if(!ed.commit()){notice("Sollwerte konnten nicht gespeichert werden.");return;}
+   recordProjectEvent("Sollwerte aus PDF übernommen");compareSoll();dialog.dismiss();notice("Sollwerte gespeichert. Istmaße unverändert.");
+  }));dialog.show();
+ }
  void showDocuments(){StringBuilder b=new StringBuilder();for(int j=0;j<documents.length();j++){org.json.JSONObject o=documents.optJSONObject(j);if(o!=null)b.append(o.optString("name")).append(" – Soll / nicht ausgewertet\n");}documentsList.setText(b.length()==0?"Keine Unterlagen ausgewählt":b.toString());}
  void attachDocument(android.net.Uri uri,int flags){if(uri==null)return;try{for(int j=0;j<documents.length();j++){org.json.JSONObject old=documents.optJSONObject(j);if(old!=null&&uri.toString().equals(old.optString("uri")))return;}getContentResolver().takePersistableUriPermission(uri,flags&android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);String name=uri.getLastPathSegment();try(android.database.Cursor c=getContentResolver().query(uri,new String[]{android.provider.OpenableColumns.DISPLAY_NAME},null,null,null)){if(c!=null&&c.moveToFirst())name=c.getString(0);}org.json.JSONObject o=new org.json.JSONObject();o.put("uri",uri.toString());o.put("name",name);documents.put(o);getPreferences(0).edit().putString("documents",documents.toString()).apply();}catch(Exception e){Toast.makeText(this,"Unterlage konnte nicht dauerhaft verknüpft werden.",Toast.LENGTH_LONG).show();}}
  String selectedPoint,pendingPoint,pendingPhoto;
@@ -2338,6 +2415,7 @@ public class MainActivity extends Activity {
  try{startActivityForResult(i,410);}catch(android.content.ActivityNotFoundException e){Toast.makeText(this,"Keine Spracherkennung verfügbar.",Toast.LENGTH_LONG).show();}
  }
  @Override protected void onActivityResult(int request,int result,android.content.Intent data){super.onActivityResult(request,result,data);
+ if(request==425&&result==RESULT_OK&&data!=null&&data.getData()!=null){android.net.Uri uri=data.getData();String name=uri.getLastPathSegment();try(android.database.Cursor c=getContentResolver().query(uri,new String[]{android.provider.OpenableColumns.DISPLAY_NAME},null,null,null)){if(c!=null&&c.moveToFirst())name=c.getString(0);}catch(Exception ignored){}analyzePdfDocument(uri,name==null?"PDF":name);return;}
  if(request==424){if(result==RESULT_OK&&data!=null&&data.getData()!=null)writeNachtragPdf(data.getData());else pendingNachtragPdfId=null;return;}
  if(request==423){if(result==RESULT_OK&&data!=null&&data.getData()!=null)writeDailyPdf(data.getData());else pendingDailyPdfId=null;return;}
  if(request==422&&result==RESULT_OK&&data!=null&&data.getData()!=null){writePhotoReport(data.getData());return;}
