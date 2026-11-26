@@ -5513,7 +5513,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     org.json.JSONObject updated=new org.json.JSONObject(current[0].toString());
     for(int i=0;i<2;i++){double value;try{value=Double.parseDouble(fields[i].getText().toString().trim().replace(',','.'));if(!Double.isFinite(value)||value<0)throw new NumberFormatException();}catch(Exception ex){fields[i].setError("Gültiges Maß eingeben");return;}updated.put(keys[i],value);}
     org.json.JSONArray next=new org.json.JSONArray(rows.toString());next.put(selected[0],updated);
-    if(saveUtilities(next)){rows.put(selected[0],updated);current[0]=updated;savedPosition[0]=extraUtilities().toString();recordProjectEvent("Leitungslage geändert");if(close){dialog.dismiss();if(refresh!=null)refresh.run();}else{notice("Leitungslage gespeichert");preview.invalidate();}}
+    if(saveUtilities(next)){rows.put(selected[0],updated);current[0]=updated;savedPosition[0]=extraUtilities().toString();recordProjectEvent("Leitungslage geändert");if(close){dialog.dismiss();if(refresh!=null)refresh.run();}else{notice("Leitungslage gespeichert");preview.invalidate();if(refresh!=null)refresh.run();}}
    }catch(Exception ex){notice("Leitungslage konnte nicht gespeichert werden.");}
   };saveProfile.setOnClickListener(v->persistPosition.accept(false));dialog.setOnShowListener(x->dialog.getButton(-1).setOnClickListener(y->persistPosition.accept(true)));dialog.show();
  }
@@ -5594,7 +5594,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  }
  boolean saveUtilities(org.json.JSONArray rows){
   boolean ok=getPreferences(0).edit().putString("extraUtilities",rows.toString()).commit();
-  if(ok){if(profile!=null)profile.invalidate();}else notice("Leitungen konnten nicht gespeichert werden.");return ok;
+  if(ok){if(profile!=null)profile.invalidate();if(sketch!=null)sketch.invalidate();if(livePreview!=null)livePreview.invalidate();}else notice("Leitungen konnten nicht gespeichert werden.");return ok;
  }
  double profileShoringStation=0;
  double[] shoringAtStation(double station){
