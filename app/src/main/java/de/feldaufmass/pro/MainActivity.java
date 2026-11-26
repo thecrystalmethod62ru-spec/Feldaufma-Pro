@@ -589,16 +589,18 @@ public class MainActivity extends Activity {
  }
  void chooseEditorObject(RouteSketch route,org.json.JSONArray draft,Runnable refresh,int index){
   org.json.JSONObject o=draft.optJSONObject(index);if(o==null)return;
-  android.widget.PopupMenu menu=new android.widget.PopupMenu(this,route);
-  menu.getMenu().add(0,0,0,o.optString("type")+" · "+csvNumber(o.optDouble("station"))+" m").setEnabled(false);
-  menu.getMenu().add(0,1,1,"Eigenschaften");
-  menu.getMenu().add(0,2,2,"Objekt entfernen");
-  menu.setOnMenuItemClickListener(item->{
-   if(draft.optJSONObject(index)!=o)return false;
-   if(item.getItemId()==1)editEditorObject(route,draft,refresh,index,Double.NaN);
-   else if(item.getItemId()==2)new android.app.AlertDialog.Builder(this).setTitle("Objekt entfernen?").setMessage("Die Trasse und andere Objekte bleiben unverändert.").setNegativeButton("Abbrechen",null).setPositiveButton("Entfernen",(x,y)->{if(draft.optJSONObject(index)==o){draft.remove(index);refresh.run();}}).show();
-   return true;
-  });menu.show();
+  LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(dp(12),dp(10),dp(12),dp(10));panel.setBackground(editorShape(0xff202827,16));
+  TextView title=sheetText(o.optString("type"),17,true);title.setTextColor(0xffe3f0ed);panel.addView(title);
+  TextView subtitle=sheetText("Station "+csvNumber(o.optDouble("station"))+" m · "+o.optString("side"),13,false);subtitle.setTextColor(0xff9edbd2);panel.addView(subtitle);
+  android.widget.PopupWindow popup=new android.widget.PopupWindow(panel,Math.min(route.getWidth(),dp(360)),-2,true);popup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));popup.setOutsideTouchable(true);
+  LinearLayout actions=new LinearLayout(this);panel.addView(actions);
+  Button edit=new Button(this),remove=new Button(this),close=new Button(this);
+  edit.setText("Eigenschaften");remove.setText("Entfernen");close.setText("Schließen");
+  for(Button button:new Button[]{edit,remove,close}){styleEditorButton(button,button==edit);actions.addView(button,new LinearLayout.LayoutParams(0,dp(48),1));}
+  edit.setOnClickListener(v->{popup.dismiss();if(draft.optJSONObject(index)==o)editEditorObject(route,draft,refresh,index,Double.NaN);});
+  remove.setOnClickListener(v->{popup.dismiss();if(draft.optJSONObject(index)==o)new android.app.AlertDialog.Builder(this).setTitle("Objekt entfernen?").setMessage("Die Trasse und andere Objekte bleiben unverändert.").setNegativeButton("Abbrechen",null).setPositiveButton("Entfernen",(x,y)->{if(draft.optJSONObject(index)==o){draft.remove(index);refresh.run();}}).show();});
+  close.setOnClickListener(v->popup.dismiss());
+  popup.showAtLocation(route,Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL,0,dp(12));
  }
  void pickEditorObject(RouteSketch route,org.json.JSONArray draft,Runnable refresh,java.util.ArrayList<Integer> hits){
   if(hits.isEmpty()){notice("Bitte ein Objekt auf der Zeichnung antippen.");return;}
