@@ -17,8 +17,20 @@ public class MainActivity extends Activity {
  e.setText(getPreferences(0).getString(key,""));root.addView(e);return e;
  }
  double number(EditText e){return Double.parseDouble(e.getText().toString().replace(',','.'));}
+ LinearLayout shell,body,planPage,measurePage,voicePage,profilePage,segmentPage,objectPage,quantityPage; TextView projectHeader;
+ LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(16,12,16,12);return p;}
+ int dp(int n){return (int)(n*getResources().getDisplayMetrics().density+.5f);}
+ void showPage(LinearLayout p){body.removeAllViews();ScrollView sc=new ScrollView(this);sc.setFillViewport(true);if(p.getParent()!=null)((android.view.ViewGroup)p.getParent()).removeView(p);sc.addView(p);body.addView(sc,new LinearLayout.LayoutParams(-1,-1));}
+ void nav(LinearLayout bar,String name,Runnable action){Button b=new Button(this);b.setText(name);b.setTextSize(12);b.setAllCaps(false);bar.addView(b,new LinearLayout.LayoutParams(0,-2,1));b.setOnClickListener(v->action.run());}
  public void onCreate(Bundle b){super.onCreate(b);
- ScrollView scroll=new ScrollView(this);LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setPadding(24,32,24,24);scroll.addView(root);setContentView(scroll);
+ shell=page();shell.setPadding(0,dp(28),0,dp(20));shell.setBackgroundColor(0xfff4f6f8);setContentView(shell);
+ projectHeader=new TextView(this);projectHeader.setText("Feldaufmaß Pro");projectHeader.setTextColor(Color.WHITE);projectHeader.setTextSize(22);projectHeader.setPadding(dp(16),dp(12),dp(16),dp(12));projectHeader.setBackgroundColor(0xff203849);shell.addView(projectHeader);
+ LinearLayout tabs=new LinearLayout(this);shell.addView(tabs);nav(tabs,"Zeichnung",()->showPage(planPage));nav(tabs,"Regelprofil",()->showPage(profilePage));nav(tabs,"Mengen",()->showPage(quantityPage));
+ body=new LinearLayout(this);shell.addView(body,new LinearLayout.LayoutParams(-1,0,1));
+ LinearLayout tools=new LinearLayout(this);shell.addView(tools);nav(tools,"Maße",()->showPage(measurePage));nav(tools,"Beläge",()->showPage(segmentPage));nav(tools,"Objekte",()->showPage(objectPage));
+ Button voiceButton=new Button(this);voiceButton.setText("Sprachassistent");voiceButton.setAllCaps(false);shell.addView(voiceButton);voiceButton.setOnClickListener(v->showPage(voicePage));
+ planPage=page();measurePage=page();voicePage=page();profilePage=page();segmentPage=page();objectPage=page();quantityPage=page();
+ LinearLayout root=voicePage;
  TextView title=new TextView(this);title.setText("Feldaufmaß Pro");title.setTextSize(28);root.addView(title);
  TextView voiceHeading=new TextView(this);voiceHeading.setText("Sprachassistent – Diktat");voiceHeading.setTextSize(20);root.addView(voiceHeading);
  voiceLanguage=new Spinner(this);voiceLanguage.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Deutsch","Русский"}));root.addView(voiceLanguage);
@@ -26,6 +38,7 @@ public class MainActivity extends Activity {
  voiceText=new EditText(this);voiceText.setHint("Diktat prüfen oder bearbeiten");root.addView(voiceText);
  Button applyVoice=new Button(this);applyVoice.setText("Maße aus Diktat übernehmen");root.addView(applyVoice);
  mic.setOnClickListener(v->startDictation());applyVoice.setOnClickListener(v->applyDictation());
+ root=measurePage;
  project=field(root,"Projekt / Baustelle","project",false);
  length=field(root,"Trassenlänge (m)","length",true);
  width=field(root,"Grabenbreite (m)","width",true);
@@ -50,10 +63,16 @@ public class MainActivity extends Activity {
  leftInput=field(root,"Nachschnitt links (m, optional)","left",true);
  rightInput=field(root,"Nachschnitt rechts (m, optional)","right",true);
  Button save=new Button(this);save.setText("Berechnen und speichern");root.addView(save);
+ root=quantityPage;
  result=new TextView(this);result.setTextSize(18);root.addView(result);
- sketch=new Sketch();root.addView(sketch,new LinearLayout.LayoutParams(-1,300));
+ root=planPage;
+ sketch=new Sketch();root.addView(sketch,new LinearLayout.LayoutParams(-1,dp(280)));
+ Button edit=new Button(this);edit.setText("Trassenmaße bearbeiten");root.addView(edit);edit.setOnClickListener(v->showPage(measurePage));
+ root=profilePage;
  TextView heading=new TextView(this);heading.setText("Regelprofil – Grabenquerschnitt");heading.setTextSize(20);root.addView(heading);
  legend=new TextView(this);legend.setTextSize(14);root.addView(legend);
+ root=segmentPage;
+ Button editSurface=new Button(this);editSurface.setText("Belagsdetails bearbeiten");root.addView(editSurface);editSurface.setOnClickListener(v->showPage(measurePage));
  TextView segmentHeading=new TextView(this);segmentHeading.setText("Oberflächenabschnitte");segmentHeading.setTextSize(20);root.addView(segmentHeading);
  stationFrom=field(root,"Station von (m)","stationFrom",true);
  stationTo=field(root,"Station bis (m)","stationTo",true);
@@ -64,6 +83,7 @@ public class MainActivity extends Activity {
  addSegment.setOnClickListener(v->addSegment());
  removeSegment.setOnClickListener(v->{if(segments.length()>0){segments.remove(segments.length()-1);persistSegments();}});
  showSegments();
+ root=objectPage;
  TextView oh=new TextView(this);oh.setText("Trassenobjekte");oh.setTextSize(20);root.addView(oh);
  objectType=new Spinner(this);objectType.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Hausanschluss","Suchschachtung","Startgrube","Zielgrube","KVS","Hindernis","Kernbohrung","Knickpunkt"}));root.addView(objectType);
  objectStation=field(root,"Objektstation (m)","objectStation",true);
@@ -73,8 +93,9 @@ public class MainActivity extends Activity {
  Button ob=new Button(this);ob.setText("Objekt hinzufügen");root.addView(ob);ob.setOnClickListener(v->addObject());
  objectList=new TextView(this);root.addView(objectList);showObjects();
  Button undo=new Button(this);undo.setText("Letztes Objekt entfernen");root.addView(undo);undo.setOnClickListener(v->{if(objects.length()>0){objects.remove(objects.length()-1);saveObjects();}});
+ root=profilePage;
  profile=new Profile();root.addView(profile,new LinearLayout.LayoutParams(-1,(int)(300*getResources().getDisplayMetrics().density)));
- save.setOnClickListener(v->calculate());if(length.length()>0&&width.length()>0&&depth.length()>0)calculate();
+ save.setOnClickListener(v->{calculate();showPage(planPage);});if(length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);
  }
  void calculate(){try{l=number(length);w=number(width);d=number(depth);if(!Double.isFinite(l*w*d)||l<=0||w<=0||d<=0)throw new Exception();
  optional(stoneLength);optional(stoneWidth);optional(stoneDepth);
@@ -82,6 +103,7 @@ public class MainActivity extends Activity {
  asphalt=optional(asphaltInput);left=optional(leftInput);right=optional(rightInput);if(Double.isFinite(asphalt)&&asphalt>d)throw new Exception();
  if(Double.isFinite(base)&&base+(Double.isFinite(asphalt)?asphalt:0)>d)throw new Exception();
  getPreferences(0).edit().putString("stoneLength",stoneLength.getText().toString()).putString("stoneWidth",stoneWidth.getText().toString()).putString("stoneDepth",stoneDepth.getText().toString()).putString("stoneColor",stoneColor.getText().toString()).putString("pattern",pattern.getText().toString()).putString("bedding",bedding.getText().toString()).putString("underlying",underlying.getText().toString()).putInt("handling",handling.getSelectedItemPosition()).putInt("surface",surface.getSelectedItemPosition()).putString("base",baseInput.getText().toString()).putString("pipe",pipeInput.getText().toString()).putString("asphalt",asphaltInput.getText().toString()).putString("left",leftInput.getText().toString()).putString("right",rightInput.getText().toString()).putString("project",project.getText().toString()).putString("length",length.getText().toString()).putString("width",width.getText().toString()).putString("depth",depth.getText().toString()).apply();
+ projectHeader.setText(project.length()>0?project.getText().toString():"Feldaufmaß Pro");
  result.setText(String.format(java.util.Locale.GERMANY,"Aushub: %.2f m³\nGrundfläche: %.2f m²",l*w*d,l*w));StringBuilder details=new StringBuilder("Legende\nOberfläche: "+covering);
  if(stoneLength.length()>0||stoneWidth.length()>0)details.append("\nSteinformat: "+(stoneLength.length()>0?stoneLength.getText():"?")+" × "+(stoneWidth.length()>0?stoneWidth.getText():"?")+" cm");
  if(stoneDepth.length()>0)details.append("\nBelagsstärke: "+stoneDepth.getText()+" cm");
