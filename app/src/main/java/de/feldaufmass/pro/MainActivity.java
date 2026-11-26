@@ -3307,6 +3307,13 @@ public class MainActivity extends Activity {
       EditText newWidth=new EditText(this),newDepth=new EditText(this);
       newWidth.setHint("Grabenbreite (m)");newDepth.setHint("Grabentiefe (m)");
       newWidth.setInputType(8194);newDepth.setInputType(8194);newWidth.setText(String.valueOf(bw));newDepth.setText(String.valueOf(bd));fields.addView(newWidth);fields.addView(newDepth);
+      utilitySlider(fields,newWidth,"Grabenbreite (m)",0.1,Math.max(6,bw),0.01,false);
+      utilitySlider(fields,newDepth,"Grabentiefe (m)",0.1,Math.max(8,bd),0.01,false);
+      PipeLayoutView draftView=new PipeLayoutView(this);draftView.setLayoutData(pipes,bw,bd);fields.addView(draftView,new LinearLayout.LayoutParams(-1,dp(180)));
+      TextView volumePreview=new TextView(this);fields.addView(volumePreview);
+      Runnable updateDraft=()->{try{double ww=number(newWidth),dd=number(newDepth);if(!Double.isFinite(ww)||!Double.isFinite(dd)||ww<=0||dd<=0)return;draftView.setLayoutData(pipes,ww,dd);volumePreview.setText(String.format(java.util.Locale.GERMANY,"Aushub (rechteckig, brutto): %.3f m³",ww*dd*(p.optDouble("to")-p.optDouble("from"))));}catch(Exception ignored){}};
+      android.text.TextWatcher draftWatcher=new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){updateDraft.run();}public void afterTextChanged(android.text.Editable e){}};
+      newWidth.addTextChangedListener(draftWatcher);newDepth.addTextChangedListener(draftWatcher);updateDraft.run();
       android.app.AlertDialog editor=new android.app.AlertDialog.Builder(this).setTitle(labels[index]).setView(fields).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
       editor.setOnShowListener(open->editor.getButton(-1).setOnClickListener(save->{
        try{new PipeLayoutStore(getPreferences(0)).saveSection(p.getDouble("from"),p.getDouble("to"),number(newWidth),number(newDepth),pipes);if(sketch!=null)sketch.invalidate();editor.dismiss();notice("Abschnittsprofil aktualisiert.");}
