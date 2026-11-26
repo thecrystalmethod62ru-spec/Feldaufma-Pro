@@ -278,8 +278,12 @@ final class RouteSketch extends View {
    public void onStartTrackingTouch(android.widget.SeekBar bar){}
    public void onStopTrackingTouch(android.widget.SeekBar bar){}
   });
-  android.widget.Button done=new android.widget.Button(getContext());done.setText("Übernehmen");done.setAllCaps(false);panel.addView(done);done.setOnClickListener(v->popup.dismiss());
-  popup.setOnDismissListener(()->{if(!saveDimensionLayout()){if(old==null)dimensionOffsets.remove(k);else dimensionOffsets.put(k,old);}invalidate();});
+  final boolean[] confirmed={false};
+  android.widget.LinearLayout actions=new android.widget.LinearLayout(getContext());panel.addView(actions);
+  android.widget.Button cancel=new android.widget.Button(getContext());cancel.setText("Abbrechen");cancel.setAllCaps(false);actions.addView(cancel,new android.widget.LinearLayout.LayoutParams(0,-2,1));cancel.setOnClickListener(v->popup.dismiss());
+  android.widget.Button reset=new android.widget.Button(getContext());reset.setText("0°");reset.setAllCaps(false);actions.addView(reset,new android.widget.LinearLayout.LayoutParams(0,-2,1));reset.setOnClickListener(v->slider.setProgress(6));
+  android.widget.Button done=new android.widget.Button(getContext());done.setText("Übernehmen");done.setAllCaps(false);actions.addView(done,new android.widget.LinearLayout.LayoutParams(0,-2,1));done.setOnClickListener(v->{confirmed[0]=true;popup.dismiss();});
+  popup.setOnDismissListener(()->{if(!confirmed[0]||!saveDimensionLayout()){if(old==null)dimensionOffsets.remove(k);else dimensionOffsets.put(k,old);}invalidate();});
   popup.showAtLocation(this,android.view.Gravity.BOTTOM|android.view.Gravity.CENTER_HORIZONTAL,0,d);
  }
  private void drawSurfaceDimensions(Canvas c,float d){
