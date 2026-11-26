@@ -137,7 +137,7 @@ public class MainActivity extends Activity {
   }
   if(manifest==null||!"FeldaufmassPro".equals(manifest.optString("format"))||manifest.optInt("version")!=1)throw new java.io.IOException("Unbekanntes Sicherungsformat");
   org.json.JSONObject fields=manifest.getJSONObject("preferences");
-  java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","objectUndo","objectRedo","elevationPoints","lvPositions","dailyReports","nachtraege"));
+  java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","objectUndo","objectRedo","elevationPoints","lvPositions","dailyReports","nachtraege","routeUnderlay"));
   java.util.Set<String> ints=new java.util.HashSet<>(java.util.Arrays.asList("surface","handling","dictationLanguage","gpsDurationSeconds"));
   SharedPreferences.Editor ed=projectStorage(id).edit();
   java.util.Iterator<String> keys=fields.keys();String name="Importiertes Projekt";java.util.Set<String> used=new java.util.HashSet<>();
@@ -153,7 +153,8 @@ public class MainActivity extends Activity {
       org.json.JSONArray items=row.optJSONArray(4);if(items==null)continue;
       for(int k=0;k<items.length();k++){String old=items.getString(k),replacement=photos.get(old);if(replacement==null)throw new java.io.IOException("Foto fehlt");used.add(old);items.put(k,replacement);org.json.JSONObject meta=row.optJSONObject(10);if(meta!=null&&meta.has(old)){Object photoMeta=meta.remove(old);meta.put(replacement,photoMeta);}}
      }v=rows.toString();
-    }else if(key.equals("documents")){
+    }else if(key.equals("routeUnderlay")){if(!v.isEmpty()){String replacement=photos.get(v);if(replacement==null)throw new java.io.IOException("Zeichenvorlage fehlt");used.add(v);v=replacement;}}
+    else if(key.equals("documents")){
      org.json.JSONArray docs=new org.json.JSONArray(v);for(int j=0;j<docs.length();j++){org.json.JSONObject doc=docs.getJSONObject(j);doc.remove("uri");doc.put("name",doc.optString("name")+" (neu verknüpfen)");}v=docs.toString();
     }else if(key.equals("dailyReports")||key.equals("nachtraege")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++){org.json.JSONArray items=dailyPhotos(rows.getJSONObject(j));for(int k=0;k<items.length();k++){org.json.JSONObject photo=items.getJSONObject(k);String old=photo.getString("file"),replacement=photos.get(old);if(replacement==null)throw new java.io.IOException("Berichtsfoto fehlt");used.add(old);photo.put("file",replacement);}}v=rows.toString();
     }else if(key.equals("objects")||key.equals("segments")||key.equals("elevationPoints")||key.equals("lvPositions")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)rows.getJSONObject(j);}
@@ -198,6 +199,7 @@ public class MainActivity extends Activity {
     photos.add(name);
    }
   }
+  Object template=snapshot.get("routeUnderlay");if(template instanceof String&&!((String)template).isEmpty()){String filename=(String)template;if(!filename.matches("[A-Za-z0-9._-]+")||filename.equals(".")||filename.equals(".."))throw new java.io.IOException("Ungültige Vorlage");photos.add(filename);}
   for(String reportKey:new String[]{"dailyReports","nachtraege"}){
   Object reportsData=snapshot.get(reportKey);
   if(reportsData instanceof String){org.json.JSONArray reports=new org.json.JSONArray((String)reportsData);for(int j=0;j<reports.length();j++){org.json.JSONArray items=dailyPhotos(reports.getJSONObject(j));for(int k=0;k<items.length();k++){String name=items.getJSONObject(k).getString("file");if(!name.matches("[A-Za-z0-9._-]+")||name.equals(".")||name.equals(".."))throw new java.io.IOException("Ungültiger Fotodateiname");photos.add(name);}}}
@@ -432,6 +434,32 @@ public class MainActivity extends Activity {
   }catch(Exception ignored){}
   notice("Trasse konnte nicht gespeichert werden. Bitte erneut versuchen.");return false;
  }
+ void chooseRouteUnderlay(){
+  new android.app.AlertDialog.Builder(this).setTitle("Handskizze als Zeichenvorlage")
+   .setMessage("Bild wird als Hintergrund im Trasseneditor gespeichert. Vorhandene Punkte und Maße bleiben unverändert. Keine automatische Maßstabsberechnung.")
+   .setNegativeButton("Abbrechen",null).setPositiveButton("Bild auswählen",(d,w)->{
+    android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.setType("image/*");startActivityForResult(i,427);
+   }).show();
+ }
+ void importRouteUnderlay(android.net.Uri uri){
+  String projectId=activeProject;String original=getPreferences(0).getString("routeUnderlay","");
+  new Thread(()->{
+   java.io.File file=null;android.graphics.Bitmap bitmap=null;
+   try{
+    bitmap=imageForOcr(uri);if(bitmap==null)throw new java.io.IOException("Bild nicht lesbar");
+    java.io.File dir=new java.io.File(getFilesDir(),"photos");if(!dir.isDirectory()&&!dir.mkdirs())throw new java.io.IOException("Bildordner fehlt");
+    file=java.io.File.createTempFile("vorlage_",".png",dir);
+    try(java.io.OutputStream out=new java.io.FileOutputStream(file)){if(!bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out))throw new java.io.IOException("Bild konnte nicht gespeichert werden");}
+    final java.io.File saved=file;
+    runOnUiThread(()->{
+     if(isDestroyed()||isFinishing()||!projectId.equals(activeProject)||!original.equals(getPreferences(0).getString("routeUnderlay",""))){saved.delete();return;}
+     if(!getPreferences(0).edit().putString("routeUnderlay",saved.getName()).commit()){saved.delete();notice("Vorlage konnte nicht gespeichert werden.");return;}
+     recordProjectEvent("Zeichenvorlage geändert");editRoute(false);
+    });
+   }catch(Exception e){if(file!=null)file.delete();runOnUiThread(()->{if(!isDestroyed())notice("Vorlage konnte nicht geladen werden.");});}
+   finally{if(bitmap!=null)bitmap.recycle();}
+  },"route-underlay").start();
+ }
  void editRoute(boolean measure){
   LinearLayout form=page();
   ScrollView scroll=new ScrollView(this);scroll.addView(form);
@@ -439,6 +467,23 @@ public class MainActivity extends Activity {
   TextView hint=sheetText("Trasse mit dem Finger zeichnen. Weitere Striche verlängern das Ende.",15,false);
   form.addView(hint);
   form.addView(route,new LinearLayout.LayoutParams(-1,dp(260)));
+  String template=getPreferences(0).getString("routeUnderlay","");
+  if(!template.isEmpty()){
+   android.graphics.Bitmap image=reportPhoto(template);
+   if(image!=null){
+    route.setUnderlay(image);
+    android.widget.CheckBox showTemplate=new android.widget.CheckBox(this);showTemplate.setText("Zeichenvorlage anzeigen");showTemplate.setChecked(true);form.addView(showTemplate);
+    showTemplate.setOnCheckedChangeListener((b,checked)->route.setUnderlayVisible(checked));
+    form.addView(sheetText("Deckkraft der Vorlage",13,false));
+    android.widget.SeekBar opacity=new android.widget.SeekBar(this);opacity.setMax(255);opacity.setProgress(150);form.addView(opacity);
+    opacity.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(android.widget.SeekBar bar,int progress,boolean user){route.setUnderlayAlpha(progress);}public void onStartTrackingTouch(android.widget.SeekBar bar){}public void onStopTrackingTouch(android.widget.SeekBar bar){}});
+    Button removeTemplate=new Button(this);removeTemplate.setAllCaps(false);removeTemplate.setText("Vorlage aus Projekt entfernen");form.addView(removeTemplate);
+    removeTemplate.setOnClickListener(v->new android.app.AlertDialog.Builder(this).setTitle("Zeichenvorlage entfernen?").setMessage("Die gezeichnete Trasse und Maße bleiben erhalten.").setNegativeButton("Abbrechen",null).setPositiveButton("Entfernen",(d,w)->{
+     if(template.equals(getPreferences(0).getString("routeUnderlay",""))&&getPreferences(0).edit().remove("routeUnderlay").commit()){route.setUnderlay(null);showTemplate.setEnabled(false);opacity.setEnabled(false);removeTemplate.setEnabled(false);recordProjectEvent("Zeichenvorlage entfernt");}else notice("Vorlage konnte nicht entfernt werden.");
+    }).show());
+   }else form.addView(sheetText("Zeichenvorlage fehlt oder ist nicht lesbar.",13,false));
+  }
+
   Spinner mode=choices(form,new String[]{"Zeichnen","Maß eintragen","Punkte verschieben"});
   Spinner angles=choices(form,new String[]{"Freier Winkel","0°","15°","30°","45°","60°","75°","90°"});
   angles.setVisibility(View.GONE);
@@ -1190,7 +1235,8 @@ public class MainActivity extends Activity {
   menu.getMenu().add(0,113,Menu.NONE,"Nachtragsmanagement");
   menu.getMenu().add(0,114,Menu.NONE,"PDF-Unterlagen analysieren");
   menu.getMenu().add(0,115,Menu.NONE,"Foto / Handskizze analysieren");
-  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==115)chooseImageAnalysis();else if(item.getItemId()==114)choosePdfAnalysis();else if(item.getItemId()==113)showNachtraege();else if(item.getItemId()==112)showDailyReports();else if(item.getItemId()==111)exportPhotoReport();else if(item.getItemId()==110)exportX31();else if(item.getItemId()==109)exportReb();else if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
+  menu.getMenu().add(0,116,Menu.NONE,"Handskizze als Zeichenvorlage");
+  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==116)chooseRouteUnderlay();else if(item.getItemId()==115)chooseImageAnalysis();else if(item.getItemId()==114)choosePdfAnalysis();else if(item.getItemId()==113)showNachtraege();else if(item.getItemId()==112)showDailyReports();else if(item.getItemId()==111)exportPhotoReport();else if(item.getItemId()==110)exportX31();else if(item.getItemId()==109)exportReb();else if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
   menu.show();
  }
  LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(dp(12),dp(8),dp(12),dp(8));return p;}
@@ -2497,6 +2543,7 @@ public class MainActivity extends Activity {
  try{startActivityForResult(i,410);}catch(android.content.ActivityNotFoundException e){Toast.makeText(this,"Keine Spracherkennung verfügbar.",Toast.LENGTH_LONG).show();}
  }
  @Override protected void onActivityResult(int request,int result,android.content.Intent data){super.onActivityResult(request,result,data);
+ if(request==427&&result==RESULT_OK&&data!=null&&data.getData()!=null){importRouteUnderlay(data.getData());return;}
  if(request==426&&result==RESULT_OK&&data!=null&&data.getData()!=null){android.net.Uri uri=data.getData();String name=uri.getLastPathSegment();try(android.database.Cursor c=getContentResolver().query(uri,new String[]{android.provider.OpenableColumns.DISPLAY_NAME},null,null,null)){if(c!=null&&c.moveToFirst())name=c.getString(0);}catch(Exception ignored){}analyzeImageDocument(uri,name==null?"Bild":name);return;}
  if(request==425&&result==RESULT_OK&&data!=null&&data.getData()!=null){android.net.Uri uri=data.getData();String name=uri.getLastPathSegment();try(android.database.Cursor c=getContentResolver().query(uri,new String[]{android.provider.OpenableColumns.DISPLAY_NAME},null,null,null)){if(c!=null&&c.moveToFirst())name=c.getString(0);}catch(Exception ignored){}analyzePdfDocument(uri,name==null?"PDF":name);return;}
  if(request==424){if(result==RESULT_OK&&data!=null&&data.getData()!=null)writeNachtragPdf(data.getData());else pendingNachtragPdfId=null;return;}
