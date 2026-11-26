@@ -669,7 +669,7 @@ public class MainActivity extends Activity {
   if(move){
    android.graphics.PointF target=fix.hasAccuracy()&&RouteSketch.preciseGps(fix.getAccuracy())?latest.gpsPosition(fix.getLatitude(),fix.getLongitude(),i):null;
    if(target==null){notice("GPS-Verschiebung nicht möglich.");return;}
-   v.point.set(target);
+   v.rememberGpsMove();v.point.set(target);
   }
   v.latitude=fix.getLatitude();v.longitude=fix.getLongitude();v.accuracy=fix.hasAccuracy()?fix.getAccuracy():Double.NaN;
   if(saveRoute(latest)){refreshRoute();notice(move?"Punkt auf GPS-Position verschoben.":"GPS-Koordinaten gespeichert.");}
@@ -686,16 +686,26 @@ public class MainActivity extends Activity {
    latest.vertices.get(j).name=name.getText().toString().trim();if(saveRoute(latest))refreshRoute();
   }).show();
  }
+ void undoGps(String id){
+  RouteSketch initial=new RouteSketch(this,routeData());int index=findPoint(initial,id);
+  if(index<0||initial.vertices.get(index).gpsUndo==null){notice("Keine GPS-Verschiebung zum Rückgängigmachen.");return;}
+  new android.app.AlertDialog.Builder(this).setTitle("GPS-Verschiebung rückgängig machen?").setMessage("Die vorherige Position und GPS-Zuordnung werden wiederhergestellt. Maße, Name und Fotos bleiben erhalten.").setNegativeButton("Abbrechen",null).setPositiveButton("Wiederherstellen",(d,w)->{
+   RouteSketch route=new RouteSketch(this,routeData());int i=findPoint(route,id);
+   if(i>=0&&route.vertices.get(i).undoGpsMove()&&saveRoute(route)){refreshRoute();notice("Vorherige Position wiederhergestellt.");}
+  }).show();
+ }
  void pointMenu(){
   RouteSketch route=new RouteSketch(this,routeData());int index=findPoint(route,selectedPoint);
   if(index<0)return;
   org.json.JSONArray photos=route.vertices.get(index).photos;
-  String[] labels=new String[3+photos.length()];labels[0]="Foto aufnehmen";labels[1]="GPS-Punkt zuordnen";labels[2]="Punkt umbenennen";
-  for(int i=0;i<photos.length();i++)labels[i+3]="Foto "+(i+1)+" öffnen";
+  boolean canUndo=route.vertices.get(index).gpsUndo!=null;int photoStart=canUndo?4:3;
+  String[] labels=new String[photoStart+photos.length()];labels[0]="Foto aufnehmen";labels[1]="GPS-Punkt zuordnen";labels[2]="Punkt umbenennen";
+  if(canUndo)labels[3]="GPS-Verschiebung rückgängig machen";
+  for(int i=0;i<photos.length();i++)labels[i+photoStart]="Foto "+(i+1)+" öffnen";
   new android.app.AlertDialog.Builder(this).setTitle(route.vertices.get(index).name.isEmpty()?"Trassenpunkt "+(index+1):route.vertices.get(index).name).setItems(labels,(dialog,i)->{
-   if(i==0)capturePhoto();else if(i==1)assignGps(route.vertices.get(index).id);else if(i==2)renamePoint(route.vertices.get(index).id,null);else {
+   if(i==0)capturePhoto();else if(i==1)assignGps(route.vertices.get(index).id);else if(i==2)renamePoint(route.vertices.get(index).id,null);else if(canUndo&&i==3)undoGps(route.vertices.get(index).id);else {
     android.content.Intent view=new android.content.Intent(android.content.Intent.ACTION_VIEW);
-    view.setDataAndType(photoUri(photos.optString(i-3)),"image/jpeg");
+    view.setDataAndType(photoUri(photos.optString(i-photoStart)),"image/jpeg");
     view.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
     try{startActivity(view);}catch(android.content.ActivityNotFoundException e){notice("Keine Bildanzeige verfügbar.");}
    }
