@@ -1610,6 +1610,31 @@ public class MainActivity extends Activity {
  void showMontageInventory(){
   try{org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));StringBuilder out=new StringBuilder();for(int i=0;i<rows.length();i++){org.json.JSONObject row=rows.getJSONObject(i);out.append(MontageCatalog.Fitting.valueOf(row.getString("type")).label).append(" · DN ").append(row.optString("dn").isEmpty()?"unbekannt":row.optString("dn")).append(" · ").append(row.optString("material")).append(row.has("station")?" · Station "+row.optDouble("station")+" m":" · ohne Station").append(" · nicht platziert\n");}new android.app.AlertDialog.Builder(this).setTitle("Projekt-Formstücke").setMessage(out.length()==0?"Keine Formstücke gespeichert.":out.toString()).setPositiveButton("Zurück",(d,w)->showMontage()).show();}catch(Exception e){notice("Formstücke konnten nicht gelesen werden.");}
  }
+ void showMetricRoute(){
+  RouteSketch route=new RouteSketch(this,routeData());
+  if(!DxfExport.metricAvailable(route)){notice("Zuerst alle Trassenabschnitte bemaßen und gültige Richtungen zeichnen.");return;}
+  DxfExport model=new DxfExport(new java.io.StringWriter(),route,true);
+  LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);
+  TextView info=new TextView(this);info.setText("Gemessene Längen · Richtungen aus Skizze (nicht vermessen)");panel.addView(info);
+  android.view.View drawing=new android.view.View(this){
+   final android.graphics.Paint pen=new android.graphics.Paint(3);
+   @Override protected void onDraw(android.graphics.Canvas c){
+    super.onDraw(c);double minX=0,maxX=0,minY=0,maxY=0;
+    for(double[] p:model.vertices){minX=Math.min(minX,p[0]);maxX=Math.max(maxX,p[0]);minY=Math.min(minY,p[1]);maxY=Math.max(maxY,p[1]);}
+    double scale=Math.min((getWidth()-dp(48))/Math.max(.001,maxX-minX),(getHeight()-dp(64))/Math.max(.001,maxY-minY));if(!Double.isFinite(scale)||scale<=0)return;
+    double ox=(getWidth()-(maxX-minX)*scale)/2-minX*scale,oy=(getHeight()-(maxY-minY)*scale)/2+maxY*scale;
+    for(int i=1;i<model.vertices.size();i++){
+     double[] a=model.vertices.get(i-1),b=model.vertices.get(i);
+     float ax=(float)(ox+a[0]*scale),ay=(float)(oy-a[1]*scale),bx=(float)(ox+b[0]*scale),by=(float)(oy-b[1]*scale);
+     pen.setColor(0xff398bda);pen.setStrokeWidth(dp(2));c.drawLine(ax,ay,bx,by,pen);
+     pen.setTextSize(dp(12));pen.setColor(0xff777777);c.drawText(String.format(java.util.Locale.GERMANY,"%.2f m",route.vertices.get(i).metres),(ax+bx)/2,(ay+by)/2-dp(8),pen);
+    }
+    double bar=Math.pow(10,Math.floor(Math.log10((getWidth()/4.0)/scale)));
+    if(Double.isFinite(bar)&&bar>0){float end=dp(12)+(float)(bar*scale);pen.setColor(0xff777777);pen.setStrokeWidth(dp(2));c.drawLine(dp(12),getHeight()-dp(12),end,getHeight()-dp(12),pen);pen.setTextSize(dp(11));c.drawText(String.format(java.util.Locale.GERMANY,"%.3g m",bar),dp(12),getHeight()-dp(18),pen);}
+   }
+  };panel.addView(drawing,new LinearLayout.LayoutParams(-1,dp(300)));
+  new android.app.AlertDialog.Builder(this).setTitle("Tiefbau – Maßstäbliche Vorschau").setView(panel).setPositiveButton("Schließen",null).show();
+ }
  void showTools(){
   String[] names={"Maße","Beläge","Objekte","Unterlagen / PDF","Sprachassistent"};
   LinearLayout[] pages={measurePage,segmentPage,objectPage,documentsPage,voicePage};
@@ -1634,7 +1659,8 @@ public class MainActivity extends Activity {
   menu.getMenu().add(0,116,Menu.NONE,"Handskizze als Zeichenvorlage");
   menu.getMenu().add(0,117,Menu.NONE,"Bluetooth-Messgerät (Test)");
   menu.getMenu().add(0,118,Menu.NONE,"Rohrleitungsbau – Montage");
-  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==118)showMontage();else if(item.getItemId()==117)testBleMeasure();else if(item.getItemId()==116)chooseRouteUnderlay();else if(item.getItemId()==115)chooseImageAnalysis();else if(item.getItemId()==114)choosePdfAnalysis();else if(item.getItemId()==113)showNachtraege();else if(item.getItemId()==112)showDailyReports();else if(item.getItemId()==111)exportPhotoReport();else if(item.getItemId()==110)exportX31();else if(item.getItemId()==109)exportReb();else if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
+  menu.getMenu().add(0,119,Menu.NONE,"Tiefbau – Maßstäbliche Vorschau");
+  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==119)showMetricRoute();else if(item.getItemId()==118)showMontage();else if(item.getItemId()==117)testBleMeasure();else if(item.getItemId()==116)chooseRouteUnderlay();else if(item.getItemId()==115)chooseImageAnalysis();else if(item.getItemId()==114)choosePdfAnalysis();else if(item.getItemId()==113)showNachtraege();else if(item.getItemId()==112)showDailyReports();else if(item.getItemId()==111)exportPhotoReport();else if(item.getItemId()==110)exportX31();else if(item.getItemId()==109)exportReb();else if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
   menu.show();
  }
  LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(dp(12),dp(8),dp(12),dp(8));return p;}
