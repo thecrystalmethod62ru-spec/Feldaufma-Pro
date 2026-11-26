@@ -219,6 +219,26 @@ final class RouteSketch extends View {
  }
  private final java.util.ArrayList<DimensionHit> dimensionHits=new java.util.ArrayList<>();
  private final java.util.HashMap<String,Float> dimensionOffsets=new java.util.HashMap<>();
+ private String dimensionProject;
+ void bindDimensionProject(String project){
+  dimensionProject=project;dimensionOffsets.clear();
+  try{
+   org.json.JSONObject data=new org.json.JSONObject(getContext().getSharedPreferences("dimension_layout",0).getString(project,"{}"));
+   java.util.Iterator<String> keys=data.keys();while(keys.hasNext()){String k=keys.next();double v=data.optDouble(k);if(Double.isFinite(v)&&v>=15&&v<=260)dimensionOffsets.put(k,(float)v);}
+  }catch(Exception ignored){}
+  invalidate();
+ }
+ private boolean saveDimensionLayout(){
+  if(dimensionProject==null)return false;
+  org.json.JSONObject data=new org.json.JSONObject();
+  try{for(java.util.Map.Entry<String,Float> e:dimensionOffsets.entrySet())data.put(e.getKey(),e.getValue().doubleValue());}catch(Exception e){return false;}
+  boolean ok=getContext().getSharedPreferences("dimension_layout",0).edit().putString(dimensionProject,data.toString()).commit();
+  if(!ok)android.widget.Toast.makeText(getContext(),"Maßpositionen konnten nicht gespeichert werden.",0).show();
+  return ok;
+ }
+ void resetDimensionLayout(){
+  new android.app.AlertDialog.Builder(getContext()).setTitle("Maßpositionen zurücksetzen?").setMessage("Alle Oberflächenmaße werden wieder automatisch angeordnet. Messwerte bleiben unverändert.").setNegativeButton("Abbrechen",null).setPositiveButton("Zurücksetzen",(dialog,which)->{java.util.HashMap<String,Float> old=new java.util.HashMap<>(dimensionOffsets);dimensionOffsets.clear();if(!saveDimensionLayout())dimensionOffsets.putAll(old);invalidate();}).show();
+ }
  private DimensionHit activeDimension;
  private float dimensionStartX,dimensionStartY;
  private Float previousDimensionOffset;
@@ -614,6 +634,7 @@ final class RouteSketch extends View {
    }
    if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL){
     if(action==MotionEvent.ACTION_CANCEL){if(previousDimensionOffset==null)dimensionOffsets.remove(activeDimension.key);else dimensionOffsets.put(activeDimension.key,previousDimensionOffset);}
+    if(action==MotionEvent.ACTION_UP&&!saveDimensionLayout()){if(previousDimensionOffset==null)dimensionOffsets.remove(activeDimension.key);else dimensionOffsets.put(activeDimension.key,previousDimensionOffset);}
     activeDimension=null;getParent().requestDisallowInterceptTouchEvent(false);invalidate();return true;
    }
    return true;
