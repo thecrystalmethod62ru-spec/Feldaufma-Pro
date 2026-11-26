@@ -137,7 +137,7 @@ public class MainActivity extends Activity {
   }
   if(manifest==null||!"FeldaufmassPro".equals(manifest.optString("format"))||manifest.optInt("version")!=1)throw new java.io.IOException("Unbekanntes Sicherungsformat");
   org.json.JSONObject fields=manifest.getJSONObject("preferences");
-  java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","objectUndo","objectRedo","elevationPoints","lvPositions","dailyReports","nachtraege","routeUnderlay","sketchCalibration"));
+  java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","sollUtilities","objectUndo","objectRedo","elevationPoints","lvPositions","dailyReports","nachtraege","routeUnderlay","sketchCalibration"));
   java.util.Set<String> ints=new java.util.HashSet<>(java.util.Arrays.asList("surface","handling","dictationLanguage","gpsDurationSeconds"));
   SharedPreferences.Editor ed=projectStorage(id).edit();
   java.util.Iterator<String> keys=fields.keys();String name="Importiertes Projekt";java.util.Set<String> used=new java.util.HashSet<>();
@@ -157,7 +157,7 @@ public class MainActivity extends Activity {
     else if(key.equals("documents")){
      org.json.JSONArray docs=new org.json.JSONArray(v);for(int j=0;j<docs.length();j++){org.json.JSONObject doc=docs.getJSONObject(j);doc.remove("uri");doc.put("name",doc.optString("name")+" (neu verknüpfen)");}v=docs.toString();
     }else if(key.equals("dailyReports")||key.equals("nachtraege")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++){org.json.JSONArray items=dailyPhotos(rows.getJSONObject(j));for(int k=0;k<items.length();k++){org.json.JSONObject photo=items.getJSONObject(k);String old=photo.getString("file"),replacement=photos.get(old);if(replacement==null)throw new java.io.IOException("Berichtsfoto fehlt");used.add(old);photo.put("file",replacement);}}v=rows.toString();
-    }else if(key.equals("objects")||key.equals("segments")||key.equals("elevationPoints")||key.equals("lvPositions")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)rows.getJSONObject(j);}
+    }else if(key.equals("objects")||key.equals("segments")||key.equals("elevationPoints")||key.equals("lvPositions")||key.equals("sollUtilities")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)rows.getJSONObject(j);}
     else if(key.equals("objectUndo")||key.equals("objectRedo")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)new org.json.JSONArray(rows.getString(j));}
     if(key.equals("project")&&!v.trim().isEmpty())name=v.trim();
     ed.putString(key,v);
@@ -1617,6 +1617,7 @@ public class MainActivity extends Activity {
  TextView info=new TextView(this);info.setText("Unterlagen sind Planungsdaten (Soll). Automatische KI-Auswertung noch nicht verfügbar. Ist-Maße bleiben unverändert.");documentsPage.addView(info);
  Button planAssistant=new Button(this);planAssistant.setText("KI-Planassistent – Unterlagen prüfen");documentsPage.addView(planAssistant);planAssistant.setOnClickListener(v->choosePlanDocument());
  Button planText=new Button(this);planText.setText("Soll-Leitungen aus Text erkennen");documentsPage.addView(planText);planText.setOnClickListener(v->openPlanTextAnalysis());
+ Button savedSoll=new Button(this);savedSoll.setText("Gespeicherte Soll-Leitungen");documentsPage.addView(savedSoll);savedSoll.setOnClickListener(v->showSavedSollUtilities());
  TextView sh=new TextView(this);sh.setText("Soll-Maße aus Ausführungsunterlagen");sh.setTextSize(20);documentsPage.addView(sh);
  sollLength=field(documentsPage,"Trassenlänge Soll (m)","sollLength",true);
  sollWidth=field(documentsPage,"Grabenbreite Soll (m)","sollWidth",true);
@@ -2453,7 +2454,11 @@ public class MainActivity extends Activity {
    recordProjectEvent("Sollwerte aus Unterlage übernommen");compareSoll();dialog.dismiss();notice("Sollwerte gespeichert. Istmaße unverändert.");
   }));dialog.show();
  }
+ void showSavedSollUtilities(){
+  try{org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("sollUtilities","[]"));StringBuilder out=new StringBuilder();for(int i=0;i<rows.length();i++){org.json.JSONObject row=rows.getJSONObject(i);out.append(row.optString("type")).append(" · DN ").append(row.optString("dn","")).append(" · ").append(row.optString("material")).append("\n");}new android.app.AlertDialog.Builder(this).setTitle("Gespeicherte Soll-Leitungen").setMessage(out.length()==0?"Keine Soll-Leitungen gespeichert.":out.toString()).setPositiveButton("Schließen",null).show();}catch(Exception e){notice("Soll-Leitungen konnten nicht gelesen werden.");}
+ }
  void openPlanTextAnalysis(){
+  final String sourceProject=activeProject;
   EditText input=new EditText(this);
   input.setHint("Text aus dem Ausführungsplan einfügen");
   input.setMinLines(4);
@@ -2475,13 +2480,15 @@ public class MainActivity extends Activity {
     android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Soll-Leitungen bearbeiten").setView(scroll).setNegativeButton("Abbrechen",null).setPositiveButton("Vorschau",null).create();
     dialog.setOnShowListener(x->dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
      StringBuilder summary=new StringBuilder("Geprüfte Eingaben – nur Vorschau, noch nicht gespeichert.\n\n");
+     org.json.JSONArray reviewed=new org.json.JSONArray();
      for(EditText[] row:fields){
       String type=row[0].getText().toString().trim(),dn=row[1].getText().toString().trim(),material=row[2].getText().toString().trim();
       if(type.isEmpty()){row[0].setError("Leitungsart erforderlich");return;}
       if(!dn.isEmpty()&&!dn.matches("[1-9][0-9]{0,3}")){row[1].setError("DN zwischen 1 und 9999 eingeben");return;}
+      try{PlanTextParser.Candidate c=candidates.get(reviewed.length());org.json.JSONObject item=new org.json.JSONObject();item.put("type",type);item.put("dn",dn);item.put("material",material);item.put("sourceLine",c.sourceLine);item.put("lineNumber",c.lineNumber);reviewed.put(item);}catch(org.json.JSONException e){notice("Soll-Daten ungültig.");return;}
       summary.append(type).append(" · DN ").append(dn.isEmpty()?"unbekannt":dn).append(" · ").append(material.isEmpty()?"Material unbekannt":material).append("\n");
      }
-     new android.app.AlertDialog.Builder(this).setTitle("Soll-Vorschau").setMessage(summary.toString()).setPositiveButton("Zurück",null).show();
+     new android.app.AlertDialog.Builder(this).setTitle("Soll-Vorschau").setMessage(summary.toString()).setNegativeButton("Zurück",null).setPositiveButton("Soll-Liste ersetzen und speichern",(confirm,which)->{if(!sourceProject.equals(activeProject)){notice("Projekt wurde gewechselt.");return;}if(getPreferences(0).edit().putString("sollUtilities",reviewed.toString()).commit()){dialog.dismiss();notice("Soll-Leitungen gespeichert.");}else notice("Speichern fehlgeschlagen.");}).show();
     }));
     dialog.show();
    }).show();
