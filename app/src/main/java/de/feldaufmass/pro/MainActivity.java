@@ -3281,6 +3281,27 @@ public class MainActivity extends Activity {
  root=planPage;
  sketch=new Sketch();sketch.setBackgroundColor(Color.WHITE);root.addView(sketch,new LinearLayout.LayoutParams(-1,dp(280))); LinearLayout historyBar=new LinearLayout(this);root.addView(historyBar);undoObjectsButton=new Button(this);undoObjectsButton.setText("Rückgängig");historyBar.addView(undoObjectsButton,new LinearLayout.LayoutParams(0,-2,1));redoObjectsButton=new Button(this);redoObjectsButton.setText("Wiederholen");historyBar.addView(redoObjectsButton,new LinearLayout.LayoutParams(0,-2,1));undoObjectsButton.setOnClickListener(v->restoreObjectHistory(false));redoObjectsButton.setOnClickListener(v->restoreObjectHistory(true));updateHistoryButtons();
  Button edit=new Button(this);edit.setText("Trassenmaße bearbeiten");root.addView(edit);edit.setOnClickListener(v->showPage(measurePage));
+ actionButtonSingle(planPage,"Abschnittsprofile anzeigen",()->{
+  try{
+   org.json.JSONArray profiles=new PipeLayoutStore(getPreferences(0)).sections();
+   if(profiles.length()==0){notice("Keine Abschnittsprofile vorhanden.");return;}
+   String[] labels=new String[profiles.length()];
+   for(int i=0;i<profiles.length();i++){org.json.JSONObject p=profiles.getJSONObject(i);labels[i]=String.format(java.util.Locale.GERMANY,"Station %.2f – %.2f m",p.getDouble("from"),p.getDouble("to"));}
+   new android.app.AlertDialog.Builder(this).setTitle("Abschnittsprofile").setItems(labels,(dialog,index)->{
+    try{
+     org.json.JSONObject p=profiles.getJSONObject(index);
+     double bw=p.getDouble("width"),bd=p.getDouble("depth");
+     java.util.List<PipeLayout.Pipe> pipes=PipeLayoutStore.decode(p.getJSONArray("pipes").toString());
+     LinearLayout body=new LinearLayout(this);body.setOrientation(1);
+     PipeLayoutView view=new PipeLayoutView(this);view.setLayoutData(pipes,bw,bd);
+     body.addView(view,new LinearLayout.LayoutParams(-1,dp(300)));
+     TextView info=new TextView(this);info.setText(android.text.TextUtils.join("\n",PipeLayout.dimensions(pipes,bw,bd)));body.addView(info);
+     ScrollView scroll=new ScrollView(this);scroll.addView(body);
+     new android.app.AlertDialog.Builder(this).setTitle(labels[index]).setView(scroll).setPositiveButton("Schließen",null).show();
+    }catch(Exception ex){notice("Abschnittsprofil: "+ex.getMessage());}
+   }).setNegativeButton("Schließen",null).show();
+  }catch(Exception ex){notice("Abschnittsprofile: "+ex.getMessage());}
+ });
  sheetHeading(planPage,"Stationierte Objekte");
  stationRows=new LinearLayout(this);
  stationRows.setOrientation(LinearLayout.VERTICAL);
