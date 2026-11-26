@@ -2087,8 +2087,50 @@ public class MainActivity extends Activity {
    if(calculate()){notice("Projekt gespeichert.");}else{notice("Projekt nicht gespeichert. Bitte Maße prüfen.");}
   }).show();return true;
  }
+ boolean offerVoiceDailyReport(String text,int version){
+  java.util.regex.Matcher m=java.util.regex.Pattern.compile("(?isu)^(?:(?:добавь|запиши|внеси)\\s+(?:в\\s+)?(?:строительный\\s+журнал|журнал|отч[её]т)|(?:bau)?tagesbericht|(?:добавь\\s+в\\s+)?bautagesbericht)\\s*[:;,–—-]?\\s*(.*)$").matcher(text.trim());
+  if(!m.matches())return false;
+  String payload=m.group(1).trim();
+  if(payload.isEmpty()){showDailyReports();return true;}
+  final String projectId=activeProject;
+  if(!java.util.regex.Pattern.compile("[\\p{IsCyrillic}]").matcher(payload).find()){confirmVoiceDailyReport(payload);return true;}
+  if(translator==null)translator=com.google.mlkit.nl.translate.Translation.getClient(
+   new com.google.mlkit.nl.translate.TranslatorOptions.Builder().setSourceLanguage("ru").setTargetLanguage("de").build());
+  notice("Bautagesbericht wird ins Deutsche übersetzt …");
+  translator.downloadModelIfNeeded().onSuccessTask(ignored->translator.translate(payload))
+   .addOnSuccessListener(this,german->{if(version==speechVersion&&projectId.equals(activeProject)&&!isFinishing()&&!isDestroyed())confirmVoiceDailyReport(german);})
+   .addOnFailureListener(this,error->{if(version==speechVersion)notice("Übersetzung fehlgeschlagen. Kein Bericht geändert.");});
+  return true;
+ }
+ void confirmVoiceDailyReport(String german){
+  if(german==null||german.trim().isEmpty()){notice("Kein Text erkannt.");return;}
+  LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
+  form.addView(sheetText("Datum",14,true));EditText date=new EditText(this);date.setSingleLine(true);date.setText(java.time.LocalDate.now().toString());form.addView(date);
+  String[] labels=java.util.Arrays.copyOfRange(DAILY_LABELS,1,DAILY_LABELS.length);
+  form.addView(sheetText("Abschnitt des Bautagesberichts",14,true));Spinner section=choices(form,labels);section.setSelection(3);
+  form.addView(sheetText("Deutschen Text vor dem Speichern prüfen, insbesondere Zahlen und Maße.",14,false));
+  EditText content=new EditText(this);content.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);content.setMinLines(4);content.setText(german);form.addView(content);
+  form.addView(sheetText("Text wird an den vorhandenen Abschnitt angehängt. Fehlende Tagesberichte werden neu erstellt.",13,false));
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Bautagesbericht – Diktat").setView(scroll).setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",null).create();
+  dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(b->{
+   String day=date.getText().toString().trim(),value=content.getText().toString().trim();
+   try{if(!day.matches("\\d{4}-\\d{2}-\\d{2}")||!java.time.LocalDate.parse(day).toString().equals(day))throw new IllegalArgumentException();}
+   catch(Exception e){date.setError("Gültiges Datum: JJJJ-MM-TT");return;}
+   if(value.isEmpty()){content.setError("Text erforderlich");return;}
+   try{
+    org.json.JSONArray rows=dailyReports();java.util.ArrayList<org.json.JSONObject> sorted=new java.util.ArrayList<>();org.json.JSONObject selected=null;
+    for(int j=0;j<rows.length();j++){org.json.JSONObject row=rows.getJSONObject(j);sorted.add(row);if(day.equals(row.optString("date")))selected=row;}
+    if(selected==null){selected=new org.json.JSONObject().put("id",java.util.UUID.randomUUID().toString()).put("date",day);sorted.add(selected);}
+    String key=DAILY_KEYS[section.getSelectedItemPosition()+1],before=selected.optString(key,"");
+    selected.put(key,before.isEmpty()?value:before+"\n"+value).put("modifiedAt",System.currentTimeMillis());
+    sorted.sort((a,c)->a.optString("date").compareTo(c.optString("date")));
+    if(saveDailyReports(new org.json.JSONArray(sorted))){dialog.dismiss();notice("Diktat im Bautagesbericht gespeichert.");showDailyReports();}
+   }catch(Exception e){notice("Diktat konnte nicht gespeichert werden.");}
+  }));dialog.show();
+ }
  void handleSpeech(String text){
   int version=++speechVersion;
+  if(offerVoiceDailyReport(text,version))return;
   if(offerVoiceSave(text)||offerAssistantAnswer(text))return;
   String normalized=text.toLowerCase(java.util.Locale.ROOT);
   if(normalized.matches(".*(?:сделай|сделать|сними|прикрепи|прицепи|mach|nimm|nehme|aufnehmen|erstelle|hänge|füge).*?(?:фото|снимок|foto).*") ||
