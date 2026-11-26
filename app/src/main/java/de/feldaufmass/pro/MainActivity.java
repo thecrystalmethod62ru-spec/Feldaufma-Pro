@@ -163,7 +163,26 @@ public class MainActivity extends Activity {
     }else if(key.equals("objects")||key.equals("segments")||key.equals("elevationPoints")||key.equals("lvPositions")||key.equals("sollUtilities")||key.equals("montageFittings")||key.equals("metricWidthSections")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++){org.json.JSONObject o=rows.getJSONObject(j);if(key.equals("metricWidthSections")){double from=o.getDouble("from"),to=o.getDouble("to"),width=o.getDouble("width");for(String side:new String[]{"left","right"})if(o.has(side)){double cut=o.getDouble(side);if(!Double.isFinite(cut)||cut<0)throw new org.json.JSONException("Ungültiger Nachschnitt");}if(!Double.isFinite(from)||!Double.isFinite(to)||!Double.isFinite(width)||from<0||to<=from||width<=0)throw new org.json.JSONException("Ungültiger Breitenabschnitt");for(int k=0;k<j;k++){org.json.JSONObject previous=rows.getJSONObject(k);if(from<previous.getDouble("to")&&to>previous.getDouble("from"))throw new org.json.JSONException("Überlappende Breitenabschnitte");}}}}
     else if(key.equals("objectUndo")||key.equals("objectRedo")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)new org.json.JSONArray(rows.getString(j));}
     if(key.equals(PipeLayoutStore.KEY))PipeLayoutStore.decode(v);
-    if(key.equals(PipeLayoutStore.SECTION_KEY))new org.json.JSONArray(v);
+    if(key.equals(PipeLayoutStore.SECTION_KEY)){
+     org.json.JSONArray rows=new org.json.JSONArray(v);
+     for(int j=0;j<rows.length();j++){
+      org.json.JSONObject row=rows.getJSONObject(j);
+      double from=row.getDouble("from"),to=row.getDouble("to"),bw=row.getDouble("width"),bd=row.getDouble("depth");
+      if(!Double.isFinite(from+to+bw+bd)||from<0||to<=from||bw<=0||bd<=0)throw new org.json.JSONException("Ungültiges Abschnittsprofil");
+      PipeLayoutStore.decode(row.getJSONArray("pipes").toString());
+      for(int k=0;k<j;k++){org.json.JSONObject prev=rows.getJSONObject(k);if(from<prev.getDouble("to")&&to>prev.getDouble("from"))throw new org.json.JSONException("Überlappende Abschnittsprofile");}
+     }
+    }
+    if(key.equals("metricVerbauSections")){
+     org.json.JSONArray rows=new org.json.JSONArray(v);
+     for(int j=0;j<rows.length();j++){
+      org.json.JSONArray row=rows.getJSONArray(j);
+      if(row.length()!=4)throw new org.json.JSONException("Ungültiger Verbauabschnitt");
+      double from=row.getDouble(0),to=row.getDouble(1),left=row.getDouble(2),right=row.getDouble(3);
+      if(!Double.isFinite(from+to+left+right)||from<0||to<=from||left<0||right<0||left+right<=0)throw new org.json.JSONException("Ungültige Verbaumaße");
+      for(int k=0;k<j;k++){org.json.JSONArray prev=rows.getJSONArray(k);if(from<prev.getDouble(1)&&to>prev.getDouble(0)&&((left>0&&prev.getDouble(2)>0)||(right>0&&prev.getDouble(3)>0)))throw new org.json.JSONException("Überlappende Verbauabschnitte");}
+     }
+    }
     if(key.equals(RouteBranchStore.KEY))RouteBranchStore.decode(v);
     if(key.equals("extraUtilities")||key.equals(MontageProtocols.KEY))new org.json.JSONArray(v);
     if(key.equals("project")&&!v.trim().isEmpty())name=v.trim();
