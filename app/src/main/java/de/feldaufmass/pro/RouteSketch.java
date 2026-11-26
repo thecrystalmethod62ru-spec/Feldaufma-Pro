@@ -207,21 +207,40 @@ final class RouteSketch extends View {
    double from=o.optDouble("from"),to=o.optDouble("to");
    if(Double.isFinite(from)&&Double.isFinite(to)&&from<to&&stationPoint(from)!=null&&stationPoint(to)!=null){boundaries.add(from);boundaries.add(to);}
   }
+  if(boundaries.size()<2)return;
+  // Split dimension geometry at route bends, without modifying actual station data.
+  double cumulative=0;
+  for(int i=1;i<vertices.size();i++){
+   double metres=vertices.get(i).metres;if(!Double.isFinite(metres)||metres<=0)break;
+   cumulative+=metres;if(cumulative>boundaries.first()&&cumulative<boundaries.last())boundaries.add(cumulative);
+  }
   Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);p.setTextSize(10*d);p.setStrokeWidth(d);
   Double previous=null;
   for(Double station:boundaries){
-   PointF at=stationPoint(station);if(at==null)continue;
-   float x=left()+scale()*at.x,y=top()+scale()*at.y;
-   p.setColor(0xff263238);c.drawLine(x,y-8*d,x,y+8*d,p);
    if(previous!=null){
     double mid=(previous+station)/2;boolean covered=false;
     for(int j=0;j<surfaceSections.length();j++){org.json.JSONObject o=surfaceSections.optJSONObject(j);if(o!=null&&o.optDouble("from")<=mid&&o.optDouble("to")>=mid){covered=true;break;}}
-    PointF m=stationPoint(mid);
-    if(covered&&m!=null){
-     String label=String.format(Locale.GERMANY,"%.2f m",station-previous);
-     float tx=left()+scale()*m.x,ty=top()+scale()*m.y+22*d,w=p.measureText(label);
-     p.setColor(Color.WHITE);c.drawRect(tx-w/2-3*d,ty-11*d,tx+w/2+3*d,ty+3*d,p);
-     p.setColor(0xff263238);c.drawText(label,tx-w/2,ty,p);
+    PointF a=stationPoint(previous),b=stationPoint(station);
+    if(covered&&a!=null&&b!=null){
+     float ax=left()+scale()*a.x,ay=top()+scale()*a.y,bx=left()+scale()*b.x,by=top()+scale()*b.y;
+     float len=(float)Math.hypot(bx-ax,by-ay);
+     if(len>.1f){
+      float ux=(bx-ax)/len,uy=(by-ay)/len,nx=-uy,ny=ux;
+      if(ny<0||(Math.abs(ny)<.001f&&nx<0)){nx=-nx;ny=-ny;}
+      float offset=25*d;
+      float x1=ax+nx*offset,y1=ay+ny*offset,x2=bx+nx*offset,y2=by+ny*offset;
+      p.setColor(0xff263238);
+      c.drawLine(ax+nx*7*d,ay+ny*7*d,x1+nx*4*d,y1+ny*4*d,p);
+      c.drawLine(bx+nx*7*d,by+ny*7*d,x2+nx*4*d,y2+ny*4*d,p);
+      c.drawLine(x1,y1,x2,y2,p);
+      for(int k=0;k<2;k++){float x=k==0?x1:x2,y=k==0?y1:y2;c.drawLine(x-(ux+nx)*3*d,y-(uy+ny)*3*d,x+(ux+nx)*3*d,y+(uy+ny)*3*d,p);}
+      String label=String.format(Locale.GERMANY,"%.2f m",station-previous);
+      float tx=(x1+x2)/2,ty=(y1+y2)/2,w=p.measureText(label);
+      float angle=(float)Math.toDegrees(Math.atan2(uy,ux));if(angle>90)angle-=180;if(angle<-90)angle+=180;
+      c.save();c.translate(tx,ty);c.rotate(angle);
+      p.setColor(Color.WHITE);c.drawRect(-w/2-2*d,-11*d,w/2+2*d,3*d,p);
+      p.setColor(0xff263238);c.drawText(label,-w/2,0,p);c.restore();
+     }
     }
    }
    previous=station;
