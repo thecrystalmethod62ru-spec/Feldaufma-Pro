@@ -1625,8 +1625,12 @@ public class MainActivity extends Activity {
     montagePoints.add(new double[]{pos.x,-pos.y});
    }catch(IllegalArgumentException ignored){}}
   }catch(Exception e){notice("Montage-Zuordnung konnte nicht vollständig gelesen werden.");}
+  final double[] widths={Double.NaN,Double.NaN,Double.NaN};
+  String[] widthKeys={"width","left","right"};
+  for(int i=0;i<widthKeys.length;i++){try{double v=Double.parseDouble(getPreferences(0).getString(widthKeys[i],"").trim().replace(',','.'));if(Double.isFinite(v)&&v>=0&&(i!=0||v>0))widths[i]=v;}catch(Exception ignored){}}
   LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);
   TextView info=new TextView(this);info.setText("Gemessene Längen · Richtungen aus Skizze (nicht vermessen)");panel.addView(info);
+  TextView widthHint=new TextView(this);widthHint.setText("Grabenbreite: "+(Double.isFinite(widths[0])?widths[0]+" m":"offen")+" · Nachschnitt links: "+(Double.isFinite(widths[1])?widths[1]+" m":"offen")+" · rechts: "+(Double.isFinite(widths[2])?widths[2]+" m":"offen")+"\nAbschnittsbänder schematisch an Knicken; keine Flächenberechnung.");panel.addView(widthHint);
   TextView montageHint=new TextView(this);montageHint.setText("Montage: "+montagePoints.size()+" darstellbare Stationspunkte. Fehlender Versatz = Achse (Vorschau); Eckversatz nicht dargestellt.");panel.addView(montageHint);
   android.view.View drawing=new android.view.View(this){
    final android.graphics.Paint pen=new android.graphics.Paint(3);
@@ -1634,8 +1638,26 @@ public class MainActivity extends Activity {
     super.onDraw(c);double minX=0,maxX=0,minY=0,maxY=0;
     for(double[] p:model.vertices){minX=Math.min(minX,p[0]);maxX=Math.max(maxX,p[0]);minY=Math.min(minY,p[1]);maxY=Math.max(maxY,p[1]);}
     for(double[] p:montagePoints){minX=Math.min(minX,p[0]);maxX=Math.max(maxX,p[0]);minY=Math.min(minY,p[1]);maxY=Math.max(maxY,p[1]);}
+    double margin=Double.isFinite(widths[0])?widths[0]/2+Math.max(Double.isFinite(widths[1])?widths[1]:0,Double.isFinite(widths[2])?widths[2]:0):0;
+    minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
     double scale=Math.min((getWidth()-dp(48))/Math.max(.001,maxX-minX),(getHeight()-dp(64))/Math.max(.001,maxY-minY));if(!Double.isFinite(scale)||scale<=0)return;
     double ox=(getWidth()-(maxX-minX)*scale)/2-minX*scale,oy=(getHeight()-(maxY-minY)*scale)/2+maxY*scale;
+    if(Double.isFinite(widths[0])){
+     for(int i=1;i<model.vertices.size();i++){
+      double[] a=model.vertices.get(i-1),b=model.vertices.get(i);
+      double dx=b[0]-a[0],dy=b[1]-a[1],n=Math.hypot(dx,dy);if(n<=0)continue;
+      double nx=-dy/n,ny=dx/n,half=widths[0]/2;
+      double[][] bands={{-half,half},{half,half+(Double.isFinite(widths[1])?widths[1]:0)},{-half-(Double.isFinite(widths[2])?widths[2]:0),-half}};
+      for(int j=0;j<bands.length;j++){double lo=bands[j][0],hi=bands[j][1];if(hi<=lo)continue;
+       android.graphics.Path shape=new android.graphics.Path();
+       shape.moveTo((float)(ox+(a[0]+nx*lo)*scale),(float)(oy-(a[1]+ny*lo)*scale));
+       shape.lineTo((float)(ox+(b[0]+nx*lo)*scale),(float)(oy-(b[1]+ny*lo)*scale));
+       shape.lineTo((float)(ox+(b[0]+nx*hi)*scale),(float)(oy-(b[1]+ny*hi)*scale));
+       shape.lineTo((float)(ox+(a[0]+nx*hi)*scale),(float)(oy-(a[1]+ny*hi)*scale));shape.close();
+       pen.setColor(j==0?0xffb79b70:0xff777e86);c.drawPath(shape,pen);
+      }
+     }
+    }
     for(int i=1;i<model.vertices.size();i++){
      double[] a=model.vertices.get(i-1),b=model.vertices.get(i);
      float ax=(float)(ox+a[0]*scale),ay=(float)(oy-a[1]*scale),bx=(float)(ox+b[0]*scale),by=(float)(oy-b[1]*scale);
