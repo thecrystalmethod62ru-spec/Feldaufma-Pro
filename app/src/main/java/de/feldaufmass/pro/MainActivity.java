@@ -1704,28 +1704,28 @@ public class MainActivity extends Activity {
     if(Double.isFinite(from)&&Double.isFinite(to)&&from>=0&&to<=total&&to>from){cuts.add(from);cuts.add(to);}
    }
    java.util.ArrayList<Double> stations=new java.util.ArrayList<>(cuts);
-   java.util.TreeMap<String,Double> bySurface=new java.util.TreeMap<>();
-   double area=0,unmeasured=0,unknownSurface=0,nachschnittArea=0;boolean missingCuts=false;int surfaceConflicts=0;
+   java.util.TreeMap<String,Double> bySurface=new java.util.TreeMap<>(),cutsBySurface=new java.util.TreeMap<>();
+   double area=0,unmeasured=0,unknownSurface=0,nachschnittArea=0,nachschnittLeft=0,nachschnittRight=0;boolean missingCuts=false;int surfaceConflicts=0;
    for(int i=1;i<stations.size();i++){
     double from=stations.get(i-1),to=stations.get(i),mid=(from+to)/2,w=widths[0];
     for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o!=null&&mid>=o.optDouble("from",Double.NaN)&&mid<o.optDouble("to",Double.NaN))w=o.optDouble("width",Double.NaN);}
     if(!Double.isFinite(w)||w<=0){unmeasured+=to-from;continue;}
     double part=(to-from)*w;area+=part;
     double cutLeft=widths[1],cutRight=widths[2];for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o!=null&&mid>=o.optDouble("from",Double.NaN)&&mid<o.optDouble("to",Double.NaN)){if(o.has("left"))cutLeft=o.optDouble("left",Double.NaN);if(o.has("right"))cutRight=o.optDouble("right",Double.NaN);}}
-    if(Double.isFinite(cutLeft)&&Double.isFinite(cutRight))nachschnittArea+=(to-from)*(cutLeft+cutRight);else missingCuts=true;
+    if(Double.isFinite(cutLeft)&&cutLeft>=0&&Double.isFinite(cutRight)&&cutRight>=0){nachschnittLeft+=(to-from)*cutLeft;nachschnittRight+=(to-from)*cutRight;nachschnittArea+=(to-from)*(cutLeft+cutRight);}else missingCuts=true;
     String surface=null;int matches=0;
     for(int j=0;j<surfaces.length();j++){org.json.JSONObject o=surfaces.optJSONObject(j);if(o==null)continue;
      double lo=o.optDouble("from",Double.NaN),hi=o.optDouble("to",Double.NaN);String name=o.optString("surface","").trim();
      if(Double.isFinite(lo)&&Double.isFinite(hi)&&lo>=0&&hi<=total&&lo<=mid&&mid<hi&&!name.isEmpty()){surface=name;matches++;}
     }
-    if(matches==1)bySurface.put(surface,bySurface.containsKey(surface)?bySurface.get(surface)+part:part);
+    if(matches==1){bySurface.put(surface,bySurface.containsKey(surface)?bySurface.get(surface)+part:part);if(Double.isFinite(cutLeft)&&cutLeft>=0&&Double.isFinite(cutRight)&&cutRight>=0){double extra=(to-from)*(cutLeft+cutRight);cutsBySurface.put(surface,cutsBySurface.containsKey(surface)?cutsBySurface.get(surface)+extra:extra);}}
     else{unknownSurface+=part;if(matches>1)surfaceConflicts++;}
    }
    StringBuilder result=new StringBuilder(String.format(java.util.Locale.GERMANY,"Rechnerische Grabenfläche (Länge × Breite): %.2f m²",area));
-   if(!missingCuts)result.append(String.format(java.util.Locale.GERMANY,"\\nNachschnitt-Zusatzfläche links + rechts: %.2f m²",nachschnittArea));
+   if(!missingCuts)result.append(String.format(java.util.Locale.GERMANY,"\\nNachschnitt links: %.2f m²\\nNachschnitt rechts: %.2f m²\\nNachschnitt gesamt: %.2f m²",nachschnittLeft,nachschnittRight,nachschnittArea));
    else result.append("\\nNachschnitt-Zusatzfläche: unvollständig bemaßt (links/rechts).");
    if(!missingCuts)result.append(String.format(java.util.Locale.GERMANY,"\\nRechnerische Gesamtfläche inkl. Nachschnitt: %.2f m²",area+nachschnittArea));
-   for(java.util.Map.Entry<String,Double> item:bySurface.entrySet())result.append(String.format(java.util.Locale.GERMANY,"\\n%s: %.2f m²",item.getKey(),item.getValue()));
+   for(java.util.Map.Entry<String,Double> item:bySurface.entrySet()){result.append(String.format(java.util.Locale.GERMANY,"\\n%s · Graben: %.2f m²",item.getKey(),item.getValue()));Double cut=cutsBySurface.get(item.getKey());if(cut!=null)result.append(String.format(java.util.Locale.GERMANY," · Nachschnitt: %.2f m²",cut));}
    if(unknownSurface>0)result.append(String.format(java.util.Locale.GERMANY,"\\nOberfläche unklar / nicht zugeordnet: %.2f m²",unknownSurface));
    if(unmeasured>0)result.append(String.format(java.util.Locale.GERMANY,"\\nNicht bemaßte Länge: %.2f m",unmeasured));
    if(surfaceConflicts>0)result.append("\\nWarnung: überlappende Oberflächenzuordnungen.");
