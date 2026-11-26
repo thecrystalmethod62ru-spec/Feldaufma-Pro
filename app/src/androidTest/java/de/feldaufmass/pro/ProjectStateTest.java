@@ -12,6 +12,13 @@ import static org.junit.Assert.*;
 
 @RunWith(AndroidJUnit4.class)
 public class ProjectStateTest {
+ @Test public void fittingTextSuggestsOnlyExplicitValues(){
+  java.util.List<FittingTextParser.Candidate> found=FittingTextParser.parse(
+    "Bogen 22,5° DN 80, Station 12,5 m\nBogen 32°\nMuffe und Flansch\nT Stück DN 80 DN 100\nSchieber");
+  assertEquals(3,found.size());assertEquals(MontageCatalog.Fitting.BEND_22_5,found.get(0).type);
+  assertEquals("80",found.get(0).dn);assertEquals("12,5",found.get(0).station);
+  assertEquals("",found.get(1).dn);assertEquals("",found.get(2).station);
+ }
  @Test public void confirmedPipeLengthsAreIndependentOfTrenchLength(){
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    scenario.onActivity(activity->{

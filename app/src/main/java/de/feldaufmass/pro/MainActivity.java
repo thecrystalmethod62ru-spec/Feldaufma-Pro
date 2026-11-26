@@ -1622,6 +1622,9 @@ public class MainActivity extends Activity {
   dialog.show();
  }
  void showMontageFitting(MontageCatalog.Fitting fitting, org.json.JSONObject original){
+  showMontageFitting(fitting,original,null,null);
+ }
+ void showMontageFitting(MontageCatalog.Fitting fitting,org.json.JSONObject original,String source,FittingTextParser.Candidate suggestion){
   final String projectId=activeProject;
   LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);
   MontageSymbolView preview=new MontageSymbolView(this,fitting);panel.addView(preview,new LinearLayout.LayoutParams(-1,dp(100)));
@@ -1639,6 +1642,12 @@ public class MainActivity extends Activity {
    rotation.setText(original.optString("rotation","0"));mirror.setChecked(original.optBoolean("mirrored"));
    station.setText(original.optString("station"));offset.setText(original.optString("offset"));cover.setText(original.optString("cover"));
    installed.setChecked(original.optBoolean("installed",false));
+  }
+  if(suggestion!=null){
+   dn.setText(suggestion.dn);station.setText(suggestion.station);
+   panel.addView(sheetText("Quelle: "+source+" · Zeile "+suggestion.line+"\n"+suggestion.evidence,14,false));
+  }else if(original!=null&&original.has("sourceLine")){
+   panel.addView(sheetText("Quelle: "+original.optString("sourceName")+" · Zeile "+original.optInt("sourceLineNumber")+"\n"+original.optString("sourceLine"),14,false));
   }
   Runnable updatePreview=()->{
    try{preview.setRotation((float)MontageCatalog.normalizeRotation(Double.parseDouble(rotation.getText().toString().trim().replace(',','.'))));}
@@ -1683,9 +1692,10 @@ public class MainActivity extends Activity {
      if(i==0){String routeLength=getPreferences(0).getString("length","").trim();try{double max=Double.parseDouble(routeLength.replace(',','.'));if(!Double.isFinite(max)||max<=0||value>max)throw new IllegalArgumentException();}catch(Exception e){station.setError("Station innerhalb einer gültigen Tiefbau-Trassenlänge erforderlich");return;}}
      item.put(keys[i],value);
     }
+    if(suggestion!=null)item.put("sourceName",source).put("sourceLine",suggestion.evidence).put("sourceLineNumber",suggestion.line);
     item.put("stationLinked",item.has("station"));if(index<0)rows.put(item);else rows.put(index,item);
     if(!getPreferences(0).edit().putString("montageFittings",rows.toString()).commit()){notice("Speichern fehlgeschlagen.");return;}
-    dialog.dismiss();notice("Formstück gespeichert.");if(original==null)showMontageCatalog();else showMontageInventory();
+    dialog.dismiss();notice("Formstück gespeichert.");if(original==null&&suggestion==null)showMontageCatalog();else showMontageInventory();
    }catch(Exception e){notice("Formstück konnte nicht gespeichert werden.");}
   }));dialog.show();
  }
@@ -3716,11 +3726,23 @@ public class MainActivity extends Activity {
   form.addView(sheetText(name+"\nOCR – Handschrift kann falsch oder unvollständig erkannt werden. Bitte mit dem Original vergleichen.",14,true));
   EditText content=new EditText(this);content.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);content.setMinLines(5);content.setText(recognized);form.addView(content);
   form.addView(sheetText("Fehlende Bezeichnungen ergänzen, z. B. Grabenbreite 0,92 m. Einzelne unbeschriftete Zahlen werden nicht automatisch zugeordnet.",14,false));
-  new android.app.AlertDialog.Builder(this).setTitle("Erkannten Bildtext prüfen").setView(scroll).setNegativeButton("Abbrechen",null).setPositiveButton("Maße suchen",(d,w)->{
+  new android.app.AlertDialog.Builder(this).setTitle("Erkannten Bildtext prüfen").setView(scroll).setNegativeButton("Abbrechen",null).setNeutralButton("Formstücke suchen",(d,w)->reviewFittingText(name,content.getText().toString())).setPositiveButton("Maße suchen",(d,w)->{
    java.util.ArrayList<DocMeasure> matches=new java.util.ArrayList<>();
    for(DocMeasure m:findDocumentMeasures(content.getText().toString(),1))matches.add(new DocMeasure(m.field,1,m.metres,"OCR / geprüfter Bildtext: "+m.evidence));
    previewDocumentMeasures(name,"Bild / Handskizze · OCR-Text",matches);
   }).show();
+ }
+ void reviewFittingText(String source,String text){
+  java.util.List<FittingTextParser.Candidate> matches=FittingTextParser.parse(text);
+  if(matches.isEmpty()){new android.app.AlertDialog.Builder(this).setTitle("Keine eindeutige Bezeichnung gefunden").setMessage("Eine Bezeichnung je Zeile verwenden, z. B. Bogen 45° DN 80, Station 12,5 m.")
+    .setPositiveButton("Text prüfen",(d,w)->reviewImageText(source,text)).setNegativeButton("Schließen",null).show();return;}
+  String[] labels=new String[matches.size()];
+  for(int i=0;i<labels.length;i++){
+   FittingTextParser.Candidate c=matches.get(i);labels[i]="Zeile "+c.line+" · "+c.evidence;
+  }
+  new android.app.AlertDialog.Builder(this).setTitle("Formstück zur Prüfung auswählen").setItems(labels,(d,i)->{
+   FittingTextParser.Candidate c=matches.get(i);showMontageFitting(c.type,null,source,c);
+  }).setNegativeButton("Zurück",(d,w)->reviewImageText(source,text)).show();
  }
  void choosePdfAnalysis(){
   java.util.ArrayList<org.json.JSONObject> pdfs=new java.util.ArrayList<>();java.util.ArrayList<String> labels=new java.util.ArrayList<>();
