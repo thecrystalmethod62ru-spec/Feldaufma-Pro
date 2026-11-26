@@ -1635,19 +1635,25 @@ public class MainActivity extends Activity {
   for(int i=0;i<widthKeys.length;i++){try{double v=Double.parseDouble(getPreferences(0).getString(widthKeys[i],"").trim().replace(',','.'));if(Double.isFinite(v)&&v>=0&&(i!=0||v>0))widths[i]=v;}catch(Exception ignored){}}
   LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);
   TextView info=new TextView(this);info.setText("Gemessene Längen · Richtungen aus Skizze (nicht vermessen)");panel.addView(info);
-  TextView widthHint=new TextView(this);widthHint.setText("Grabenbreite: "+(Double.isFinite(widths[0])?widths[0]+" m":"offen")+" · Nachschnitt links: "+(Double.isFinite(widths[1])?widths[1]+" m":"offen")+" · rechts: "+(Double.isFinite(widths[2])?widths[2]+" m":"offen")+"\nVerbundene Vorschaukonturen; Überschneidungen nicht bereinigt, keine Flächenberechnung.");panel.addView(widthHint);
+  TextView widthHint=new TextView(this);widthHint.setText("Grabenbreite: "+(Double.isFinite(widths[0])?widths[0]+" m":"offen")+" · Nachschnitt links: "+(Double.isFinite(widths[1])?widths[1]+" m":"offen")+" · rechts: "+(Double.isFinite(widths[2])?widths[2]+" m":"offen")+"\nVariable Breiten: Abschnittskonturen an Knicken schematisch; keine Flächenberechnung.");panel.addView(widthHint);
   TextView surfaceHint=new TextView(this);surfaceHint.setText("Oberflächen: "+surfaces.length()+" gespeicherte Abschnitte · Standardfarben und Stationsmaße; ungültige Stationen werden ausgelassen.");panel.addView(surfaceHint);
   TextView montageHint=new TextView(this);montageHint.setText("Montage: "+montagePoints.size()+" darstellbare Stationspunkte. Fehlender Versatz = Achse (Vorschau); Eckversatz nicht dargestellt.");panel.addView(montageHint);
   android.view.View drawing=new android.view.View(this){
    final android.graphics.Paint pen=new android.graphics.Paint(3);
+   double widthAt(double station){
+    for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o==null)continue;double from=o.optDouble("from"),to=o.optDouble("to"),w=o.optDouble("width");if(from>=0&&to<=route.measuredLength()&&station>=from&&station<to&&Double.isFinite(w)&&w>0)return w;}
+    return widths[0];
+   }
    @Override protected void onDraw(android.graphics.Canvas c){
     super.onDraw(c);double minX=0,maxX=0,minY=0,maxY=0;
     for(double[] p:model.vertices){minX=Math.min(minX,p[0]);maxX=Math.max(maxX,p[0]);minY=Math.min(minY,p[1]);maxY=Math.max(maxY,p[1]);}
     for(double[] p:montagePoints){minX=Math.min(minX,p[0]);maxX=Math.max(maxX,p[0]);minY=Math.min(minY,p[1]);maxY=Math.max(maxY,p[1]);}
     double margin=Double.isFinite(widths[0])?widths[0]/2+Math.max(Double.isFinite(widths[1])?widths[1]:0,Double.isFinite(widths[2])?widths[2]:0):0;
+    for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o!=null){double w=o.optDouble("width");if(Double.isFinite(w)&&w>0)margin=Math.max(margin,w/2+Math.max(Double.isFinite(widths[1])?widths[1]:0,Double.isFinite(widths[2])?widths[2]:0));}}
     margin*=2;minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
     double scale=Math.min((getWidth()-dp(48))/Math.max(.001,maxX-minX),(getHeight()-dp(64))/Math.max(.001,maxY-minY));if(!Double.isFinite(scale)||scale<=0)return;
     double ox=(getWidth()-(maxX-minX)*scale)/2-minX*scale,oy=(getHeight()-(maxY-minY)*scale)/2+maxY*scale;
+    if(widthSections.length()==0){
     if(Double.isFinite(widths[0])){
      double half=widths[0]/2,left=Double.isFinite(widths[1])?widths[1]:0,right=Double.isFinite(widths[2])?widths[2]:0;
      double[][] bands={{-half-right,half+left},{-half,half}};
@@ -1693,6 +1699,25 @@ public class MainActivity extends Activity {
       }
       double[] mid=model.station((from+to)/2);if(mid!=null){pen.setColor(0xff777777);pen.setTextSize(dp(11));c.drawText(name,(float)(ox+mid[0]*scale),(float)(oy-mid[1]*scale+widths[0]*scale/2+dp(14)),pen);}
      }
+    }
+    }else{
+     java.util.TreeSet<Double> cuts=new java.util.TreeSet<>();cuts.add(0.0);double total=route.measuredLength(),station=0;
+     for(int i=1;i<route.vertices.size();i++){station+=route.vertices.get(i).metres;cuts.add(station);}
+     for(org.json.JSONArray arr:new org.json.JSONArray[]{widthSections,surfaces})for(int j=0;j<arr.length();j++){org.json.JSONObject o=arr.optJSONObject(j);if(o==null)continue;double from=o.optDouble("from"),to=o.optDouble("to");if(Double.isFinite(from)&&Double.isFinite(to)&&from>=0&&to<=total&&to>from){cuts.add(from);cuts.add(to);}}
+     java.util.ArrayList<Double> stations=new java.util.ArrayList<>(cuts);
+     double left=Double.isFinite(widths[1])?widths[1]:0,right=Double.isFinite(widths[2])?widths[2]:0;
+     for(int pass=0;pass<2;pass++)for(int i=1;i<stations.size();i++){
+      double from=stations.get(i-1),to=stations.get(i),mid=(from+to)/2,w=widthAt(mid);if(!Double.isFinite(w)||w<=0)continue;
+      double[] u=model.station(from),v=model.station(to);if(u==null||v==null)continue;
+      double dx=v[0]-u[0],dy=v[1]-u[1],n=Math.hypot(dx,dy);if(n<=0)continue;
+      double nx=-dy/n,ny=dx/n,lo=-w/2-(pass==0?right:0),hi=w/2+(pass==0?left:0);
+      android.graphics.Path shape=new android.graphics.Path();double[][] points={{u[0]+nx*lo,u[1]+ny*lo},{v[0]+nx*lo,v[1]+ny*lo},{v[0]+nx*hi,v[1]+ny*hi},{u[0]+nx*hi,u[1]+ny*hi}};
+      for(int k=0;k<4;k++){float x=(float)(ox+points[k][0]*scale),y=(float)(oy-points[k][1]*scale);if(k==0)shape.moveTo(x,y);else shape.lineTo(x,y);}shape.close();
+      int color=pass==0?0xff777e86:0xffb79b70;
+      if(pass==1)for(int j=0;j<surfaces.length();j++){org.json.JSONObject o=surfaces.optJSONObject(j);if(o!=null&&mid>=o.optDouble("from")&&mid<o.optDouble("to")&&!o.optString("surface").trim().isEmpty())color=route.configuredSurfaceColor(o.optString("surface"),route.legendSettings());}
+      pen.setColor(color);c.drawPath(shape,pen);
+     }
+     for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o==null)continue;double from=o.optDouble("from"),to=o.optDouble("to"),w=o.optDouble("width");if(!(from>=0&&to<=total&&to>from&&Double.isFinite(w)&&w>0))continue;double[] q=model.station((from+to)/2);if(q==null)continue;pen.setColor(0xff555555);pen.setTextSize(dp(11));c.drawText(String.format(java.util.Locale.GERMANY,"B %.2f m",w),(float)(ox+q[0]*scale),(float)(oy-q[1]*scale-dp(38)),pen);}
     }
     for(int i=1;i<model.vertices.size();i++){
      double[] a=model.vertices.get(i-1),b=model.vertices.get(i);
