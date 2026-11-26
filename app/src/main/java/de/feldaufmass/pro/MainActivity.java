@@ -354,6 +354,13 @@ public class MainActivity extends Activity {
   dialog.show();
  }
 
+ static final class RouteEditHistory{
+  final java.util.ArrayDeque<String> undo=new java.util.ArrayDeque<>(),redo=new java.util.ArrayDeque<>();
+  String current;
+  RouteEditHistory(String initial){current=initial;}
+  void record(String next){if(current.equals(next))return;undo.push(current);while(undo.size()>50)undo.removeLast();current=next;redo.clear();}
+  String step(boolean forward){java.util.ArrayDeque<String> from=forward?redo:undo,to=forward?undo:redo;if(from.isEmpty())return current;to.push(current);current=from.pop();return current;}
+ }
  void editRoute(boolean measure){
   LinearLayout form=page();
   ScrollView scroll=new ScrollView(this);scroll.addView(form);
@@ -371,10 +378,15 @@ public class MainActivity extends Activity {
    hint.setText(new String[]{"Mit einem Finger zeichnen, mit zwei Fingern zoomen oder verschieben.","Abschnitt zum Bemaßen antippen.","Punkt ziehen. Der Winkel gilt zur Waagerechten am benachbarten Punkt."}[index]);
   });
   mode.setSelection(measure?1:0);
+  RouteEditHistory history=new RouteEditHistory(route.encode());
+  LinearLayout historyBar=new LinearLayout(this);form.addView(historyBar);
+  Button undo=new Button(this),redo=new Button(this);undo.setAllCaps(false);redo.setAllCaps(false);undo.setText("Rückgängig");redo.setText("Wiederholen");
+  historyBar.addView(undo,new LinearLayout.LayoutParams(0,-2,1));historyBar.addView(redo,new LinearLayout.LayoutParams(0,-2,1));
   Button remove=new Button(this);remove.setText("Letzten Abschnitt entfernen");form.addView(remove);
   LinearLayout list=page();form.addView(list);
   route.selected=i->measureSegment(route,i);
-  route.changed=()->{
+  Runnable refreshEditor=()->{
+   undo.setEnabled(!history.undo.isEmpty());redo.setEnabled(!history.redo.isEmpty());
    remove.setEnabled(route.vertices.size()>1);
    list.removeAllViews();
    String[] lines=route.measurements().split("\n");
@@ -384,6 +396,12 @@ public class MainActivity extends Activity {
     measureButton.setOnClickListener(v->measureSegment(route,index));list.addView(measureButton);
    }
   };
+  route.changed=()->{history.record(route.encode());refreshEditor.run();};
+  java.util.function.Consumer<Boolean> restore=forward->{
+   String snapshot=history.step(forward);RouteSketch parsed=new RouteSketch(this,snapshot);
+   route.vertices.clear();route.vertices.addAll(parsed.vertices);route.highlight=-1;route.dragged=-1;route.invalidate();refreshEditor.run();
+  };
+  undo.setOnClickListener(v->restore.accept(false));redo.setOnClickListener(v->restore.accept(true));
   remove.setOnClickListener(v->{
    route.vertices.remove(route.vertices.size()-1);
    if(route.vertices.size()==1)route.vertices.clear();
