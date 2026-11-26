@@ -1894,6 +1894,27 @@ public class MainActivity extends Activity {
   TextView surfaceHint=new TextView(this);surfaceHint.setText("Oberflächen: "+surfaces.length()+" gespeicherte Abschnitte · Standardfarben und Stationsmaße; ungültige Stationen werden ausgelassen.");panel.addView(surfaceHint);
   TextView montageHint=new TextView(this);montageHint.setText("Montage: "+montagePoints.size()+" darstellbare Stationspunkte. Fehlender Versatz = Achse (Vorschau); Eckversatz nicht dargestellt.");panel.addView(montageHint);
   android.view.View drawing=new android.view.View(this){
+   final java.util.List<float[]> branchHits=new java.util.ArrayList<>();
+   final java.util.List<String> branchHitIds=new java.util.ArrayList<>();
+   @Override public boolean onTouchEvent(android.view.MotionEvent event){
+    if(event.getAction()==android.view.MotionEvent.ACTION_DOWN)return true;
+    if(event.getAction()!=android.view.MotionEvent.ACTION_UP)return true;
+    int best=-1;double distance=dp(18);
+    for(int i=0;i<branchHits.size();i++){float[] p=branchHits.get(i);double d=Math.hypot(event.getX()-p[0],event.getY()-p[1]);if(d<distance){distance=d;best=i;}}
+    if(best<0)return true;
+    final String id=branchHitIds.get(best);final int index=(int)branchHits.get(best)[2];
+    if(index==0){notice("Anschlussstation über Abzweigungen verwalten ändern");return true;}
+    new android.app.AlertDialog.Builder(MainActivity.this).setTitle("Knickpunkt "+index).setItems(new String[]{"Punkt löschen und verbinden"},(dialog,which)->{
+     new android.app.AlertDialog.Builder(MainActivity.this).setMessage("Punkt löschen und Abschnittslängen neu berechnen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(d,w)->{
+      try{java.util.List<RouteBranch> branches=branchStore.load();boolean found=false;
+       for(int j=0;j<branches.size();j++)if(branches.get(j).id.equals(id)){branches.set(j,BranchPointEditor.remove(branches.get(j),model.vertices,index));found=true;break;}
+       if(!found)throw new IllegalStateException("Abzweigung nicht gefunden");
+       branchStore.save(branches);invalidate();notice("Punkt gelöscht");
+      }catch(Exception ex){notice("Punkt konnte nicht gelöscht werden: "+ex.getMessage());}
+     }).show();
+    }).show();performClick();return true;
+   }
+   @Override public boolean performClick(){super.performClick();return true;}
    final android.graphics.Paint pen=new android.graphics.Paint(3);
    double cutAt(double station,String side,double fallback){
     for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o==null)continue;if(station>=o.optDouble("from",Double.NaN)&&station<o.optDouble("to",Double.NaN)&&o.has(side)){double v=o.optDouble(side,Double.NaN);if(Double.isFinite(v)&&v>=0)return v;}}
@@ -1904,7 +1925,7 @@ public class MainActivity extends Activity {
     return widths[0];
    }
    @Override protected void onDraw(android.graphics.Canvas c){
-    super.onDraw(c);double minX=0,maxX=0,minY=0,maxY=0;
+    super.onDraw(c);branchHits.clear();branchHitIds.clear();double minX=0,maxX=0,minY=0,maxY=0;
     for(double[] p:model.vertices){minX=Math.min(minX,p[0]);maxX=Math.max(maxX,p[0]);minY=Math.min(minY,p[1]);maxY=Math.max(maxY,p[1]);}
     for(double[] p:montagePoints){minX=Math.min(minX,p[0]);maxX=Math.max(maxX,p[0]);minY=Math.min(minY,p[1]);maxY=Math.max(maxY,p[1]);}
     double margin=Double.isFinite(widths[0])?widths[0]/2+Math.max(Double.isFinite(widths[1])?widths[1]:0,Double.isFinite(widths[2])?widths[2]:0):0;
@@ -2020,6 +2041,7 @@ public class MainActivity extends Activity {
       pen.setColor(0xff398bda);pen.setStrokeWidth(dp(2));c.drawLine(ax,ay,bx,by,pen);
       pen.setColor(0xff555555);pen.setTextSize(dp(11));c.drawText(String.format(java.util.Locale.GERMANY,"%.2f m",Math.hypot(b[0]-a[0],b[1]-a[1])),(ax+bx)/2,(ay+by)/2-dp(8),pen);
      }
+     for(int k=0;k<points.size();k++){double[] point=points.get(k);float px=(float)(ox+point[0]*scale),py=(float)(oy-point[1]*scale);branchHits.add(new float[]{px,py,k});branchHitIds.add(branch.id);pen.setColor(0xff398bda);c.drawCircle(px,py,dp(4),pen);}
      double[] p=points.get(0);pen.setColor(0xff398bda);c.drawCircle((float)(ox+p[0]*scale),(float)(oy-p[1]*scale),dp(4),pen);
      p=points.get(points.size()-1);pen.setColor(0xff555555);pen.setTextSize(dp(11));c.drawText(branch.name,(float)(ox+p[0]*scale),(float)(oy-p[1]*scale-dp(14)),pen);
     }
