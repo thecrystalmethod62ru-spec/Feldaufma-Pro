@@ -107,6 +107,9 @@ public class MainActivity extends Activity {
  objectSide=new Spinner(this);objectSide.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Unbekannt","links","rechts","mittig"}));root.addView(objectSide);
  objectNote=field(root,"Objektdetails / Bemerkung","objectNote",false);
  try{objects=new org.json.JSONArray(getPreferences(0).getString("objects","[]"));}catch(Exception ignored){}
+  readHistory("objectUndo",undoObjects);
+  readHistory("objectRedo",redoObjects);
+  updateHistoryButtons();
  Button ob=new Button(this);ob.setText("Objekt hinzufügen");root.addView(ob);ob.setOnClickListener(v->addObject());
  objectList=new TextView(this);root.addView(objectList);showObjects();
  Button undo=new Button(this);undo.setText("Letztes Objekt entfernen");root.addView(undo);undo.setOnClickListener(v->{if(objects.length()>0){objects.remove(objects.length()-1);saveObjects();}});
@@ -154,8 +157,33 @@ public class MainActivity extends Activity {
  boolean objectWarning(int index){org.json.JSONObject o=objects.optJSONObject(index);if(o==null)return false;double x=o.optDouble("station"),a=detailExtent(o)/2;if(!Double.isFinite(x)||x-a<0||x+a>l)return true;for(int j=0;j<objects.length();j++){org.json.JSONObject q=objects.optJSONObject(j);if(j==index||q==null)continue;double y=q.optDouble("station"),b=detailExtent(q)/2;if(!Double.isFinite(y))continue;if(o.optString("side").equals(q.optString("side"))&&(Math.abs(x-y)<0.01||Math.abs(x-y)<a+b))return true;}return false;}
  void addObject(){try{double st=number(objectStation),total=l;if(!Double.isFinite(st)||!Double.isFinite(total)||total<=0||st<0||st>total)throw new Exception();org.json.JSONObject o=new org.json.JSONObject();o.put("station",st);o.put("type",objectType.getSelectedItem().toString());o.put("side",objectSide.getSelectedItem().toString());o.put("note",objectNote.getText().toString());objects.put(o);saveObjects();}catch(Exception e){Toast.makeText(this,"Objektstation außerhalb der Trasse oder ungültig.",Toast.LENGTH_LONG).show();}}
  void updateHistoryButtons(){if(undoObjectsButton!=null)undoObjectsButton.setEnabled(!undoObjects.isEmpty());if(redoObjectsButton!=null)redoObjectsButton.setEnabled(!redoObjects.isEmpty());}
- void persistObjects(){getPreferences(0).edit().putString("objects",objects.toString()).apply();showObjects();refreshDetailQuantities();sketch.invalidate();updateHistoryButtons();}
- void saveObjects(){String old=getPreferences(0).getString("objects","[]");if(!old.equals(objects.toString())){undoObjects.push(old);while(undoObjects.size()>50)undoObjects.removeLast();redoObjects.clear();}persistObjects();}
+ static final int HISTORY_LIMIT = 50;
+
+ void readHistory(String key, java.util.ArrayDeque<String> history) {
+  try {
+   org.json.JSONArray entries = new org.json.JSONArray(getPreferences(0).getString(key,"[]"));
+   for (int i = 0; i < Math.min(entries.length(), HISTORY_LIMIT); i++) {
+    String snapshot = entries.getString(i);
+    new org.json.JSONArray(snapshot);
+    history.addLast(snapshot);
+   }
+  } catch (org.json.JSONException invalidEntry) {
+   // Entries are newest first. Keep only the valid steps before the damaged one.
+  }
+ }
+
+ void persistObjects() {
+  getPreferences(0).edit()
+    .putString("objects", objects.toString())
+    .putString("objectUndo", new org.json.JSONArray(undoObjects).toString())
+    .putString("objectRedo", new org.json.JSONArray(redoObjects).toString())
+    .apply();
+  showObjects();
+  refreshDetailQuantities();
+  sketch.invalidate();
+  updateHistoryButtons();
+ }
+ void saveObjects(){String old=getPreferences(0).getString("objects","[]");if(!old.equals(objects.toString())){undoObjects.push(old);while(undoObjects.size()>HISTORY_LIMIT)undoObjects.removeLast();redoObjects.clear();}persistObjects();}
  void restoreObjectHistory(boolean redo){java.util.ArrayDeque<String> from=redo?redoObjects:undoObjects,to=redo?undoObjects:redoObjects;if(from.isEmpty())return;try{org.json.JSONArray restored=new org.json.JSONArray(from.peek());to.push(objects.toString());from.pop();objects=restored;persistObjects();}catch(org.json.JSONException e){Toast.makeText(this,"Änderung konnte nicht wiederhergestellt werden",Toast.LENGTH_SHORT).show();}}
 
  void refreshDetailQuantities(){if(detailQuantities==null)return;StringBuilder b=new StringBuilder("\nDetailmengen – geometrisch, nicht addiert\n");for(int i=0;i<objects.length();i++){org.json.JSONObject o=objects.optJSONObject(i);if(o==null)continue;double a=detailNumber(o,"detailLength"),w=detailNumber(o,"detailWidth"),h=detailNumber(o,"detailDepth");b.append(o.optString("type")).append(" / ").append(o.optString("station")).append(" m\n");if(Double.isFinite(a*w)&&a>0&&w>0){b.append(String.format(java.util.Locale.GERMANY,"Fläche: %.2f m²",a*w));if(Double.isFinite(a*w*h)&&h>0)b.append(String.format(java.util.Locale.GERMANY," | Körpervolumen: %.2f m³",a*w*h));else b.append(" | Tiefe fehlt");}else b.append("Detailmaße fehlen");if(objectWarning(i))b.append(" | ⚠ Lage prüfen");b.append("\n");}b.append("\nNicht zur Haupttrasse addieren: Überschneidungen und LV-Regeln prüfen.");detailQuantities.setText(b.toString());}

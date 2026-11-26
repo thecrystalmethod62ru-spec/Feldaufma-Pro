@@ -17,6 +17,30 @@ public class ProjectStateTest {
    scenario.onActivity(activity -> {
     try { verifyProjectState(activity); } catch (Exception e) { throw new AssertionError(e); }
    });
+   scenario.recreate();
+   scenario.onActivity(activity -> {
+    assertEquals(2, activity.objects.length());
+    assertTrue(activity.undoObjectsButton.isEnabled());
+    assertFalse(activity.redoObjectsButton.isEnabled());
+    activity.undoObjectsButton.performClick();
+    assertEquals(1, activity.objects.length());
+   });
+  }
+  try (ActivityScenario<MainActivity> reopened = ActivityScenario.launch(MainActivity.class)) {
+   reopened.onActivity(activity -> {
+    assertTrue(activity.redoObjectsButton.isEnabled());
+    activity.redoObjectsButton.performClick();
+    assertEquals(2, activity.objects.length());
+    assertEquals(8, activity.objects.optJSONObject(1).optDouble("station"), 0);
+    activity.undoObjectsButton.performClick();
+    activity.objectStation.setText("9");
+    activity.addObject();
+   });
+   reopened.recreate();
+   reopened.onActivity(activity -> {
+    assertFalse(activity.redoObjectsButton.isEnabled());
+    assertEquals(9, activity.objects.optJSONObject(1).optDouble("station"), 0);
+   });
   }
  }
  private void verifyProjectState(MainActivity activity) throws Exception {
