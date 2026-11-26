@@ -121,6 +121,25 @@ final class RouteSketch extends View {
  }
  JSONArray stationObjects=new JSONArray(),surfaceSections=new JSONArray();
  void setStationLayers(JSONArray objects,JSONArray sections){stationObjects=objects;surfaceSections=sections;invalidate();}
+ int draggedObject=-1; String objectBefore; float objectGrabX,objectGrabY;
+ void cancelObjectDrag(){if(draggedObject>=0&&objectBefore!=null)try{stationObjects.put(draggedObject,new org.json.JSONObject(objectBefore));}catch(Exception ignored){}draggedObject=-1;objectBefore=null;invalidate();}
+ void moveStationObject(float x,float y){
+  org.json.JSONObject o=stationObjects.optJSONObject(draggedObject);if(o==null)return;
+  java.util.ArrayList<StationHit> hits=stationCandidates(x,y,Double.POSITIVE_INFINITY);if(hits.isEmpty())return;
+  StationHit h=hits.get(0);Vertex a=vertices.get(h.segment-1),b=vertices.get(h.segment);
+  double dx=b.point.x-a.point.x,dy=b.point.y-a.point.y,n=Math.hypot(dx,dy);
+  double wid=positiveDimension(o,"detailWidth");if(n<=0||!Double.isFinite(b.metres)||b.metres<=0)return;
+  PointF anchor=stationPoint(h.station);if(anchor==null)return;
+  double lateral=((x-anchor.x)*dy-(y-anchor.y)*dx)/n*b.metres/n;
+  try{o.put("station",Math.round(h.station*100)/100.0);
+   if(Double.isFinite(wid)&&Double.isFinite(trenchWidth)&&trenchWidth>0){
+    double half=(wid+trenchWidth)/2;
+    o.put("side",Math.abs(lateral)<half/2?"mittig":lateral>0?"links":"rechts");
+    o.put("detailOffset",Math.round(Math.max(0,Math.abs(lateral)-half)*100)/100.0);
+   }
+   invalidate();
+  }catch(Exception ignored){}
+ }
  boolean editingObjects;
  java.util.function.Consumer<java.util.ArrayList<Integer>> objectSelected;
  java.util.ArrayList<Integer> objectCandidates(double x,double y,double tolerance){
@@ -673,6 +692,7 @@ final class RouteSketch extends View {
    return true;
   }
   if(event.getPointerCount()>=2){
+   cancelObjectDrag();
    float x=(event.getX(0)+event.getX(1))/2,y=(event.getY(0)+event.getY(1))/2;
    float next=(float)Math.hypot(event.getX(0)-event.getX(1),event.getY(0)-event.getY(1));
    if(gesture && action==MotionEvent.ACTION_MOVE && span>0)zoomAt(next/span,focusX,focusY,x,y);
@@ -688,12 +708,14 @@ final class RouteSketch extends View {
    case MotionEvent.ACTION_DOWN:
     getParent().requestDisallowInterceptTouchEvent(true);
     stroke.clear();
+    if(editingObjects||moving){java.util.ArrayList<Integer> hits=objectCandidates((event.getX()-left())/scale(),(event.getY()-top())/scale(),12*getResources().getDisplayMetrics().density/scale());if(hits.size()==1){draggedObject=hits.get(0);org.json.JSONObject o=stationObjects.optJSONObject(draggedObject);ObjectFootprint f=objectFootprint(o);objectBefore=o.toString();objectGrabX=(event.getX()-left())/scale()-f.center.x;objectGrabY=(event.getY()-top())/scale()-f.center.y;dragged=-1;return true;}}
     if(placingObject||editingObjects){dragged=-1;return true;}
     if(moving || !editable)dragged=layerVisible(LAYER_ROUTE)?nearestPoint(event.getX(),event.getY()):-1;
     else if(!dimensioning)stroke.add(vertices.isEmpty()?p:vertices.get(vertices.size()-1).point);
     return true;
    case MotionEvent.ACTION_MOVE:
     if(Math.hypot(event.getX()-touchStartX,event.getY()-touchStartY)>android.view.ViewConfiguration.get(getContext()).getScaledTouchSlop())touchMoved=true;
+    if(draggedObject>=0&&touchMoved){moveStationObject((event.getX()-left())/scale()-objectGrabX,(event.getY()-top())/scale()-objectGrabY);return true;}
     if(touchMoved&&(placingObject||editingObjects||(moving&&dragged<0)||dimensioning||!editable)){centerX=clamp(centerX-(event.getX()-lastTouchX)/scale());centerY=clamp(centerY-(event.getY()-lastTouchY)/scale());invalidate();}
     lastTouchX=event.getX();lastTouchY=event.getY();
     if(placingObject||editingObjects)return true;
@@ -702,6 +724,7 @@ final class RouteSketch extends View {
     return true;
    case MotionEvent.ACTION_UP:
     getParent().requestDisallowInterceptTouchEvent(false);
+    if(draggedObject>=0){int index=draggedObject;draggedObject=-1;objectBefore=null;if(!touchMoved&&objectSelected!=null&&event.getEventTime()-touchStartTime>=android.view.ViewConfiguration.getLongPressTimeout()){java.util.ArrayList<Integer> hits=new java.util.ArrayList<>();hits.add(index);objectSelected.accept(hits);}invalidate();return true;}
     if(editingObjects){if(!touchMoved&&objectSelected!=null&&event.getEventTime()-touchStartTime>=android.view.ViewConfiguration.getLongPressTimeout()){double tolerance=20*getResources().getDisplayMetrics().density/scale();objectSelected.accept(objectCandidates((event.getX()-left())/scale(),(event.getY()-top())/scale(),tolerance));}performClick();invalidate();return true;}
     if(placingObject){if(!touchMoved&&stationSelected!=null){double tolerance=24*getResources().getDisplayMetrics().density/scale();stationSelected.accept(stationCandidates((event.getX()-left())/scale(),(event.getY()-top())/scale(),tolerance));}performClick();invalidate();return true;}
     if(editable&&tappedPoint>=0&&!touchMoved&&pointSelected!=null){
@@ -720,7 +743,7 @@ final class RouteSketch extends View {
     }
     performClick();invalidate();return true;
    case MotionEvent.ACTION_CANCEL:
-    getParent().requestDisallowInterceptTouchEvent(false);stroke.clear();invalidate();return true;
+    cancelObjectDrag();getParent().requestDisallowInterceptTouchEvent(false);stroke.clear();invalidate();return true;
    default:return true;
   }
  }
