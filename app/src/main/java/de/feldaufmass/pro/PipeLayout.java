@@ -72,13 +72,78 @@ public final class PipeLayout {
         return result;
     }
 
+    /** Place movable pipes around locked positions, retaining their list indices. */
+    private static List<Pipe> proposeAroundFixed(List<Pipe> pipes, double width, double depth,
+            double clearance, double minCover, boolean allowLayers) {
+        List<Pipe> placed = new ArrayList<>();
+        for (Pipe pipe : pipes) {
+            if (pipe.fixed) placed.add(pipe);
+        }
+        if (!warnings(placed, width, depth, clearance, minCover).isEmpty()) return new ArrayList<>();
+        if (warnings(pipes, width, depth, clearance, minCover).isEmpty()) return new ArrayList<>(pipes);
+
+        List<Pipe> result = new ArrayList<>(pipes);
+        for (int i = 0; i < pipes.size(); i++) {
+            Pipe pipe = pipes.get(i);
+            if (pipe.fixed) continue;
+            java.util.SortedSet<Double> floors = new java.util.TreeSet<>();
+            floors.add(pipe.bedding);
+            if (allowLayers) {
+                for (Pipe other : placed) {
+                    double gap = Math.max(clearance, Math.max(pipe.minGap, other.minGap));
+                    floors.add(Math.max(pipe.bedding, other.bedding + other.diameter + gap));
+                }
+            }
+            Pipe chosen = null;
+            double radius = pipe.diameter / 2;
+            for (double floor : floors) {
+                if (floor + pipe.diameter + Math.max(minCover, pipe.minCover) > depth + EPS) break;
+                List<Double> offsets = new ArrayList<>();
+                offsets.add(pipe.offset);
+                offsets.add((pipe.diameter - width) / 2);
+                offsets.add((width - pipe.diameter) / 2);
+                for (Pipe other : placed) {
+                    double gap = Math.max(clearance, Math.max(pipe.minGap, other.minGap));
+                    double distance = radius + other.diameter / 2 + gap;
+                    double dy = Math.abs(floor + radius - other.centerHeight());
+                    if (dy >= distance) continue;
+                    double dx = Math.sqrt((distance - dy) * (distance + dy));
+                    offsets.add(other.offset - dx);
+                    offsets.add(other.offset + dx);
+                }
+                offsets.sort(java.util.Comparator.comparingDouble(x -> Math.abs(x - pipe.offset)));
+                for (double offset : offsets) {
+                    if (Math.abs(offset) + radius > width / 2 + EPS) continue;
+                    boolean fits = true;
+                    for (Pipe other : placed) {
+                        double gap = Math.max(clearance, Math.max(pipe.minGap, other.minGap));
+                        if (Math.hypot(offset - other.offset, floor + radius - other.centerHeight())
+                                + EPS < radius + other.diameter / 2 + gap) {
+                            fits = false;
+                            break;
+                        }
+                    }
+                    if (fits) {
+                        chosen = new Pipe(pipe.name, offset, pipe.diameter, pipe.wall, floor, pipe.minGap, pipe.minCover);
+                        break;
+                    }
+                }
+                if (chosen != null) break;
+            }
+            if (chosen == null) return new ArrayList<>();
+            result.set(i, chosen);
+            placed.add(chosen);
+        }
+        return result;
+    }
+
     /** Proposes a centered single-row layout, preserving each pipe's bedding.
      * Returns an empty list if this conservative arrangement cannot satisfy the limits.
      * Does not modify the input list.
      */
     public static List<Pipe> proposeRow(List<Pipe> pipes,double width,double depth,double clearance,double minCover){
         warnings(pipes,width,depth,clearance,minCover);
-        for(Pipe a:pipes)if(a.fixed)return warnings(pipes,width,depth,clearance,minCover).isEmpty()?new ArrayList<>(pipes):new ArrayList<>();
+        for(Pipe a:pipes)if(a.fixed)return proposeAroundFixed(pipes,width,depth,clearance,minCover,false);
         List<Pipe> result=new ArrayList<>();
         double total=0;
         for(int i=0;i<pipes.size();i++){
@@ -101,7 +166,7 @@ public final class PipeLayout {
     /** Conservative shelf layout; existing bedding is a lower bound, never reduced. */
     public static List<Pipe> proposeLayers(List<Pipe> pipes,double width,double depth,double clearance,double minCover){
         warnings(pipes,width,depth,clearance,minCover);
-        for(Pipe a:pipes)if(a.fixed)return warnings(pipes,width,depth,clearance,minCover).isEmpty()?new ArrayList<>(pipes):new ArrayList<>();
+        for(Pipe a:pipes)if(a.fixed)return proposeAroundFixed(pipes,width,depth,clearance,minCover,true);
         List<Pipe> result=new ArrayList<>();
         double gap=clearance;
         for(Pipe a:pipes)gap=Math.max(gap,a.minGap);

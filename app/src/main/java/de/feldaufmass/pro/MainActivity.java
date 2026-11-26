@@ -1826,7 +1826,6 @@ public class MainActivity extends Activity {
      final Button optimizePipes=new Button(this);optimizePipes.setText("Rohranordnung optimieren");content.addView(optimizePipes,content.indexOfChild(warnings));
      optimizePipes.setOnClickListener(button->{
       try{
-       for(PipeLayout.Pipe p:pipes)if(p.fixed){warnings.setText("Fixierte Leitungen: automatische Anordnung derzeit nicht verfügbar.");return;}
        if(pipes.isEmpty()){warnings.setText("Keine Leitungen vorhanden.");return;}
        final java.util.List<PipeLayout.Pipe> rowProposal=PipeLayout.proposeRow(pipes,bw,bd,requirements[0],requirements[1]);
        final boolean layered=rowProposal.isEmpty();
@@ -1836,7 +1835,7 @@ public class MainActivity extends Activity {
        preview.setLayoutData(proposal,bw,bd);preview.setRequirements(requirements[0],requirements[1]);
        android.widget.LinearLayout previewContent=new android.widget.LinearLayout(this);previewContent.setOrientation(1);
        previewContent.addView(preview,new android.widget.LinearLayout.LayoutParams(-1,dp(240)));
-       TextView previewInfo=new TextView(this);previewInfo.setText((layered?"Vorschlag: mehrlagig. Höhenlage kann sich ändern; fachlich prüfen.\n":"Vorschlag: einreihig, Bettung unverändert.\n")+android.text.TextUtils.join("\n",PipeLayout.dimensions(proposal,bw,bd)));
+       TextView previewInfo=new TextView(this);previewInfo.setText((layered?"Vorschlag: mehrlagig. Höhenlage kann sich ändern; fachlich prüfen.\n":"Vorschlag: Bettung unverändert.\n")+android.text.TextUtils.join("\n",PipeLayout.dimensions(proposal,bw,bd)));
        android.widget.ScrollView previewScroll=new android.widget.ScrollView(this);previewScroll.addView(previewInfo);previewContent.addView(previewScroll,new android.widget.LinearLayout.LayoutParams(-1,dp(140)));
        new android.app.AlertDialog.Builder(this).setTitle("Rohranordnung – Vorschau").setView(previewContent).setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",(dialog,which)->{
         try{multiPipeStore.save(proposal);pipes.clear();pipes.addAll(proposal);refresh.run();}
