@@ -211,8 +211,30 @@ public class MainActivity extends Activity {
    tab.setTextColor(selected?Color.WHITE:INK);
   }
   if(p==documentsPage)compareSoll();if(p==quantityPage)refreshDetailQuantities();body.removeAllViews();ScrollView sc=new ScrollView(this);sc.setFillViewport(true);if(p.getParent()!=null)((android.view.ViewGroup)p.getParent()).removeView(p);sc.addView(p);body.addView(sc,new LinearLayout.LayoutParams(-1,-1));}
+ private void fitSystemPanels(LinearLayout root){
+  Window window=getWindow();
+  androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window,false);
+  window.setStatusBarColor(Color.TRANSPARENT);
+  window.setNavigationBarColor(Color.TRANSPARENT);
+  if(android.os.Build.VERSION.SDK_INT>=29)window.setNavigationBarContrastEnforced(false);
+  window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+  androidx.core.view.WindowInsetsControllerCompat controller=
+    androidx.core.view.WindowCompat.getInsetsController(window,root);
+  controller.setAppearanceLightStatusBars(true);
+  controller.setAppearanceLightNavigationBars(true);
+  androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root,(view,insets)->{
+   int types=androidx.core.view.WindowInsetsCompat.Type.systemBars()
+      |androidx.core.view.WindowInsetsCompat.Type.displayCutout()
+      |androidx.core.view.WindowInsetsCompat.Type.ime();
+   androidx.core.graphics.Insets safe=insets.getInsets(types);
+   view.setPadding(safe.left,safe.top,safe.right,safe.bottom);
+   return insets;
+  });
+  androidx.core.view.ViewCompat.requestApplyInsets(root);
+ }
+
  public void onCreate(Bundle b){super.onCreate(b);
- shell=page();shell.setPadding(0,dp(28),0,dp(20));shell.setBackgroundColor(0xfff4f6f8);setContentView(shell);
+ shell=page();shell.setPadding(0,0,0,0);shell.setBackgroundColor(0xfff4f6f8);setContentView(shell);fitSystemPanels(shell);
  planPage=page();measurePage=page();voicePage=page();profilePage=page();segmentPage=page();objectPage=page();quantityPage=page();
  LinearLayout header=new LinearLayout(this);
  header.setGravity(Gravity.CENTER_VERTICAL);

@@ -12,6 +12,24 @@ import static org.junit.Assert.*;
 
 @RunWith(AndroidJUnit4.class)
 public class ProjectStateTest {
+ @Test public void contentClearsVisibleSystemBars(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->{
+    androidx.core.view.WindowInsetsCompat windowInsets=
+      androidx.core.view.ViewCompat.getRootWindowInsets(activity.shell);
+    assertNotNull(windowInsets);
+    androidx.core.graphics.Insets bars=windowInsets.getInsets(
+       androidx.core.view.WindowInsetsCompat.Type.systemBars()
+       |androidx.core.view.WindowInsetsCompat.Type.displayCutout());
+    assertTrue(bars.top>0);
+    assertEquals(bars.top,activity.shell.getPaddingTop());
+    assertEquals(bars.bottom,activity.shell.getPaddingBottom());
+    assertEquals(bars.left,activity.shell.getPaddingLeft());
+    assertEquals(bars.right,activity.shell.getPaddingRight());
+    assertTrue(activity.body.getBottom()<=activity.shell.getHeight()-bars.bottom);
+   });
+  }
+ }
  @Test public void detailHistoryAndExportUseSavedGeometry() throws Exception {
   try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
    scenario.onActivity(activity -> {
