@@ -1703,6 +1703,30 @@ public class MainActivity extends Activity {
   TextView nominalArea=new TextView(this);panel.addView(nominalArea);
   Runnable refreshNominalArea=()->{
    double total=route.measuredLength();
+   java.util.ArrayList<double[]> strips=new java.util.ArrayList<>();
+   double station=0;
+   for(int k=1;k<model.vertices.size();k++){
+    double[] a=model.vertices.get(k-1),b=model.vertices.get(k);
+    double length=route.vertices.get(k).metres;
+    double end=station+length;
+    java.util.TreeSet<Double> split=new java.util.TreeSet<>();split.add(station);split.add(end);
+    for(int j=0;j<widthSections.length();j++){
+     org.json.JSONObject o=widthSections.optJSONObject(j);if(o==null)continue;
+     double lo=o.optDouble("from"),hi=o.optDouble("to");
+     if(lo>station&&lo<end)split.add(lo);if(hi>station&&hi<end)split.add(hi);
+    }
+    java.util.ArrayList<Double> ss=new java.util.ArrayList<>(split);
+    for(int j=1;j<ss.size();j++){
+     double lo=ss.get(j-1),hi=ss.get(j),mid=(lo+hi)/2,w=widths[0],l=widths[1],rr=widths[2];
+     for(int q=0;q<widthSections.length();q++){
+      org.json.JSONObject o=widthSections.optJSONObject(q);if(o==null||!(mid>=o.optDouble("from")&&mid<o.optDouble("to")))continue;
+      w=o.optDouble("width");if(o.has("left"))l=o.optDouble("left");if(o.has("right"))rr=o.optDouble("right");
+     }
+     double t=(lo-station)/length,u=(hi-station)/length;
+     strips.add(new double[]{a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u,w>0&&l>=0?w/2+l:Double.NaN,w>0&&rr>=0?w/2+rr:Double.NaN});
+    }
+    station=end;
+   }
    java.util.TreeSet<Double> cuts=new java.util.TreeSet<>();cuts.add(0.0);cuts.add(total);
    for(org.json.JSONArray sections:new org.json.JSONArray[]{widthSections,surfaces})for(int j=0;j<sections.length();j++){
     org.json.JSONObject o=sections.optJSONObject(j);if(o==null)continue;double from=o.optDouble("from",Double.NaN),to=o.optDouble("to",Double.NaN);
@@ -1736,7 +1760,14 @@ public class MainActivity extends Activity {
    if(unknownSurface>0)result.append(String.format(java.util.Locale.GERMANY,"\\nOberfläche unklar / nicht zugeordnet: %.2f m²",unknownSurface));
    if(unmeasured>0)result.append(String.format(java.util.Locale.GERMANY,"\\nNicht bemaßte Länge: %.2f m",unmeasured));
    if(surfaceConflicts>0)result.append("\\nWarnung: überlappende Oberflächenzuordnungen.");
-   result.append("\\nNur rechnerischer Kontrollwert; keine Polygon-Vereinigung und keine Abrechnungsfreigabe.");
+   result.append("\\nNur rechnerischer Kontrollwert; keine Abrechnungsfreigabe.");
+   if(!missingCuts&&unmeasured==0){
+    try{
+     StripOverlap.Result geometric=StripOverlap.calculate(strips);
+     result.append(String.format(java.util.Locale.GERMANY,"\nGeometrische Kontrollwerte (inkl. Nachschnitt):\nBruttofläche: %.2f m²\nÜberlappungsfläche: %.2f m²\nNettofläche: %.2f m²",geometric.gross,geometric.overlap,geometric.net));
+     result.append("\nGerade Abschnittsstreifen ohne Eckergänzungen; keine automatische Abrechnung.");
+    }catch(RuntimeException e){result.append("\nGeometrische Flächenprüfung nicht verfügbar.");}
+   }
    nominalArea.setText(result.toString());
   };
   refreshNominalArea.run();
