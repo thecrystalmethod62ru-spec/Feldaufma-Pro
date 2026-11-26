@@ -4285,7 +4285,14 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
       for(double stop:cuts){if(previous==null){previous=stop;continue;}double begin=previous;previous=stop;double mid=(begin+stop)/2,bw=trenchWidth;if(mid<routeFrom||mid>=routeTo)continue;
        for(int k=0;k<widths.length();k++){org.json.JSONObject section=widths.optJSONObject(k);if(section!=null&&mid>=section.optDouble("from")&&mid<section.optDouble("to")&&section.optDouble("width")>0){bw=section.optDouble("width");break;}}
        double localDepth=pdfDefaultDepth;for(double[] section:pdfDepthSections)if(mid>=section[0]&&mid<section[1]){localDepth=section[2];break;}
-       if(!Double.isFinite(bw)||bw<=0||utilityOutsideProfile(row,bw,localDepth)){omitted=true;continue;}
+       if(!Double.isFinite(bw)||bw<=0||utilityOutsideProfile(row,bw,localDepth)){
+        omitted=true;
+        int previousColor=p.getColor();float previousWidth=p.getStrokeWidth();
+        p.setColor(0xffb3261e);p.setStrokeWidth(3);
+        double tStart=(begin-station)/len,tEnd=(stop-station)/len;
+        c.drawLine((float)(40+(a.point.x+dx*tStart-minX)*unit),(float)(85+(a.point.y+dy*tStart-minY)*unit),(float)(40+(a.point.x+dx*tEnd-minX)*unit),(float)(85+(a.point.y+dy*tEnd-minY)*unit),p);
+        p.setColor(previousColor);p.setStrokeWidth(previousWidth);continue;
+       }
        double shift=(bw/2-offset)/factor,nx=dy/n*shift,ny=-dx/n*shift,t1=(begin-station)/len,t2=(stop-station)/len;
        utilityLegend.put(type+" · "+String.format(java.util.Locale.GERMANY,"%.0f mm",diameter*1000),p.getColor());
        float x1=(float)(40+(a.point.x+dx*t1+nx-minX)*unit),y1=(float)(85+(a.point.y+dy*t1+ny-minY)*unit),x2=(float)(40+(a.point.x+dx*t2+nx-minX)*unit),y2=(float)(85+(a.point.y+dy*t2+ny-minY)*unit);
@@ -4304,7 +4311,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
      if(truncated){p.setColor(INK);c.drawText("…",width-55,ly,p);}
     }
     if(!pdfDepthValid){p.setColor(0xffb3261e);p.setTextSize(9);c.drawText("Tiefenabschnitte ungültig – Tiefenprüfung nicht möglich",36,height-98,p);}
-    if(utilities.length()>0){p.setColor(INK);p.setTextSize(9);c.drawText(omitted?"Zusatzleitungen: ungültige Profillage oder fehlende Maße teilweise ausgelassen":"Zusatzleitungen: Profilversatz ab linker Kante; Verbindungen schematisch",36,height-110,p);}
+    if(utilities.length()>0){p.setColor(INK);p.setTextSize(9);c.drawText(omitted?"Zusatzleitungen: ungültige Abschnitte rot markiert; fehlende Maße ggf. ausgelassen":"Zusatzleitungen: Profilversatz ab linker Kante; Verbindungen schematisch",36,height-110,p);}
    }
    p.setColor(INK);p.setStrokeWidth(1);float bar=(float)(50*72/25.4);float by=height-47;c.drawLine(40,by,40+bar,by,p);c.drawLine(40,by-4,40,by+4,p);c.drawLine(40+bar,by-4,40+bar,by+4,p);c.drawText("50 mm Kontrollmaß",40,by+17,p);
   }finally{pdf.finishPage(page);}
