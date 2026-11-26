@@ -91,4 +91,26 @@ public final class PipeLayout {
         if(!warnings(result,width,depth,clearance,minCover).isEmpty())return new ArrayList<>();
         return result;
     }
+
+    /** Conservative shelf layout; existing bedding is a lower bound, never reduced. */
+    public static List<Pipe> proposeLayers(List<Pipe> pipes,double width,double depth,double clearance,double minCover){
+        warnings(pipes,width,depth,clearance,minCover);
+        List<Pipe> result=new ArrayList<>();
+        double gap=clearance;
+        for(Pipe a:pipes)gap=Math.max(gap,a.minGap);
+        double cursor=-width/2, floor=0, top=0;
+        for(Pipe a:pipes){
+            if(a.diameter>width+EPS)return new ArrayList<>();
+            if(cursor+a.diameter>width/2+EPS){
+                floor=top+gap;cursor=-width/2;
+            }
+            double bedding=Math.max(floor,a.bedding);
+            if(bedding+a.diameter+Math.max(minCover,a.minCover)>depth+EPS)return new ArrayList<>();
+            result.add(new Pipe(a.name,cursor+a.diameter/2,a.diameter,a.wall,bedding,a.minGap,a.minCover));
+            top=Math.max(top,bedding+a.diameter);
+            cursor+=a.diameter+gap;
+        }
+        if(!warnings(result,width,depth,clearance,minCover).isEmpty())return new ArrayList<>();
+        return result;
+    }
 }
