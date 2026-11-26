@@ -1777,11 +1777,14 @@ public class MainActivity extends Activity {
       double c1=first.optDouble("cover"),c2=second.optDouble("cover"),h1=first.optDouble("verticalEnvelope"),h2=second.optDouble("verticalEnvelope");
       // Cover is measured from the local surface; different stations may have different surface elevations.
       boolean comparable=delta<=0.001&&Double.isFinite(c1)&&c1>=0&&Double.isFinite(c2)&&c2>=0&&Double.isFinite(h1)&&h1>0&&Double.isFinite(h2)&&h2>0;
-      if(comparable&&(c1+h1<=c2||c2+h2<=c1))verticallySeparated++;else possibleConflicts++;
+      double z1=first.optDouble("topElevation"),z2=second.optDouble("topElevation");
+      boolean absolute=Double.isFinite(z1)&&Double.isFinite(z2)&&Double.isFinite(h1)&&h1>0&&Double.isFinite(h2)&&h2>0;
+      boolean separated=absolute?(z1-h1>=z2||z2-h2>=z1):(comparable&&(c1+h1<=c2||c2+h2<=c1));
+      if(separated)verticallySeparated++;else possibleConflicts++;
      }
     }
    }
-   if(verticallySeparated>0)panel.addView(sheetText("Bei "+verticallySeparated+" Überlappungen an gleicher Station sind die angegebenen Tiefenintervalle getrennt. Mindestabstand und Bezugshöhe prüfen.",14,false));
+   if(verticallySeparated>0)panel.addView(sheetText("Bei "+verticallySeparated+" Überlappungen sind die angegebenen Höhen- oder Tiefenintervalle getrennt. Mindestabstand und Bezugshöhe prüfen.",14,false));
    if(possibleConflicts>0)panel.addView(sheetText("Hinweis: "+possibleConflicts+" mögliche Formstück-Überlappungen in der Draufsicht. Höhenlage, fehlende Längsmaße und Anschluss prüfen.",14,true));
    if(envelopeOutside>0)panel.addView(sheetText("Hinweis: "+envelopeOutside+" Formstücke überschreiten mit ihrer angegebenen Querabmessung die Grabenbreite.",14,true));
    if(envelopeUnknown>0)panel.addView(sheetText("Querabmessung fehlt bei "+envelopeUnknown+" Formstücken – vollständige Breitenprüfung offen.",14,false));
@@ -1939,6 +1942,7 @@ public class MainActivity extends Activity {
   offset.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void afterTextChanged(android.text.Editable s){}public void onTextChanged(CharSequence s,int start,int before,int count){try{double m=Double.parseDouble(s.toString().trim().replace(',','.'));if(Double.isFinite(m))offsetSlider.setProgress((int)Math.round(500+100*Math.max(-5,Math.min(5,m))));}catch(NumberFormatException ex){if(s.length()==0)offsetSlider.setProgress(500);}}});
   Button resetOffset=new Button(this);resetOffset.setText("Versatz auf 0 setzen");panel.addView(resetOffset);resetOffset.setOnClickListener(v->offset.setText("0"));
 
+  EditText elevation=new EditText(this);elevation.setHint("Absolute Oberkante Formstück (m, gemeinsamer Höhenbezug, optional)");elevation.setInputType(8194|4096);panel.addView(elevation);
   EditText vertical=new EditText(this);vertical.setHint("Tatsächliche Bauhöhe (m, optional)");vertical.setInputType(8194);panel.addView(vertical);
   EditText longitudinal=new EditText(this);longitudinal.setHint("Tatsächliche Längsabmessung zur Trasse (m, optional)");longitudinal.setInputType(8194);panel.addView(longitudinal);
   EditText envelope=new EditText(this);envelope.setHint("Tatsächliche Querabmessung zur Trasse (m, optional)");envelope.setInputType(8194);panel.addView(envelope);
@@ -1949,6 +1953,7 @@ public class MainActivity extends Activity {
    dn.setText(original.optString("dn"));material.setText(original.optString("material"));
    rotation.setText(original.optString("rotation","0"));mirror.setChecked(original.optBoolean("mirrored"));
    station.setText(original.optString("station"));offset.setText(original.optString("offset"));cover.setText(original.optString("cover"));
+   elevation.setText(original.optString("topElevation"));
    vertical.setText(original.optString("verticalEnvelope"));
    longitudinal.setText(original.optString("longitudinalEnvelope"));
    envelope.setText(original.optString("lateralEnvelope"));
@@ -2008,6 +2013,7 @@ public class MainActivity extends Activity {
      item.put(keys[i],value);
     }
     if(suggestion!=null)item.put("sourceName",source).put("sourceLine",suggestion.evidence).put("sourceLineNumber",suggestion.line);
+    String rawElevation=elevation.getText().toString().trim();if(rawElevation.isEmpty())item.remove("topElevation");else{try{double value=Double.parseDouble(rawElevation.replace(',','.'));if(!Double.isFinite(value))throw new IllegalArgumentException();item.put("topElevation",value);}catch(Exception ex){elevation.setError("Gültige Höhenkote erforderlich");return;}}
     String rawVertical=vertical.getText().toString().trim();if(rawVertical.isEmpty())item.remove("verticalEnvelope");else{try{double value=Double.parseDouble(rawVertical.replace(',','.'));if(!Double.isFinite(value)||value<=0)throw new IllegalArgumentException();item.put("verticalEnvelope",value);}catch(Exception ex){vertical.setError("Positive Bauhöhe erforderlich");return;}}
     String rawLong=longitudinal.getText().toString().trim();if(rawLong.isEmpty())item.remove("longitudinalEnvelope");else{try{double value=Double.parseDouble(rawLong.replace(',','.'));if(!Double.isFinite(value)||value<=0)throw new IllegalArgumentException();item.put("longitudinalEnvelope",value);}catch(Exception ex){longitudinal.setError("Positive Längsabmessung erforderlich");return;}}
     String rawEnvelope=envelope.getText().toString().trim();if(rawEnvelope.isEmpty())item.remove("lateralEnvelope");else{try{double value=Double.parseDouble(rawEnvelope.replace(',','.'));if(!Double.isFinite(value)||value<=0)throw new IllegalArgumentException();item.put("lateralEnvelope",value);}catch(Exception ex){envelope.setError("Positive Querabmessung erforderlich");return;}}
