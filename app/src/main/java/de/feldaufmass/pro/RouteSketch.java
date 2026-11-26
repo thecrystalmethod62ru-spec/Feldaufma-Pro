@@ -368,7 +368,7 @@ final class RouteSketch extends View {
   if(!layerVisible(LAYER_ROUTE))return;
   try{
    JSONArray rows=new JSONArray(((android.app.Activity)getContext()).getPreferences(0).getString("metricVerbauSections","[]"));
-   paint.setColor(darkEditor?0xffe6a45e:0xffa65e19);paint.setStrokeWidth(3*density);
+   int color=darkEditor?0xffe6a45e:0xffa65e19;org.json.JSONObject style=legendSettings().optJSONObject("Verbau");if(style!=null)try{color=Color.parseColor(style.optString("color"));}catch(Exception ignored){}paint.setColor(color);paint.setStrokeWidth(3*density);
    for(int j=0;j<rows.length();j++){
     JSONArray row=rows.optJSONArray(j);if(row==null)continue;
     double from=row.optDouble(0),to=row.optDouble(1);
@@ -548,6 +548,7 @@ final class RouteSketch extends View {
  java.util.LinkedHashMap<String,Integer> legendEntries(){
   java.util.LinkedHashMap<String,Integer> entries=new java.util.LinkedHashMap<>();
   if(layerVisible(LAYER_ROUTE)&&vertices.size()>1)entries.put("Trasse",0xff13665f);
+  if(layerVisible(LAYER_ROUTE))try{JSONArray rows=new JSONArray(((android.app.Activity)getContext()).getPreferences(0).getString("metricVerbauSections","[]"));for(int j=0;j<rows.length();j++){JSONArray row=rows.optJSONArray(j);if(row!=null&&row.optDouble(0)<row.optDouble(1)&&stationPoint(row.optDouble(0))!=null&&stationPoint(row.optDouble(1))!=null&&(row.optDouble(2,0)>0||row.optDouble(3,0)>0)){entries.put("Verbau",darkEditor?0xffe6a45e:0xffa65e19);break;}}}catch(Exception ignored){}
   if(layerVisible(LAYER_SURFACES))for(int j=0;j<surfaceSections.length();j++){
    org.json.JSONObject o=surfaceSections.optJSONObject(j);if(o==null)continue;
    String name=o.optString("surface").trim();if(!name.isEmpty())entries.put(name,surfaceColor(name));
