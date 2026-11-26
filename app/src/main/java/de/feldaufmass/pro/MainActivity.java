@@ -12,6 +12,24 @@ public class MainActivity extends Activity {
  SharedPreferences projectRegistry(){return getSharedPreferences("project_registry",MODE_PRIVATE);}
  SharedPreferences projectStorage(String id){return LEGACY_PROJECT.equals(id)?super.getPreferences(MODE_PRIVATE):getSharedPreferences("project_"+id,MODE_PRIVATE);}
  @Override public SharedPreferences getPreferences(int mode){return projectStorage(activeProject);}
+ void recordProjectEvent(String event){
+  try{
+   SharedPreferences history=getSharedPreferences("history_"+activeProject,MODE_PRIVATE);
+   org.json.JSONArray old=new org.json.JSONArray(history.getString("events","[]")),next=new org.json.JSONArray();
+   for(int i=Math.max(0,old.length()-499);i<old.length();i++)next.put(old.get(i));
+   next.put(new org.json.JSONObject().put("time",System.currentTimeMillis()).put("event",event));
+   if(!history.edit().putString("events",next.toString()).commit())notice("Projektverlauf konnte nicht gespeichert werden.");
+  }catch(Exception e){notice("Projektverlauf konnte nicht gespeichert werden.");}
+ }
+ void showProjectHistory(){
+  StringBuilder b=new StringBuilder();
+  try{
+   org.json.JSONArray events=new org.json.JSONArray(getSharedPreferences("history_"+activeProject,MODE_PRIVATE).getString("events","[]"));
+   java.text.DateFormat format=java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT,java.text.DateFormat.SHORT,java.util.Locale.GERMANY);
+   for(int i=events.length()-1;i>=0;i--){org.json.JSONObject e=events.getJSONObject(i);b.append(format.format(new java.util.Date(e.getLong("time")))).append(" – ").append(e.getString("event")).append("\n\n");}
+  }catch(Exception e){b.append("Projektverlauf nicht lesbar.");}
+  new android.app.AlertDialog.Builder(this).setTitle("Projektverlauf").setMessage(b.length()==0?"Noch keine Änderungen erfasst.":b.toString()).setPositiveButton("Schließen",null).show();
+ }
  void requestProjectRestore(){
   new android.app.AlertDialog.Builder(this).setTitle("Projekt wiederherstellen").setMessage("Eine ZIP-Sicherung wird als neues Projekt importiert. Bestehende Projekte bleiben unverändert. Externe Unterlagen müssen neu verknüpft werden.").setNegativeButton("Abbrechen",null).setPositiveButton("ZIP auswählen",(d,w)->{
    android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);i.setType("application/zip");i.addCategory(android.content.Intent.CATEGORY_OPENABLE);startActivityForResult(i,415);
@@ -322,7 +340,7 @@ public class MainActivity extends Activity {
   editor.show();
  }
 
- boolean saveRoute(RouteSketch route){try{if(getPreferences(0).edit().putString("routeSketch",route.encode()).commit())return true;}catch(RuntimeException ignored){}notice("Trasse konnte nicht gespeichert werden. Bitte erneut versuchen.");return false;}
+ boolean saveRoute(RouteSketch route){try{String before=routeData(),after=route.encode();if(getPreferences(0).edit().putString("routeSketch",after).commit()){if(!before.equals(after))recordProjectEvent("Trasse geändert · "+route.vertices.size()+" Punkte");return true;}}catch(RuntimeException ignored){}notice("Trasse konnte nicht gespeichert werden. Bitte erneut versuchen.");return false;}
  Spinner choices(LinearLayout parent,String[] labels){
   Spinner spinner=new Spinner(this);
   spinner.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,labels));
@@ -443,7 +461,8 @@ public class MainActivity extends Activity {
   menu.getMenu().add(0,100,Menu.NONE,"Projekte");
   menu.getMenu().add(0,101,Menu.NONE,"Projekt sichern");
   menu.getMenu().add(0,102,Menu.NONE,"Projekt wiederherstellen");
-  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
+  menu.getMenu().add(0,103,Menu.NONE,"Projektverlauf");
+  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
   menu.show();
  }
  LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(dp(12),dp(8),dp(12),dp(8));return p;}
@@ -719,7 +738,7 @@ public class MainActivity extends Activity {
   sketch.invalidate();
   updateHistoryButtons();
  }
- void saveObjects(){String old=getPreferences(0).getString("objects","[]");if(!old.equals(objects.toString())){undoObjects.push(old);while(undoObjects.size()>HISTORY_LIMIT)undoObjects.removeLast();redoObjects.clear();}persistObjects();}
+ void saveObjects(){String old=getPreferences(0).getString("objects","[]");if(!old.equals(objects.toString())){recordProjectEvent("Objekte geändert");undoObjects.push(old);while(undoObjects.size()>HISTORY_LIMIT)undoObjects.removeLast();redoObjects.clear();}persistObjects();}
  void restoreObjectHistory(boolean redo){java.util.ArrayDeque<String> from=redo?redoObjects:undoObjects,to=redo?undoObjects:redoObjects;if(from.isEmpty())return;try{org.json.JSONArray restored=new org.json.JSONArray(from.peek());to.push(objects.toString());from.pop();objects=restored;persistObjects();}catch(org.json.JSONException e){Toast.makeText(this,"Änderung konnte nicht wiederhergestellt werden",Toast.LENGTH_SHORT).show();}}
 
  void refreshDetailQuantities(){if(detailQuantities==null)return;StringBuilder b=new StringBuilder("\nDetailmengen – geometrisch, nicht addiert\n");for(int i=0;i<objects.length();i++){org.json.JSONObject o=objects.optJSONObject(i);if(o==null)continue;double a=detailNumber(o,"detailLength"),w=detailNumber(o,"detailWidth"),h=detailNumber(o,"detailDepth");b.append(o.optString("type")).append(" / ").append(o.optString("station")).append(" m\n");if(Double.isFinite(a*w)&&a>0&&w>0){b.append(String.format(java.util.Locale.GERMANY,"Fläche: %.2f m²",a*w));if(Double.isFinite(a*w*h)&&h>0)b.append(String.format(java.util.Locale.GERMANY," | Körpervolumen: %.2f m³",a*w*h));else b.append(" | Tiefe fehlt");}else b.append("Detailmaße fehlen");if(objectWarning(i))b.append(" | ⚠ Lage prüfen");b.append("\n");}b.append("\nNicht zur Haupttrasse addieren: Überschneidungen und LV-Regeln prüfen.");detailQuantities.setText(b.toString());}
