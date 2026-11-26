@@ -5318,13 +5318,14 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
    @Override public boolean performClick(){super.performClick();return true;}
 
    final java.util.List<android.graphics.RectF> dimensionLabels=new java.util.ArrayList<>();
+   int hiddenDimensions;
    void dimension(Canvas c,float ax,float ay,float bx,float by,double value){
     pen.setColor(value<0?0xffff7777:0xffeeeeee);pen.setStrokeWidth(dp(1));pen.setTextSize(dp(10));
     c.drawLine(ax,ay,bx,by,pen);float dx=bx-ax,dy=by-ay;double len=Math.hypot(dx,dy);
     if(len>0){float tx=(float)(-dy/len*dp(3)),ty=(float)(dx/len*dp(3));c.drawLine(ax-tx,ay-ty,ax+tx,ay+ty,pen);c.drawLine(bx-tx,by-ty,bx+tx,by+ty,pen);}
     String label=String.format(java.util.Locale.GERMANY,"%.2f m",value);float lx=Math.max(dp(2),Math.min(getWidth()-pen.measureText(label)-dp(2),(ax+bx)/2-pen.measureText(label)/2)),ly=Math.max(dp(12),(ay+by)/2-dp(4));float tw=pen.measureText(label),th=dp(12);android.graphics.RectF bounds=null;
     for(int attempt=0;attempt<25;attempt++){int shift=attempt==0?0:((attempt+1)/2)*(attempt%2==1?-1:1);float yy=ly+shift*dp(14);android.graphics.RectF candidate=new android.graphics.RectF(lx-dp(2),yy-th,lx+tw+dp(2),yy+dp(3));if(candidate.top<0||candidate.bottom>getHeight())continue;boolean occupied=false;for(android.graphics.RectF other:dimensionLabels)if(android.graphics.RectF.intersects(candidate,other)){occupied=true;break;}if(!occupied){bounds=candidate;ly=yy;break;}}
-    if(bounds!=null){dimensionLabels.add(bounds);int color=pen.getColor();pen.setColor(0xff171717);c.drawRect(bounds,pen);pen.setColor(color);c.drawText(label,lx,ly,pen);}
+    if(bounds!=null){dimensionLabels.add(bounds);int color=pen.getColor();pen.setColor(0xff171717);c.drawRect(bounds,pen);pen.setColor(color);c.drawText(label,lx,ly,pen);if(Math.abs(ly-((ay+by)/2-dp(4)))>dp(14)){pen.setColor(0xffaaaaaa);c.drawLine((ax+bx)/2,(ay+by)/2,lx+tw/2,ly+dp(3),pen);}}else hiddenDimensions++;
    }
    @Override protected void onDraw(Canvas c){
     super.onDraw(c);
@@ -5357,7 +5358,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
      c.drawCircle((float)(left+nx*scale),(float)(top+ny*scale),(float)(nr*scale),pen);
     }
     c.save();c.clipRect(0,0,getWidth(),getHeight());pen.setColor(outside||collision?0xffef5350:clearance||coverWarning?0xffffb74d:0xff42a5f5);c.drawCircle((float)(left+x*scale),(float)(top+y*scale),(float)(radius*scale),pen);c.restore();
-    dimensionLabels.clear();
+    dimensionLabels.clear();hiddenDimensions=0;
     if(showDimensions[0]){
      float cx=(float)(left+x*scale),cy=(float)(top+y*scale),rr=(float)(radius*scale),right=(float)(left+width*scale);
      dimension(c,left,cy,cx-rr,cy,x-radius);
@@ -5376,6 +5377,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
       dimension(c,(float)(left+(x+ux*radius)*scale),(float)(top+(y+uy*radius)*scale),(float)(left+(nx-ux*nr)*scale),(float)(top+(ny-uy*nr)*scale),dist-radius-nr);
      }
     }
+    if(hiddenDimensions>0){pen.setColor(0xffffb74d);pen.setTextSize(dp(10));c.drawText(hiddenDimensions+" Maßangaben ausgeblendet – Ansicht vergrößern",dp(8),dp(24),pen);}
     if(clearance||coverWarning){pen.setColor(0xffffb74d);pen.setTextSize(dp(11));c.drawText(clearance&&coverWarning?"Mindestabstand / Überdeckung":clearance?"Mindestabstand unterschritten":"Mindestüberdeckung unterschritten",dp(8),dp(11),pen);}
     if(outside||collision){pen.setColor(0xffff7777);pen.setTextSize(dp(11));c.drawText(outside&&collision?"Profilgrenze und Leitungskollision":outside?"Außerhalb des Grabenprofils":"Leitungskollision",dp(8),getHeight()-dp(4),pen);}
    }
