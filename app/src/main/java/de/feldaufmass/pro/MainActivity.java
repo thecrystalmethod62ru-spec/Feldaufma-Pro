@@ -627,6 +627,12 @@ public class MainActivity extends Activity {
   String[] sides={"Unbekannt","links","rechts","mittig"};Spinner side=choices(form,sides);if(old!=null)side.setSelection(Math.max(0,java.util.Arrays.asList(sides).indexOf(old.optString("side"))));
   String[] keys={"detailLength","detailWidth","detailDepth","detailOffset"},labels={"Länge (m)","Breite (m)","Tiefe (m)","Abstand zum Grabenrand (m)"};
   EditText[] fields=new EditText[keys.length];for(int j=0;j<fields.length;j++){fields[j]=new EditText(this);fields[j].setInputType(8194);fields[j].setHint(labels[j]+" – optional");if(old!=null)fields[j].setText(old.optString(keys[j],""));form.addView(fields[j]);addObjectMeasureSlider(form,fields[j],j==3?5:10,j==3?0:1);}
+  LinearLayout angleRow=new LinearLayout(this);angleRow.setGravity(Gravity.CENTER_VERTICAL);form.addView(angleRow);
+  TextView angleLabel=sheetText("Drehwinkel",13,false);angleLabel.setTextColor(0xffa4b9b5);angleRow.addView(angleLabel,new LinearLayout.LayoutParams(0,-2,1));
+  TextView angleValue=sheetText("",16,true);angleValue.setTextColor(0xff69cdbb);angleRow.addView(angleValue);
+  SeekBar rotationBar=new SeekBar(this);rotationBar.setMax(360);rotationBar.setProgress(Math.max(0,Math.min(360,180+(old==null?0:old.optInt("detailRotation",0)))));rotationBar.setProgressTintList(android.content.res.ColorStateList.valueOf(0xff55c7b5));rotationBar.setThumbTintList(android.content.res.ColorStateList.valueOf(0xff69cdbb));form.addView(rotationBar,new LinearLayout.LayoutParams(-1,dp(36)));
+  angleValue.setText((rotationBar.getProgress()-180)+"°");
+  LinearLayout presets=new LinearLayout(this);form.addView(presets);for(int angle:new int[]{0,15,30,45,60,75,90}){Button preset=new Button(this);preset.setText(angle+"°");styleEditorButton(preset,false);presets.addView(preset,new LinearLayout.LayoutParams(0,dp(40),1));preset.setOnClickListener(v->rotationBar.setProgress(angle+180));}
   View separator=new View(this);separator.setBackgroundColor(0xff465452);LinearLayout.LayoutParams separatorParams=new LinearLayout.LayoutParams(-1,dp(1));separatorParams.setMargins(0,dp(12),0,dp(12));form.addView(separator,separatorParams);
   LinearLayout quantities=new LinearLayout(this);quantities.setPadding(dp(4),dp(4),dp(4),dp(8));form.addView(quantities);
   TextView[] results=new TextView[2];String[] resultLabels={"Fläche","Volumen"};
@@ -655,12 +661,13 @@ public class MainActivity extends Activity {
    try{
     double st=number(station);if(!Double.isFinite(st)||st<0||st>route.measuredLength())return;
     org.json.JSONObject candidate=old==null?new org.json.JSONObject():new org.json.JSONObject(old.toString());
-    String chosen=side.getSelectedItem().toString();candidate.put("station",st).put("type",type.getSelectedItem().toString()).put("side",chosen);
+    String chosen=side.getSelectedItem().toString();candidate.put("detailRotation",rotationBar.getProgress()-180).put("station",st).put("type",type.getSelectedItem().toString()).put("side",chosen);
     for(int k=0;k<fields.length;k++){candidate.remove(keys[k]);if(fields[k].length()==0)continue;try{double n=number(fields[k]);if(Double.isFinite(n)&&(k==3?n>=0&&(chosen.equals("links")||chosen.equals("rechts")):n>0))candidate.put(keys[k],n);}catch(Exception ignored){}}
     org.json.JSONArray temporary=new org.json.JSONArray(draft.toString());if(index<0)temporary.put(candidate);else temporary.put(index,candidate);
     route.setStationLayers(temporary,route.surfaceSections);
    }catch(Exception ignored){}
   };
+  rotationBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(SeekBar bar,int progress,boolean user){angleValue.setText((progress-180)+"°");preview.run();}public void onStartTrackingTouch(SeekBar bar){}public void onStopTrackingTouch(SeekBar bar){}});
   android.text.TextWatcher previewWatcher=new android.text.TextWatcher(){
    public void beforeTextChanged(CharSequence value,int start,int count,int after){}
    public void onTextChanged(CharSequence value,int start,int before,int count){preview.run();}
@@ -676,9 +683,9 @@ public class MainActivity extends Activity {
    try{
     double st=number(station),limit=route.measuredLength();if(!Double.isFinite(st)||!Double.isFinite(limit)||st<0||st>limit){station.setError("Station außerhalb der bemaßten Trasse");return;}
     String chosen=side.getSelectedItem().toString();
-    org.json.JSONObject o=(old==null?new org.json.JSONObject():new org.json.JSONObject(old.toString())).put("station",st).put("type",type.getSelectedItem().toString()).put("side",chosen).put("note",note.getText().toString());
+    org.json.JSONObject o=(old==null?new org.json.JSONObject():new org.json.JSONObject(old.toString())).put("detailRotation",rotationBar.getProgress()-180).put("station",st).put("type",type.getSelectedItem().toString()).put("side",chosen).put("note",note.getText().toString());
     for(int j=0;j<fields.length;j++){if(fields[j].length()==0){o.remove(keys[j]);continue;}double value=number(fields[j]);if(!Double.isFinite(value)||value<0||(j<3&&value==0)||(j==3&&!chosen.equals("links")&&!chosen.equals("rechts"))){fields[j].setError("Maß / Seite prüfen");return;}o.put(keys[j],fields[j].getText().toString());}
-    if(old==null)draft.put(o);else if(draft.optJSONObject(index)==old){if(!overlapGeometry(old).equals(overlapGeometry(o)))o.remove("acceptedOverlap");draft.put(index,o);}else{notice("Objekt wurde geändert.");return;}refresh.run();dialog.dismiss();
+    if(old==null)draft.put(o);else if(draft.optJSONObject(index)==old){if(old.optInt("detailRotation",0)!=o.optInt("detailRotation",0)||!overlapGeometry(old).equals(overlapGeometry(o)))o.remove("acceptedOverlap");draft.put(index,o);}else{notice("Objekt wurde geändert.");return;}refresh.run();dialog.dismiss();
    }catch(Exception e){notice("Station und Maße prüfen.");}
   });dialog.showAtLocation(route,Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL,0,dp(8));preview.run();
  }
