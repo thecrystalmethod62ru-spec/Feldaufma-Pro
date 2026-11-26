@@ -1173,6 +1173,50 @@ public class MainActivity extends Activity {
   canvas.restore();
  }
 
+ int appendLongitudinalPdf(android.graphics.pdf.PdfDocument pdf,int pageNumber,RouteSketch route){
+  double measured=route.measuredLength(),total=Double.isFinite(measured)&&measured>0?measured:l;
+  if(!Double.isFinite(total)||total<=0)return pageNumber;
+  org.json.JSONArray points=elevationPoints();
+  boolean absolute=hasAbsoluteElevations(points,total),relative=false;
+  for(int j=0;j<points.length();j++){org.json.JSONObject o=points.optJSONObject(j);if(o!=null&&Double.isFinite(o.optDouble("depth"))&&o.optDouble("depth")>0&&o.optDouble("station")>=0&&o.optDouble("station")<=total)relative=true;}
+  boolean standard=!absolute&&!relative&&Double.isFinite(d)&&d>0;
+  if(standard){
+   points=new org.json.JSONArray();
+   try{points.put(new org.json.JSONObject().put("station",0).put("depth",d));points.put(new org.json.JSONObject().put("station",total).put("depth",d));}catch(org.json.JSONException e){throw new IllegalStateException(e);}
+  }
+  Paint pen=new Paint(Paint.ANTI_ALIAS_FLAG);pen.setColor(INK);
+  android.graphics.pdf.PdfDocument.Page page=pdf.startPage(new android.graphics.pdf.PdfDocument.PageInfo.Builder(595,842,pageNumber++).create());
+  try{
+   Canvas c=page.getCanvas();pen.setTextSize(19);c.drawText("Längsschnitt",36,40,pen);pen.setTextSize(12);
+   c.drawText("Trassenlänge: "+reportMeasure(total),36,65,pen);
+   c.drawText(standard?"Relatives Standardprofil – einheitliche Grabentiefe":absolute?"Höhenprofil – gemeinsamer Höhenbezug":"Relatives Tiefenprofil – Oberfläche als Bezug",36,85,pen);
+   if(absolute||relative||standard){
+    c.save();c.translate(36,105);
+    float density=getResources().getDisplayMetrics().density;
+    ElevationProfileView view=new ElevationProfileView(points,objects,total,absolute);
+    view.layout(0,0,(int)(523*density),(int)(420*density));c.scale(1/density,1/density);view.draw(c);c.restore();
+    String[] labels=absolute?new String[]{"OK Gelände","Grabensohle","Rohrsohle"}:new String[]{"Oberfläche (Bezug)","Grabensohle"};
+    int[] colors={0xff65717a,0xffa65e19,TEAL};
+    for(int k=0;k<labels.length;k++){pen.setColor(colors[k]);pen.setStrokeWidth(3);c.drawLine(36,550+k*20,60,550+k*20,pen);pen.setColor(INK);c.drawText(labels[k],68,554+k*20,pen);}
+   }else c.drawText("Keine darstellbaren Höhen- oder Tiefenmesswerte.",36,125,pen);
+   pen.setTextSize(11);c.drawText("Vertikal überhöht / nicht maßstäblich. Keine Extrapolation.",36,740,pen);
+   c.drawText("Fehlende Höhenwerte bleiben offen. Vor Abrechnung prüfen.",36,758,pen);
+   c.drawText("Seite "+(pageNumber-1),500,805,pen);
+  }finally{pdf.finishPage(page);}
+  String report=elevationReport();
+  android.text.TextPaint tp=new android.text.TextPaint(Paint.ANTI_ALIAS_FLAG);tp.setTextSize(12);tp.setColor(INK);
+  android.text.StaticLayout layout=android.text.StaticLayout.Builder.obtain(report,0,report.length(),tp,523).build();
+  int line=0;
+  while(line<layout.getLineCount()){
+   int top=layout.getLineTop(line),end=line+1;
+   while(end<layout.getLineCount()&&layout.getLineBottom(end)-top<=700)end++;
+   page=pdf.startPage(new android.graphics.pdf.PdfDocument.PageInfo.Builder(595,842,pageNumber++).create());
+   try{Canvas c=page.getCanvas();pen.setTextSize(16);c.drawText("Höhenpunkte und Gefälle",36,40,pen);pen.setTextSize(11);c.drawText("Seite "+(pageNumber-1),500,805,pen);c.save();c.translate(36,64);c.clipRect(0,0,523,layout.getLineTop(end)-top);c.translate(0,-top);layout.draw(c);c.restore();}
+   finally{pdf.finishPage(page);}
+   line=end;
+  }
+  return pageNumber;
+ }
  void writePdf(android.net.Uri uri) {
   android.graphics.pdf.PdfDocument pdf=new android.graphics.pdf.PdfDocument();
   try(java.io.OutputStream out=getContentResolver().openOutputStream(uri,"wt")) {
@@ -1215,12 +1259,13 @@ public class MainActivity extends Activity {
     line=end;
    }
    if(route.vertices.size()>1){
-    page=pdf.startPage(new android.graphics.pdf.PdfDocument.PageInfo.Builder(595,842,pageNumber).create());
+    page=pdf.startPage(new android.graphics.pdf.PdfDocument.PageInfo.Builder(595,842,pageNumber++).create());
     try{
      page.getCanvas().drawText("Trassenskizze – schematisch",36,44,pen);
      drawReportView(page.getCanvas(),route,80,523,523);
     }finally{pdf.finishPage(page);}
    }
+   appendLongitudinalPdf(pdf,pageNumber,route);
    pdf.writeTo(out);
   } catch(Exception e) {
    Toast.makeText(this,"PDF konnte nicht gespeichert werden.",Toast.LENGTH_LONG).show();
