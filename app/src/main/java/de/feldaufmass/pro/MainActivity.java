@@ -5344,15 +5344,16 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   android.widget.FrameLayout workspace=new android.widget.FrameLayout(this);
   workspace.addView(preview,new android.widget.FrameLayout.LayoutParams(-1,-1));
   form.addView(workspace,0,new LinearLayout.LayoutParams(-1,dp(210)));
-  android.widget.FrameLayout.LayoutParams barParams=new android.widget.FrameLayout.LayoutParams(-1,-2,android.view.Gravity.TOP);
-  workspace.addView(toolbar,barParams);
+  android.widget.FrameLayout.LayoutParams barParams=new android.widget.FrameLayout.LayoutParams(Math.min(dp(280),Math.max(dp(160),getResources().getDisplayMetrics().widthPixels-dp(96))),-2,android.view.Gravity.TOP|android.view.Gravity.LEFT);
+  workspace.addView(toolbar,barParams);toolbar.setBackgroundColor(0xff303030);
+  workspace.addOnLayoutChangeListener((v,l,t,rr,b,ol,ot,orr,ob)->{toolbar.setTranslationX(Math.max(0,Math.min(workspace.getWidth()-toolbar.getWidth(),toolbar.getTranslationX())));toolbar.setTranslationY(Math.max(0,Math.min(workspace.getHeight()-toolbar.getHeight(),toolbar.getTranslationY())));});
   TextView handle=new TextView(this);handle.setText("⠿");handle.setTextSize(22);handle.setPadding(dp(8),dp(6),dp(8),dp(6));handle.setContentDescription("Werkzeugleiste verschieben");toolbar.addView(handle,0);
   handle.setOnTouchListener(new View.OnTouchListener(){
-   float startY,baseY;
+   float startY,baseY,startX,baseX;
    public boolean onTouch(View v,android.view.MotionEvent e){
     switch(e.getActionMasked()){
-     case android.view.MotionEvent.ACTION_DOWN:startY=e.getRawY();baseY=toolbar.getTranslationY();v.getParent().requestDisallowInterceptTouchEvent(true);return true;
-     case android.view.MotionEvent.ACTION_MOVE:toolbar.setTranslationY(Math.max(0,Math.min(workspace.getHeight()-toolbar.getHeight(),baseY+e.getRawY()-startY)));return true;
+     case android.view.MotionEvent.ACTION_DOWN:startY=e.getRawY();baseY=toolbar.getTranslationY();startX=e.getRawX();baseX=toolbar.getTranslationX();v.getParent().requestDisallowInterceptTouchEvent(true);return true;
+     case android.view.MotionEvent.ACTION_MOVE:toolbar.setTranslationX(Math.max(0,Math.min(workspace.getWidth()-toolbar.getWidth(),baseX+e.getRawX()-startX)));toolbar.setTranslationY(Math.max(0,Math.min(workspace.getHeight()-toolbar.getHeight(),baseY+e.getRawY()-startY)));return true;
      case android.view.MotionEvent.ACTION_UP:case android.view.MotionEvent.ACTION_CANCEL:v.getParent().requestDisallowInterceptTouchEvent(false);return true;
      default:return true;
     }
@@ -5364,7 +5365,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
    android.view.ViewGroup.LayoutParams lp=workspace.getLayoutParams();
    boolean expanded=lp.height>dp(160);
    lp.height=expanded?dp(160):Math.max(dp(240),getResources().getDisplayMetrics().heightPixels-dp(280));
-   workspace.setLayoutParams(lp);toolbar.setTranslationY(0);expandPreview.setText(expanded?"Querschnitt vergrößern":"Querschnitt verkleinern");
+   workspace.setLayoutParams(lp);toolbar.setTranslationY(0);toolbar.setTranslationX(0);expandPreview.setText(expanded?"Querschnitt vergrößern":"Querschnitt verkleinern");
   });
   fullscreen.setOnClickListener(v->{
    android.view.Window window=dialog.getWindow();if(window==null)return;
@@ -5373,7 +5374,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
    window.getDecorView().setSystemUiVisibility(full?5894:0);
    android.view.ViewGroup.LayoutParams lp=workspace.getLayoutParams();
    lp.height=full?Math.max(dp(160),getResources().getDisplayMetrics().heightPixels-dp(200)):dp(160);
-   workspace.setLayoutParams(lp);toolbar.setTranslationY(0);fullscreen.setText(full?"Vollbild beenden":"Vollbild");
+   workspace.setLayoutParams(lp);toolbar.setTranslationY(0);toolbar.setTranslationX(0);fullscreen.setText(full?"Vollbild beenden":"Vollbild");
    expandPreview.setText(full?"Querschnitt verkleinern":"Querschnitt vergrößern");
   });
   dialog.setOnShowListener(x->dialog.getButton(-1).setOnClickListener(y->{
