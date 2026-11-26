@@ -1743,7 +1743,7 @@ public class MainActivity extends Activity {
    try{nominalWidth=Double.parseDouble(getPreferences(0).getString("width","").trim().replace(',','.'));}catch(NumberFormatException ignored){}
    org.json.JSONArray localWidths;
    try{localWidths=new org.json.JSONArray(getPreferences(0).getString("metricWidthSections","[]"));}catch(Exception ex){localWidths=null;}
-   int unknownWidth=0;
+   int unknownWidth=0, envelopeOutside=0, envelopeUnknown=0;
    for(org.json.JSONObject fitting:linked){
     double station=fitting.optDouble("station"),lateral=fitting.optDouble("offset",0),width=nominalWidth;
     int matches=0;
@@ -1754,11 +1754,14 @@ public class MainActivity extends Activity {
     }
     if(localWidths==null||matches>1||!Double.isFinite(width)||width<=0||!Double.isFinite(lateral)){unknownWidth++;continue;}
     if(Math.abs(lateral)>width/2)outside++;
+    double envelope=fitting.optDouble("lateralEnvelope");if(!Double.isFinite(envelope)||envelope<=0)envelopeUnknown++;else if(Math.abs(lateral)+envelope/2>width/2)envelopeOutside++;
    }
 
    LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(dp(12),dp(8),dp(12),dp(8));
    TextView hint=new TextView(this);hint.setText("Lineare Stationsübersicht – keine maßstäbliche Montagegeometrie. Ohne gültige Station: "+missing);panel.addView(hint);
    if(outside>0)panel.addView(sheetText("Hinweis: "+outside+" Formstück-Mittelpunkte außerhalb der örtlichen Grabenbreite. Bauteilabmessungen prüfen.",14,true));
+   if(envelopeOutside>0)panel.addView(sheetText("Hinweis: "+envelopeOutside+" Formstücke überschreiten mit ihrer angegebenen Querabmessung die Grabenbreite.",14,true));
+   if(envelopeUnknown>0)panel.addView(sheetText("Querabmessung fehlt bei "+envelopeUnknown+" Formstücken – vollständige Breitenprüfung offen.",14,false));
    if(unknownWidth>0)panel.addView(sheetText("Seitliche Lage bei "+unknownWidth+" Formstücken nicht prüfbar: Breitenangaben fehlen oder sind widersprüchlich.",14,false));
    android.view.View axis=new android.view.View(this){
     final android.graphics.Paint paint=new android.graphics.Paint(3);
@@ -1913,6 +1916,7 @@ public class MainActivity extends Activity {
   offset.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void afterTextChanged(android.text.Editable s){}public void onTextChanged(CharSequence s,int start,int before,int count){try{double m=Double.parseDouble(s.toString().trim().replace(',','.'));if(Double.isFinite(m))offsetSlider.setProgress((int)Math.round(500+100*Math.max(-5,Math.min(5,m))));}catch(NumberFormatException ex){if(s.length()==0)offsetSlider.setProgress(500);}}});
   Button resetOffset=new Button(this);resetOffset.setText("Versatz auf 0 setzen");panel.addView(resetOffset);resetOffset.setOnClickListener(v->offset.setText("0"));
 
+  EditText envelope=new EditText(this);envelope.setHint("Tatsächliche Querabmessung zur Trasse (m, optional)");envelope.setInputType(8194);panel.addView(envelope);
   EditText cover=new EditText(this);cover.setHint("Überdeckung bis Rohroberkante (m, optional)");cover.setInputType(8194);panel.addView(cover);
   android.widget.CheckBox installed=new android.widget.CheckBox(this);
   installed.setText("Einbau bestätigt · in Materialliste übernehmen");panel.addView(installed);
@@ -1920,6 +1924,7 @@ public class MainActivity extends Activity {
    dn.setText(original.optString("dn"));material.setText(original.optString("material"));
    rotation.setText(original.optString("rotation","0"));mirror.setChecked(original.optBoolean("mirrored"));
    station.setText(original.optString("station"));offset.setText(original.optString("offset"));cover.setText(original.optString("cover"));
+   envelope.setText(original.optString("lateralEnvelope"));
    installed.setChecked(original.optBoolean("installed",false));
   }
   if(suggestion!=null){
@@ -1976,6 +1981,7 @@ public class MainActivity extends Activity {
      item.put(keys[i],value);
     }
     if(suggestion!=null)item.put("sourceName",source).put("sourceLine",suggestion.evidence).put("sourceLineNumber",suggestion.line);
+    String rawEnvelope=envelope.getText().toString().trim();if(rawEnvelope.isEmpty())item.remove("lateralEnvelope");else{try{double value=Double.parseDouble(rawEnvelope.replace(',','.'));if(!Double.isFinite(value)||value<=0)throw new IllegalArgumentException();item.put("lateralEnvelope",value);}catch(Exception ex){envelope.setError("Positive Querabmessung erforderlich");return;}}
     item.put("stationLinked",item.has("station"));if(index<0)rows.put(item);else rows.put(index,item);
     if(!getPreferences(0).edit().putString("montageFittings",rows.toString()).commit()){notice("Speichern fehlgeschlagen.");return;}
     rememberMontageStation(projectId,before,rows.toString());if(sketch!=null)sketch.invalidate();if(livePreview!=null)livePreview.invalidate();
