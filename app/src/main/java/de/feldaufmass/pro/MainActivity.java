@@ -381,14 +381,28 @@ public class MainActivity extends Activity {
   refreshStationLayers();
  }
 
+ BleMeasure bleMeasure;
+ java.util.function.DoubleConsumer pendingBleConsumer;
+ void openBleMeasure(java.util.function.DoubleConsumer accept){
+  String[] permissions=android.os.Build.VERSION.SDK_INT>=31?new String[]{android.Manifest.permission.BLUETOOTH_SCAN,android.Manifest.permission.BLUETOOTH_CONNECT}:new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION};
+  for(String permission:permissions)if(checkSelfPermission(permission)!=android.content.pm.PackageManager.PERMISSION_GRANTED){pendingBleConsumer=accept;requestPermissions(permissions,703);return;}
+  if(bleMeasure!=null)bleMeasure.close();
+  bleMeasure=new BleMeasure(this,accept);bleMeasure.show();
+ }
+ void testBleMeasure(){
+  openBleMeasure(value->new android.app.AlertDialog.Builder(this).setTitle("Bluetooth-Messwert").setMessage(reportMeasure(value)+"\nTestmessung, keine Projektdaten geändert. Im Trasseneditor kann ein Messwert direkt übernommen werden.").setPositiveButton("OK",null).show());
+ }
  void measureSegment(RouteSketch route,int i){
   EditText metres=new EditText(this);
   metres.setSingleLine(true);metres.setKeyListener(android.text.method.DigitsKeyListener.getInstance("0123456789,."));
   metres.setHint("Länge in m");
   double old=route.vertices.get(i).metres;
   if(Double.isFinite(old))metres.setText(String.valueOf(old).replace('.',','));
+  LinearLayout measureForm=page();measureForm.addView(metres);
+  Button bluetooth=new Button(this);bluetooth.setAllCaps(false);bluetooth.setText("Bluetooth-Messwert (Test)");measureForm.addView(bluetooth);
+  bluetooth.setOnClickListener(v->openBleMeasure(value->metres.setText(java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString().replace('.',','))));
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this)
-    .setTitle("Abschnitt "+i+" bemaßen").setView(metres)
+    .setTitle("Abschnitt "+i+" bemaßen").setView(measureForm)
     .setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",null).create();
   dialog.setOnShowListener(ignored->dialog.getButton(-1).setOnClickListener(v->{
    try{
@@ -1275,7 +1289,8 @@ public class MainActivity extends Activity {
   menu.getMenu().add(0,114,Menu.NONE,"PDF-Unterlagen analysieren");
   menu.getMenu().add(0,115,Menu.NONE,"Foto / Handskizze analysieren");
   menu.getMenu().add(0,116,Menu.NONE,"Handskizze als Zeichenvorlage");
-  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==116)chooseRouteUnderlay();else if(item.getItemId()==115)chooseImageAnalysis();else if(item.getItemId()==114)choosePdfAnalysis();else if(item.getItemId()==113)showNachtraege();else if(item.getItemId()==112)showDailyReports();else if(item.getItemId()==111)exportPhotoReport();else if(item.getItemId()==110)exportX31();else if(item.getItemId()==109)exportReb();else if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
+  menu.getMenu().add(0,117,Menu.NONE,"Bluetooth-Messgerät (Test)");
+  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==117)testBleMeasure();else if(item.getItemId()==116)chooseRouteUnderlay();else if(item.getItemId()==115)chooseImageAnalysis();else if(item.getItemId()==114)choosePdfAnalysis();else if(item.getItemId()==113)showNachtraege();else if(item.getItemId()==112)showDailyReports();else if(item.getItemId()==111)exportPhotoReport();else if(item.getItemId()==110)exportX31();else if(item.getItemId()==109)exportReb();else if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
   menu.show();
  }
  LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(dp(12),dp(8),dp(12),dp(8));return p;}
@@ -2262,6 +2277,7 @@ public class MainActivity extends Activity {
  }
  @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] results){
   super.onRequestPermissionsResult(requestCode,permissions,results);
+  if(requestCode==703){java.util.function.DoubleConsumer next=pendingBleConsumer;pendingBleConsumer=null;boolean granted=results.length>0;for(int result:results)granted&=result==android.content.pm.PackageManager.PERMISSION_GRANTED;if(granted&&next!=null)openBleMeasure(next);else notice("Bluetooth-Berechtigung fehlt.");return;}
   if(requestCode==702){if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==android.content.pm.PackageManager.PERMISSION_GRANTED){startLiveGps();assignGps(selectedPoint);}else notice("Für GPS-Punkte ist der genaue Standort erforderlich.");}
  }
  void renamePoint(String id,String proposed){
@@ -2572,7 +2588,7 @@ public class MainActivity extends Activity {
    .addOnSuccessListener(this,german->{if(version==speechVersion){voiceText.setText(german);if(!offerVoiceSave(german)&&!offerVoiceNewPoint(german)&&!offerVoiceObjectDimensions(german)&&!offerVoiceSurface(german)&&!offerVoiceObject(german)&&!offerVoiceSegment(german))offerVoiceRename(german);}})
    .addOnFailureListener(this,error->{if(version==speechVersion)notice("Übersetzung fehlgeschlagen. Für den ersten Modellabruf wird Internet benötigt.");});
  }
- @Override protected void onDestroy(){if(translator!=null)translator.close();super.onDestroy();}
+ @Override protected void onDestroy(){if(bleMeasure!=null)bleMeasure.close();pendingBleConsumer=null;if(translator!=null)translator.close();super.onDestroy();}
  void startDictation(){
 
  android.content.Intent i=new android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
