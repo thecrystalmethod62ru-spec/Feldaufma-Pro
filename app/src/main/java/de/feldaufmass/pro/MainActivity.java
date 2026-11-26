@@ -2338,16 +2338,42 @@ public class MainActivity extends Activity {
    try{org.json.JSONObject m=v.photoMetadata.optJSONObject(filename);if(m==null)m=new org.json.JSONObject();m.put("description",description.getText().toString());v.photoMetadata.put(filename,m);if(saveRoute(latest))refreshRoute();}catch(Exception e){notice("Beschreibung konnte nicht gespeichert werden.");}
   }).show();
  }
+ void importNmeaPoint(String id){
+  LinearLayout form=page();
+  form.addView(sheetText("NMEA-Daten eines externen Empfängers einfügen (GGA und GST desselben Messzeitpunkts). WGS84-Koordinaten vorausgesetzt. Keine Live-Verbindung; Aufnahmezeit und Empfänger prüfen.",14,false));
+  EditText input=new EditText(this);input.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);input.setMinLines(4);input.setHint("$GNGGA,...\n$GNGST,...");form.addView(input);
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("GNSS / RTK – NMEA-Import (Test)").setView(form).setNegativeButton("Abbrechen",null).setPositiveButton("Prüfen",null).create();
+  dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(b->{
+   NmeaFix fix=NmeaFix.parse(input.getText().toString());
+   if(fix==null){input.setError("Gültiger GGA-Satz mit Prüfsumme erforderlich");return;}
+   dialog.dismiss();reviewNmeaPoint(id,fix);
+  }));dialog.show();
+ }
+ void reviewNmeaPoint(String id,NmeaFix data){
+  RouteSketch route=new RouteSketch(this,routeData());int index=findPoint(route,id);if(index<0){notice("Punkt nicht gefunden.");return;}
+  android.location.Location fix=new android.location.Location("external-nmea-import");
+  fix.setLatitude(data.lat);fix.setLongitude(data.lon);
+  if(data.movable())fix.setAccuracy((float)data.accuracy);
+  boolean move=data.movable()&&route.gpsPosition(data.lat,data.lon,index)!=null;
+  String info=String.format(java.util.Locale.GERMANY,"Breite %.8f°\nLänge %.8f°\n%s\nSatelliten: %d\nUTC: %s",data.lat,data.lon,data.status(),data.satellites,data.utc);
+  info+="\n"+(Double.isFinite(data.accuracy)?String.format(java.util.Locale.GERMANY,"GST-basierte horizontale Schätzung: %.3f m",data.accuracy):"Keine passende GST-Genauigkeitsangabe");
+  info+="\nImportierte Messung, nicht live. Bezugssystem, Aktualität und Empfängerstatus vor Übernahme prüfen.";
+  info+=move?"\nVerschieben möglich.":"\nVerschieben gesperrt: Fix-Code 4, Genauigkeit ≤ 0,50 m und gültige Plankalibrierung erforderlich.";
+  android.app.AlertDialog.Builder builder=new android.app.AlertDialog.Builder(this).setTitle("Externe GNSS-Koordinaten prüfen").setMessage(info).setNegativeButton("Abbrechen",null)
+   .setPositiveButton("Manuellen Punkt beibehalten",(d,w)->{storeGps(id,fix,false);});
+  if(move)builder.setNeutralButton("Auf GNSS verschieben",(d,w)->storeGps(id,fix,true));
+  builder.show();
+ }
  void pointMenu(){
   RouteSketch route=new RouteSketch(this,routeData());int index=findPoint(route,selectedPoint);
   if(index<0)return;
   org.json.JSONArray photos=route.vertices.get(index).photos;
-  boolean canUndo=route.vertices.get(index).gpsUndo!=null;int photoStart=canUndo?4:3;
+  boolean canUndo=route.vertices.get(index).gpsUndo!=null;int photoStart=canUndo?5:4;
   String[] labels=new String[photoStart+photos.length()];labels[0]="Foto aufnehmen";labels[1]="GPS-Punkt zuordnen";labels[2]="Punkt umbenennen";
-  if(canUndo)labels[3]="GPS-Verschiebung rückgängig machen";
+  labels[3]="GNSS / RTK – NMEA importieren";if(canUndo)labels[4]="GPS-Verschiebung rückgängig machen";
   for(int i=0;i<photos.length();i++)labels[i+photoStart]="Foto "+(i+1)+" · Details";
   new android.app.AlertDialog.Builder(this).setTitle(route.vertices.get(index).name.isEmpty()?"Trassenpunkt "+(index+1):route.vertices.get(index).name).setItems(labels,(dialog,i)->{
-   if(i==0)capturePhoto();else if(i==1)assignGps(route.vertices.get(index).id);else if(i==2)renamePoint(route.vertices.get(index).id,null);else if(canUndo&&i==3)undoGps(route.vertices.get(index).id);else {
+   if(i==0)capturePhoto();else if(i==1)assignGps(route.vertices.get(index).id);else if(i==2)renamePoint(route.vertices.get(index).id,null);else if(i==3)importNmeaPoint(route.vertices.get(index).id);else if(canUndo&&i==4)undoGps(route.vertices.get(index).id);else {
     showPhotoDetails(route.vertices.get(index).id,photos.optString(i-photoStart));
    }
   }).show();
