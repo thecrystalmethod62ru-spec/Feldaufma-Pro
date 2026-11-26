@@ -1896,11 +1896,31 @@ public class MainActivity extends Activity {
   android.view.View drawing=new android.view.View(this){
    final java.util.List<float[]> branchHits=new java.util.ArrayList<>();
    final java.util.List<String> branchHitIds=new java.util.ArrayList<>();
+   double touchScale,touchOx,touchOy;
+   int downHit=-1;float downX,downY;
    @Override public boolean onTouchEvent(android.view.MotionEvent event){
-    if(event.getAction()==android.view.MotionEvent.ACTION_DOWN)return true;
-    if(event.getAction()!=android.view.MotionEvent.ACTION_UP)return true;
-    int best=-1;double distance=dp(18);
-    for(int i=0;i<branchHits.size();i++){float[] p=branchHits.get(i);double d=Math.hypot(event.getX()-p[0],event.getY()-p[1]);if(d<distance){distance=d;best=i;}}
+    if(event.getAction()==android.view.MotionEvent.ACTION_DOWN){
+     downX=event.getX();downY=event.getY();downHit=-1;double distance=dp(18);
+     for(int i=0;i<branchHits.size();i++){float[] p=branchHits.get(i);double d=Math.hypot(downX-p[0],downY-p[1]);if(d<distance){distance=d;downHit=i;}}
+     if(downHit<0)return false;
+     getParent().requestDisallowInterceptTouchEvent(true);return true;
+    }
+    if(event.getAction()==android.view.MotionEvent.ACTION_CANCEL){downHit=-1;getParent().requestDisallowInterceptTouchEvent(false);return true;}
+    if(event.getAction()!=android.view.MotionEvent.ACTION_UP)return downHit>=0;
+    getParent().requestDisallowInterceptTouchEvent(false);
+    int best=downHit;downHit=-1;
+    if(best>=0&&best<branchHits.size()&&Math.hypot(event.getX()-downX,event.getY()-downY)>dp(8)){
+     final String moveId=branchHitIds.get(best);final int moveIndex=(int)branchHits.get(best)[2];
+     if(moveIndex==0||touchScale<=0){notice("Anschlussstation über Abzweigungen verwalten ändern");return true;}
+     final double x=(event.getX()-touchOx)/touchScale,y=(touchOy-event.getY())/touchScale;
+     new android.app.AlertDialog.Builder(MainActivity.this).setTitle("Punkt verschieben").setItems(new String[]{"Mit Winkelraster 15°","Ohne Winkelraster"},(dialog,which)->{
+      try{java.util.List<RouteBranch> branches=branchStore.load();boolean found=false;
+       for(int j=0;j<branches.size();j++)if(branches.get(j).id.equals(moveId)){branches.set(j,BranchPointEditor.move(branches.get(j),model.vertices,moveIndex,x,y,which==0));found=true;break;}
+       if(!found)throw new IllegalStateException("Abzweigung nicht gefunden");
+       branchStore.save(branches);invalidate();notice("Punkt verschoben");
+      }catch(Exception ex){notice("Verschieben fehlgeschlagen: "+ex.getMessage());}
+     }).setNegativeButton("Abbrechen",null).show();return true;
+    }
     if(best<0)return true;
     final String id=branchHitIds.get(best);final int index=(int)branchHits.get(best)[2];
     if(index==0){notice("Anschlussstation über Abzweigungen verwalten ändern");return true;}
@@ -1945,6 +1965,7 @@ public class MainActivity extends Activity {
     margin*=2;minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
     double scale=Math.min((getWidth()-dp(48))/Math.max(.001,maxX-minX),(getHeight()-dp(64))/Math.max(.001,maxY-minY));if(!Double.isFinite(scale)||scale<=0)return;
     double ox=(getWidth()-(maxX-minX)*scale)/2-minX*scale,oy=(getHeight()-(maxY-minY)*scale)/2+maxY*scale;
+    touchScale=scale;touchOx=ox;touchOy=oy;
     if(widthSections.length()==0){
     if(Double.isFinite(widths[0])){
      double half=widths[0]/2,left=Double.isFinite(widths[1])?widths[1]:0,right=Double.isFinite(widths[2])?widths[2]:0;
