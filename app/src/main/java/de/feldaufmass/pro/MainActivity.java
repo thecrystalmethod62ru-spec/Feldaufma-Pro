@@ -513,10 +513,21 @@ public class MainActivity extends Activity {
    @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused&&getWindow()!=null){androidx.core.view.WindowInsetsControllerCompat c=androidx.core.view.WindowCompat.getInsetsController(getWindow(),getWindow().getDecorView());c.setSystemBarsBehavior(androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);c.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars());}}
   };
   full.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+  final int previousOrientation=getRequestedOrientation();
   LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setBackgroundColor(Color.WHITE);
   LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);root.addView(header);
   Button back=new Button(this),save=new Button(this);back.setAllCaps(false);save.setAllCaps(false);back.setText("Vollbild beenden");save.setText("Speichern");
   header.addView(back,new LinearLayout.LayoutParams(0,-2,1));header.addView(save,new LinearLayout.LayoutParams(0,-2,1));
+  Spinner orientation=new Spinner(this);
+  orientation.setAdapter(new android.widget.ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Automatisch drehen","Querformat","Hochformat"}));
+  header.addView(orientation,new LinearLayout.LayoutParams(0,-2,1));
+  orientation.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
+   public void onItemSelected(android.widget.AdapterView<?> parent,View view,int position,long id){
+    if(!full.isShowing())return;
+    setRequestedOrientation(position==1?android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE:position==2?android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT:android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
+   }
+   public void onNothingSelected(android.widget.AdapterView<?> parent){}
+  });
   for(View view:views)form.removeView(view);
   LinearLayout controls=new LinearLayout(this);root.addView(controls);
   controls.addView(mode,new LinearLayout.LayoutParams(0,-2,1));controls.addView(angles,new LinearLayout.LayoutParams(0,-2,1));
@@ -524,6 +535,7 @@ public class MainActivity extends Activity {
   root.addView(historyBar,new LinearLayout.LayoutParams(-1,-2));
   full.setContentView(root);
   full.setOnDismissListener(d->{
+   setRequestedOrientation(previousOrientation);
    for(View view:views){android.view.ViewParent parent=view.getParent();if(parent instanceof android.view.ViewGroup)((android.view.ViewGroup)parent).removeView(view);}
    // Original positions are ascending; restore before other controls.
    for(int j=0;j<views.length;j++)form.addView(views[j],Math.min(positions[j],form.getChildCount()),params[j]);
@@ -540,6 +552,7 @@ public class MainActivity extends Activity {
    });
   }
   full.show();
+  setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
   if(window!=null){window.setLayout(-1,-1);androidx.core.view.WindowInsetsControllerCompat c=androidx.core.view.WindowCompat.getInsetsController(window,root);c.setSystemBarsBehavior(androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);c.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars());androidx.core.view.ViewCompat.requestApplyInsets(root);}
  }
  void editRoute(boolean measure){editRoute(measure,false);}
