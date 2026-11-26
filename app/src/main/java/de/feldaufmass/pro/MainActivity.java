@@ -635,6 +635,7 @@ public class MainActivity extends Activity {
   tools.addView(mic,new LinearLayout.LayoutParams(0,-2,1));tools.addView(measureList,new LinearLayout.LayoutParams(0,-2,1));tools.addView(resetZoom,new LinearLayout.LayoutParams(0,-2,1));
   mic.setOnClickListener(v->startEditorDictation(speech->applyEditorSpeech(speech,route,mode,historyBar,full)));
   measureList.setOnClickListener(v->showFullscreenMeasures(route));
+  Button legendEdit=new Button(this);legendEdit.setAllCaps(false);legendEdit.setText("Legende");tools.addView(legendEdit,new LinearLayout.LayoutParams(0,-2,1));legendEdit.setOnClickListener(v->route.editLegend());
   resetZoom.setOnClickListener(v->{route.zoom=1;route.centerX=.5f;route.centerY=.5f;route.invalidate();});
   Button objectTools=new Button(this);objectTools.setAllCaps(false);objectTools.setText("Objekte");tools.addView(objectTools,new LinearLayout.LayoutParams(0,-2,1));objectTools.setOnClickListener(v->openObjects.run());
   full.setContentView(root);
@@ -725,6 +726,7 @@ public class MainActivity extends Activity {
   LinearLayout historyBar=new LinearLayout(this);form.addView(historyBar);
   Button undo=new Button(this),redo=new Button(this);undo.setAllCaps(false);redo.setAllCaps(false);undo.setText("Rückgängig");redo.setText("Wiederholen");
   historyBar.addView(undo,new LinearLayout.LayoutParams(0,-2,1));historyBar.addView(redo,new LinearLayout.LayoutParams(0,-2,1));
+  Button legendEdit=new Button(this);legendEdit.setAllCaps(false);legendEdit.setText("Legende bearbeiten");form.addView(legendEdit);legendEdit.setOnClickListener(v->route.editLegend());
   Button deletePoint=new Button(this);deletePoint.setAllCaps(false);deletePoint.setText("Punkt löschen");historyBar.addView(deletePoint,new LinearLayout.LayoutParams(0,-2,1));deletePoint.setOnClickListener(v->deleteRoutePoint(route));
   Button remove=new Button(this);remove.setText("Letzten Abschnitt entfernen");form.addView(remove);
   final org.json.JSONObject[] calibration={savedSketchCalibration()};
