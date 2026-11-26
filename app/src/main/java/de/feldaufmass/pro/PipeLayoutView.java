@@ -12,7 +12,11 @@ public final class PipeLayoutView extends View {
     public interface Selection { void select(int index); }
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
     private List<PipeLayout.Pipe> pipes=new ArrayList<>();
-    private double width=1,depth=1;
+    private double width=1,depth=1, minGap=0,minCover=0;
+    public void setRequirements(double gap,double cover){
+        PipeLayout.warnings(pipes,width,depth,gap,cover);
+        minGap=gap;minCover=cover;invalidate();
+    }
     private float scale,cx,bottom;
     private Selection selection;
     public interface Move { void move(int index,double offset,double bedding); }
@@ -40,20 +44,21 @@ public final class PipeLayoutView extends View {
         p.setColor(0x33b79b70);c.drawRect(left,top,right,bottom,p);
         p.setColor(0xff68945d);p.setStrokeWidth(3);c.drawLine(left,top,right,top,p);
         p.setColor(0xffb79b70);c.drawLine(left,top,left,bottom,p);c.drawLine(right,top,right,bottom,p);c.drawLine(left,bottom,right,bottom,p);
-        int[] colors={0xff397db5,0xffd4ab35,0xffc95353,0xff9567b8};
+        int[] colors={0xff397db5,0xffd4ab35,0xff398b75,0xff9567b8};
         p.setTextSize(12*getResources().getDisplayMetrics().scaledDensity);
         for(int i=0;i<pipes.size();i++){
             PipeLayout.Pipe pipe=pipes.get(i);
             float x=cx+(float)(pipe.offset*scale),y=bottom-(float)(pipe.centerHeight()*scale),r=(float)(pipe.diameter*scale/2);
-            boolean conflict=Math.abs(pipe.offset)+pipe.diameter/2>width/2||pipe.bedding+pipe.diameter>depth;
+            boolean conflict=Math.abs(pipe.offset)+pipe.diameter/2>width/2+1e-9||depth-pipe.bedding-pipe.diameter+1e-9<Math.max(minCover,pipe.minCover);
             for(int j=0;j<pipes.size();j++){
                 if(i==j)continue;
                 PipeLayout.Pipe other=pipes.get(j);
-                if(Math.hypot(pipe.offset-other.offset,pipe.centerHeight()-other.centerHeight())<(pipe.diameter+other.diameter)/2)conflict=true;
+                double gap=Math.hypot(pipe.offset-other.offset,pipe.centerHeight()-other.centerHeight())-(pipe.diameter+other.diameter)/2;
+                if(gap+1e-9<Math.max(minGap,Math.max(pipe.minGap,other.minGap)))conflict=true;
             }
             p.setColor(conflict?0xffd32f2f:colors[i%colors.length]);c.drawCircle(x,y,r,p);
             p.setColor(0xffeeeeee);c.drawCircle(x,y,r-(float)(pipe.wall*scale),p);
-            p.setColor(0xff777777);c.drawText(pipe.name,x-p.measureText(pipe.name)/2,y-r-4,p);
+            p.setColor(conflict?0xffd32f2f:0xff777777);c.drawText(pipe.name,x-p.measureText(pipe.name)/2,y-r-4,p);
         }
         // Dimension the selected pipe while dragging, or the only pipe in the section.
         int selected=dragged>=0?dragged:(pipes.size()==1?0:-1);
