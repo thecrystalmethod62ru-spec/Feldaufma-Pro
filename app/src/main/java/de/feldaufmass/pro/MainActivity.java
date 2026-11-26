@@ -795,6 +795,31 @@ public class MainActivity extends Activity {
     latest.vertices.get(j).metres=metres;if(saveRoute(latest)){refreshRoute();notice("Abschnitt gespeichert.");}
    }).show();return true;
  }
+ boolean offerVoiceObject(String text){
+  java.util.regex.Matcher m=java.util.regex.Pattern.compile("(?iu)^(?:добавь|добавить|erfasse|füge)\\s+(домовое подключение|препятствие|поисковый шурф|стартовый котлован|приёмный котлован|приемный котлован|hausanschluss|hindernis|suchschachtung|startgrube|zielgrube|kvs|квс|knickpunkt|точку поворота)\\s+(?:на\\s+станции|bei\\s+station|an\\s+station|station)\\s+(\\d+(?:[.,]\\d+)?)\\s*(?:метр[а-я]*|meter|м|m)?(?:\\s+(слева|справа|по центру|links|rechts|mittig))?(?:\\s+hinzu)?[.!]?$").matcher(text.trim());
+  if(!m.matches())return false;
+  String raw=m.group(1).toLowerCase(java.util.Locale.ROOT),type;
+  switch(raw){
+   case "домовое подключение":case "hausanschluss":type="Hausanschluss";break;
+   case "препятствие":case "hindernis":type="Hindernis";break;
+   case "поисковый шурф":case "suchschachtung":type="Suchschachtung";break;
+   case "стартовый котлован":case "startgrube":type="Startgrube";break;
+   case "приёмный котлован":case "приемный котлован":case "zielgrube":type="Zielgrube";break;
+   case "kvs":case "квс":type="KVS";break;
+   default:type="Knickpunkt";
+  }
+  double station;try{station=Double.parseDouble(m.group(2).replace(',','.'));}catch(NumberFormatException e){notice("Ungültige Station.");return true;}
+  if(!Double.isFinite(station)||!Double.isFinite(l)||l<=0||station<0||station>l){notice("Objektstation außerhalb der Trasse.");return true;}
+  String side=m.group(3)==null?"":m.group(3).toLowerCase(java.util.Locale.ROOT);
+  String initial=side.equals("слева")||side.equals("links")?"links":side.equals("справа")||side.equals("rechts")?"rechts":side.equals("по центру")||side.equals("mittig")?"mittig":"Unbekannt";
+  LinearLayout form=page();form.addView(sheetText(String.format(java.util.Locale.GERMANY,"%s · Station %.2f m",type,station),16,true));
+  String[] sides={"Unbekannt","links","rechts","mittig"};Spinner choose=choices(form,sides);choose.setSelection(java.util.Arrays.asList(sides).indexOf(initial));
+  EditText note=new EditText(this);note.setHint("Bemerkung");form.addView(note);
+  new android.app.AlertDialog.Builder(this).setTitle("Objekt hinzufügen").setView(form).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",(d,w)->{
+   if(!Double.isFinite(l)||l<=0||station>l){notice("Objektstation außerhalb der Trasse.");return;}
+   try{org.json.JSONObject o=new org.json.JSONObject();o.put("station",station);o.put("type",type);o.put("side",choose.getSelectedItem().toString());o.put("note",note.getText().toString());objects.put(o);saveObjects();notice("Objekt gespeichert.");}catch(Exception e){notice("Objekt konnte nicht gespeichert werden.");}
+  }).show();return true;
+ }
  void handleSpeech(String text){
   int version=++speechVersion;
   String normalized=text.toLowerCase(java.util.Locale.ROOT);
@@ -802,14 +827,14 @@ public class MainActivity extends Activity {
      normalized.matches(".*(?:сфотографируй|fotografier|foto aufnehmen|foto machen|foto erstellen|foto anhängen|foto hinzufügen|foto aufnehmen).*")){
    if(selectVoicePoint(text))capturePhoto();return;
   }
-  if(offerVoiceSegment(text)||offerVoicePointAction(text))return;
+  if(offerVoiceObject(text)||offerVoiceSegment(text)||offerVoicePointAction(text))return;
   showPage(voicePage);
   if(voiceLanguage.getSelectedItemPosition()==0){voiceText.setText(text);offerVoiceRename(text);return;}
   if(translator==null)translator=com.google.mlkit.nl.translate.Translation.getClient(
    new com.google.mlkit.nl.translate.TranslatorOptions.Builder().setSourceLanguage("ru").setTargetLanguage("de").build());
   voiceText.setText("");notice("Diktat wird ins Deutsche übersetzt …");
   translator.downloadModelIfNeeded().onSuccessTask(ignored->translator.translate(text))
-   .addOnSuccessListener(this,german->{if(version==speechVersion){voiceText.setText(german);if(!offerVoiceSegment(german))offerVoiceRename(german);}})
+   .addOnSuccessListener(this,german->{if(version==speechVersion){voiceText.setText(german);if(!offerVoiceObject(german)&&!offerVoiceSegment(german))offerVoiceRename(german);}})
    .addOnFailureListener(this,error->{if(version==speechVersion)notice("Übersetzung fehlgeschlagen. Für den ersten Modellabruf wird Internet benötigt.");});
  }
  @Override protected void onDestroy(){if(translator!=null)translator.close();super.onDestroy();}
