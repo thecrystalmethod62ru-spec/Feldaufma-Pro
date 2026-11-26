@@ -2793,8 +2793,8 @@ public class MainActivity extends Activity {
        org.json.JSONArray rows=extraUtilities();java.util.ArrayList<String> labels=new java.util.ArrayList<>();java.util.ArrayList<Integer> indices=new java.util.ArrayList<>();
        for(int k=0;k<rows.length();k++){org.json.JSONObject u=rows.optJSONObject(k);if(u!=null&&station>=u.optDouble("routeFrom",0)&&station<=u.optDouble("routeTo",Double.POSITIVE_INFINITY)){indices.add(k);labels.add(u.optString("name",u.optString("type"))+" · "+u.optDouble("diameter")+" mm");}}
        if(indices.isEmpty()){notice("Keine Leitung an dieser Station");return;}
-       if(indices.size()==1){editUtilityPosition(indices.get(0),()->invalidate());return;}
-       new android.app.AlertDialog.Builder(MainActivity.this).setTitle("Leitung an dieser Station wählen").setItems(labels.toArray(new String[0]),(dd,ii)->editUtilityPosition(indices.get(ii),()->invalidate())).setNegativeButton("Abbrechen",null).show();return;
+       if(indices.size()==1){editUtilityPosition(indices.get(0),station,()->invalidate());return;}
+       new android.app.AlertDialog.Builder(MainActivity.this).setTitle("Leitung an dieser Station wählen").setItems(labels.toArray(new String[0]),(dd,ii)->editUtilityPosition(indices.get(ii),station,()->invalidate())).setNegativeButton("Abbrechen",null).show();return;
       }requestedBranchStation[0]=station;branchEditor.performClick();}).setNegativeButton("Abbrechen",null).show();
      }
      return true;
@@ -5248,7 +5248,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
    add.setOnShowListener(x->add.getButton(-1).setOnClickListener(y->{try{double mm=Double.parseDouble(diameter.getText().toString().replace(',','.'));if(!Double.isFinite(mm)||mm<=0)throw new Exception();org.json.JSONObject o=new org.json.JSONObject();o.put("id",java.util.UUID.randomUUID().toString()).put("type",type.getSelectedItem().toString());o.put("diameter",mm);rows.put(o);if(saveUtilities(rows))add.dismiss();}catch(Exception e){diameter.setError("Positiven Durchmesser eingeben");}}));add.show();
   }).setNegativeButton("Schließen",null).show();
  }
- void editUtilityPosition(int index,Runnable refresh){
+ void editUtilityPosition(int index,double station,Runnable refresh){
   org.json.JSONArray rows=extraUtilities();org.json.JSONObject source=rows.optJSONObject(index);if(source==null)return;
   String before=rows.toString(),projectId=activeProject;
   LinearLayout form=new LinearLayout(this);form.setOrientation(1);
@@ -5261,6 +5261,13 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
    @Override protected void onDraw(Canvas c){
     super.onDraw(c);
     double width=w, height=d, x=read(offset), y=read(depth),radius=source.optDouble("diameter")/2000;
+    android.content.SharedPreferences prefs=getPreferences(0);
+    try{org.json.JSONArray sections=new org.json.JSONArray(prefs.getString("metricWidthSections","[]"));for(int k=0;k<sections.length();k++){org.json.JSONObject section=sections.getJSONObject(k);if(station>=section.optDouble("from")&&station<section.optDouble("to")){width=section.optDouble("width");break;}}}catch(Exception ignored){}
+    try{String raw=prefs.getString("metricMainExcavationDepth","").trim();if(!raw.isEmpty())height=Double.parseDouble(raw.replace(',','.'));for(String line:prefs.getString("metricDepthSections","").split("\\n")){if(line.trim().isEmpty())continue;String[] parts=line.split(";",-1);if(parts.length!=3)throw new IllegalArgumentException();double from=Double.parseDouble(parts[0].trim().replace(',','.')),to=Double.parseDouble(parts[1].trim().replace(',','.'));if(station>=from&&station<to){height=Double.parseDouble(parts[2].trim().replace(',','.'));break;}}}catch(Exception ex){height=Double.NaN;}
+    double gap=0,cover=0;
+    try{double value=Double.parseDouble(prefs.getString("metricPipeMinGap","0").replace(',','.'));if(Double.isFinite(value)&&value>=0)gap=value;}catch(Exception ignored){}
+    try{double value=Double.parseDouble(prefs.getString("metricPipeMinCover","0").replace(',','.'));if(Double.isFinite(value)&&value>=0)cover=value;}catch(Exception ignored){}
+
     c.drawColor(0xff171717);
     if(!Double.isFinite(width)||!Double.isFinite(height)||width<=0||height<=0)return;
     double scale=Math.min((getWidth()-dp(32))/width,(getHeight()-dp(32))/height);if(scale<=0)return;
@@ -5269,18 +5276,19 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth(dp(1));pen.setColor(0xffaaaaaa);c.drawRect(left,top,(float)(left+width*scale),(float)(top+height*scale),pen);pen.setStyle(Paint.Style.FILL);
     if(!Double.isFinite(x)||!Double.isFinite(y)||!Double.isFinite(radius)||radius<=0)return;
     boolean outside=x-radius<0||x+radius>width||y-radius<0||y+radius>height;
-    boolean collision=false;
+    boolean collision=false,clearance=false,coverWarning=y-radius<cover;
     for(int k=0;k<rows.length();k++){
      if(k==index)continue;org.json.JSONObject neighbor=rows.optJSONObject(k);if(neighbor==null)continue;
      double from=Math.max(source.optDouble("routeFrom",0),neighbor.optDouble("routeFrom",0)),to=Math.min(source.optDouble("routeTo",Double.POSITIVE_INFINITY),neighbor.optDouble("routeTo",Double.POSITIVE_INFINITY));
-     if(to<=from)continue;
+     if(to<=from||station<from||station>=to)continue;
      double nx=neighbor.optDouble("offset"),ny=neighbor.optDouble("axisDepth"),nr=neighbor.optDouble("diameter")/2000;
      if(!Double.isFinite(nx)||!Double.isFinite(ny)||!Double.isFinite(nr)||nr<=0)continue;
-     boolean overlap=Math.hypot(x-nx,y-ny)<radius+nr;collision|=overlap;
-     pen.setColor(overlap?0xffef5350:0xff9e9e9e);
+     double distance=Math.hypot(x-nx,y-ny)-radius-nr;boolean overlap=distance<0;collision|=overlap;clearance|=distance<gap;
+     pen.setColor(overlap?0xffef5350:distance<gap?0xffffb74d:0xff9e9e9e);
      c.drawCircle((float)(left+nx*scale),(float)(top+ny*scale),(float)(nr*scale),pen);
     }
-    c.save();c.clipRect(0,0,getWidth(),getHeight());pen.setColor(outside||collision?0xffef5350:0xff42a5f5);c.drawCircle((float)(left+x*scale),(float)(top+y*scale),(float)(radius*scale),pen);c.restore();
+    c.save();c.clipRect(0,0,getWidth(),getHeight());pen.setColor(outside||collision?0xffef5350:clearance||coverWarning?0xffffb74d:0xff42a5f5);c.drawCircle((float)(left+x*scale),(float)(top+y*scale),(float)(radius*scale),pen);c.restore();
+    if(clearance||coverWarning){pen.setColor(0xffffb74d);pen.setTextSize(dp(11));c.drawText(clearance&&coverWarning?"Mindestabstand / Überdeckung":clearance?"Mindestabstand unterschritten":"Mindestüberdeckung unterschritten",dp(8),dp(11),pen);}
     if(outside||collision){pen.setColor(0xffff7777);pen.setTextSize(dp(11));c.drawText(outside&&collision?"Profilgrenze und Leitungskollision":outside?"Außerhalb des Grabenprofils":"Leitungskollision",dp(8),getHeight()-dp(4),pen);}
    }
   };
