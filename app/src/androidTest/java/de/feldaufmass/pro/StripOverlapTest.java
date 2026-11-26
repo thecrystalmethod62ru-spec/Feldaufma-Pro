@@ -35,4 +35,25 @@ public class StripOverlapTest {
     @Test(expected=IllegalArgumentException.class) public void missingWidth() {
         StripOverlap.calculate(Arrays.asList(new double[]{0,0,10,0,Double.NaN,1}));
     }
+    @Test public void rightAngleWithBevel() {
+        StripOverlap.Result result=StripOverlap.calculateWithCorners(Arrays.asList(
+            new double[]{0,0,10,0,1,1},new double[]{10,0,10,10,1,1}));
+        assertEquals(40.5,result.gross,0.01);
+        assertEquals(39.5,result.net,0.01);
+        assertEquals(1,result.overlap,0.01);
+    }
+    @Test public void straightWithCorners() {
+        StripOverlap.Result result=StripOverlap.calculateWithCorners(Arrays.asList(
+            new double[]{0,0,5,0,1,1},new double[]{5,0,10,0,1,1}));
+        assertEquals(20,result.net,0.01);
+    }
+    @Test public void disconnectedSegmentsHaveNoCorner() {
+        org.junit.Assert.assertNull(StripOverlap.cornerFiller(
+            new double[]{0,0,5,0,1,1},new double[]{6,0,6,5,1,1}));
+    }
+    @Test public void mirroredBend() {
+        StripOverlap.Result result=StripOverlap.calculateWithCorners(Arrays.asList(
+            new double[]{0,0,10,0,1,1},new double[]{10,0,10,-10,1,1}));
+        assertEquals(39.5,result.net,0.01);
+    }
 }
