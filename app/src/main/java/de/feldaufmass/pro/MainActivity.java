@@ -137,7 +137,7 @@ public class MainActivity extends Activity {
   }
   if(manifest==null||!"FeldaufmassPro".equals(manifest.optString("format"))||manifest.optInt("version")!=1)throw new java.io.IOException("Unbekanntes Sicherungsformat");
   org.json.JSONObject fields=manifest.getJSONObject("preferences");
-  java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","objectUndo","objectRedo","elevationPoints","lvPositions","dailyReports","nachtraege","routeUnderlay"));
+  java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","objectUndo","objectRedo","elevationPoints","lvPositions","dailyReports","nachtraege","routeUnderlay","sketchCalibration"));
   java.util.Set<String> ints=new java.util.HashSet<>(java.util.Arrays.asList("surface","handling","dictationLanguage","gpsDurationSeconds"));
   SharedPreferences.Editor ed=projectStorage(id).edit();
   java.util.Iterator<String> keys=fields.keys();String name="Importiertes Projekt";java.util.Set<String> used=new java.util.HashSet<>();
@@ -460,6 +460,36 @@ public class MainActivity extends Activity {
    finally{if(bitmap!=null)bitmap.recycle();}
   },"route-underlay").start();
  }
+ double sketchCalibration(RouteSketch route,org.json.JSONObject calibration){
+  if(calibration==null)return Double.NaN;
+  int a=findPoint(route,calibration.optString("a")),b=findPoint(route,calibration.optString("b"));
+  if(a<0||b<0||a==b)return Double.NaN;
+  RouteSketch.Vertex first=route.vertices.get(a),second=route.vertices.get(b);
+  if(first.point.x!=calibration.optDouble("ax")||first.point.y!=calibration.optDouble("ay")||second.point.x!=calibration.optDouble("bx")||second.point.y!=calibration.optDouble("by"))return Double.NaN;
+  return RouteSketch.calibrationFactor(first,second,calibration.optDouble("metres"));
+ }
+ org.json.JSONObject savedSketchCalibration(){
+  try{return new org.json.JSONObject(getPreferences(0).getString("sketchCalibration","{}"));}catch(Exception e){return new org.json.JSONObject();}
+ }
+ void calibrateSketch(RouteSketch route,java.util.function.Consumer<org.json.JSONObject> accept){
+  if(route.vertices.size()<2){notice("Zuerst mindestens zwei Punkte zeichnen.");return;}
+  LinearLayout form=page();
+  form.addView(sheetText("Zwei Punkte mit bekanntem geradlinigem Abstand wählen. Nur für maßstäbliche Vorlagen geeignet. Schätzwerte sind keine Aufmaßwerte.",14,false));
+  String[] labels=new String[route.vertices.size()];
+  for(int j=0;j<labels.length;j++)labels[j]="Punkt "+(j+1)+(route.vertices.get(j).name.isEmpty()?"":" · "+route.vertices.get(j).name);
+  form.addView(sheetText("Referenzpunkt A",14,true));Spinner a=choices(form,labels);
+  form.addView(sheetText("Referenzpunkt B",14,true));Spinner b=choices(form,labels);b.setSelection(1);
+  EditText distance=new EditText(this);distance.setHint("Bekannter Abstand (m)");distance.setInputType(8194);form.addView(distance);
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Zeichnungsmaßstab kalibrieren").setView(form).setNegativeButton("Abbrechen",null).setPositiveButton("Kalibrieren",null).create();
+  dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(btn->{
+   try{
+    RouteSketch.Vertex first=route.vertices.get(a.getSelectedItemPosition()),second=route.vertices.get(b.getSelectedItemPosition());
+    double known=number(distance);if(!Double.isFinite(RouteSketch.calibrationFactor(first,second,known))){distance.setError("Positive Distanz und zwei getrennte Punkte erforderlich");return;}
+    org.json.JSONObject data=new org.json.JSONObject().put("a",first.id).put("b",second.id).put("ax",(double)first.point.x).put("ay",(double)first.point.y).put("bx",(double)second.point.x).put("by",(double)second.point.y).put("metres",known);
+    accept.accept(data);dialog.dismiss();
+   }catch(Exception e){distance.setError("Abstand prüfen");}
+  }));dialog.show();
+ }
  void editRoute(boolean measure){
   LinearLayout form=page();
   ScrollView scroll=new ScrollView(this);scroll.addView(form);
@@ -500,19 +530,28 @@ public class MainActivity extends Activity {
   Button undo=new Button(this),redo=new Button(this);undo.setAllCaps(false);redo.setAllCaps(false);undo.setText("Rückgängig");redo.setText("Wiederholen");
   historyBar.addView(undo,new LinearLayout.LayoutParams(0,-2,1));historyBar.addView(redo,new LinearLayout.LayoutParams(0,-2,1));
   Button remove=new Button(this);remove.setText("Letzten Abschnitt entfernen");form.addView(remove);
+  final org.json.JSONObject[] calibration={savedSketchCalibration()};
+  TextView scaleStatus=sheetText("",13,false);form.addView(scaleStatus);
+  Button calibrate=new Button(this);calibrate.setAllCaps(false);calibrate.setText("Maßstab kalibrieren");form.addView(calibrate);
+  Button clearScale=new Button(this);clearScale.setAllCaps(false);clearScale.setText("Kalibrierung entfernen");form.addView(clearScale);
   LinearLayout list=page();form.addView(list);
   route.selected=i->measureSegment(route,i);
   Runnable refreshEditor=()->{
    undo.setEnabled(!history.undo.isEmpty());redo.setEnabled(!history.redo.isEmpty());
    remove.setEnabled(route.vertices.size()>1);
    list.removeAllViews();
+   double factor=sketchCalibration(route,calibration[0]);
+   scaleStatus.setText(Double.isFinite(factor)?"Maßstab aktiv – Schätzwerte, keine Istmaße":calibration[0].length()>0?"Referenzpunkte geändert – neu kalibrieren":"Kein Zeichnungsmaßstab");
+   clearScale.setEnabled(calibration[0].length()>0);
    String[] lines=route.measurements().split("\n");
    for(int i=1;i<route.vertices.size();i++){
     int index=i;
-    Button measureButton=new Button(this);measureButton.setAllCaps(false);measureButton.setText(lines[i-1]);
+    Button measureButton=new Button(this);measureButton.setAllCaps(false);measureButton.setText(lines[i-1]+(!Double.isFinite(route.vertices.get(i).metres)&&Double.isFinite(route.estimatedSegment(i,factor))?" · geschätzt ca. "+reportMeasure(route.estimatedSegment(i,factor)):""));
     measureButton.setOnClickListener(v->measureSegment(route,index));list.addView(measureButton);
    }
   };
+  calibrate.setOnClickListener(v->calibrateSketch(route,data->{calibration[0]=data;refreshEditor.run();}));
+  clearScale.setOnClickListener(v->{calibration[0]=new org.json.JSONObject();refreshEditor.run();});
   route.changed=()->{history.record(route.encode());refreshEditor.run();};
   java.util.function.Consumer<Boolean> restore=forward->{
    String snapshot=history.step(forward);RouteSketch parsed=new RouteSketch(this,snapshot);
@@ -530,7 +569,7 @@ public class MainActivity extends Activity {
   editor.setOnShowListener(ignored->editor.getButton(-1).setOnClickListener(v->{
    if(!initialSaved.equals(routeData())){notice("Trasse wurde zwischenzeitlich geändert. Editor neu öffnen.");return;}
    history.record(route.encode());
-   if(persistRouteHistory(history)){refreshRoute();editor.dismiss();notice("Trasse gespeichert.");}
+   if(persistRouteHistory(history)){boolean saved=getPreferences(0).edit().putString("sketchCalibration",calibration[0].toString()).commit();refreshRoute();editor.dismiss();notice(saved?"Trasse gespeichert.":"Trasse gespeichert, Kalibrierung nicht gespeichert.");}
   }));
   editor.show();
  }
