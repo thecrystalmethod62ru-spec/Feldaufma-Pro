@@ -16,6 +16,27 @@ public final class PipeLayout {
         public double centerHeight(){return bedding+diameter/2;}
         public PipeSection section(double ground,double depth){return new PipeSection(ground,depth,bedding,diameter,wall);}
     }
+    /** Signed clear distances in metres; negative values indicate overlap. */
+    public static List<String> dimensions(List<Pipe> pipes,double width,double depth){
+        warnings(pipes,width,depth,0);
+        List<String> result=new ArrayList<>();
+        for(int i=0;i<pipes.size();i++){
+            Pipe a=pipes.get(i);
+            double radius=a.diameter/2;
+            result.add(a.name+": Wand links "+metres(width/2+a.offset-radius)
+                +" | rechts "+metres(width/2-a.offset-radius)
+                +" | Überdeckung "+metres(depth-a.bedding-a.diameter));
+            for(int j=0;j<i;j++){
+                Pipe b=pipes.get(j);
+                double gap=Math.hypot(a.offset-b.offset,a.centerHeight()-b.centerHeight())-(a.diameter+b.diameter)/2;
+                result.add(b.name+" / "+a.name+": lichter Abstand "+metres(gap));
+            }
+        }
+        return result;
+    }
+    private static String metres(double value){
+        return String.format(java.util.Locale.GERMANY,"%.3f m",value);
+    }
     public static List<String> warnings(List<Pipe> pipes,double width,double depth,double clearance){
         if(!Double.isFinite(width)||width<=0||!Double.isFinite(depth)||depth<=0||!Double.isFinite(clearance)||clearance<0)
             throw new IllegalArgumentException("Ungültige Grabenmaße");
