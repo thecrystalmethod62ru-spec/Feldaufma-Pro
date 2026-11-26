@@ -1770,7 +1770,12 @@ public class MainActivity extends Activity {
     }
     montageGround=new ElevationProfile(groundPoints,total);
    }catch(Exception ignored){}
-   int derivedElevations=0;
+   int derivedElevations=0, inconsistentElevations=0;
+   if(montageGround!=null)for(org.json.JSONObject fitting:linked){
+    double top=fitting.optDouble("topElevation"),cover=fitting.optDouble("cover"),ground=montageGround.elevation(fitting.optDouble("station"));
+    if(Double.isFinite(top)&&Double.isFinite(cover)&&cover>=0&&Double.isFinite(ground)&&Math.abs(ground-top-cover)>0.01)inconsistentElevations++;
+   }
+   if(inconsistentElevations>0)panel.addView(sheetText("Hinweis: Bei "+inconsistentElevations+" Formstücken weichen Höhenkote und Überdeckung gegenüber der Tiefbau-GOK um mehr als 1 cm ab. Angaben prüfen.",14,true));
    java.util.Map<org.json.JSONObject,Double> derivedTops=new java.util.IdentityHashMap<>();
    if(montageGround!=null)for(org.json.JSONObject fitting:linked){
     if(Double.isFinite(fitting.optDouble("topElevation")))continue;
