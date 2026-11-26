@@ -3314,6 +3314,12 @@ public class MainActivity extends Activity {
   Runnable saveVerbau=()->{org.json.JSONArray data=new org.json.JSONArray();for(double[] e:entries){org.json.JSONArray row=new org.json.JSONArray();for(double v:e)try{row.put(v);}catch(Exception ex){throw new IllegalArgumentException(ex);}data.put(row);}getPreferences(0).edit().putString("metricVerbauSections",data.toString()).apply();refreshVerbau.run();};
   try{org.json.JSONArray data=new org.json.JSONArray(getPreferences(0).getString("metricVerbauSections","[]"));for(int i=0;i<data.length();i++){org.json.JSONArray row=data.getJSONArray(i);entries.add(new double[]{row.getDouble(0),row.getDouble(1),row.getDouble(2),row.getDouble(3)});}}catch(Exception ex){notice("Verbaudaten konnten nicht geladen werden.");return;}
   refreshVerbau.run();
+  Button remove=new Button(this);remove.setText("Einzelnen Abschnitt löschen");fields.addView(remove);
+  remove.setOnClickListener(button->{
+   if(entries.isEmpty()){notice("Keine Verbauabschnitte vorhanden.");return;}
+   String[] labels=new String[entries.size()];for(int i=0;i<entries.size();i++){double[] e=entries.get(i);labels[i]=String.format(java.util.Locale.GERMANY,"%.2f – %.2f m | L %.2f / R %.2f m",e[0],e[1],e[2],e[3]);}
+   new android.app.AlertDialog.Builder(this).setTitle("Verbauabschnitt auswählen").setItems(labels,(dialog,index)->new android.app.AlertDialog.Builder(this).setMessage(labels[index]+" löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(confirm,which)->{entries.remove(index);saveVerbau.run();}).show()).show();
+  });
   Button add=new Button(this);add.setText("Abschnitt hinzufügen");fields.addView(add);
   add.setOnClickListener(button->{
    try{
