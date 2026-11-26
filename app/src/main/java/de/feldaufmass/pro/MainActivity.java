@@ -1740,7 +1740,7 @@ public class MainActivity extends Activity {
       try{java.util.List<RouteBranch> updated=branchStore.load();updated.removeIf(item->item.id.equals(existing.id));branchStore.save(updated);branchChanged[0].run();for(int k=0;k<panel.getChildCount();k++)panel.getChildAt(k).invalidate();notice("Abzweigung gelöscht");}catch(Exception ex){notice("Speichern fehlgeschlagen: "+ex.getMessage());}
      }).show());
      android.app.AlertDialog entry=builder.create();
-     entry.setOnShowListener(d->entry.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(b->{
+     entry.setOnShowListener(shownDialog->entry.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(b->{
       try{
        double[] n=new double[5];for(int j:new int[]{0,3,4})n[j]=Double.parseDouble(inputs[j+1].getText().toString().trim().replace(',','.'));
        String[] l=inputs[2].getText().toString().split(";",-1),d=inputs[3].getText().toString().split(";",-1);
@@ -2109,11 +2109,11 @@ public class MainActivity extends Activity {
     if(!minimumCoverInput.getText().toString().trim().isEmpty()){
      double minimum=Double.parseDouble(minimumCoverInput.getText().toString().trim().replace(',','.'));
      if(!Double.isFinite(minimum)||minimum<0)throw new IllegalArgumentException("Ungültige Mindestüberdeckung");
-     double station=0;StringBuilder warnings=new StringBuilder();
+     double profileStation=0;StringBuilder warnings=new StringBuilder();
      for(double[] v:profileData){
       PipeSection section=new PipeSection(0,v[1],dims[2],dims[0],dims[1]);
-      if(!section.meetsCover(minimum))warnings.append(String.format(java.util.Locale.GERMANY,"\nStation %.2f–%.2f m: Überdeckung %.2f m < %.2f m",station,station+v[0],section.cover,minimum));
-      station+=v[0];
+      if(!section.meetsCover(minimum))warnings.append(String.format(java.util.Locale.GERMANY,"\nStation %.2f–%.2f m: Überdeckung %.2f m < %.2f m",profileStation,profileStation+v[0],section.cover,minimum));
+      profileStation+=v[0];
      }
      if(profileData.isEmpty())warnings.append("\nKeine Prüfung ohne Grabentiefe.");
      else if(warnings.length()==0)warnings.append("\nEingegebene Mindestüberdeckung eingehalten.");
@@ -2181,8 +2181,8 @@ public class MainActivity extends Activity {
        }
       }
       if(!branches.isEmpty()){
-       StripOverlap.Result total=StripOverlap.calculate(combined);
-       result.append(String.format(java.util.Locale.GERMANY,"\nGesamttrasse inkl. Abzweigungen (gerade Streifen):\nAbzweiglänge: %.2f m\nAbzweigfläche nominal: %.2f m²\nBrutto gesamt: %.2f m²\nÜberlappung gesamt: %.2f m²\nNetto gesamt: %.2f m²",branchLength,branchArea,total.gross,total.overlap,total.net));
+       StripOverlap.Result combinedArea=StripOverlap.calculate(combined);
+       result.append(String.format(java.util.Locale.GERMANY,"\nGesamttrasse inkl. Abzweigungen (gerade Streifen):\nAbzweiglänge: %.2f m\nAbzweigfläche nominal: %.2f m²\nBrutto gesamt: %.2f m²\nÜberlappung gesamt: %.2f m²\nNetto gesamt: %.2f m²",branchLength,branchArea,combinedArea.gross,combinedArea.overlap,combinedArea.net));
        result.append(String.format(java.util.Locale.GERMANY,"\nAbzweige – Aushub nominal: %.2f m³",branchVolume));
        for(java.util.Map.Entry<String,double[]> entry:branchQuantities.entrySet()){
         double[] q=entry.getValue();
@@ -2208,7 +2208,7 @@ public class MainActivity extends Activity {
        }catch(Exception ex){result.append("\nGesamt-Aushub: Tiefenangaben fehlen oder Tiefenabschnitte sind ungültig.");}
 
 
-       if(combinedMode==1||combinedMode==2)result.append(String.format(java.util.Locale.GERMANY,"\nKontrollwert Gesamttrasse: %.2f m²",combinedMode==1?total.gross:total.net));
+       if(combinedMode==1||combinedMode==2)result.append(String.format(java.util.Locale.GERMANY,"\nKontrollwert Gesamttrasse: %.2f m²",combinedMode==1?combinedArea.gross:combinedArea.net));
        result.append("\nAbzweige ohne Nachschnitt und Eckergänzungen; keine automatische Abrechnung.");
       }
      }catch(Exception ex){result.append("\nGesamtfläche inkl. Abzweigungen nicht vollständig berechenbar.");}
