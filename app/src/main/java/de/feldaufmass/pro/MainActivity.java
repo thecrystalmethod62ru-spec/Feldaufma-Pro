@@ -5255,6 +5255,30 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   EditText offset=new EditText(this),depth=new EditText(this);
   EditText[] fields={offset,depth};String[] keys={"offset","axisDepth"},labels={"Abstand vom linken Grabenrand (m)","Achstiefe (m)"};
   for(int i=0;i<2;i++){fields[i].setInputType(8194);fields[i].setHint(labels[i]);fields[i].setText(source.optString(keys[i],""));form.addView(fields[i]);double existing=source.optDouble(keys[i],0);utilitySlider(form,fields[i],labels[i],0,Math.max(10,Double.isFinite(existing)?existing:0),0.01,true);}
+  View preview=new View(this){
+   final Paint pen=new Paint(3);
+   double read(EditText field){try{return Double.parseDouble(field.getText().toString().trim().replace(',','.'));}catch(Exception ex){return Double.NaN;}}
+   @Override protected void onDraw(Canvas c){
+    super.onDraw(c);
+    double width=w, height=d, x=read(offset), y=read(depth),radius=source.optDouble("diameter")/2000;
+    c.drawColor(0xff171717);
+    if(!Double.isFinite(width)||!Double.isFinite(height)||width<=0||height<=0)return;
+    double scale=Math.min((getWidth()-dp(32))/width,(getHeight()-dp(32))/height);if(scale<=0)return;
+    float left=(float)((getWidth()-width*scale)/2),top=dp(12);
+    pen.setStyle(Paint.Style.FILL);pen.setColor(0xff303030);c.drawRect(left,top,(float)(left+width*scale),(float)(top+height*scale),pen);
+    pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth(dp(1));pen.setColor(0xffaaaaaa);c.drawRect(left,top,(float)(left+width*scale),(float)(top+height*scale),pen);pen.setStyle(Paint.Style.FILL);
+    if(!Double.isFinite(x)||!Double.isFinite(y)||!Double.isFinite(radius)||radius<=0)return;
+    boolean outside=x-radius<0||x+radius>width||y-radius<0||y+radius>height;
+    c.save();c.clipRect(0,0,getWidth(),getHeight());pen.setColor(outside?0xffef5350:0xff42a5f5);c.drawCircle((float)(left+x*scale),(float)(top+y*scale),(float)(radius*scale),pen);c.restore();
+    if(outside){pen.setColor(0xffff7777);pen.setTextSize(dp(11));c.drawText("Außerhalb des Grabenprofils",dp(8),getHeight()-dp(4),pen);}
+   }
+  };
+  form.addView(preview,0,new LinearLayout.LayoutParams(-1,dp(160)));
+  for(EditText field:fields)field.addTextChangedListener(new android.text.TextWatcher(){
+   public void beforeTextChanged(CharSequence s,int start,int count,int after){}
+   public void onTextChanged(CharSequence s,int start,int before,int count){preview.invalidate();}
+   public void afterTextChanged(android.text.Editable e){}
+  });
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(source.optString("name",source.optString("type"))+" – Lage").setView(form).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
   dialog.setOnShowListener(x->dialog.getButton(-1).setOnClickListener(y->{
    if(!projectId.equals(activeProject)||!before.equals(extraUtilities().toString())){notice("Projektdaten geändert. Leitung erneut öffnen.");return;}
