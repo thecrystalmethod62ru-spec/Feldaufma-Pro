@@ -1,6 +1,14 @@
 package de.feldaufmass.pro
 
 import android.os.Bundle
+import android.Manifest
+import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationManager
+import android.os.CancellationSignal
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Canvas
@@ -32,6 +40,13 @@ class MainActivity : ComponentActivity() {
                 var depth by remember { mutableStateOf("") }
                 var surface by remember { mutableStateOf("") }
                 var asphalt by remember { mutableStateOf("") }
+                var gps by remember { mutableStateOf(listOf<GpsPoint>()) }
+                var gpsStatus by remember { mutableStateOf("") }
+                var gpsBusy by remember { mutableStateOf(false) }
+                val manager = getSystemService(LOCATION_SERVICE) as LocationManager
+                val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+                    gpsStatus = if (result[Manifest.permission.ACCESS_FINE_LOCATION] == true) "GPS erlaubt. Erneut auf GPS-Punkt tippen." else "Für GPS bitte genauen Standort erlauben."
+                }
                 var points by remember { mutableStateOf(listOf<Offset>()) }
                 var extras by remember { mutableStateOf(listOf<Extra>()) }
                 var kind by remember { mutableStateOf("Suchschachtung") }
@@ -102,6 +117,38 @@ class MainActivity : ComponentActivity() {
                         }
                         Text("Rote Punkte: Zusatzpositionen. Stationen werden proportional auf die Skizze verteilt.")
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("0,00 m"); Text(fmt(l ?: 0.0) + " m") }
+                        Text("GPS-Aufmaß", style = MaterialTheme.typography.titleLarge)
+                        Text("GPS dient zur Orientierung, nicht zur zentimetergenauen Vermessung.")
+                        Button(enabled = !gpsBusy, onClick = {
+                            if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                                permission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                            } else if (!manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                                gpsStatus = "Bitte GPS am Gerät einschalten."
+                            } else if (Build.VERSION.SDK_INT >= 30) {
+                                gpsBusy = true
+                                gpsStatus = "GPS-Signal wird gesucht …"
+                                try {
+                                    manager.getCurrentLocation(LocationManager.GPS_PROVIDER, CancellationSignal(), mainExecutor) { loc ->
+                                        gpsBusy = false
+                                        if (loc != null) {
+                                            gps = gps + GpsPoint(loc.latitude, loc.longitude, loc.accuracy.toDouble())
+                                            gpsStatus = "GPS-Punkt erfasst"
+                                        } else gpsStatus = "Kein GPS-Signal. Bitte im Freien erneut versuchen."
+                                    }
+                                } catch (e: Exception) { gpsBusy = false; gpsStatus = "GPS nicht verfügbar." }
+                            } else gpsStatus = "GPS-Erfassung benötigt Android 11 oder neuer."
+                        }) { Text("GPS-Punkt erfassen") }
+                        Text(gpsStatus)
+                        val gpsLength = gps.zipWithNext().sumOf { (a,b) ->
+                            val result = FloatArray(1)
+                            Location.distanceBetween(a.lat, a.lon, b.lat, b.lon, result)
+                            result[0].toDouble()
+                        }
+                        Text("GPS-Strecke: " + fmt(gpsLength) + " m")
+                        gps.forEachIndexed { i, point ->
+                            Text("Punkt " + (i+1) + ": " + String.format(Locale.US, "%.6f, %.6f", point.lat, point.lon) + " · ±" + fmt(point.accuracy) + " m")
+                        }
+                        OutlinedButton(enabled = !gpsBusy && gps.isNotEmpty(), onClick = { gps = gps.dropLast(1) }) { Text("Letzten GPS-Punkt entfernen") }
                         Text("Zusatzleistungen / Abschnitte", style = MaterialTheme.typography.titleLarge)
                         val types = listOf("Suchschachtung", "Hausanschluss", "Startgrube", "Zielgrube", "Handschachtung", "Verbau", "Großpflaster", "Gehwegplatten", "KVS", "Kernbohrung", "Hindernis")
                         var expanded by remember { mutableStateOf(false) }
@@ -141,19 +188,19 @@ class MainActivity : ComponentActivity() {
                             Text("Verbau beidseitig (geometrisch): " + fmt(2 * ll * dd) + " m²")
                             Text("Geometrische Richtwerte, keine geprüfte Abrechnung.")
                         } else Text("Bitte gültige Maße eingeben. Aufbruchbreite ≥ Grabenbreite; Asphaltstärke ≤ Grabentiefe.")
-                        Button(enabled = valid && name.isNotBlank(), onClick = {
-                            val data = JSONObject().put("l", length).put("w", width).put("d", depth).put("s", surface).put("a", asphalt).put("points", JSONArray().apply { points.forEach { put(JSONObject().put("x", it.x.toDouble()).put("y", it.y.toDouble())) } }).put("extras", JSONArray().apply { extras.forEach { put(it.json()) } })
+                        Button(enabled = !gpsBusy && valid && name.isNotBlank(), onClick = {
+                            val data = JSONObject().put("l", length).put("w", width).put("d", depth).put("s", surface).put("a", asphalt).put("gps", JSONArray().apply { gps.forEach { put(JSONObject().put("lat", it.lat).put("lon", it.lon).put("accuracy", it.accuracy)) } }).put("points", JSONArray().apply { points.forEach { put(JSONObject().put("x", it.x.toDouble()).put("y", it.y.toDouble())) } }).put("extras", JSONArray().apply { extras.forEach { put(it.json()) } })
                             prefs.edit().putString(name.trim(), data.toString()).apply()
                             projects = prefs.all.keys.sorted()
                             message = "Projekt gespeichert"
                         }, modifier = Modifier.fillMaxWidth()) { Text("Projekt speichern") }
-                        OutlinedButton(onClick = { name = ""; length = ""; width = ""; depth = ""; surface = ""; asphalt = ""; extras = emptyList(); points = emptyList(); message = "" }) { Text("Neues Projekt") }
+                        OutlinedButton(enabled = !gpsBusy, onClick = { name = ""; length = ""; width = ""; depth = ""; surface = ""; asphalt = ""; extras = emptyList(); points = emptyList(); gps = emptyList(); message = "" }) { Text("Neues Projekt") }
                         Text(message)
                         Text("Gespeicherte Projekte", style = MaterialTheme.typography.titleLarge)
                         projects.forEach { key ->
-                            OutlinedButton(onClick = {
+                            OutlinedButton(enabled = !gpsBusy, onClick = {
                                 val obj = JSONObject(prefs.getString(key, "{}") ?: "{}")
-                                name = key; length = obj.optString("l"); width = obj.optString("w"); depth = obj.optString("d"); surface = obj.optString("s"); asphalt = obj.optString("a"); points = obj.optJSONArray("points")?.let { arr -> (0 until arr.length()).map { i -> arr.getJSONObject(i).let { Offset(it.getDouble("x").toFloat(), it.getDouble("y").toFloat()) } } } ?: emptyList(); extras = obj.optJSONArray("extras")?.let { arr -> (0 until arr.length()).map { Extra.read(arr.getJSONObject(it)) } } ?: emptyList(); message = "Projekt geladen"
+                                name = key; length = obj.optString("l"); width = obj.optString("w"); depth = obj.optString("d"); surface = obj.optString("s"); asphalt = obj.optString("a"); gps = obj.optJSONArray("gps")?.let { arr -> (0 until arr.length()).map { i -> arr.getJSONObject(i).let { GpsPoint(it.getDouble("lat"), it.getDouble("lon"), it.getDouble("accuracy")) } } } ?: emptyList(); points = obj.optJSONArray("points")?.let { arr -> (0 until arr.length()).map { i -> arr.getJSONObject(i).let { Offset(it.getDouble("x").toFloat(), it.getDouble("y").toFloat()) } } } ?: emptyList(); extras = obj.optJSONArray("extras")?.let { arr -> (0 until arr.length()).map { Extra.read(arr.getJSONObject(it)) } } ?: emptyList(); message = "Projekt geladen"
                             }, modifier = Modifier.fillMaxWidth()) { Text(key) }
                         }
                     }
@@ -174,3 +221,5 @@ private data class Extra(val kind: String, val station: Double, val length: Doub
         }
     }
 }
+
+private data class GpsPoint(val lat: Double, val lon: Double, val accuracy: Double)
