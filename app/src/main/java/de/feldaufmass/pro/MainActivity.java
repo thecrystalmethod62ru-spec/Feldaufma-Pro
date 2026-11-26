@@ -1651,8 +1651,24 @@ public class MainActivity extends Activity {
  depth=field(root,"Grabentiefe (m)","depth",true);
  TextView surfaceLabel=new TextView(this);surfaceLabel.setText("Oberfläche");root.addView(surfaceLabel);
  surface=new Spinner(this);String[] types={"Unbekannt","Asphalt","Pflaster","Gehwegplatten","Unbefestigt","Betonpflaster – Rechteck","Betonpflaster – Quadrat","Doppel-T-Pflaster","Wellenverbundpflaster","Sechseckpflaster","Achteckpflaster","Verbundpflaster – sonstige","Betonpflaster – Mehrformat","Ökopflaster / Sickerpflaster","Rasengittersteine","Rasenfugenpflaster","Natursteinpflaster – Großpflaster","Natursteinpflaster – Kleinpflaster","Natursteinpflaster – Mosaikpflaster","Natursteinpflaster – sonstige","Klinkerpflaster","Ziegelpflaster","Beton-Gehwegplatten","Natursteinplatten","Waschbetonplatten","Taktilplatten – Rippen","Taktilplatten – Noppen","Rinnenpflaster","Schlackenpflaster","Holzpflaster","Sonstiges","Beton","Betonpflaster","Großpflaster","Kleinpflaster","Gehwegplatten 1 × 1 m","Verbundpflaster","Schotter","Kies","Sand","Unbefestigte Fläche","Rasen","Grünfläche","Wassergebundene Decke","Sonstige Oberfläche"};
- surface.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,types));root.addView(surface);
- surface.setSelection(Math.min(types.length-1,Math.max(0,getPreferences(0).getInt("surface",0))));
+ java.util.ArrayList<String> surfaceTypes=new java.util.ArrayList<>(java.util.Arrays.asList(types));
+ android.content.SharedPreferences catalog=getSharedPreferences("surface_catalog",MODE_PRIVATE);
+ try{org.json.JSONArray custom=new org.json.JSONArray(catalog.getString("custom","[]"));for(int i=0;i<custom.length();i++){String name=custom.optString(i).trim();if(!name.isEmpty()&&!surfaceTypes.contains(name))surfaceTypes.add(name);}}catch(Exception ignored){}
+ ArrayAdapter<String> surfaceAdapter=new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,surfaceTypes);
+ surface.setAdapter(surfaceAdapter);root.addView(surface);
+ surface.setSelection(Math.min(surfaceTypes.size()-1,Math.max(0,getPreferences(0).getInt("surface",0))));
+ Button addSurface=new Button(this);addSurface.setAllCaps(false);addSurface.setText("Eigene Oberfläche hinzufügen");root.addView(addSurface);
+ addSurface.setOnClickListener(v->{
+  EditText input=new EditText(this);input.setSingleLine(true);input.setHint("Bezeichnung der Oberfläche");input.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(80)});
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Eigene Oberfläche hinzufügen").setView(input).setNegativeButton("Abbrechen",null).setPositiveButton("Hinzufügen",null).create();
+  dialog.setOnShowListener(x->dialog.getButton(-1).setOnClickListener(y->{
+   String name=input.getText().toString().trim();if(name.isEmpty()){input.setError("Bezeichnung eingeben");return;}
+   for(int i=0;i<surfaceTypes.size();i++)if(surfaceTypes.get(i).equalsIgnoreCase(name)){surface.setSelection(i);dialog.dismiss();return;}
+   org.json.JSONArray custom=new org.json.JSONArray();for(int i=types.length;i<surfaceTypes.size();i++)custom.put(surfaceTypes.get(i));custom.put(name);
+   if(!catalog.edit().putString("custom",custom.toString()).commit()){input.setError("Speichern fehlgeschlagen");return;}
+   surfaceAdapter.add(name);surfaceAdapter.notifyDataSetChanged();surface.setSelection(surfaceTypes.size()-1);dialog.dismiss();
+  }));dialog.show();
+ });
  belagsToggle=new Button(this);
  belagsToggle.setAllCaps(false);
  root.addView(belagsToggle);
