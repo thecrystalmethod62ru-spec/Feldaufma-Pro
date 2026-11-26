@@ -820,6 +820,24 @@ public class MainActivity extends Activity {
    try{org.json.JSONObject o=new org.json.JSONObject();o.put("station",station);o.put("type",type);o.put("side",choose.getSelectedItem().toString());o.put("note",note.getText().toString());objects.put(o);saveObjects();notice("Objekt gespeichert.");}catch(Exception e){notice("Objekt konnte nicht gespeichert werden.");}
   }).show();return true;
  }
+ boolean offerVoiceObjectDimensions(String text){
+  java.util.regex.Matcher m=java.util.regex.Pattern.compile("(?iu)^(?:размеры объекта|maße objekt|objektmaße)\\s+(\\d+)\\s*[:,]?\\s*(.+)$").matcher(text.trim());
+  if(!m.matches())return false;
+  int i;try{i=Integer.parseInt(m.group(1))-1;}catch(NumberFormatException e){notice("Ungültige Objektnummer.");return true;}
+  org.json.JSONObject o=objects.optJSONObject(i);if(o==null){notice("Objekt nicht gefunden.");return true;}
+  String[] keys={"detailLength","detailWidth","detailDepth"},names={"Länge","Breite","Tiefe"},patterns={"(?:длина|länge)","(?:ширина|breite)","(?:глубина|tiefe)"};
+  String[] values=new String[3];StringBuilder preview=new StringBuilder(o.optString("type")+" · Station "+o.optString("station")+" m\n");
+  for(int j=0;j<3;j++){
+   java.util.regex.Matcher v=java.util.regex.Pattern.compile("(?iu)"+patterns[j]+"\\s*[:=]?\\s*(\\d+(?:[.,]\\d+)?)\\s*(zentimeter|cm|сантиметр[а-я]*|см|meter|метр[а-я]*|m|м)(?![\\p{L}])").matcher(m.group(2));
+   if(v.find()){double n=Double.parseDouble(v.group(1).replace(',','.'));String u=v.group(2).toLowerCase(java.util.Locale.ROOT);if(u.equals("cm")||u.equals("см")||u.startsWith("сантиметр")||u.equals("zentimeter"))n/=100;
+    if(!Double.isFinite(n)||n<=0){notice("Positive Maße erforderlich.");return true;}values[j]=Double.toString(n);preview.append(names[j]).append(": ").append(String.format(java.util.Locale.GERMANY,"%.3f m",n)).append("\n");}
+  }
+  if(values[0]==null&&values[1]==null&&values[2]==null){notice("Keine Maße mit Einheit erkannt.");return true;}
+  new android.app.AlertDialog.Builder(this).setTitle("Detailmaße prüfen").setMessage(preview.toString()).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",(d,w)->{
+   if(objects.optJSONObject(i)!=o){notice("Objekt wurde geändert. Bitte erneut wählen.");return;}
+   try{for(int j=0;j<3;j++)if(values[j]!=null)o.put(keys[j],values[j]);saveObjects();notice("Detailmaße gespeichert.");}catch(Exception e){notice("Detailmaße konnten nicht gespeichert werden.");}
+  }).show();return true;
+ }
  void handleSpeech(String text){
   int version=++speechVersion;
   String normalized=text.toLowerCase(java.util.Locale.ROOT);
@@ -827,14 +845,14 @@ public class MainActivity extends Activity {
      normalized.matches(".*(?:сфотографируй|fotografier|foto aufnehmen|foto machen|foto erstellen|foto anhängen|foto hinzufügen|foto aufnehmen).*")){
    if(selectVoicePoint(text))capturePhoto();return;
   }
-  if(offerVoiceObject(text)||offerVoiceSegment(text)||offerVoicePointAction(text))return;
+  if(offerVoiceObjectDimensions(text)||offerVoiceObject(text)||offerVoiceSegment(text)||offerVoicePointAction(text))return;
   showPage(voicePage);
   if(voiceLanguage.getSelectedItemPosition()==0){voiceText.setText(text);offerVoiceRename(text);return;}
   if(translator==null)translator=com.google.mlkit.nl.translate.Translation.getClient(
    new com.google.mlkit.nl.translate.TranslatorOptions.Builder().setSourceLanguage("ru").setTargetLanguage("de").build());
   voiceText.setText("");notice("Diktat wird ins Deutsche übersetzt …");
   translator.downloadModelIfNeeded().onSuccessTask(ignored->translator.translate(text))
-   .addOnSuccessListener(this,german->{if(version==speechVersion){voiceText.setText(german);if(!offerVoiceObject(german)&&!offerVoiceSegment(german))offerVoiceRename(german);}})
+   .addOnSuccessListener(this,german->{if(version==speechVersion){voiceText.setText(german);if(!offerVoiceObjectDimensions(german)&&!offerVoiceObject(german)&&!offerVoiceSegment(german))offerVoiceRename(german);}})
    .addOnFailureListener(this,error->{if(version==speechVersion)notice("Übersetzung fehlgeschlagen. Für den ersten Modellabruf wird Internet benötigt.");});
  }
  @Override protected void onDestroy(){if(translator!=null)translator.close();super.onDestroy();}
