@@ -322,8 +322,8 @@ public class MainActivity extends Activity {
  }
  int drawingLayers(){return getSharedPreferences("drawing_view",MODE_PRIVATE).getInt(activeProject,RouteSketch.ALL_LAYERS)&RouteSketch.ALL_LAYERS;}
  void showDrawingLayers(){
-  String[] labels={"Leitungsverlauf / Punkte","Bemaßung","Punktnamen","GPS / Standort","Fotodokumentation"};
-  int[] masks={RouteSketch.LAYER_ROUTE,RouteSketch.LAYER_DIMENSIONS,RouteSketch.LAYER_NAMES,RouteSketch.LAYER_GPS,RouteSketch.LAYER_PHOTOS};
+  String[] labels={"Leitungsverlauf / Punkte","Bemaßung","Punktnamen","GPS / Standort","Fotodokumentation","Objekte","Oberflächen"};
+  int[] masks={RouteSketch.LAYER_ROUTE,RouteSketch.LAYER_DIMENSIONS,RouteSketch.LAYER_NAMES,RouteSketch.LAYER_GPS,RouteSketch.LAYER_PHOTOS,RouteSketch.LAYER_OBJECTS,RouteSketch.LAYER_SURFACES};
   boolean[] checked=new boolean[labels.length];int current=drawingLayers();
   for(int j=0;j<labels.length;j++)checked[j]=(current&masks[j])!=0;
   new android.app.AlertDialog.Builder(this).setTitle("Zeichnungsebenen")
@@ -334,6 +334,24 @@ public class MainActivity extends Activity {
  void applyDrawingLayers(int mask){
   if(!getSharedPreferences("drawing_view",MODE_PRIVATE).edit().putInt(activeProject,mask).commit()){notice("Ebenen konnten nicht gespeichert werden.");return;}
   if(livePreview!=null)livePreview.setVisibleLayers(mask);
+ }
+ void refreshStationLayers(){
+  if(livePreview==null)return;
+  org.json.JSONArray obj=new org.json.JSONArray(),sections=new org.json.JSONArray();
+  try{obj=new org.json.JSONArray(getPreferences(0).getString("objects","[]"));}catch(Exception ignored){}
+  try{sections=new org.json.JSONArray(getPreferences(0).getString("segments","[]"));}catch(Exception ignored){}
+  livePreview.setStationLayers(obj,sections);
+  if(livePreview.vertices.size()>=2&&(obj.length()>0||sections.length()>0)){
+   double total=livePreview.measuredLength();
+   String label=(livePreview.vertices.size()-1)+" Abschnitte · "+(Double.isFinite(total)?"Bemaßte Länge: "+reportMeasure(total):"Bemaßung unvollständig");
+   int omitted=0;
+   for(int j=0;j<obj.length();j++){org.json.JSONObject o=obj.optJSONObject(j);if(o==null||livePreview.stationPoint(o.optDouble("station"))==null)omitted++;}
+   for(int j=0;j<sections.length();j++){org.json.JSONObject o=sections.optJSONObject(j);if(o==null||o.optDouble("from")>=o.optDouble("to")||livePreview.stationPoint(o.optDouble("from"))==null||livePreview.stationPoint(o.optDouble("to"))==null)omitted++;}
+   if(omitted>0)label+=" · "+omitted+" Stationseinträge ohne Planposition";
+   routeSummary.setText(label);
+  }else if(livePreview.vertices.size()>=2){
+   double total=livePreview.measuredLength();routeSummary.setText((livePreview.vertices.size()-1)+" Abschnitte · "+(Double.isFinite(total)?"Bemaßte Länge: "+reportMeasure(total):"Bemaßung unvollständig"));
+  }
  }
  void refreshRoute(){
   routePreviewBox.removeAllViews();
@@ -346,9 +364,10 @@ public class MainActivity extends Activity {
   if(!preview.vertices.isEmpty() && !routeData().equals(preview.encode()))getPreferences(0).edit().putString("routeSketch",preview.encode()).remove("routeHistoryHead").remove("routeUndo").remove("routeRedo").commit();
   routePreviewBox.addView(preview,new LinearLayout.LayoutParams(-1,dp(300)));
   double total=preview.measuredLength();
-  if(preview.vertices.size()<2){routeSummary.setText("Trasse mit dem Finger zeichnen");return;}
+  if(preview.vertices.size()<2){routeSummary.setText("Trasse mit dem Finger zeichnen");refreshStationLayers();return;}
   routeSummary.setText((preview.vertices.size()-1)+" Abschnitte · "+
     (Double.isFinite(total)?"Bemaßte Länge: "+reportMeasure(total):"Bemaßung unvollständig"));
+  refreshStationLayers();
  }
 
  void measureSegment(RouteSketch route,int i){
@@ -858,6 +877,7 @@ public class MainActivity extends Activity {
     .putString("objectRedo", new org.json.JSONArray(redoObjects).toString())
     .apply();
   showObjects();
+  refreshStationLayers();
   refreshDetailQuantities();
   sketch.invalidate();
   updateHistoryButtons();
@@ -1338,7 +1358,7 @@ public class MainActivity extends Activity {
  if(Double.isFinite(a)&&Double.isFinite(b))item.put("cutWidth",gw+a+b);
  segments.put(item);persistSegments();
  }catch(Exception e){Toast.makeText(this,"Bitte gültige Stationsgrenzen und Breite eingeben.",Toast.LENGTH_LONG).show();}}
- void persistSegments(){getPreferences(0).edit().putString("segments",segments.toString()).apply();showSegments();}
+ void persistSegments(){getPreferences(0).edit().putString("segments",segments.toString()).apply();showSegments();refreshStationLayers();}
  void showSegments(){StringBuilder out=new StringBuilder();java.util.TreeMap<String,Double> totals=new java.util.TreeMap<>();
  for(int i=0;i<segments.length();i++){org.json.JSONObject o=segments.optJSONObject(i);if(o==null)continue;double a=o.optDouble("from"),b=o.optDouble("to"),area=(b-a)*o.optDouble("width");String type=o.optString("surface");
  out.append(String.format(java.util.Locale.GERMANY,"RP %02d | %.2f–%.2f m | %s | %.2f m² (Graben)\n",i+1,a,b,type,area));
