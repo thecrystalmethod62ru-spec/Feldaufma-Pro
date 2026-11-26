@@ -5257,6 +5257,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   EditText offset=new EditText(this),depth=new EditText(this);
   EditText[] fields={offset,depth};String[] keys={"offset","axisDepth"},labels={"Abstand vom linken Grabenrand (m)","Achstiefe (m)"};
   for(int i=0;i<2;i++){fields[i].setInputType(8194);fields[i].setHint(labels[i]);fields[i].setText(source.optString(keys[i],""));form.addView(fields[i]);double existing=source.optDouble(keys[i],0);utilitySlider(form,fields[i],labels[i],0,Math.max(10,Double.isFinite(existing)?existing:0),0.01,true);}
+  final java.util.Map<Integer,java.util.ArrayDeque<String[]>> undoByUtility=new java.util.HashMap<>(),redoByUtility=new java.util.HashMap<>();
   final java.util.ArrayDeque<String[]> positionHistory=new java.util.ArrayDeque<>();
   final java.util.ArrayDeque<String[]> redoHistory=new java.util.ArrayDeque<>();
   Button redoPosition=new Button(this);redoPosition.setText("Wiederholen");redoPosition.setEnabled(false);
@@ -5283,8 +5284,9 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
        if(hit<0)return false;
        if(!Double.isFinite(x)||!Double.isFinite(y)||x<0||y<0){notice("Zuerst gültige Maße eingeben");return true;}
        try{current[0].put("offset",x);current[0].put("axisDepth",y);}catch(Exception ex){return true;}
+       undoByUtility.put(selected[0],new java.util.ArrayDeque<>(positionHistory));redoByUtility.put(selected[0],new java.util.ArrayDeque<>(redoHistory));
        selected[0]=hit;current[0]=rows.optJSONObject(hit);offset.setText(current[0].optString("offset",""));depth.setText(current[0].optString("axisDepth",""));
-       positionHistory.clear();redoHistory.clear();undoPosition.setEnabled(false);redoPosition.setEnabled(false);
+       positionHistory.clear();redoHistory.clear();if(undoByUtility.containsKey(hit))positionHistory.addAll(undoByUtility.get(hit));if(redoByUtility.containsKey(hit))redoHistory.addAll(redoByUtility.get(hit));undoPosition.setEnabled(!positionHistory.isEmpty());redoPosition.setEnabled(!redoHistory.isEmpty());
        notice(current[0].optString("name",current[0].optString("type")));invalidate();return true;
       }
       redoHistory.clear();redoPosition.setEnabled(false);positionHistory.push(new String[]{offset.getText().toString(),depth.getText().toString()});if(positionHistory.size()>50)positionHistory.removeLast();undoPosition.setEnabled(true);
@@ -5384,8 +5386,8 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   redoPosition.setText("↷");redoPosition.setContentDescription("Wiederholen");
   expandPreview.setOnClickListener(v->{
    android.view.ViewGroup.LayoutParams lp=workspace.getLayoutParams();
-   boolean expanded=lp.height>dp(160);
-   lp.height=expanded?dp(160):Math.max(dp(240),getResources().getDisplayMetrics().heightPixels-dp(280));
+   boolean expanded=lp.height>dp(210);
+   lp.height=expanded?dp(210):Math.max(dp(240),getResources().getDisplayMetrics().heightPixels-dp(280));
    workspace.setLayoutParams(lp);toolbar.setTranslationY(0);toolbar.setTranslationX(0);expandPreview.setText(expanded?"Querschnitt vergrößern":"Querschnitt verkleinern");
   });
   fullscreen.setOnClickListener(v->{
@@ -5394,7 +5396,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
    window.setLayout(full?-1:-2,full?-1:-2);
    window.getDecorView().setSystemUiVisibility(full?5894:0);
    android.view.ViewGroup.LayoutParams lp=workspace.getLayoutParams();
-   lp.height=full?Math.max(dp(160),getResources().getDisplayMetrics().heightPixels-dp(200)):dp(160);
+   lp.height=full?Math.max(dp(160),getResources().getDisplayMetrics().heightPixels-dp(200)):dp(210);
    workspace.setLayoutParams(lp);toolbar.setTranslationY(0);toolbar.setTranslationX(0);fullscreen.setText(full?"Normal":"Vollbild");
    expandPreview.setText(full?"Querschnitt verkleinern":"Querschnitt vergrößern");
   });
