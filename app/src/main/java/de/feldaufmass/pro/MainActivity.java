@@ -24,9 +24,9 @@ public class MainActivity extends Activity {
  width=field(root,"Grabenbreite (m)","width",true);
  depth=field(root,"Grabentiefe (m)","depth",true);
  TextView surfaceLabel=new TextView(this);surfaceLabel.setText("Oberfläche");root.addView(surfaceLabel);
- surface=new Spinner(this);String[] types={"Unbekannt","Asphalt","Pflaster","Gehwegplatten","Unbefestigt"};
+ surface=new Spinner(this);String[] types={"Unbekannt","Asphalt","Pflaster","Gehwegplatten","Unbefestigt","Betonpflaster – Rechteck","Betonpflaster – Quadrat","Doppel-T-Pflaster","Wellenverbundpflaster","Sechseckpflaster","Achteckpflaster","Verbundpflaster – sonstige","Betonpflaster – Mehrformat","Ökopflaster / Sickerpflaster","Rasengittersteine","Rasenfugenpflaster","Natursteinpflaster – Großpflaster","Natursteinpflaster – Kleinpflaster","Natursteinpflaster – Mosaikpflaster","Natursteinpflaster – sonstige","Klinkerpflaster","Ziegelpflaster","Beton-Gehwegplatten","Natursteinplatten","Waschbetonplatten","Taktilplatten – Rippen","Taktilplatten – Noppen","Rinnenpflaster","Schlackenpflaster","Holzpflaster","Sonstiges"};
  surface.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,types));root.addView(surface);
- surface.setSelection(Math.min(4,Math.max(0,getPreferences(0).getInt("surface",0))));
+ surface.setSelection(Math.min(types.length-1,Math.max(0,getPreferences(0).getInt("surface",0))));
  baseInput=field(root,"Tragschichtstärke (m, optional)","base",true);
  pipeInput=field(root,"Rohr-Außendurchmesser (mm, optional)","pipe",true);
  asphaltInput=field(root,"Asphaltstärke (m, optional)","asphalt",true);
@@ -61,7 +61,7 @@ public class MainActivity extends Activity {
  float layerTop=top;
  if(Double.isFinite(asphalt)&&covering.equals("Asphalt")){p.setColor(0xff454950);layerTop=top+(float)(asphalt*scale);c.drawRect(20,top,340,layerTop,p);}
  if(Double.isFinite(base)){p.setColor(0xffa6a6a6);c.drawRect(20,layerTop,340,layerTop+(float)(base*scale),p);}
- if(covering.equals("Pflaster")||covering.equals("Gehwegplatten")){p.setColor(0xff777777);c.drawLine(20,top,340,top,p);for(int i=20;i<340;i+=covering.equals("Pflaster")?12:28)c.drawLine(i,top-4,i,top,p);}
+ if(!covering.equals("Asphalt")&&!covering.equals("Unbekannt")&&!covering.equals("Unbefestigt")&&!covering.equals("Sonstiges")){p.setColor(0xff777777);c.drawLine(20,top,340,top,p);for(int i=20;i<340;i+=covering.contains("platten")||covering.contains("Platten")?28:12)c.drawLine(i,top-4,i,top,p);}
  if(Double.isFinite(pipe)){float radius=(float)(pipe/2000*scale);p.setColor(0xff3686bc);c.drawCircle(180,bottom-radius,radius,p);}
 
  p.setColor(Color.BLACK);p.setStrokeWidth(1);c.drawLine(x,top,x,bottom,p);c.drawLine(z,top,z,bottom,p);c.drawLine(x,bottom,z,bottom,p);
