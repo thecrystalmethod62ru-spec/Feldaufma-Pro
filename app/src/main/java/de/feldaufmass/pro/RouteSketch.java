@@ -15,7 +15,7 @@ import java.util.Locale;
 
 /** Coordinates describe a schematic only. Metres are entered in the field. */
 final class RouteSketch extends View {
- static final int LAYER_ROUTE=1,LAYER_DIMENSIONS=2,LAYER_NAMES=4,LAYER_GPS=8,LAYER_PHOTOS=16,ALL_LAYERS=31;
+ static final int LAYER_ROUTE=1,LAYER_DIMENSIONS=2,LAYER_NAMES=4,LAYER_GPS=8,LAYER_PHOTOS=16,LAYER_OBJECTS=32,LAYER_SURFACES=64,ALL_LAYERS=127;
  int visibleLayers=ALL_LAYERS;
  boolean layerVisible(int layer){return (visibleLayers&layer)!=0;}
  void setVisibleLayers(int layers){visibleLayers=layers&ALL_LAYERS;invalidate();}
@@ -117,6 +117,60 @@ final class RouteSketch extends View {
   }
   return text.toString();
  }
+ JSONArray stationObjects=new JSONArray(),surfaceSections=new JSONArray();
+ void setStationLayers(JSONArray objects,JSONArray sections){stationObjects=objects;surfaceSections=sections;invalidate();}
+ PointF stationPoint(double station){
+  double total=measuredLength();
+  if(!Double.isFinite(total)||total<=0||!Double.isFinite(station)||station<0||station>total+1e-8)return null;
+  double start=0;
+  for(int i=1;i<vertices.size();i++){
+   Vertex v=vertices.get(i);if(!Double.isFinite(v.metres)||v.metres<=0)return null;
+  }
+  for(int i=1;i<vertices.size();i++){
+   Vertex a=vertices.get(i-1),b=vertices.get(i);double end=start+b.metres;
+   if(station<=end+1e-8){float f=(float)Math.max(0,Math.min(1,(station-start)/b.metres));return new PointF(a.point.x+(b.point.x-a.point.x)*f,a.point.y+(b.point.y-a.point.y)*f);}
+   start=end;
+  }
+  return null;
+ }
+ static int surfaceColor(String name){
+  String n=name.toLowerCase(Locale.ROOT);
+  if(n.contains("asphalt"))return 0xff68737a;
+  if(n.contains("platten"))return 0xffd1ab79;
+  if(n.contains("pflaster"))return 0xffa99887;
+  if(n.contains("unbefestigt")||n.contains("rasen"))return 0xff81a574;
+  return 0xffc7b5d7;
+ }
+ void drawSurfaceSections(Canvas c,float density){
+  if(!layerVisible(LAYER_SURFACES))return;
+  for(int j=0;j<surfaceSections.length();j++){
+   org.json.JSONObject section=surfaceSections.optJSONObject(j);if(section==null)continue;
+   double from=section.optDouble("from"),to=section.optDouble("to");
+   if(from>=to||stationPoint(from)==null||stationPoint(to)==null)continue;
+   paint.setColor(surfaceColor(section.optString("surface")));paint.setStrokeWidth(12*density);
+   double start=0;
+   for(int i=1;i<vertices.size();i++){
+    double end=start+vertices.get(i).metres,lo=Math.max(from,start),hi=Math.min(to,end);
+    if(hi>lo){PointF a=stationPoint(lo),b=stationPoint(hi);if(a!=null&&b!=null)line(c,a,b);}
+    start=end;
+   }
+  }
+ }
+ void drawStationObjects(Canvas c,float density){
+  if(!layerVisible(LAYER_OBJECTS))return;
+  paint.setTextSize(11*density);
+  for(int j=0;j<stationObjects.length();j++){
+   org.json.JSONObject o=stationObjects.optJSONObject(j);if(o==null)continue;
+   double station=o.optDouble("station");PointF p=stationPoint(station);if(p==null)continue;
+   float x=left()+scale()*p.x,y=top()+scale()*p.y;
+   paint.setColor(0xffa65e19);c.drawRect(x-4*density,y-4*density,x+4*density,y+4*density,paint);
+   String label=o.optString("type","Objekt")+" · "+String.format(Locale.GERMANY,"%.2f m",station);
+   float tx=x+6*density,ty=y-13*density;
+   paint.setColor(Color.WHITE);c.drawRect(tx-2*density,ty-11*density,tx+paint.measureText(label)+2*density,ty+3*density,paint);
+   paint.setColor(0xff7c4514);c.drawText(label,tx,ty,paint);
+  }
+  paint.setTextSize(13*density);
+ }
  private android.location.Location liveFix;
  void setLiveFix(android.location.Location fix){liveFix=fix;invalidate();}
  float zoom=1,centerX=.5f,centerY=.5f;
@@ -152,6 +206,7 @@ final class RouteSketch extends View {
   }
   float density=getResources().getDisplayMetrics().density;
   paint.setTextSize(13*density);
+  drawSurfaceSections(c,density);
   for(int i=1;i<vertices.size();i++){
    PointF a=vertices.get(i-1).point,b=vertices.get(i).point;
    if(layerVisible(LAYER_ROUTE)){paint.setColor(0xff13665f);paint.setStrokeWidth(4);line(c,a,b);}
@@ -179,6 +234,7 @@ final class RouteSketch extends View {
    }
    String name=vertex.name;if(layerVisible(LAYER_NAMES)&&!name.isEmpty()){paint.setColor(0xff173c42);c.drawText(name,left()+scale()*p.x+8*density,top()+scale()*p.y+16*density,paint);}
   }
+  drawStationObjects(c,density);
   if(layerVisible(LAYER_GPS)&&liveFix!=null){
    PointF gps=gpsPosition(liveFix.getLatitude(),liveFix.getLongitude(),-1);
    if(gps!=null){
