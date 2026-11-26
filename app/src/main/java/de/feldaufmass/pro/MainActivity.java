@@ -1533,6 +1533,25 @@ public class MainActivity extends Activity {
     }
    };panel.addView(axis,new LinearLayout.LayoutParams(-1,dp(70)));
    TextView range=new TextView(this);range.setText("0,00 m  —  "+total+" m");panel.addView(range);
+   RouteSketch geometry=new RouteSketch(this,routeData());
+   double measured=geometry.measuredLength();
+   if(Double.isFinite(measured)&&measured>0&&Math.abs(measured-total)<0.001){
+    TextView title=new TextView(this);title.setText("Gemeinsame Trassenskizze – Stationspunkte (ohne seitlichen Versatz)");panel.addView(title);
+    android.view.View map=new android.view.View(this){
+     final android.graphics.Paint pen=new android.graphics.Paint(3);
+     @Override protected void onDraw(android.graphics.Canvas c){
+      super.onDraw(c);float size=Math.min(getWidth(),getHeight())-dp(32);if(size<=0)return;
+      float ox=(getWidth()-size)/2,oy=(getHeight()-size)/2;
+      pen.setColor(0xff9b876c);pen.setStrokeWidth(dp(14));pen.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+      for(int i=1;i<geometry.vertices.size();i++){android.graphics.PointF a=geometry.vertices.get(i-1).point,b=geometry.vertices.get(i).point;c.drawLine(ox+a.x*size,oy+a.y*size,ox+b.x*size,oy+b.y*size,pen);}
+      pen.setColor(0xff398bda);pen.setStrokeWidth(dp(2));
+      for(int i=1;i<geometry.vertices.size();i++){android.graphics.PointF a=geometry.vertices.get(i-1).point,b=geometry.vertices.get(i).point;c.drawLine(ox+a.x*size,oy+a.y*size,ox+b.x*size,oy+b.y*size,pen);}
+      pen.setColor(0xffe6a23c);
+      for(org.json.JSONObject o:linked){android.graphics.PointF p=geometry.stationPoint(o.optDouble("station"));if(p!=null)c.drawCircle(ox+p.x*size,oy+p.y*size,dp(5),pen);}
+     }
+    };panel.addView(map,new LinearLayout.LayoutParams(-1,dp(240)));
+   }else{TextView warning=new TextView(this);warning.setText("Geometrische Zuordnung offen: Skizzenmaße fehlen oder stimmen nicht mit der Trassenlänge überein.");panel.addView(warning);}
+
    for(org.json.JSONObject o:linked){TextView row=new TextView(this);row.setPadding(0,dp(6),0,dp(6));row.setText(o.optDouble("station")+" m · "+MontageCatalog.Fitting.valueOf(o.getString("type")).label+" · DN "+(o.optString("dn").isEmpty()?"unbekannt":o.optString("dn")));panel.addView(row);}
    android.widget.ScrollView scroll=new android.widget.ScrollView(this);scroll.addView(panel);
    new android.app.AlertDialog.Builder(this).setTitle("Gesamtplan – Stationierung").setView(scroll).setPositiveButton("Zurück",(d,w)->showMontage()).show();
