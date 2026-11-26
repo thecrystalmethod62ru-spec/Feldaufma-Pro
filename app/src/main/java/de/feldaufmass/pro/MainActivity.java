@@ -661,6 +661,60 @@ public class MainActivity extends Activity {
   }
   return b.toString();
  }
+ static double elevationValue(org.json.JSONObject o,int series){
+  if(o==null)return Double.NaN;
+  if(series==0)return o.optDouble("ground");
+  if(series==2)return o.optDouble("invert");
+  double ground=o.optDouble("ground"),depth=o.optDouble("depth");
+  return Double.isFinite(ground-depth)&&depth>0?ground-depth:Double.NaN;
+ }
+ boolean hasAbsoluteElevations(org.json.JSONArray points,double total){
+  for(int j=0;j<points.length();j++){org.json.JSONObject o=points.optJSONObject(j);if(o==null)continue;double st=o.optDouble("station");if(!Double.isFinite(st)||st<0||st>total)continue;
+   for(int k=0;k<3;k++)if(Double.isFinite(elevationValue(o,k)))return true;
+  }return false;
+ }
+ class ElevationProfileView extends View{
+  final org.json.JSONArray points,markers;final double total;
+  final boolean absolute;
+  final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
+  final int[] colors={0xff65717a,0xffa65e19,TEAL};
+  ElevationProfileView(org.json.JSONArray points,org.json.JSONArray markers,double total,boolean absolute){
+   super(MainActivity.this);this.points=points;this.markers=markers;this.total=total;this.absolute=absolute;setContentDescription("Längsschnitt Höhenprofil");
+  }
+  double value(org.json.JSONObject o,int k){if(absolute)return elevationValue(o,k);if(k!=1||o==null)return Double.NaN;double n=o.optDouble("depth");return Double.isFinite(n)&&n>0?-n:Double.NaN;}
+  void label(Canvas c,String s,float x,float y){p.setColor(INK);p.setTextSize(dp(10));c.drawText(s,x,y,p);}
+  protected void onDraw(Canvas c){
+   c.drawColor(Color.WHITE);
+   float left=dp(64),right=getWidth()-dp(20),top=dp(30),bottom=getHeight()-dp(48);
+   if(right<=left||bottom<=top||!Double.isFinite(total)||total<=0)return;
+   double lo=absolute?Double.POSITIVE_INFINITY:0,hi=absolute?Double.NEGATIVE_INFINITY:0;
+   for(int j=0;j<points.length();j++){org.json.JSONObject o=points.optJSONObject(j);if(o==null)continue;double st=o.optDouble("station");if(!Double.isFinite(st)||st<0||st>total)continue;
+    for(int k=0;k<3;k++){double v=value(o,k);if(Double.isFinite(v)){lo=Math.min(lo,v);hi=Math.max(hi,v);}}
+   }
+   if(!Double.isFinite(lo)||!Double.isFinite(hi)){label(c,"Keine darstellbaren Höhenwerte",left,top);return;}
+   double pad=Math.max(.05,(hi-lo)*.08);lo-=pad;hi+=pad;
+   double span=hi-lo;if(!Double.isFinite(span)||span<=0)return;
+   for(int k=0;k<=4;k++){
+    float y=top+(bottom-top)*k/4f;p.setColor(0xffd9e3e5);p.setStrokeWidth(dp(1));c.drawLine(left,y,right,y,p);
+    label(c,String.format(java.util.Locale.GERMANY,"%.2f",hi-span*k/4),dp(3),y+dp(3));
+    float x=left+(right-left)*k/4f;p.setColor(0xffd9e3e5);c.drawLine(x,top,x,bottom,p);
+    String station=String.format(java.util.Locale.GERMANY,"%.1f",total*k/4);p.setTextSize(dp(10));label(c,station,Math.min(x,right-p.measureText(station)),bottom+dp(15));
+   }
+   label(c,absolute?"Höhe (m)":"Rel. Höhe (m)",left,dp(15));label(c,"Station (m)",left,bottom+dp(32));
+   if(!absolute){float y=top+(bottom-top)*(float)(hi/span);p.setColor(colors[0]);p.setStrokeWidth(dp(2));c.drawLine(left,y,right,y,p);}
+   for(int k=0;k<3;k++){
+    if(!absolute&&k!=1)continue;
+    float px=0,py=0;boolean prev=false;
+    for(int j=0;j<points.length();j++){
+     org.json.JSONObject o=points.optJSONObject(j);double st=o==null?Double.NaN:o.optDouble("station"),v=value(o,k);
+     if(!Double.isFinite(st)||st<0||st>total||!Double.isFinite(v)){prev=false;continue;}
+     float x=left+(right-left)*(float)(st/total),y=top+(bottom-top)*(float)((hi-v)/span);
+     p.setColor(colors[k]);p.setStrokeWidth(dp(2));if(prev)c.drawLine(px,py,x,y,p);c.drawCircle(x,y,dp(3),p);px=x;py=y;prev=true;
+    }
+   }
+   for(int j=0;j<markers.length();j++){org.json.JSONObject o=markers.optJSONObject(j);if(o==null)continue;double st=o.optDouble("station");if(!Double.isFinite(st)||st<0||st>total)continue;float x=left+(right-left)*(float)(st/total);p.setColor(0xff87979b);p.setStrokeWidth(dp(1));c.drawLine(x,top,x,top+dp(7),p);label(c,String.valueOf(j+1),Math.min(x+dp(2),right-dp(10)),top+dp(17));}
+  }
+ }
  void showLongitudinalProfile(){
   LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
   RouteSketch route=new RouteSketch(this,routeData());
@@ -671,10 +725,18 @@ public class MainActivity extends Activity {
   form.addView(sheetText(caption,14,false));
   actionButtonSingle(form,"Höhenpunkte bearbeiten",()->editElevationPoints());
   form.addView(sheetText(elevationReport(),14,false));
-  form.addView(sheetText("Grafik: relatives Tiefenprofil mit einheitlicher Grabentiefe. Höhenpunkte und Gefälle separat oben.",14,false));
-  if(!Double.isFinite(total)||total<=0||!Double.isFinite(depth)||depth<=0){
+  org.json.JSONArray points=elevationPoints();
+  boolean absolute=hasAbsoluteElevations(points,total),relative=false;
+  for(int j=0;j<points.length();j++){org.json.JSONObject o=points.optJSONObject(j);if(o!=null&&Double.isFinite(o.optDouble("depth"))&&o.optDouble("depth")>0&&o.optDouble("station")>=0&&o.optDouble("station")<=total)relative=true;}
+  if(Double.isFinite(total)&&total>0&&(absolute||relative)){
+   form.addView(sheetText(absolute?"Höhenprofil · gemeinsamer Höhenbezug":"Relatives Tiefenprofil · Oberfläche = 0 m (Bezug)",16,true));
+   form.addView(sheetText(absolute?"Grau: OK Gelände · Braun: Grabensohle · Grün: Rohrsohle":"Grau: Bezugslinie · Braun: gemessene Grabentiefe",14,false));
+   form.addView(new ElevationProfileView(points,objects,total,absolute),new LinearLayout.LayoutParams(-1,dp(300)));
+   form.addView(sheetText("Verbindung nur zwischen benachbarten vorhandenen Messwerten. Keine Extrapolation. Fehlende Werte bleiben offen. Vertikal überhöht / nicht maßstäblich.",13,false));
+  }else if(!Double.isFinite(total)||total<=0||!Double.isFinite(depth)||depth<=0){
    form.addView(sheetText("Zuerst gültige Trassenlänge und Grabentiefe speichern.",16,true));
   }else{
+   form.addView(sheetText("Relatives Standardprofil mit einheitlicher gespeicherter Grabentiefe; keine Geländehöhen.",14,false));
    View drawing=new View(this){
     final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
     void label(Canvas c,String s,float x,float y){p.setColor(INK);p.setTextSize(dp(11));c.drawText(s,x,y,p);}
