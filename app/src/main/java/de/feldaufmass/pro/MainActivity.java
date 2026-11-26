@@ -4176,6 +4176,29 @@ public class MainActivity extends Activity {
    }
    p.setColor(TEAL);p.setStrokeWidth(1.5f);
    for(int i=1;i<route.vertices.size();i++){RouteSketch.Vertex a=route.vertices.get(i-1),b=route.vertices.get(i);c.drawLine((float)(40+(a.point.x-minX)*unit),(float)(85+(a.point.y-minY)*unit),(float)(40+(b.point.x-minX)*unit),(float)(85+(b.point.y-minY)*unit),p);}
+   if(trenchWidth>0)try{
+    org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("metricVerbauSections","[]"));
+    double station=0;
+    p.setColor(0xffa65e19);p.setStrokeWidth(.8f);
+    for(int i=1;i<route.vertices.size();i++){
+     RouteSketch.Vertex a=route.vertices.get(i-1),b=route.vertices.get(i);
+     double len=b.metres,dx=b.point.x-a.point.x,dy=b.point.y-a.point.y,n=Math.hypot(dx,dy);
+     if(n<=0||len<=0)continue;
+     for(int j=0;j<rows.length();j++){
+      org.json.JSONArray row=rows.optJSONArray(j);if(row==null)continue;
+      double from=Math.max(station,row.optDouble(0)),to=Math.min(station+len,row.optDouble(1));
+      if(!Double.isFinite(from)||!Double.isFinite(to)||to<=from)continue;
+      for(int side=0;side<2;side++){
+       double h=row.optDouble(side+2);if(!Double.isFinite(h)||h<=0)continue;
+       double offset=(side==0?1:-1)*trenchWidth/(2*factor),nx=dy/n*offset,ny=-dx/n*offset;
+       double t1=(from-station)/len,t2=(to-station)/len;
+       c.drawLine((float)(40+(a.point.x+dx*t1+nx-minX)*unit),(float)(85+(a.point.y+dy*t1+ny-minY)*unit),(float)(40+(a.point.x+dx*t2+nx-minX)*unit),(float)(85+(a.point.y+dy*t2+ny-minY)*unit),p);
+      }
+     }
+     station+=len;
+    }
+    if(rows.length()>0){p.setTextSize(10);c.drawText("Braun: Verbau an Grabenkante (symbolisch)",36,height-65,p);}
+   }catch(Exception ignored){}
    p.setColor(INK);p.setStrokeWidth(1);float bar=(float)(50*72/25.4);float by=height-47;c.drawLine(40,by,40+bar,by,p);c.drawLine(40,by-4,40,by+4,p);c.drawLine(40+bar,by-4,40+bar,by+4,p);c.drawText("50 mm Kontrollmaß",40,by+17,p);
   }finally{pdf.finishPage(page);}
   return pageNumber;
