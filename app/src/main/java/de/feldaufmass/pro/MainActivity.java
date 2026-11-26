@@ -1711,6 +1711,10 @@ public class MainActivity extends Activity {
   try{storedOverlapMode=overlapPrefs.getInt("metricOverlapMode",0);}catch(ClassCastException ignored){}
   final int[] savedOverlapMode={Math.max(0,Math.min(2,storedOverlapMode))};
   overlapMode.setSelection(savedOverlapMode[0]);
+  final CheckBox includeCorners=new CheckBox(this);
+  includeCorners.setText("Abgeschrägte Außenecken im Kontrollwert berücksichtigen");
+  includeCorners.setChecked(overlapPrefs.getBoolean("metricIncludeCorners",false));
+  panel.addView(includeCorners);
   final EditText correction=new EditText(this);correction.setSingleLine(true);correction.setHint("Flächenkorrektur (+/− m²)");correction.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL|android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);
   final EditText correctionReason=new EditText(this);correctionReason.setHint("Begründung der Korrektur");correctionReason.setSingleLine(true);
   correction.setText(overlapPrefs.getString("metricAreaCorrection","0"));
@@ -1788,7 +1792,9 @@ public class MainActivity extends Activity {
      result.append("\nGerade Abschnittsstreifen ohne Eckergänzungen; keine automatische Abrechnung.");
      int mode=overlapMode.getSelectedItemPosition();
      if(mode==1||mode==2){
-      double base=mode==1?geometric.gross:geometric.net;
+      StripOverlap.Result selected=includeCorners.isChecked()?withCorners:geometric;
+      double base=mode==1?selected.gross:selected.net;
+      result.append(includeCorners.isChecked()?"\nGewähltes Eckmodell: abgeschrägt":"\nGewähltes Eckmodell: ohne Eckergänzung");
       result.append(String.format(java.util.Locale.GERMANY,"\nGewählter Kontrollwert: %.2f m²",base));
       double delta=Double.parseDouble(overlapPrefs.getString("metricAreaCorrection","0"));
       if(Double.isFinite(delta)&&Double.isFinite(base+delta)&&base+delta>=0){
@@ -1800,6 +1806,12 @@ public class MainActivity extends Activity {
    }
    nominalArea.setText(result.toString());
   };
+  includeCorners.setOnCheckedChangeListener((button,checked)->{
+   if(!overlapPrefs.edit().putBoolean("metricIncludeCorners",checked).commit()){
+    notice("Eckmodell konnte nicht gespeichert werden.");
+   }
+   refreshNominalArea.run();
+  });
   saveCorrection.setOnClickListener(v->{
    try{
     double delta=Double.parseDouble(correction.getText().toString().trim().replace(',','.'));
