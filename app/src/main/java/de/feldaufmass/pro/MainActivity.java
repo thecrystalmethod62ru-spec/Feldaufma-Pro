@@ -1756,7 +1756,7 @@ public class MainActivity extends Activity {
     if(Math.abs(lateral)>width/2)outside++;
     double envelope=fitting.optDouble("lateralEnvelope");
     if(!Double.isFinite(envelope)||envelope<=0){envelopeUnknown++;continue;}
-    double requiredWidth=2*Math.abs(lateral)+envelope;
+    double requiredWidth=MontageGeometry.requiredTrenchWidth(lateral,envelope);
     boolean exceeds=requiredWidth>width;
     double longitudinal=fitting.optDouble("longitudinalEnvelope");
     if(Double.isFinite(longitudinal)&&longitudinal>0){
@@ -1805,14 +1805,14 @@ public class MainActivity extends Activity {
     double depth=nominalDepth;int matches=0;
     for(double[] section:depthRanges)if(st>=section[0]&&(st<section[1]||(st==total&&st==section[1]))){depth=section[2];matches++;}
     if(!depthDataValid||matches>1||!Double.isFinite(depth)||depth<=0||!Double.isFinite(cover)||cover<0||!Double.isFinite(height)||height<=0){depthUnknown++;continue;}
-    if(cover+height>depth+0.001)depthOutside++;
+    if(MontageGeometry.exceedsExcavationDepth(cover,height,depth))depthOutside++;
    }
    if(depthOutside>0)panel.addView(sheetText("Hinweis: "+depthOutside+" Formstücke reichen an ihrer Station unter die Grabensohle. Bettung und Tiefenlage prüfen.",14,true));
    if(depthUnknown>0)panel.addView(sheetText("Tiefenprüfung bei "+depthUnknown+" Formstücken offen: Grabentiefe, Überdeckung oder Bauhöhe fehlen bzw. sind widersprüchlich.",14,false));
    int derivedElevations=0, inconsistentElevations=0;
    if(montageGround!=null)for(org.json.JSONObject fitting:linked){
     double top=fitting.optDouble("topElevation"),cover=fitting.optDouble("cover"),ground=montageGround.elevation(fitting.optDouble("station"));
-    if(Double.isFinite(top)&&Double.isFinite(cover)&&cover>=0&&Double.isFinite(ground)&&Math.abs(ground-top-cover)>0.01)inconsistentElevations++;
+    if(Double.isFinite(top)&&Double.isFinite(cover)&&cover>=0&&Double.isFinite(ground)&&MontageGeometry.elevationMismatch(ground,top,cover))inconsistentElevations++;
    }
    if(inconsistentElevations>0)panel.addView(sheetText("Hinweis: Bei "+inconsistentElevations+" Formstücken weichen Höhenkote und Überdeckung gegenüber der Tiefbau-GOK um mehr als 1 cm ab. Angaben prüfen.",14,true));
    java.util.Map<org.json.JSONObject,Double> derivedTops=new java.util.IdentityHashMap<>();
