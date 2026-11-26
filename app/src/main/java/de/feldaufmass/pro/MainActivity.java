@@ -1760,6 +1760,20 @@ public class MainActivity extends Activity {
    LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(dp(12),dp(8),dp(12),dp(8));
    TextView hint=new TextView(this);hint.setText("Lineare Stationsübersicht – keine maßstäbliche Montagegeometrie. Ohne gültige Station: "+missing);panel.addView(hint);
    if(outside>0)panel.addView(sheetText("Hinweis: "+outside+" Formstück-Mittelpunkte außerhalb der örtlichen Grabenbreite. Bauteilabmessungen prüfen.",14,true));
+   int possibleConflicts=0;
+   for(int i=0;i<linked.size();i++){
+    org.json.JSONObject first=linked.get(i);
+    double st=first.optDouble("station"),w=first.optDouble("lateralEnvelope"),off=first.optDouble("offset",0);
+    if(!Double.isFinite(w)||w<=0||!Double.isFinite(off))continue;
+    for(int j=i+1;j<linked.size();j++){
+     org.json.JSONObject second=linked.get(j);
+     if(second.optDouble("station")-st>0.001)break;
+     double w2=second.optDouble("lateralEnvelope"),off2=second.optDouble("offset",0);
+     if(!Double.isFinite(w2)||w2<=0||!Double.isFinite(off2))continue;
+     if(Math.abs(off-off2)<(w+w2)/2)possibleConflicts++;
+    }
+   }
+   if(possibleConflicts>0)panel.addView(sheetText("Hinweis: "+possibleConflicts+" mögliche seitliche Formstück-Überlappungen an gleicher Station. Höhenlage und Anschluss prüfen.",14,true));
    if(envelopeOutside>0)panel.addView(sheetText("Hinweis: "+envelopeOutside+" Formstücke überschreiten mit ihrer angegebenen Querabmessung die Grabenbreite.",14,true));
    if(envelopeUnknown>0)panel.addView(sheetText("Querabmessung fehlt bei "+envelopeUnknown+" Formstücken – vollständige Breitenprüfung offen.",14,false));
    if(unknownWidth>0)panel.addView(sheetText("Seitliche Lage bei "+unknownWidth+" Formstücken nicht prüfbar: Breitenangaben fehlen oder sind widersprüchlich.",14,false));
