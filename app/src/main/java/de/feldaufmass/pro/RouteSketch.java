@@ -204,7 +204,7 @@ final class RouteSketch extends View {
   drawHatchBand(c,length,density,pattern);
   c.restore();
  }
- private void drawHatchBand(Canvas c,float length,float density,int pattern){
+ void drawHatchBand(Canvas c,float length,float density,int pattern){
   Paint hatch=new Paint(Paint.ANTI_ALIAS_FLAG);hatch.setColor(0xAA202020);hatch.setStrokeWidth(.8f*density);
   float step=(5+pattern%4*3)*density;
   for(float x=-12*density;x<length+12*density;x+=step){
@@ -315,11 +315,11 @@ final class RouteSketch extends View {
    previous=station;
   }
  }
- private int configuredHatch(String name,org.json.JSONObject settings){
+ int configuredHatch(String name,org.json.JSONObject settings){
   org.json.JSONObject style=settings.optJSONObject(name.trim());int hatch=style==null?0:style.optInt("hatch",0);
   return hatch==17?-1:hatch>=1&&hatch<=16?hatch-1:surfacePattern(name);
  }
- private int configuredSurfaceColor(String name,org.json.JSONObject settings){
+ int configuredSurfaceColor(String name,org.json.JSONObject settings){
   org.json.JSONObject item=settings.optJSONObject(name.trim());
   if(item!=null)try{return Color.parseColor(item.optString("color"));}catch(Exception ignored){}
   return surfaceColor(name);
@@ -475,7 +475,7 @@ final class RouteSketch extends View {
   }
   return entries;
  }
- private org.json.JSONObject legendSettings(){
+ org.json.JSONObject legendSettings(){
   try{return new org.json.JSONObject(getContext().getSharedPreferences("project_legend",0).getString(dimensionProject==null?"default":dimensionProject,"{}"));}catch(Exception e){return new org.json.JSONObject();}
  }
  void editLegend(){
