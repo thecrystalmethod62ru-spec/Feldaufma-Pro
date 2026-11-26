@@ -59,6 +59,36 @@ final class RouteSketch extends View {
   }catch(JSONException e){throw new IllegalStateException(e);}
   return rows.toString();
  }
+ /** Similarity transform from two independent GPS anchors, local tangent plane.
+  * Returns null when calibration is insufficient or the target is outside the sketch. */
+ PointF gpsPosition(double lat,double lon,int excluded){
+  if(!Double.isFinite(lat)||!Double.isFinite(lon)||Math.abs(lat)>85||Math.abs(lon)>180)return null;
+  Vertex a=null,b=null;double best=0;
+  for(int i=0;i<vertices.size();i++){
+   Vertex u=vertices.get(i);
+   if(i==excluded||!gpsAnchor(u))continue;
+   for(int j=i+1;j<vertices.size();j++){
+    Vertex v=vertices.get(j);if(j==excluded||!gpsAnchor(v))continue;
+    double d=distance(u.point,v.point);
+    if(d>best){best=d;a=u;b=v;}
+   }
+  }
+  if(a==null||best<.03)return null;
+  double cos=Math.cos(Math.toRadians(a.latitude));
+  double ex=longitudeDelta(b.longitude,a.longitude)*cos*111195,ey=-(b.latitude-a.latitude)*111195;
+  double norm=ex*ex+ey*ey;
+  if(norm<Math.pow(Math.max(10,3*Math.hypot(a.accuracy,b.accuracy)),2))return null;
+  double tx=longitudeDelta(lon,a.longitude)*cos*111195,ty=-(lat-a.latitude)*111195;
+  double sx=b.point.x-a.point.x,sy=b.point.y-a.point.y;
+  double real=(sx*ex+sy*ey)/norm,imag=(sy*ex-sx*ey)/norm;
+  double x=a.point.x+real*tx-imag*ty,y=a.point.y+imag*tx+real*ty;
+  if(!Double.isFinite(x)||!Double.isFinite(y)||x<0||x>1||y<0||y>1)return null;
+  return new PointF((float)x,(float)y);
+ }
+ private static double longitudeDelta(double lon,double origin){return ((lon-origin+540)%360)-180;}
+ private static boolean gpsAnchor(Vertex v){
+  return Double.isFinite(v.latitude)&&Math.abs(v.latitude)<=85&&Double.isFinite(v.longitude)&&Math.abs(v.longitude)<=180&&Double.isFinite(v.accuracy)&&v.accuracy>0&&v.accuracy<=5;
+ }
  double measuredLength(){
   if(vertices.size()<2)return Double.NaN;
   double total=0;
