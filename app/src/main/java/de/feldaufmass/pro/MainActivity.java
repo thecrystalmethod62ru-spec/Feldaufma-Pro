@@ -1923,6 +1923,36 @@ public class MainActivity extends Activity {
     try{org.json.JSONArray next=new org.json.JSONArray(widthSections.toString());next.remove(i);if(getPreferences(0).edit().putString("metricWidthSections",next.toString()).commit()){widthSections.remove(i);refreshNominalArea.run();drawing.invalidate();}else notice("Speichern fehlgeschlagen.");}catch(Exception e){notice("Löschen fehlgeschlagen.");}
    }).show()).setNegativeButton("Schließen",null).show();
   });
+  Button editWidth=new Button(this);editWidth.setText("Breitenabschnitt bearbeiten");panel.addView(editWidth);
+  editWidth.setOnClickListener(v->{
+   if(widthSections.length()==0){notice("Keine Breitenabschnitte.");return;}
+   String[] names=new String[widthSections.length()];
+   for(int i=0;i<names.length;i++){org.json.JSONObject o=widthSections.optJSONObject(i);names[i]=o==null?"Ungültig":String.format(java.util.Locale.GERMANY,"%.2f – %.2f m · B %.2f m",o.optDouble("from"),o.optDouble("to"),o.optDouble("width"));}
+   new android.app.AlertDialog.Builder(this).setTitle("Abschnitt auswählen").setItems(names,(d,index)->{
+    org.json.JSONObject original=widthSections.optJSONObject(index);if(original==null){notice("Ungültiger Abschnitt.");return;}
+    LinearLayout fields=new LinearLayout(this);fields.setOrientation(1);
+    EditText[] entries=new EditText[5];String[] hints={"Station von (m)","Station bis (m)","Grabenbreite (m)","Nachschnitt links (m, leer = Standard)","Nachschnitt rechts (m, leer = Standard)"};
+    String[] keys={"from","to","width","left","right"};
+    for(int k=0;k<entries.length;k++){entries[k]=new EditText(this);entries[k].setHint(hints[k]);entries[k].setInputType(8194);
+     if(original.has(keys[k]))entries[k].setText(String.format(java.util.Locale.GERMANY,"%.3f",original.optDouble(keys[k])));
+     fields.addView(entries[k]);
+    }
+    android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Breitenabschnitt bearbeiten").setView(fields).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
+    dialog.setOnShowListener(vv->dialog.getButton(-1).setOnClickListener(save->{
+     try{
+      double[] vals=new double[5];for(int k=0;k<5;k++){String raw=entries[k].getText().toString().trim();vals[k]=raw.isEmpty()&&k>=3?Double.NaN:Double.parseDouble(raw.replace(',','.'));}
+      if(!Double.isFinite(vals[0])||!Double.isFinite(vals[1])||!Double.isFinite(vals[2])||vals[0]<0||vals[1]<=vals[0]||vals[1]>route.measuredLength()||vals[2]<=0){notice("Ungültige Stationen oder Grabenbreite.");return;}
+      for(int k=3;k<5;k++)if(!Double.isNaN(vals[k])&&(!Double.isFinite(vals[k])||vals[k]<0)){notice("Ungültiger Nachschnitt.");return;}
+      for(int k=0;k<widthSections.length();k++){if(k==index)continue;org.json.JSONObject o=widthSections.optJSONObject(k);if(o!=null&&vals[0]<o.optDouble("to")&&vals[1]>o.optDouble("from")){notice("Breitenabschnitte dürfen sich nicht überschneiden.");return;}}
+      org.json.JSONObject updated=new org.json.JSONObject().put("from",vals[0]).put("to",vals[1]).put("width",vals[2]);
+      if(Double.isFinite(vals[3]))updated.put("left",vals[3]);if(Double.isFinite(vals[4]))updated.put("right",vals[4]);
+      org.json.JSONArray next=new org.json.JSONArray(widthSections.toString());next.put(index,updated);
+      if(!getPreferences(0).edit().putString("metricWidthSections",next.toString()).commit()){notice("Speichern fehlgeschlagen.");return;}
+      widthSections.put(index,updated);refreshNominalArea.run();drawing.invalidate();dialog.dismiss();notice("Breitenabschnitt aktualisiert. Für neue Geometrieprüfung Vorschau erneut öffnen.");
+     }catch(Exception e){notice("Bitte gültige Maße eingeben.");}
+    }));dialog.show();
+   }).setNegativeButton("Schließen",null).show();
+  });
   Button editLegend=new Button(this);editLegend.setText("Legende bearbeiten");panel.addView(editLegend);editLegend.setOnClickListener(v->route.editLegend());
   Button reloadLegend=new Button(this);reloadLegend.setText("Legende aktualisieren");panel.addView(reloadLegend);reloadLegend.setOnClickListener(v->refreshLegend.run());
   ScrollView scroll=new ScrollView(this);scroll.addView(panel);
