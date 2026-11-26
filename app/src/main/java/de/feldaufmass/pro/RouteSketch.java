@@ -109,6 +109,17 @@ final class RouteSketch extends View {
   for(int i=1;i<vertices.size();i++)total+=vertices.get(i).metres;
   return total;
  }
+ double uniformMetresPerUnit(){
+  if(vertices.size()<2)return Double.NaN;
+  double factor=Double.NaN;
+  for(int i=1;i<vertices.size();i++){
+   Vertex v=vertices.get(i);double n=distance(vertices.get(i-1).point,v.point);
+   if(!Double.isFinite(v.metres)||v.metres<=0||n<1e-8)return Double.NaN;
+   double ratio=v.metres/n;if(!Double.isFinite(ratio))return Double.NaN;
+   if(i==1)factor=ratio;else if(Math.abs(ratio/factor-1)>.001)return Double.NaN;
+  }
+  return factor;
+ }
  boolean rebuildMeasuredGeometry(){
   if(vertices.size()<2)return false;
   double[] xs=new double[vertices.size()],ys=new double[vertices.size()];
