@@ -2086,7 +2086,21 @@ public class MainActivity extends Activity {
         utilitySlider(fields,bedding,"Rohrunterkante (m)",0,bd,0.01,!pipe.fixed);
         utilitySlider(fields,gapInput,"Mindestabstand (m)",0,bw,0.01,true);
         utilitySlider(fields,coverInput,"Mindestüberdeckung (m)",0,bd,0.01,true);
-        final android.app.AlertDialog edit=new android.app.AlertDialog.Builder(this).setTitle("Rohrlage bearbeiten").setView(fields).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
+        final PipeLayoutView livePreview=new PipeLayoutView(this);
+        fields.addView(livePreview,0,new LinearLayout.LayoutParams(-1,dp(200)));
+        final TextView liveWarnings=new TextView(this);fields.addView(liveWarnings,1);
+        Runnable previewUpdate=()->{try{
+         double o=number(offset),b=number(bedding),g=number(gapInput),c=number(coverInput);
+         if(!Double.isFinite(o+b+g+c)||b<0||g<0||c<0)throw new IllegalArgumentException("Ungültige Maße");
+         java.util.List<PipeLayout.Pipe> draft=new java.util.ArrayList<>(pipes);
+         draft.set(index,new PipeLayout.Pipe(pipe.name,o,pipe.diameter,pipe.wall,b,g,c,pipe.fixed));
+         livePreview.setLayoutData(draft,bw,bd);livePreview.setRequirements(requirements[0],requirements[1]);
+         liveWarnings.setText(android.text.TextUtils.join("\n",PipeLayout.warnings(draft,bw,bd,requirements[0],requirements[1])));
+        }catch(Exception ex){liveWarnings.setText("Maße prüfen");}};
+        for(EditText f:new EditText[]{offset,bedding,gapInput,coverInput})f.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){previewUpdate.run();}public void afterTextChanged(android.text.Editable e){}});
+        previewUpdate.run();
+        ScrollView editScroll=new ScrollView(this);editScroll.addView(fields);
+        final android.app.AlertDialog edit=new android.app.AlertDialog.Builder(this).setTitle("Rohrlage bearbeiten").setView(editScroll).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
         edit.setOnShowListener(ignored->edit.getButton(-1).setOnClickListener(button->{
          try{
           double o=Double.parseDouble(offset.getText().toString().trim().replace(',','.'));
@@ -3121,6 +3135,7 @@ public class MainActivity extends Activity {
  profileSlider(sizes,"Nachschnitt rechts",rightInput,0,200);
  LinearLayout pipeDetails=fold(profilePage,"Rohr und Bettung",false);
  utilitySlider(pipeDetails,pipeInput,"Rohr-Außendurchmesser (mm)",1,2000,1,true);
+ pipeInput.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){if(profile!=null)profile.invalidate();}public void afterTextChanged(android.text.Editable e){}});
  actionButtonSingle(pipeDetails,"Weitere Leitungen / Kabel",()->editUtilities());
  profilePage.removeView(legend);pipeDetails.addView(legend);
  actionButtonSingle(profilePage,"Speichern",()->calculate());
@@ -4603,15 +4618,16 @@ public class MainActivity extends Activity {
  }
  if(Double.isFinite(base)){p.setColor(0xffa6a6a6);c.drawRect(20,layerTop,340,layerTop+(float)(base*scale),p);}
  if(!covering.equals("Asphalt")&&!covering.equals("Unbekannt")&&!covering.equals("Unbefestigt")&&!covering.equals("Sonstiges")){p.setColor(0xff777777);c.drawLine(20,top,340,top,p);for(int i=20;i<340;i+=covering.contains("platten")||covering.contains("Platten")?28:12)c.drawLine(i,top-4,i,top,p);}
+ double previewPipe=pipe;try{previewPipe=optional(pipeInput);}catch(Exception ignored){}
  org.json.JSONArray utilities=dragRows==null?extraUtilities():dragRows;
- if(utilities.length()==0){if(Double.isFinite(pipe)){float radius=(float)(pipe/2000*scale);p.setColor(0xff3686bc);c.drawCircle(180,bottom-radius,radius,p);}}
+ if(utilities.length()==0){if(Double.isFinite(previewPipe)){float radius=(float)(previewPipe/2000*scale);p.setColor(0xff3686bc);c.drawCircle(180,bottom-radius,radius,p);}}
  else{
-  double sum=Double.isFinite(pipe)?pipe/1000:0;for(int i=0;i<utilities.length();i++)sum+=utilities.optJSONObject(i).optDouble("diameter",0)/1000;
-  int count=utilities.length()+(Double.isFinite(pipe)?1:0);
+  double sum=Double.isFinite(previewPipe)?previewPipe/1000:0;for(int i=0;i<utilities.length();i++)sum+=utilities.optJSONObject(i).optDouble("diameter",0)/1000;
+  int count=utilities.length()+(Double.isFinite(previewPipe)?1:0);
   float gap=(float)((w-sum)*scale/(count+1)),cursor=x+gap;
   if(gap<0){gap=0;cursor=x;label(c,"Leitungsanordnung prüfen",20,224);}
   {
-   if(Double.isFinite(pipe)){float radius=(float)(pipe/2000*scale);p.setColor(0xff3686bc);c.drawCircle(cursor+radius,bottom-radius,radius,p);cursor+=2*radius+gap;}
+   if(Double.isFinite(previewPipe)){float radius=(float)(previewPipe/2000*scale);p.setColor(0xff3686bc);c.drawCircle(cursor+radius,bottom-radius,radius,p);cursor+=2*radius+gap;}
    for(int i=0;i<utilities.length();i++){org.json.JSONObject o=utilities.optJSONObject(i);float radius=(float)(o.optDouble("diameter",0)/2000*scale);String type=o.optString("type");p.setColor(type.equals("Gas")?0xffe9b63c:type.equals("Trinkwasser")?0xff3686bc:0xffc66d56);if(radius*2<=bottom-top&&radius*2<=z-x){float cx=(float)(x+o.optDouble("offset",(cursor+radius-x)/scale)*scale),cy=(float)(top+o.optDouble("axisDepth",(bottom-radius-top)/scale)*scale);cx=Math.max(x+radius,Math.min(z-radius,cx));cy=Math.max(top+radius,Math.min(bottom-radius,cy));c.drawCircle(cx,cy,radius,p);utilityHits.add(new android.graphics.RectF(cx-radius,cy-radius,cx+radius,cy+radius));}else{utilityHits.add(null);label(c,"Leitungstiefe prüfen",20,224);}cursor+=2*radius+gap;}
   }
  }
@@ -4624,7 +4640,7 @@ public class MainActivity extends Activity {
  else label(c,"Nachschnitt: nicht vollständig erfasst",20,27);
  label(c,"Oberfläche: "+covering,20,238);
  label(c,Double.isFinite(topThickness)?"Belagsstärke: "+m(topThickness):"Belagsstärke: nicht erfasst",20,252);
- label(c,utilities.length()>0?"Leitungen: "+(utilities.length()+(Double.isFinite(pipe)?1:0))+" (Lage symbolisch)":Double.isFinite(pipe)?"Rohr Ø "+pipe+" mm (Lage symbolisch)":"Rohrmaße: unbekannt",20,266);
+ label(c,utilities.length()>0?"Leitungen: "+(utilities.length()+(Double.isFinite(previewPipe)?1:0))+" (Lage symbolisch)":Double.isFinite(previewPipe)?"Rohr Ø "+previewPipe+" mm (Lage symbolisch)":"Rohrmaße: unbekannt",20,266);
  label(c,"Schematisch – keine Ausführungsplanung",20,282);c.restore();
  }}
  class Sketch extends View{Paint p=new Paint(3);Sketch(){super(MainActivity.this);setClickable(true);}
