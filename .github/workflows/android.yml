@@ -20,6 +20,15 @@ jobs:
       - uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+      - name: Run JVM regression tests
+        run: gradle :app:testDebugUnitTest --stacktrace
+      - name: Upload JVM test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: JVM-test-reports
+          path: app/build/test-results/testDebugUnitTest/
+          if-no-files-found: warn
       - run: gradle :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
       - name: Enable KVM for Android emulator
         run: |
