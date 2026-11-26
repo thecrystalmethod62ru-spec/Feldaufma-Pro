@@ -3311,7 +3311,7 @@ public class MainActivity extends Activity {
    for(double[] e:entries){double a=(e[1]-e[0])*e[2],b=(e[1]-e[0])*e[3];left+=a;right+=b;report.append(String.format(java.util.Locale.GERMANY,"%.2f – %.2f m: L %.2f / R %.2f m²\n",e[0],e[1],a,b));}
    report.append(String.format(java.util.Locale.GERMANY,"\nLinks: %.2f m²\nRechts: %.2f m²\nGesamt: %.2f m²",left,right,left+right));resultText.setText(report.toString());
   };
-  Runnable saveVerbau=()->{org.json.JSONArray data=new org.json.JSONArray();for(double[] e:entries){org.json.JSONArray row=new org.json.JSONArray();for(double v:e)try{row.put(v);}catch(Exception ex){throw new IllegalArgumentException(ex);}data.put(row);}getPreferences(0).edit().putString("metricVerbauSections",data.toString()).apply();refreshVerbau.run();if(sketch!=null)sketch.invalidate();refreshMainQuantities();if(livePreview!=null)livePreview.invalidate();};
+  Runnable saveVerbau=()->{org.json.JSONArray data=new org.json.JSONArray();for(double[] e:entries){org.json.JSONArray row=new org.json.JSONArray();for(double v:e)try{row.put(v);}catch(Exception ex){throw new IllegalArgumentException(ex);}data.put(row);}getPreferences(0).edit().putString("metricVerbauSections",data.toString()).apply();refreshVerbau.run();if(sketch!=null)sketch.invalidate();refreshMainQuantities();if(livePreview!=null)livePreview.invalidate();if(profile!=null)profile.invalidate();};
   try{org.json.JSONArray data=new org.json.JSONArray(getPreferences(0).getString("metricVerbauSections","[]"));for(int i=0;i<data.length();i++){org.json.JSONArray row=data.getJSONArray(i);entries.add(new double[]{row.getDouble(0),row.getDouble(1),row.getDouble(2),row.getDouble(3)});}}catch(Exception ex){notice("Verbaudaten konnten nicht geladen werden.");return;}
   refreshVerbau.run();
   Button remove=new Button(this);remove.setText("Einzelnen Abschnitt löschen");fields.addView(remove);
@@ -5039,6 +5039,12 @@ public class MainActivity extends Activity {
   boolean ok=getPreferences(0).edit().putString("extraUtilities",rows.toString()).commit();
   if(ok){if(profile!=null)profile.invalidate();}else notice("Leitungen konnten nicht gespeichert werden.");return ok;
  }
+ double profileShoringStation=0;
+ double[] shoringAtStation(double station){
+  double[] heights={0,0};
+  try{org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("metricVerbauSections","[]"));for(int i=0;i<rows.length();i++){org.json.JSONArray row=rows.getJSONArray(i);if(station>=row.getDouble(0)&&station<row.getDouble(1)){for(int side=0;side<2;side++){double h=row.getDouble(side+2);if(Double.isFinite(h)&&h>0)heights[side]=Math.max(heights[side],h);}}}}catch(Exception ignored){}
+  return heights;
+ }
  class Profile extends View{
  Paint p=new Paint(3);
  final java.util.ArrayList<android.graphics.RectF> utilityHits=new java.util.ArrayList<>();
@@ -5109,6 +5115,13 @@ public class MainActivity extends Activity {
  label(c,"Oberfläche: "+covering,20,238);
  label(c,Double.isFinite(topThickness)?"Belagsstärke: "+m(topThickness):"Belagsstärke: nicht erfasst",20,252);
  label(c,utilities.length()>0?"Leitungen: "+(utilities.length()+(Double.isFinite(previewPipe)?1:0))+" (Lage symbolisch)":Double.isFinite(previewPipe)?"Rohr Ø "+previewPipe+" mm (Lage symbolisch)":"Rohrmaße: unbekannt",20,266);
+ double[] shoring=shoringAtStation(profileShoringStation);
+ if(shoring[0]>0||shoring[1]>0){
+  p.setColor(0xffa65e19);p.setStrokeWidth(3);
+  if(shoring[0]>0)c.drawLine(x-3,top,x-3,top+(float)(Math.min(d,shoring[0])*scale),p);
+  if(shoring[1]>0)c.drawLine(z+3,top,z+3,top+(float)(Math.min(d,shoring[1])*scale),p);
+  label(c,"Verbau @ "+m(profileShoringStation)+": L "+m(shoring[0])+" / R "+m(shoring[1]),20,295);
+ }
  label(c,"Schematisch – keine Ausführungsplanung",20,282);c.restore();
  }}
  class Sketch extends View{Paint p=new Paint(3);Sketch(){super(MainActivity.this);setClickable(true);}
