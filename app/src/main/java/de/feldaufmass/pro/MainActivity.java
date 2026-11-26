@@ -1840,9 +1840,17 @@ public class MainActivity extends Activity {
       java.util.List<double[]> combined=new java.util.ArrayList<>(strips);
       java.util.List<RouteBranch> branches=branchStore.load();
       double branchLength=0,branchArea=0;
+      double branchVolume=0;
+      java.util.Map<String,double[]> branchQuantities=new java.util.TreeMap<>();
+
       for(RouteBranch branch:branches){
        java.util.List<double[]> points=branch.vertices(model.vertices);
        branchLength+=branch.length();branchArea+=branch.nominalArea();
+       branchVolume+=branch.nominalVolume();
+       String surface=branch.surface.trim().isEmpty()?"Nicht zugeordnet":branch.surface;
+       double[] quantities=branchQuantities.get(surface);
+       if(quantities==null){quantities=new double[3];branchQuantities.put(surface,quantities);}
+       quantities[0]+=branch.length();quantities[1]+=branch.nominalArea();quantities[2]+=branch.nominalVolume();
        for(int k=1;k<points.size();k++){
         double[] p=points.get(k-1),q=points.get(k);
         combined.add(new double[]{p[0],p[1],q[0],q[1],branch.width/2,branch.width/2});
@@ -1851,6 +1859,12 @@ public class MainActivity extends Activity {
       if(!branches.isEmpty()){
        StripOverlap.Result total=StripOverlap.calculate(combined);
        result.append(String.format(java.util.Locale.GERMANY,"\nGesamttrasse inkl. Abzweigungen (gerade Streifen):\nAbzweiglänge: %.2f m\nAbzweigfläche nominal: %.2f m²\nBrutto gesamt: %.2f m²\nÜberlappung gesamt: %.2f m²\nNetto gesamt: %.2f m²",branchLength,branchArea,total.gross,total.overlap,total.net));
+       result.append(String.format(java.util.Locale.GERMANY,"\nAbzweige – Aushub nominal: %.2f m³",branchVolume));
+       for(java.util.Map.Entry<String,double[]> entry:branchQuantities.entrySet()){
+        double[] q=entry.getValue();
+        result.append(String.format(java.util.Locale.GERMANY,"\n%s (Abzweige): %.2f m · %.2f m² · %.2f m³",entry.getKey(),q[0],q[1],q[2]));
+       }
+       result.append("\nAushub brutto (Länge × Breite × Tiefe); räumliche Überschneidungen nicht abgezogen.");
        int combinedMode=overlapMode.getSelectedItemPosition();
        if(combinedMode==1||combinedMode==2)result.append(String.format(java.util.Locale.GERMANY,"\nKontrollwert Gesamttrasse: %.2f m²",combinedMode==1?total.gross:total.net));
        result.append("\nAbzweige ohne Nachschnitt und Eckergänzungen; keine automatische Abrechnung.");
