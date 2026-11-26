@@ -1783,6 +1783,32 @@ public class MainActivity extends Activity {
     }
     montageGround=new ElevationProfile(groundPoints,total);
    }catch(Exception ignored){}
+   int depthOutside=0, depthUnknown=0;
+   double nominalDepth=Double.NaN;
+   java.util.List<double[]> depthRanges=new java.util.ArrayList<>();
+   boolean depthDataValid=true;
+   try{
+    String raw=getPreferences(0).getString("metricMainExcavationDepth","").trim();
+    if(raw.isEmpty())raw=getPreferences(0).getString("depth","").trim();
+    if(!raw.isEmpty())nominalDepth=Double.parseDouble(raw.replace(',','.'));
+    for(String line:getPreferences(0).getString("metricDepthSections","").split("\\n")){
+     if(line.trim().isEmpty())continue;
+     String[] parts=line.split(";",-1);if(parts.length!=3)throw new IllegalArgumentException();
+     double from=Double.parseDouble(parts[0].trim().replace(',','.')),to=Double.parseDouble(parts[1].trim().replace(',','.')),d=Double.parseDouble(parts[2].trim().replace(',','.'));
+     if(!Double.isFinite(from)||!Double.isFinite(to)||!Double.isFinite(d)||from<0||to>total||from>=to||d<=0)throw new IllegalArgumentException();
+     depthRanges.add(new double[]{from,to,d});
+    }
+   }catch(Exception ex){depthDataValid=false;}
+   for(org.json.JSONObject fitting:linked){
+    double st=fitting.optDouble("station"),cover=fitting.optDouble("cover"),height=fitting.optDouble("verticalEnvelope");
+    if(!Double.isFinite(cover)&&montageGround!=null)cover=montageGround.elevation(st)-fitting.optDouble("topElevation");
+    double depth=nominalDepth;int matches=0;
+    for(double[] section:depthRanges)if(st>=section[0]&&(st<section[1]||(st==total&&st==section[1]))){depth=section[2];matches++;}
+    if(!depthDataValid||matches>1||!Double.isFinite(depth)||depth<=0||!Double.isFinite(cover)||cover<0||!Double.isFinite(height)||height<=0){depthUnknown++;continue;}
+    if(cover+height>depth+0.001)depthOutside++;
+   }
+   if(depthOutside>0)panel.addView(sheetText("Hinweis: "+depthOutside+" Formstücke reichen an ihrer Station unter die Grabensohle. Bettung und Tiefenlage prüfen.",14,true));
+   if(depthUnknown>0)panel.addView(sheetText("Tiefenprüfung bei "+depthUnknown+" Formstücken offen: Grabentiefe, Überdeckung oder Bauhöhe fehlen bzw. sind widersprüchlich.",14,false));
    int derivedElevations=0, inconsistentElevations=0;
    if(montageGround!=null)for(org.json.JSONObject fitting:linked){
     double top=fitting.optDouble("topElevation"),cover=fitting.optDouble("cover"),ground=montageGround.elevation(fitting.optDouble("station"));
