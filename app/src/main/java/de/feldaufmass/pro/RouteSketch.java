@@ -333,7 +333,7 @@ final class RouteSketch extends View {
   underlayPaint.setAlpha(underlayAlpha);
   c.drawBitmap(underlay,null,new android.graphics.RectF(x,y,x+w,y+h),underlayPaint);
  }
- private void drawAutomaticLegend(Canvas c,float d){
+ java.util.LinkedHashMap<String,Integer> legendEntries(){
   java.util.LinkedHashMap<String,Integer> entries=new java.util.LinkedHashMap<>();
   if(layerVisible(LAYER_ROUTE)&&vertices.size()>1)entries.put("Trasse",0xff13665f);
   if(layerVisible(LAYER_SURFACES))for(int j=0;j<surfaceSections.length();j++){
@@ -347,6 +347,40 @@ final class RouteSketch extends View {
    if(layerVisible(LAYER_GPS)&&Double.isFinite(v.latitude)&&Double.isFinite(v.longitude))entries.put("GPS-Punkt",0xff4285ef);
    if(layerVisible(LAYER_PHOTOS)&&v.photos.length()>0)entries.put("Foto",0xff536c80);
   }
+  return entries;
+ }
+ private org.json.JSONObject legendSettings(){
+  try{return new org.json.JSONObject(((android.app.Activity)getContext()).getPreferences(0).getString("drawingLegend","{}"));}catch(Exception e){return new org.json.JSONObject();}
+ }
+ void editLegend(){
+  java.util.LinkedHashMap<String,Integer> entries=legendEntries();
+  if(entries.isEmpty())return;
+  String[] keys=entries.keySet().toArray(new String[0]);
+  new android.app.AlertDialog.Builder(getContext()).setTitle("Legende bearbeiten").setItems(keys,(dialog,index)->{
+   String key=keys[index];org.json.JSONObject settings=legendSettings(),old=settings.optJSONObject(key);
+   android.widget.LinearLayout form=new android.widget.LinearLayout(getContext());form.setOrientation(1);form.setPadding(24,12,24,12);
+   android.widget.EditText name=new android.widget.EditText(getContext());name.setSingleLine(true);name.setHint("Bezeichnung");name.setText(old==null?key:old.optString("name",key));form.addView(name);
+   android.widget.EditText color=new android.widget.EditText(getContext());color.setSingleLine(true);color.setHint("#RRGGBB");color.setText(old==null?String.format(Locale.ROOT,"#%06X",entries.get(key)&0xffffff):old.optString("color",String.format(Locale.ROOT,"#%06X",entries.get(key)&0xffffff)));form.addView(color);
+   android.widget.EditText order=new android.widget.EditText(getContext());order.setInputType(2);order.setHint("Reihenfolge");order.setText(String.valueOf(old==null?index:old.optInt("order",index)));form.addView(order);
+   android.widget.CheckBox visible=new android.widget.CheckBox(getContext());visible.setText("In Legende anzeigen");visible.setChecked(old==null||old.optBoolean("visible",true));form.addView(visible);
+   android.app.AlertDialog edit=new android.app.AlertDialog.Builder(getContext()).setTitle(key).setView(form).setNegativeButton("Abbrechen",null).setNeutralButton("Standard",(x,y)->{settings.remove(key);saveLegend(settings);}).setPositiveButton("Übernehmen",null).create();
+   edit.setOnShowListener(x->edit.getButton(-1).setOnClickListener(v->{
+    try{String label=name.getText().toString().trim(),hex=color.getText().toString().trim();if(label.isEmpty()){name.setError("Bezeichnung eingeben");return;}if(!hex.matches("#[0-9a-fA-F]{6}")){color.setError("#RRGGBB eingeben");return;}
+     org.json.JSONObject item=new org.json.JSONObject();item.put("name",label);item.put("color",hex);item.put("order",Integer.parseInt(order.getText().toString()));item.put("visible",visible.isChecked());settings.put(key,item);if(saveLegend(settings))edit.dismiss();
+    }catch(Exception e){order.setError("Gültige Reihenfolge eingeben");}
+   }));edit.show();
+  }).setNegativeButton("Schließen",null).show();
+ }
+ private boolean saveLegend(org.json.JSONObject settings){
+  boolean ok=((android.app.Activity)getContext()).getPreferences(0).edit().putString("drawingLegend",settings.toString()).commit();
+  if(ok)invalidate();else android.widget.Toast.makeText(getContext(),"Legende konnte nicht gespeichert werden.",0).show();return ok;
+ }
+ private void drawAutomaticLegend(Canvas c,float d){
+  java.util.LinkedHashMap<String,Integer> raw=legendEntries(),entries=new java.util.LinkedHashMap<>();
+  org.json.JSONObject settings=legendSettings();
+  java.util.ArrayList<String> keys=new java.util.ArrayList<>(raw.keySet());
+  keys.sort((a,b)->Integer.compare(settings.optJSONObject(a)==null?1000:settings.optJSONObject(a).optInt("order",1000),settings.optJSONObject(b)==null?1000:settings.optJSONObject(b).optInt("order",1000)));
+  for(String key:keys){org.json.JSONObject item=settings.optJSONObject(key);if(item!=null&&!item.optBoolean("visible",true))continue;int color=raw.get(key);if(item!=null)try{color=Color.parseColor(item.optString("color"));}catch(Exception ignored){}entries.put(item==null?key:item.optString("name",key),color);}
   if(entries.isEmpty())return;
   Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);p.setTextSize(10*d);
   float row=15*d, width=0;for(String name:entries.keySet())width=Math.max(width,p.measureText(name)+30*d);
