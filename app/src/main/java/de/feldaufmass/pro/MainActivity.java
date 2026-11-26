@@ -3297,7 +3297,22 @@ public class MainActivity extends Activity {
      body.addView(view,new LinearLayout.LayoutParams(-1,dp(300)));
      TextView info=new TextView(this);info.setText(android.text.TextUtils.join("\n",PipeLayout.dimensions(pipes,bw,bd)));body.addView(info);
      ScrollView scroll=new ScrollView(this);scroll.addView(body);
-     new android.app.AlertDialog.Builder(this).setTitle(labels[index]).setView(scroll).setPositiveButton("Schließen",null).show();
+     new android.app.AlertDialog.Builder(this).setTitle(labels[index]).setView(scroll).setPositiveButton("Schließen",null).setNeutralButton("Löschen",(preview,which)->{
+      new android.app.AlertDialog.Builder(this).setTitle("Abschnittsprofil löschen?").setMessage(labels[index]).setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(confirm,choice)->{
+       try{new PipeLayoutStore(getPreferences(0)).deleteSection(p.getDouble("from"),p.getDouble("to"));if(sketch!=null)sketch.invalidate();notice("Abschnittsprofil gelöscht.");}
+       catch(Exception ex){notice(ex.getMessage());}
+      }).show();
+     }).setNegativeButton("Maße bearbeiten",(preview,which)->{
+      LinearLayout fields=new LinearLayout(this);fields.setOrientation(1);
+      EditText newWidth=new EditText(this),newDepth=new EditText(this);
+      newWidth.setHint("Grabenbreite (m)");newDepth.setHint("Grabentiefe (m)");
+      newWidth.setInputType(8194);newDepth.setInputType(8194);newWidth.setText(String.valueOf(bw));newDepth.setText(String.valueOf(bd));fields.addView(newWidth);fields.addView(newDepth);
+      android.app.AlertDialog editor=new android.app.AlertDialog.Builder(this).setTitle(labels[index]).setView(fields).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
+      editor.setOnShowListener(open->editor.getButton(-1).setOnClickListener(save->{
+       try{new PipeLayoutStore(getPreferences(0)).saveSection(p.getDouble("from"),p.getDouble("to"),number(newWidth),number(newDepth),pipes);if(sketch!=null)sketch.invalidate();editor.dismiss();notice("Abschnittsprofil aktualisiert.");}
+       catch(Exception ex){newDepth.setError(ex.getMessage());}
+      }));editor.show();
+     }).show();
     }catch(Exception ex){notice("Abschnittsprofil: "+ex.getMessage());}
    }).setNegativeButton("Schließen",null).show();
   }catch(Exception ex){notice("Abschnittsprofile: "+ex.getMessage());}
