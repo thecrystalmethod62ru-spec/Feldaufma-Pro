@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class PipeLayout {
+    // Numerical tolerance in metres; prevents false warnings at exact boundaries.
+    private static final double EPS = 1e-9;
     public static final class Pipe {
         public final String name;
         public final double offset, diameter, wall, bedding, minGap, minCover;
@@ -52,14 +54,14 @@ public final class PipeLayout {
         List<String> result=new ArrayList<>();
         for(int i=0;i<pipes.size();i++){
             Pipe a=pipes.get(i);
-            if(Math.abs(a.offset)+a.diameter/2>width/2)result.add(a.name+": außerhalb der Grabenbreite");
-            if(!a.section(0,depth).fits())result.add(a.name+": oberhalb GOK");
-            else if(depth-a.bedding-a.diameter<Math.max(minCover,a.minCover))result.add(a.name+": Mindestüberdeckung unterschritten");
+            if(Math.abs(a.offset)+a.diameter/2>width/2+EPS)result.add(a.name+": außerhalb der Grabenbreite");
+            if(a.bedding+a.diameter>depth+EPS)result.add(a.name+": oberhalb GOK");
+            else if(depth-a.bedding-a.diameter+EPS<Math.max(minCover,a.minCover))result.add(a.name+": Mindestüberdeckung unterschritten");
             for(int j=0;j<i;j++){
                 Pipe b=pipes.get(j);
                 double gap=Math.hypot(a.offset-b.offset,a.centerHeight()-b.centerHeight())-(a.diameter+b.diameter)/2;
-                if(gap<0)result.add(a.name+" / "+b.name+": Rohrüberschneidung");
-                else if(gap<Math.max(clearance,Math.max(a.minGap,b.minGap)))result.add(a.name+" / "+b.name+": Mindestabstand unterschritten");
+                if(gap < -EPS)result.add(a.name+" / "+b.name+": Rohrüberschneidung");
+                else if(gap+EPS<Math.max(clearance,Math.max(a.minGap,b.minGap)))result.add(a.name+" / "+b.name+": Mindestabstand unterschritten");
             }
         }
         return result;
