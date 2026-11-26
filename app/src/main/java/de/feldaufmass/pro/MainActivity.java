@@ -1727,17 +1727,19 @@ public class MainActivity extends Activity {
    android.app.AlertDialog dialog=builder.create();
    if(map!=null){
     map.setOnTouchListener(new View.OnTouchListener(){
-     float startX,startY;
+     float startX,startY;int dragged=-1;
      public boolean onTouch(View v,android.view.MotionEvent e){
-      if(e.getActionMasked()==android.view.MotionEvent.ACTION_DOWN){startX=e.getX();startY=e.getY();return true;}
+      if(e.getActionMasked()==android.view.MotionEvent.ACTION_DOWN){startX=e.getX();startY=e.getY();dragged=map.fittingAt(startX,startY);if(dragged>=0)v.getParent().requestDisallowInterceptTouchEvent(true);return true;}
+      if(e.getActionMasked()==android.view.MotionEvent.ACTION_CANCEL){dragged=-1;v.getParent().requestDisallowInterceptTouchEvent(false);return true;}
       if(e.getActionMasked()!=android.view.MotionEvent.ACTION_UP)return true;
-      if(Math.hypot(e.getX()-startX,e.getY()-startY)>dp(12))return true;
+      v.getParent().requestDisallowInterceptTouchEvent(false);
+      if(dragged<0&&Math.hypot(e.getX()-startX,e.getY()-startY)>dp(12))return true;
       double pos=map.stationAt(e.getX(),e.getY());if(!Double.isFinite(pos))return true;
       final double chosen=Math.min(total,Math.round(pos*1000)/1000.0);
       if(rows.length()==0){notice("Zuerst Formstück hinzufügen.");return true;}
       String[] labels=new String[rows.length()];
       for(int j=0;j<labels.length;j++){try{labels[j]=planFittingLabel(rows.getJSONObject(j),j,map);}catch(Exception ex){labels[j]="Formstück "+(j+1);}}
-      new android.app.AlertDialog.Builder(MainActivity.this).setTitle(String.format(java.util.Locale.GERMANY,"Station %.3f m – Formstück wählen",chosen)).setItems(labels,(dd,j)->{
+      java.util.function.IntConsumer assign=j->{
        try{
         if(!stationProject.equals(activeProject))throw new IllegalStateException();
         double currentLength=Double.parseDouble(getPreferences(0).getString("length","").trim().replace(',','.'));
@@ -1749,7 +1751,7 @@ public class MainActivity extends Activity {
         recordProjectEvent("Formstück im Montageplan stationiert");if(sketch!=null)sketch.invalidate();if(livePreview!=null)livePreview.invalidate();
         dialog.dismiss();showMontageStationPlan();
        }catch(Exception ex){notice("Projektdaten geändert oder Speichern fehlgeschlagen.");}
-      }).setNegativeButton("Abbrechen",null).show();return true;
+      };if(dragged>=0){if(Math.hypot(e.getX()-startX,e.getY()-startY)>dp(4))assign.accept(dragged);else{dialog.dismiss();org.json.JSONObject row=rows.optJSONObject(dragged);if(row!=null)showMontageFitting(MontageCatalog.Fitting.valueOf(row.optString("type")),row);}}else new android.app.AlertDialog.Builder(MainActivity.this).setTitle(String.format(java.util.Locale.GERMANY,"Station %.3f m – Formstück wählen",chosen)).setItems(labels,(dd,j)->assign.accept(j)).setNegativeButton("Abbrechen",null).show();dragged=-1;return true;
      }
     });
    }
