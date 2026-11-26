@@ -137,7 +137,7 @@ public class MainActivity extends Activity {
   }
   if(manifest==null||!"FeldaufmassPro".equals(manifest.optString("format"))||manifest.optInt("version")!=1)throw new java.io.IOException("Unbekanntes Sicherungsformat");
   org.json.JSONObject fields=manifest.getJSONObject("preferences");
-  java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","objectUndo","objectRedo","elevationPoints","lvPositions"));
+  java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","objectUndo","objectRedo","elevationPoints","lvPositions","dailyReports"));
   java.util.Set<String> ints=new java.util.HashSet<>(java.util.Arrays.asList("surface","handling","dictationLanguage","gpsDurationSeconds"));
   SharedPreferences.Editor ed=projectStorage(id).edit();
   java.util.Iterator<String> keys=fields.keys();String name="Importiertes Projekt";java.util.Set<String> used=new java.util.HashSet<>();
@@ -151,11 +151,11 @@ public class MainActivity extends Activity {
       org.json.JSONArray row=rows.getJSONArray(j);double x=row.getDouble(0),y=row.getDouble(1);
       if(!Double.isFinite(x)||!Double.isFinite(y)||x<0||x>1||y<0||y>1)throw new java.io.IOException("Ungültiger Trassenpunkt");
       org.json.JSONArray items=row.optJSONArray(4);if(items==null)continue;
-      for(int k=0;k<items.length();k++){String old=items.getString(k),replacement=photos.get(old);if(replacement==null)throw new java.io.IOException("Foto fehlt");used.add(old);items.put(k,replacement);org.json.JSONObject meta=row.optJSONObject(10);if(meta!=null&&meta.has(old)){Object value=meta.remove(old);meta.put(replacement,value);}}
+      for(int k=0;k<items.length();k++){String old=items.getString(k),replacement=photos.get(old);if(replacement==null)throw new java.io.IOException("Foto fehlt");used.add(old);items.put(k,replacement);org.json.JSONObject meta=row.optJSONObject(10);if(meta!=null&&meta.has(old)){Object photoMeta=meta.remove(old);meta.put(replacement,photoMeta);}}
      }v=rows.toString();
     }else if(key.equals("documents")){
      org.json.JSONArray docs=new org.json.JSONArray(v);for(int j=0;j<docs.length();j++){org.json.JSONObject doc=docs.getJSONObject(j);doc.remove("uri");doc.put("name",doc.optString("name")+" (neu verknüpfen)");}v=docs.toString();
-    }else if(key.equals("objects")||key.equals("segments")||key.equals("elevationPoints")||key.equals("lvPositions")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)rows.getJSONObject(j);}
+    }else if(key.equals("objects")||key.equals("segments")||key.equals("elevationPoints")||key.equals("lvPositions")||key.equals("dailyReports")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)rows.getJSONObject(j);}
     else if(key.equals("objectUndo")||key.equals("objectRedo")){org.json.JSONArray rows=new org.json.JSONArray(v);for(int j=0;j<rows.length();j++)new org.json.JSONArray(rows.getString(j));}
     if(key.equals("project")&&!v.trim().isEmpty())name=v.trim();
     ed.putString(key,v);
@@ -944,6 +944,52 @@ public class MainActivity extends Activity {
    }catch(Exception e){notice("Bitte LV-Eingaben prüfen.");}
   }));dialog.show();
  }
+ org.json.JSONArray dailyReports(){
+  try{return new org.json.JSONArray(getPreferences(0).getString("dailyReports","[]"));}catch(Exception e){return new org.json.JSONArray();}
+ }
+ boolean saveDailyReports(org.json.JSONArray rows){
+  if(!getPreferences(0).edit().putString("dailyReports",rows.toString()).commit()){notice("Bautagesbericht konnte nicht gespeichert werden.");return false;}
+  recordProjectEvent("Bautagesbericht geändert");return true;
+ }
+ static final String[] DAILY_KEYS={"date","weather","crew","equipment","work","materials","incidents","notes"};
+ static final String[] DAILY_LABELS={"Datum (JJJJ-MM-TT)","Wetter / Temperatur","Personal / Arbeitszeiten","Geräte / Maschinen","Ausgeführte Arbeiten / Stationen","Material / Lieferungen","Behinderungen / Besonderheiten","Bemerkungen"};
+ void showDailyReports(){
+  org.json.JSONArray rows=dailyReports();LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
+  if(rows.length()==0)form.addView(sheetText("Noch keine Bautagesberichte vorhanden.",15,false));
+  for(int j=rows.length()-1;j>=0;j--){
+   final int index=j;org.json.JSONObject o=rows.optJSONObject(j);if(o==null)continue;Button b=new Button(this);b.setAllCaps(false);
+   String work=o.optString("work");b.setText(o.optString("date")+"\n"+work.substring(0,Math.min(100,work.length())));b.setOnClickListener(v->editDailyReport(index));form.addView(b);
+  }
+  new android.app.AlertDialog.Builder(this).setTitle("Bautagesberichte").setView(scroll).setNegativeButton("Schließen",null).setPositiveButton("Neuer Bericht",(a,b)->editDailyReport(-1)).show();
+ }
+ void editDailyReport(int index){
+  org.json.JSONArray original=dailyReports();org.json.JSONObject old=index<0?null:original.optJSONObject(index);
+  LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
+  EditText[] fields=new EditText[DAILY_KEYS.length];
+  for(int j=0;j<fields.length;j++){
+   form.addView(sheetText(DAILY_LABELS[j],14,true));fields[j]=new EditText(this);
+   if(j==0){fields[j].setSingleLine(true);fields[j].setInputType(1);}
+   else{fields[j].setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);fields[j].setMinLines(2);fields[j].setGravity(Gravity.TOP);}
+   fields[j].setText(old==null?(j==0?java.time.LocalDate.now().toString():""):old.optString(DAILY_KEYS[j]));form.addView(fields[j]);
+  }
+  android.app.AlertDialog.Builder builder=new android.app.AlertDialog.Builder(this).setTitle("Bautagesbericht").setView(scroll).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null);
+  if(old!=null)builder.setNeutralButton("Löschen",(a,b)->new android.app.AlertDialog.Builder(this).setTitle("Bautagesbericht löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(x,y)->{org.json.JSONArray next=dailyReports();if(!next.toString().equals(original.toString())){notice("Berichte geändert. Neu öffnen.");return;}next.remove(index);if(saveDailyReports(next))showDailyReports();}).show());
+  android.app.AlertDialog dialog=builder.create();dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(b->{
+   String date=fields[0].getText().toString().trim();
+   try{if(!java.time.LocalDate.parse(date).toString().equals(date)||!date.matches("\\d{4}-\\d{2}-\\d{2}"))throw new IllegalArgumentException();}
+   catch(Exception e){fields[0].setError("Gültiges Datum: JJJJ-MM-TT");return;}
+   try{
+    org.json.JSONArray next=dailyReports();if(!next.toString().equals(original.toString())){notice("Berichte geändert. Neu öffnen.");return;}
+    org.json.JSONObject row=old==null?new org.json.JSONObject():new org.json.JSONObject(old.toString());
+    row.put("id",row.optString("id",java.util.UUID.randomUUID().toString())).put("modifiedAt",System.currentTimeMillis());
+    for(int j=0;j<fields.length;j++)row.put(DAILY_KEYS[j],fields[j].getText().toString().trim());
+    java.util.ArrayList<org.json.JSONObject> sorted=new java.util.ArrayList<>();
+    for(int j=0;j<next.length();j++){if(j==index)continue;org.json.JSONObject o=next.getJSONObject(j);if(date.equals(o.optString("date"))){fields[0].setError("Bericht für dieses Datum bereits vorhanden");return;}sorted.add(o);}
+    sorted.add(row);sorted.sort((a,c)->a.optString("date").compareTo(c.optString("date")));
+    if(saveDailyReports(new org.json.JSONArray(sorted))){dialog.dismiss();showDailyReports();}
+   }catch(Exception e){notice("Bericht konnte nicht gespeichert werden.");}
+  }));dialog.show();
+ }
  void showTools(){
   String[] names={"Maße","Beläge","Objekte","Unterlagen / PDF","Sprachassistent"};
   LinearLayout[] pages={measurePage,segmentPage,objectPage,documentsPage,voicePage};
@@ -961,7 +1007,8 @@ public class MainActivity extends Activity {
   menu.getMenu().add(0,109,Menu.NONE,"DA11 exportieren (Test)");
   menu.getMenu().add(0,110,Menu.NONE,"GAEB X31 exportieren (Test)");
   menu.getMenu().add(0,111,Menu.NONE,"Fotobericht als PDF");
-  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==111)exportPhotoReport();else if(item.getItemId()==110)exportX31();else if(item.getItemId()==109)exportReb();else if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
+  menu.getMenu().add(0,112,Menu.NONE,"Bautagesbericht");
+  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==112)showDailyReports();else if(item.getItemId()==111)exportPhotoReport();else if(item.getItemId()==110)exportX31();else if(item.getItemId()==109)exportReb();else if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
   menu.show();
  }
  LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(dp(12),dp(8),dp(12),dp(8));return p;}
