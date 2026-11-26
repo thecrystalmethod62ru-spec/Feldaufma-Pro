@@ -971,7 +971,7 @@ public class MainActivity extends Activity {
   }
   if(matches.isEmpty())return "";
   java.util.Collections.sort(matches);
-  return new org.json.JSONArray().put(overlapGeometry(o)).put(w).put(new org.json.JSONArray(matches)).toString();
+  try{return new org.json.JSONArray().put(overlapGeometry(o)).put(Double.isFinite(w)?(Object)w:org.json.JSONObject.NULL).put(new org.json.JSONArray(matches)).toString();}catch(RuntimeException e){return "";}
  }
  static String overlapGeometry(org.json.JSONObject o){
   org.json.JSONArray data=new org.json.JSONArray();
