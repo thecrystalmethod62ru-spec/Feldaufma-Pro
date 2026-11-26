@@ -327,25 +327,48 @@ final class RouteSketch extends View {
   paint.setColor(0xff42799e);paint.setStrokeWidth(3);
   for(int i=1;i<stroke.size();i++)line(c,stroke.get(i-1),stroke.get(i));
  }
- private void finishStroke(){
-  if(stroke.size()<2)return;
-  boolean[] keep=new boolean[stroke.size()];
-  int last=stroke.size()-1;
+ private ArrayList<PointF> simplifiedStroke(ArrayList<PointF> points,double tolerance){
+  boolean[] keep=new boolean[points.size()];
+  int last=points.size()-1;
   keep[0]=keep[last]=true;
   ArrayDeque<int[]> pending=new ArrayDeque<>();
   pending.push(new int[]{0,last});
   while(!pending.isEmpty()){
    int[] span=pending.pop();
-   double largest=.023;int split=-1;
+   double largest=tolerance;int split=-1;
    for(int i=span[0]+1;i<span[1];i++){
-    double d=distanceToLine(stroke.get(i),stroke.get(span[0]),stroke.get(span[1]));
+    double d=distanceToLine(points.get(i),points.get(span[0]),points.get(span[1]));
     if(d>largest){largest=d;split=i;}
    }
    if(split>=0){keep[split]=true;pending.push(new int[]{span[0],split});pending.push(new int[]{split,span[1]});}
   }
-  if(last==1 && distance(stroke.get(0),stroke.get(last))<.02)return;
-  for(int i=vertices.isEmpty()?0:1;i<=last;i++)
-   if(keep[i])vertices.add(new Vertex(stroke.get(i),Double.NaN));
+  ArrayList<PointF> result=new ArrayList<>();
+  for(int i=0;i<=last;i++)if(keep[i])result.add(new PointF(points.get(i).x,points.get(i).y));
+  return result;
+ }
+ private void appendStroke(ArrayList<PointF> points){
+  for(int i=vertices.isEmpty()?0:1;i<points.size();i++){
+   PointF p=points.get(i);
+   if(!vertices.isEmpty()&&distance(vertices.get(vertices.size()-1).point,p)<.00001)continue;
+   vertices.add(new Vertex(new PointF(p.x,p.y),Double.NaN));
+  }
+  stroke.clear();if(changed!=null)changed.run();invalidate();
+ }
+ private void finishStroke(){
+  if(stroke.size()<2)return;
+  ArrayList<PointF> original=new ArrayList<>();
+  for(PointF p:stroke)original.add(new PointF(p.x,p.y));
+  if(original.size()==2&&distance(original.get(0),original.get(1))<.02){stroke.clear();return;}
+  ArrayList<PointF> straight=simplifiedStroke(original,.023);
+  if(straight.size()==original.size()){appendStroke(original);return;}
+  new android.app.AlertDialog.Builder(getContext())
+   .setTitle("Freihandlinie begradigen?")
+   .setMessage("Die Skizze kann vereinfacht werden. Vorhandene Punkte und Aufmaßwerte bleiben unverändert.")
+   .setPositiveButton("Begradigen",(d,w)->appendStroke(straight))
+   .setNegativeButton("Original behalten",(d,w)->appendStroke(original))
+   .setNeutralButton("Verwerfen",(d,w)->{stroke.clear();invalidate();})
+   .setOnCancelListener(d->{stroke.clear();invalidate();})
+   .show();
  }
  @Override public boolean onTouchEvent(MotionEvent event){
   if(!editable && pointSelected==null)return false;
@@ -384,7 +407,7 @@ final class RouteSketch extends View {
     }else if(dimensioning){
      selectSegment(p);
     }else if(!stroke.isEmpty()){
-     stroke.add(p);finishStroke();stroke.clear();if(changed!=null)changed.run();
+     stroke.add(p);finishStroke();
     }
     performClick();invalidate();return true;
    case MotionEvent.ACTION_CANCEL:
