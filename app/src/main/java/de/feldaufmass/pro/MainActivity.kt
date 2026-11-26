@@ -1,6 +1,11 @@
 package de.feldaufmass.pro
 
 import android.os.Bundle
+import android.graphics.pdf.PdfDocument
+import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.Typeface
+import android.net.Uri
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import java.io.File
@@ -77,6 +82,18 @@ class MainActivity : ComponentActivity() {
                 var ew by remember { mutableStateOf("") }
                 var ed by remember { mutableStateOf("") }
                 var note by remember { mutableStateOf("") }
+                var pendingPdf by remember { mutableStateOf<ByteArray?>(null) }
+                var exportStatus by remember { mutableStateOf("") }
+                val pdfPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
+                    if (uri != null) {
+                        try {
+                            val bytes = pendingPdf ?: error("Keine PDF-Daten")
+                            contentResolver.openOutputStream(uri)?.use { it.write(bytes) } ?: error("Datei nicht verfügbar")
+                            exportStatus = "PDF gespeichert"
+                        } catch (e: Exception) { exportStatus = "PDF konnte nicht gespeichert werden." }
+                    }
+                    pendingPdf = null
+                }
                 var message by remember { mutableStateOf("") }
                 var projects by remember { mutableStateOf(prefs.all.keys.sorted()) }
                 fun number(s: String) = s.replace(',', '.').toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0 }
@@ -228,6 +245,34 @@ class MainActivity : ComponentActivity() {
                             Text("Verbau beidseitig (geometrisch): " + fmt(2 * ll * dd) + " m²")
                             Text("Geometrische Richtwerte, keine geprüfte Abrechnung.")
                         } else Text("Bitte gültige Maße eingeben. Aufbruchbreite ≥ Grabenbreite; Asphaltstärke ≤ Grabentiefe.")
+                        Button(enabled = valid && name.isNotBlank(), onClick = {
+                            try {
+                                val lines = mutableListOf(
+                                    "Projekt: " + name,
+                                    "Trassenlänge: " + fmt(l!!) + " m",
+                                    "Grabenbreite: " + fmt(w!!) + " m",
+                                    "Grabentiefe: " + fmt(d!!) + " m",
+                                    "Aufbruchbreite: " + fmt(s!!) + " m",
+                                    "Asphaltstärke: " + fmt(a!!) + " m",
+                                    "Grabenvolumen brutto: " + fmt(l!! * w!! * d!!) + " m³",
+                                    "Oberflächenaufbruch: " + fmt(l!! * s!!) + " m²",
+                                    "Asphaltaufbruch: " + fmt(l!! * s!! * a!!) + " m³",
+                                    "Zusatzpositionen (separat, ohne Überschneidungsabzug):"
+                                )
+                                extras.forEach { item ->
+                                    lines.add(item.kind + " | Station " + fmt(item.station) + " m")
+                                    lines.add("L/B/T: " + listOf(item.length, item.width, item.depth).joinToString(" / ") { it?.let { v -> fmt(v) } ?: "-" } + " m")
+                                    item.area()?.let { lines.add("Fläche: " + fmt(it) + " m²") }
+                                    item.volume()?.let { lines.add("Volumen: " + fmt(it) + " m³") }
+                                    if (item.note.isNotBlank()) lines.add(item.note)
+                                }
+                                lines.add("GPS-Strecke (Orientierung): " + fmt(gpsLength) + " m")
+                                gps.forEach { lines.add(String.format(Locale.US, "%.6f / %.6f (±%.1f m)", it.lat, it.lon, it.accuracy)) }
+                                pendingPdf = buildReport(lines, points, photos, filesDir)
+                                pdfPicker.launch("Feldaufmass.pdf")
+                            } catch (e: Exception) { exportStatus = "PDF-Erstellung fehlgeschlagen." }
+                        }, modifier = Modifier.fillMaxWidth()) { Text("PDF exportieren") }
+                        Text(exportStatus)
                         Button(enabled = !gpsBusy && valid && name.isNotBlank(), onClick = {
                             val data = JSONObject().put("l", length).put("w", width).put("d", depth).put("s", surface).put("a", asphalt).put("photos", JSONArray().apply { photos.forEach { put(JSONObject().put("file", it.file).put("station", it.station).put("note", it.note)) } }).put("gps", JSONArray().apply { gps.forEach { put(JSONObject().put("lat", it.lat).put("lon", it.lon).put("accuracy", it.accuracy)) } }).put("points", JSONArray().apply { points.forEach { put(JSONObject().put("x", it.x.toDouble()).put("y", it.y.toDouble())) } }).put("extras", JSONArray().apply { extras.forEach { put(it.json()) } })
                             prefs.edit().putString(name.trim(), data.toString()).apply()
@@ -265,3 +310,79 @@ private data class Extra(val kind: String, val station: Double, val length: Doub
 private data class GpsPoint(val lat: Double, val lon: Double, val accuracy: Double)
 
 private data class SitePhoto(val file: String, val station: String, val note: String)
+
+private fun buildReport(lines: List<String>, points: List<Offset>, photos: List<SitePhoto>, folder: File): ByteArray {
+    val doc = PdfDocument()
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    var pageNo = 0
+    var page = doc.startPage(PdfDocument.PageInfo.Builder(595, 842, ++pageNo).create())
+    var y = 0f
+    fun header() {
+        paint.color = android.graphics.Color.rgb(23,76,101)
+        paint.textSize = 22f
+        paint.typeface = Typeface.DEFAULT_BOLD
+        page.canvas.drawText("Feldaufmaß Pro", 40f, 48f, paint)
+        paint.textSize = 10f
+        page.canvas.drawText("Leitungsbau | Seite " + pageNo, 40f, 66f, paint)
+        paint.color = android.graphics.Color.BLACK
+        paint.typeface = Typeface.DEFAULT
+        paint.textSize = 11f
+        y = 92f
+    }
+    fun ensure(h: Float) {
+        if (y + h > 800f) {
+            doc.finishPage(page)
+            page = doc.startPage(PdfDocument.PageInfo.Builder(595,842,++pageNo).create())
+            header()
+        }
+    }
+    fun line(value: String) {
+        value.split('\n').forEach { part ->
+            var rest = part
+            while (rest.isNotEmpty()) {
+                ensure(18f)
+                val n = paint.breakText(rest, true, 515f, null).coerceAtLeast(1)
+                page.canvas.drawText(rest.take(n),40f,y,paint)
+                y += 16f
+                rest = rest.drop(n)
+            }
+        }
+    }
+    try {
+        header()
+        line("Geometrische Richtwerte – keine geprüfte Abrechnung.")
+        lines.take(6).forEach { line(it) }
+        if (points.size >= 2) {
+            ensure(210f)
+            line("Trassenskizze (nicht maßstäblich)")
+            val top = y
+            paint.color = android.graphics.Color.rgb(230,235,238)
+            page.canvas.drawRect(40f,top,555f,top+175f,paint)
+            paint.color = android.graphics.Color.rgb(23,76,101)
+            paint.strokeWidth = 3f
+            points.zipWithNext().forEach { (a,b) ->
+                page.canvas.drawLine(45f+a.x*505f,top+5f+a.y*165f,45f+b.x*505f,top+5f+b.y*165f,paint)
+            }
+            paint.color = android.graphics.Color.BLACK
+            y += 190f
+        }
+        lines.drop(6).forEach { line(it) }
+        photos.forEach { photo ->
+            val bitmap = BitmapFactory.decodeFile(File(folder,photo.file).absolutePath)
+            if (bitmap != null) {
+                ensure(220f)
+                line("Foto | Station " + photo.station + " m")
+                line(photo.note)
+                ensure(180f)
+                val scale = minOf(515f / bitmap.width, 165f / bitmap.height)
+                page.canvas.drawBitmap(bitmap,null,RectF(40f,y,40f+bitmap.width*scale,y+bitmap.height*scale),paint)
+                y += bitmap.height*scale+12f
+                bitmap.recycle()
+            }
+        }
+        doc.finishPage(page)
+        val output = java.io.ByteArrayOutputStream()
+        doc.writeTo(output)
+        return output.toByteArray()
+    } finally { doc.close() }
+}
