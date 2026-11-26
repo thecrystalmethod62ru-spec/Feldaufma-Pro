@@ -5272,7 +5272,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   View preview=new View(this){
    final Paint pen=new Paint(3);
    double read(EditText field){try{return Double.parseDouble(field.getText().toString().trim().replace(',','.'));}catch(Exception ex){return Double.NaN;}}
-   double dragScale,dragLeft,dragTop,grabX,grabY;boolean dragging;
+   double dragScale,dragLeft,dragTop,grabX,grabY;boolean dragging; int dragPointer=-1;
    @Override public boolean onTouchEvent(android.view.MotionEvent e){
     if(dragScale<=0)return false;
     double x=read(offset),y=read(depth);
@@ -5296,10 +5296,10 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
        notice(current[0].optString("name",current[0].optString("type")));invalidate();x=read(offset);y=read(depth);if(!Double.isFinite(x)||!Double.isFinite(y))return true;
       }
       if(groupMode[0]&&group.size()>1){try{current[0].put("offset",x);current[0].put("axisDepth",y);groupUndo.push(rows.toString());if(groupUndo.size()>50)groupUndo.removeLast();groupRedo.clear();}catch(Exception ex){return true;}positionHistory.clear();redoHistory.clear();undoPosition.setEnabled(false);redoPosition.setEnabled(false);}else{redoHistory.clear();redoPosition.setEnabled(false);positionHistory.push(new String[]{offset.getText().toString(),depth.getText().toString()});if(positionHistory.size()>50)positionHistory.removeLast();undoPosition.setEnabled(true);}
-      grabX=e.getX()-dragLeft-x*dragScale;grabY=e.getY()-dragTop-y*dragScale;dragging=true;getParent().requestDisallowInterceptTouchEvent(true);return true;
+      grabX=e.getX()-dragLeft-x*dragScale;grabY=e.getY()-dragTop-y*dragScale;dragPointer=e.getPointerId(0);dragging=true;getParent().requestDisallowInterceptTouchEvent(true);return true;
      case android.view.MotionEvent.ACTION_MOVE:
       if(!dragging)return false;
-      double targetX=Math.max(0,(e.getX()-dragLeft-grabX)/dragScale),targetY=Math.max(0,(e.getY()-dragTop-grabY)/dragScale);
+      int pointerIndex=e.findPointerIndex(dragPointer);if(pointerIndex<0)return true;double targetX=Math.max(0,(e.getX(pointerIndex)-dragLeft-grabX)/dragScale),targetY=Math.max(0,(e.getY(pointerIndex)-dragTop-grabY)/dragScale);
       if(groupMode[0]&&group.size()>1){
        double dx=targetX-x,dy=targetY-y;
        for(int k:group){if(k==selected[0])continue;org.json.JSONObject n=rows.optJSONObject(k);if(n==null)continue;double nx=n.optDouble("offset"),ny=n.optDouble("axisDepth");if(!Double.isFinite(nx)||!Double.isFinite(ny))return true;dx=Math.max(dx,-nx);dy=Math.max(dy,-ny);}
@@ -5309,9 +5309,12 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
       }
       offset.setText(String.format(java.util.Locale.US,"%.2f",targetX));
       depth.setText(String.format(java.util.Locale.US,"%.2f",targetY));return true;
+     case android.view.MotionEvent.ACTION_POINTER_UP:
+      if(e.getPointerId(e.getActionIndex())!=dragPointer)return dragging;
+      dragging=false;dragPointer=-1;getParent().requestDisallowInterceptTouchEvent(false);return true;
      case android.view.MotionEvent.ACTION_UP:
      case android.view.MotionEvent.ACTION_CANCEL:
-      boolean handled=dragging;dragging=false;getParent().requestDisallowInterceptTouchEvent(false);if(handled&&e.getActionMasked()==android.view.MotionEvent.ACTION_UP)performClick();return handled;
+      boolean handled=dragging;dragging=false;dragPointer=-1;getParent().requestDisallowInterceptTouchEvent(false);if(handled&&e.getActionMasked()==android.view.MotionEvent.ACTION_UP)performClick();return handled;
      default:return dragging;
     }
    }
