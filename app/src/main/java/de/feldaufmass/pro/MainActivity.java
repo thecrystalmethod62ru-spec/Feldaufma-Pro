@@ -642,7 +642,7 @@ public class MainActivity extends Activity {
   EditText note=new EditText(this);note.setHint("Bemerkung");if(old!=null)note.setText(old.optString("note"));form.addView(note);
   LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(dp(12),dp(10),dp(12),dp(10));panel.setBackground(editorShape(0xff202827,16));
   TextView heading=sheetText(old==null?"Objekt hinzufügen":"Objekt bearbeiten",17,true);heading.setTextColor(0xffe3f0ed);panel.addView(heading);
-  for(EditText field:new EditText[]{station,note,fields[0],fields[1],fields[2],fields[3]}){field.setTextColor(0xffe3f0ed);field.setHintTextColor(0xffa4b9b5);field.setTextSize(14);}
+  for(EditText field:new EditText[]{station,note,fields[0],fields[1],fields[2],fields[3]}){field.setTextColor(field==station||field==note?0xffe3f0ed:0xff69cdbb);field.setHintTextColor(0xffa4b9b5);field.setTextSize(14);}
   panel.addView(scroll,new LinearLayout.LayoutParams(-1,Math.min(dp(300),Math.max(dp(100),route.getHeight()/2))));
   LinearLayout actions=new LinearLayout(this);panel.addView(actions);Button cancel=new Button(this),apply=new Button(this);cancel.setText("Abbrechen");apply.setText("Übernehmen");styleEditorButton(cancel,false);styleEditorButton(apply,true);actions.addView(cancel,new LinearLayout.LayoutParams(0,dp(48),1));actions.addView(apply,new LinearLayout.LayoutParams(0,dp(48),1));
   android.widget.PopupWindow dialog=new android.widget.PopupWindow(panel,Math.min(route.getWidth(),dp(420)),-2,true);dialog.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));dialog.setOutsideTouchable(true);dialog.setInputMethodMode(android.widget.PopupWindow.INPUT_METHOD_NEEDED);dialog.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);cancel.setOnClickListener(v->dialog.dismiss());
@@ -657,7 +657,10 @@ public class MainActivity extends Activity {
   });dialog.showAtLocation(route,Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL,0,dp(8));
  }
  void addObjectMeasureSlider(LinearLayout form,EditText field,int defaultMax,int minimumCm){
-  android.widget.SeekBar bar=new android.widget.SeekBar(this);bar.setProgressTintList(android.content.res.ColorStateList.valueOf(0xff55c7b5));bar.setThumbTintList(android.content.res.ColorStateList.valueOf(0xff69cdbb));form.addView(bar,new LinearLayout.LayoutParams(-1,dp(36)));
+  android.widget.SeekBar bar=new android.widget.SeekBar(this);bar.setProgressTintList(android.content.res.ColorStateList.valueOf(0xff55c7b5));bar.setThumbTintList(android.content.res.ColorStateList.valueOf(0xff69cdbb));LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(4),dp(4),dp(4),0);
+  TextView label=sheetText(field.getHint().toString().replace(" – optional",""),13,false);label.setTextColor(0xffa4b9b5);row.addView(label,new LinearLayout.LayoutParams(0,-2,1));
+  android.view.ViewGroup parent=(android.view.ViewGroup)field.getParent();int index=parent.indexOfChild(field);parent.removeView(field);field.setTextColor(0xff69cdbb);field.setTextSize(15);field.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);field.setBackground(editorShape(0xff202827,8));field.setPadding(dp(6),0,dp(6),0);row.addView(field,new LinearLayout.LayoutParams(dp(92),dp(40)));form.addView(row,index);
+  bar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff465452));form.addView(bar,new LinearLayout.LayoutParams(-1,dp(32)));
   Runnable sync=()->{try{double value=number(field);if(!Double.isFinite(value)||value<0||value>100000)return;int cm=(int)Math.round(value*100);bar.setMax(Math.max(defaultMax*100,cm)-minimumCm);bar.setProgress(Math.max(0,cm-minimumCm));}catch(Exception ignored){}};
   bar.setMax(defaultMax*100-minimumCm);sync.run();
   bar.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener(){
