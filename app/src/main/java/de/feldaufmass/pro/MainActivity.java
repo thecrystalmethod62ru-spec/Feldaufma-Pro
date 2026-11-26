@@ -1510,7 +1510,7 @@ public class MainActivity extends Activity {
  }
  void showMontage(){
   new android.app.AlertDialog.Builder(this).setTitle("Rohrleitungsbau – Montage")
-   .setItems(new String[]{"Formstückkatalog","Projekt-Formstücke","Gesamtplan – Stationierung"},(d,w)->{if(w==0)showMontageCatalog();else if(w==1)showMontageInventory();else showMontageStationPlan();})
+   .setItems(new String[]{"Formstückkatalog","Projekt-Formstücke","Gesamtplan – Stationierung","Materialliste (eingebaut)"},(d,w)->{if(w==0)showMontageCatalog();else if(w==1)showMontageInventory();else if(w==2)showMontageStationPlan();else showMontageMaterials();})
    .setNegativeButton("Schließen",null).show();
  }
  void showMontageStationPlan(){
@@ -1569,14 +1569,14 @@ public class MainActivity extends Activity {
    row.addView(tile,new LinearLayout.LayoutParams(0,-2,1));
    MontageSymbolView symbol=new MontageSymbolView(this,fitting);tile.addView(symbol,new LinearLayout.LayoutParams(-1,dp(72)));
    TextView label=new TextView(this);label.setText(fitting.label);label.setGravity(android.view.Gravity.CENTER);tile.addView(label,new LinearLayout.LayoutParams(-1,dp(48)));
-   tile.setContentDescription(fitting.label);tile.setFocusable(true);tile.setOnClickListener(v->{dialog.dismiss();showMontageFitting(fitting);});
+   tile.setContentDescription(fitting.label);tile.setFocusable(true);tile.setOnClickListener(v->{dialog.dismiss();showMontageFitting(fitting,null);});
   }
   dialog.show();
  }
- void showMontageFitting(MontageCatalog.Fitting fitting){
+ void showMontageFitting(MontageCatalog.Fitting fitting, org.json.JSONObject original){
   final String projectId=activeProject;
   LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);
-  panel.addView(new MontageSymbolView(this,fitting),new LinearLayout.LayoutParams(-1,dp(100)));
+  MontageSymbolView preview=new MontageSymbolView(this,fitting);panel.addView(preview,new LinearLayout.LayoutParams(-1,dp(100)));
   EditText dn=new EditText(this);dn.setHint("DN (optional)");dn.setInputType(2);panel.addView(dn);
   EditText material=new EditText(this);material.setHint("Werkstoff (optional)");panel.addView(material);
   EditText rotation=new EditText(this);rotation.setHint("Drehwinkel (°)");rotation.setInputType(8194|4096);rotation.setText("0");panel.addView(rotation);
@@ -1584,8 +1584,40 @@ public class MainActivity extends Activity {
   EditText station=new EditText(this);station.setHint("Station Tiefbau (m, optional)");station.setInputType(8194);panel.addView(station);
   EditText offset=new EditText(this);offset.setHint("Seitlicher Versatz (m, + rechts / − links)");offset.setInputType(8194|4096);panel.addView(offset);
   EditText cover=new EditText(this);cover.setHint("Überdeckung bis Rohroberkante (m, optional)");cover.setInputType(8194);panel.addView(cover);
+  android.widget.CheckBox installed=new android.widget.CheckBox(this);
+  installed.setText("Einbau bestätigt · in Materialliste übernehmen");panel.addView(installed);
+  if(original!=null){
+   dn.setText(original.optString("dn"));material.setText(original.optString("material"));
+   rotation.setText(original.optString("rotation","0"));mirror.setChecked(original.optBoolean("mirrored"));
+   station.setText(original.optString("station"));offset.setText(original.optString("offset"));cover.setText(original.optString("cover"));
+   installed.setChecked(original.optBoolean("installed",false));
+  }
+  Runnable updatePreview=()->{
+   try{preview.setRotation((float)MontageCatalog.normalizeRotation(Double.parseDouble(rotation.getText().toString().trim().replace(',','.'))));}
+   catch(IllegalArgumentException invalid){preview.setRotation(0);}
+   preview.setScaleX(mirror.isChecked()?-1:1);
+  };
+  rotation.addTextChangedListener(new android.text.TextWatcher(){
+   public void beforeTextChanged(CharSequence s,int start,int count,int after){}
+   public void onTextChanged(CharSequence s,int start,int before,int count){updatePreview.run();}
+   public void afterTextChanged(android.text.Editable s){}
+  });
+  mirror.setOnCheckedChangeListener((button,checked)->updatePreview.run());updatePreview.run();
   android.widget.ScrollView scroll=new android.widget.ScrollView(this);scroll.addView(panel);
-  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(fitting.label).setView(scroll).setNegativeButton("Zurück",(d,w)->showMontageCatalog()).setPositiveButton("Zum Projekt hinzufügen",null).create();
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(fitting.label).setView(scroll).setNegativeButton("Zurück",(d,w)->{if(original==null)showMontageCatalog();else showMontageInventory();}).setPositiveButton(original==null?"Zum Projekt hinzufügen":"Änderungen speichern",null).create();
+  if(original!=null)dialog.setButton(android.app.AlertDialog.BUTTON_NEUTRAL,"Entfernen",(android.content.DialogInterface.OnClickListener)(d,w)->
+   new android.app.AlertDialog.Builder(this).setTitle("Formstück entfernen?")
+    .setMessage("Das Formstück wird aus dem Projekt, dem Stationsplan und der Materialliste entfernt.")
+    .setNegativeButton("Abbrechen",(confirm,which)->showMontageInventory())
+    .setPositiveButton("Entfernen",(confirm,which)->{
+     if(!projectId.equals(activeProject)){notice("Projekt wurde gewechselt.");return;}
+     try{
+      org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));
+      rows.remove(findMontageItem(rows,original));
+      if(!getPreferences(0).edit().putString("montageFittings",rows.toString()).commit())throw new java.io.IOException();
+      showMontageInventory();
+     }catch(Exception e){notice("Formstück konnte nicht entfernt werden.");}
+    }).show());
   dialog.setOnShowListener(x->dialog.getButton(-1).setOnClickListener(v->{
    if(!projectId.equals(activeProject)){notice("Projekt wurde gewechselt.");return;}
    String diameter=dn.getText().toString().trim();
@@ -1593,22 +1625,70 @@ public class MainActivity extends Activity {
    double angle;try{angle=MontageCatalog.normalizeRotation(Double.parseDouble(rotation.getText().toString().trim().replace(',','.')));}catch(Exception e){rotation.setError("Ungültiger Winkel");return;}
    try{
     org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));
-    org.json.JSONObject item=new org.json.JSONObject().put("id",java.util.UUID.randomUUID().toString()).put("type",fitting.name()).put("dn",diameter).put("material",material.getText().toString().trim()).put("rotation",angle).put("mirrored",mirror.isChecked()).put("placed",false);
+    int index=original==null?-1:findMontageItem(rows,original);
+    org.json.JSONObject item=original==null?new org.json.JSONObject().put("id",java.util.UUID.randomUUID().toString()).put("placed",false):new org.json.JSONObject(rows.getJSONObject(index).toString());
+    item.put("type",fitting.name()).put("dn",diameter).put("material",material.getText().toString().trim()).put("rotation",angle).put("mirrored",mirror.isChecked()).put("installed",installed.isChecked());
     EditText[] coordinates={station,offset,cover};String[] keys={"station","offset","cover"};
     if(station.length()==0&&(offset.length()>0||cover.length()>0)){station.setError("Station für die Zuordnung erforderlich");return;}
-    for(int i=0;i<coordinates.length;i++){String raw=coordinates[i].getText().toString().trim();if(raw.isEmpty())continue;double value;
+    for(int i=0;i<coordinates.length;i++){String raw=coordinates[i].getText().toString().trim();if(raw.isEmpty()){item.remove(keys[i]);continue;}double value;
      try{value=Double.parseDouble(raw.replace(',','.'));if(!Double.isFinite(value)||(i!=1&&value<0))throw new IllegalArgumentException();}catch(Exception e){coordinates[i].setError("Ungültiges Maß");return;}
      if(i==0){String routeLength=getPreferences(0).getString("length","").trim();try{double max=Double.parseDouble(routeLength.replace(',','.'));if(!Double.isFinite(max)||max<=0||value>max)throw new IllegalArgumentException();}catch(Exception e){station.setError("Station innerhalb einer gültigen Tiefbau-Trassenlänge erforderlich");return;}}
      item.put(keys[i],value);
     }
-    item.put("stationLinked",item.has("station"));rows.put(item);
+    item.put("stationLinked",item.has("station"));if(index<0)rows.put(item);else rows.put(index,item);
     if(!getPreferences(0).edit().putString("montageFittings",rows.toString()).commit()){notice("Speichern fehlgeschlagen.");return;}
-    dialog.dismiss();notice("Formstück gespeichert – noch nicht platziert.");showMontageCatalog();
+    dialog.dismiss();notice("Formstück gespeichert.");if(original==null)showMontageCatalog();else showMontageInventory();
    }catch(Exception e){notice("Formstück konnte nicht gespeichert werden.");}
   }));dialog.show();
  }
+ int findMontageItem(org.json.JSONArray rows,org.json.JSONObject original) throws org.json.JSONException {
+  String id=original.getString("id");
+  for(int i=0;i<rows.length();i++){
+   org.json.JSONObject row=rows.getJSONObject(i);
+   if(id.equals(row.optString("id"))&&original.toString().equals(row.toString()))return i;
+  }
+  throw new org.json.JSONException("Formstück wurde geändert.");
+ }
+ String montageDescription(org.json.JSONObject row) throws org.json.JSONException {
+  String dn=row.optString("dn"),material=row.optString("material");
+  return MontageCatalog.Fitting.valueOf(row.getString("type")).label+" · DN "+(dn.isEmpty()?"unbekannt":dn)
+      +" · "+(material.isEmpty()?"Werkstoff offen":material);
+ }
  void showMontageInventory(){
-  try{org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));StringBuilder out=new StringBuilder();for(int i=0;i<rows.length();i++){org.json.JSONObject row=rows.getJSONObject(i);out.append(MontageCatalog.Fitting.valueOf(row.getString("type")).label).append(" · DN ").append(row.optString("dn").isEmpty()?"unbekannt":row.optString("dn")).append(" · ").append(row.optString("material")).append(row.has("station")?" · Station "+row.optDouble("station")+" m":" · ohne Station").append(" · nicht platziert\n");}new android.app.AlertDialog.Builder(this).setTitle("Projekt-Formstücke").setMessage(out.length()==0?"Keine Formstücke gespeichert.":out.toString()).setPositiveButton("Zurück",(d,w)->showMontage()).show();}catch(Exception e){notice("Formstücke konnten nicht gelesen werden.");}
+  try{
+   org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));
+   String[] labels=new String[rows.length()];
+   for(int i=0;i<rows.length();i++){
+    org.json.JSONObject row=rows.getJSONObject(i);
+    labels[i]=montageDescription(row)+(row.has("station")?" · Station "+row.optString("station")+" m":" · ohne Station")
+       +(row.optBoolean("installed")?" · Einbau bestätigt":" · Einbau offen");
+   }
+   android.app.AlertDialog.Builder dialog=new android.app.AlertDialog.Builder(this).setTitle("Projekt-Formstücke")
+      .setNegativeButton("Zurück",(d,w)->showMontage());
+   if(labels.length==0)dialog.setMessage("Keine Formstücke gespeichert.");
+   else dialog.setItems(labels,(d,index)->{
+    org.json.JSONObject row=rows.optJSONObject(index);
+    showMontageFitting(MontageCatalog.Fitting.valueOf(row.optString("type")),row);
+   });
+   dialog.show();
+  }catch(Exception e){notice("Formstücke konnten nicht gelesen werden.");}
+ }
+ void showMontageMaterials(){
+  try{
+   org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));
+   java.util.SortedMap<String,Integer> quantities=new java.util.TreeMap<>();
+   for(int i=0;i<rows.length();i++){
+    org.json.JSONObject row=rows.getJSONObject(i);
+    if(row.optBoolean("installed",false))quantities.merge(montageDescription(row),1,Integer::sum);
+   }
+   StringBuilder list=new StringBuilder();
+   for(java.util.Map.Entry<String,Integer> entry:quantities.entrySet()){
+    list.append(entry.getValue()).append(" Stk.  ").append(entry.getKey()).append('\n');
+   }
+   new android.app.AlertDialog.Builder(this).setTitle("Materialliste · bestätigter Einbau")
+       .setMessage(list.length()==0?"Noch kein Einbau bestätigt.":list.toString().trim())
+       .setPositiveButton("Zurück",(d,w)->showMontage()).show();
+  }catch(Exception e){notice("Materialliste konnte nicht gelesen werden.");}
  }
  void showMetricRoute(){
   RouteSketch route=new RouteSketch(this,routeData());
