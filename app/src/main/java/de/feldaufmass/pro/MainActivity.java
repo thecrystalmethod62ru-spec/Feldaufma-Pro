@@ -1817,6 +1817,14 @@ public class MainActivity extends Activity {
      final TextView warnings=new TextView(this);content.addView(warnings);
      Runnable refresh=()->{cross.setLayoutData(pipes,bw,bd);warnings.setText(android.text.TextUtils.join("\n",PipeLayout.warnings(pipes,bw,bd,0)));};
      refresh.run();
+     cross.setMove((index,offset,bedding)->{
+      try{
+       PipeLayout.Pipe pipe=pipes.get(index);
+       java.util.List<PipeLayout.Pipe> next=new java.util.ArrayList<>(pipes);
+       next.set(index,new PipeLayout.Pipe(pipe.name,offset,pipe.diameter,pipe.wall,bedding));
+       multiPipeStore.save(next);pipes.clear();pipes.addAll(next);refresh.run();
+      }catch(Exception ex){refresh.run();warnings.setText("Speichern fehlgeschlagen: "+ex.getMessage());}
+     });
      cross.setSelection(index->{
       PipeLayout.Pipe pipe=pipes.get(index);
       new android.app.AlertDialog.Builder(this).setTitle(pipe.name).setItems(new String[]{"Bearbeiten","Duplizieren","Löschen"},(menu,action)->{
