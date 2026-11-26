@@ -636,16 +636,24 @@ public class MainActivity extends Activity {
   super.onRequestPermissionsResult(requestCode,permissions,results);
   if(requestCode==702){if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==android.content.pm.PackageManager.PERMISSION_GRANTED){startLiveGps();assignGps(selectedPoint);}else notice("Für GPS-Punkte ist der genaue Standort erforderlich.");}
  }
+ void renamePoint(String id,String proposed){
+  RouteSketch route=new RouteSketch(this,routeData());int i=findPoint(route,id);if(i<0){notice("Trassenpunkt nicht gefunden.");return;}
+  EditText name=new EditText(this);name.setSingleLine(true);name.setHint("Punktname");name.setText(proposed==null?route.vertices.get(i).name:proposed);
+  new android.app.AlertDialog.Builder(this).setTitle("Punkt umbenennen").setView(name).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",(d,w)->{
+   RouteSketch latest=new RouteSketch(this,routeData());int j=findPoint(latest,id);if(j<0)return;
+   latest.vertices.get(j).name=name.getText().toString().trim();if(saveRoute(latest))refreshRoute();
+  }).show();
+ }
  void pointMenu(){
   RouteSketch route=new RouteSketch(this,routeData());int index=findPoint(route,selectedPoint);
   if(index<0)return;
   org.json.JSONArray photos=route.vertices.get(index).photos;
-  String[] labels=new String[2+photos.length()];labels[0]="Foto aufnehmen";labels[1]="GPS-Punkt zuordnen";
-  for(int i=0;i<photos.length();i++)labels[i+2]="Foto "+(i+1)+" öffnen";
-  new android.app.AlertDialog.Builder(this).setTitle("Trassenpunkt "+(index+1)).setItems(labels,(dialog,i)->{
-   if(i==0)capturePhoto();else if(i==1)assignGps(route.vertices.get(index).id);else {
+  String[] labels=new String[3+photos.length()];labels[0]="Foto aufnehmen";labels[1]="GPS-Punkt zuordnen";labels[2]="Punkt umbenennen";
+  for(int i=0;i<photos.length();i++)labels[i+3]="Foto "+(i+1)+" öffnen";
+  new android.app.AlertDialog.Builder(this).setTitle(route.vertices.get(index).name.isEmpty()?"Trassenpunkt "+(index+1):route.vertices.get(index).name).setItems(labels,(dialog,i)->{
+   if(i==0)capturePhoto();else if(i==1)assignGps(route.vertices.get(index).id);else if(i==2)renamePoint(route.vertices.get(index).id,null);else {
     android.content.Intent view=new android.content.Intent(android.content.Intent.ACTION_VIEW);
-    view.setDataAndType(photoUri(photos.optString(i-2)),"image/jpeg");
+    view.setDataAndType(photoUri(photos.optString(i-3)),"image/jpeg");
     view.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
     try{startActivity(view);}catch(android.content.ActivityNotFoundException e){notice("Keine Bildanzeige verfügbar.");}
    }
@@ -691,6 +699,14 @@ public class MainActivity extends Activity {
  }
  com.google.mlkit.nl.translate.Translator translator;
  int speechVersion;
+ void offerVoiceRename(String german){
+  java.util.regex.Matcher m=java.util.regex.Pattern.compile("(?iu)^(?:benenne|nenne)\\s+(?:den\\s+)?(?:trassen)?punkt(?:\\s+(\\d+))?\\s+(?:in\\s+|als\\s+)?(.+?)(?:\\s+um)?[.!]?$").matcher(german.trim());
+  if(!m.matches())return;
+  RouteSketch route=new RouteSketch(this,routeData());int i=findPoint(route,selectedPoint);
+  if(m.group(1)!=null){try{i=Integer.parseInt(m.group(1))-1;}catch(NumberFormatException e){return;}}
+  if(i<0||i>=route.vertices.size()){notice("Bitte zuerst einen Trassenpunkt auswählen.");return;}
+  renamePoint(route.vertices.get(i).id,m.group(2).trim());
+ }
  void handleSpeech(String text){
   int version=++speechVersion;
   String normalized=text.toLowerCase(java.util.Locale.ROOT);
@@ -699,12 +715,12 @@ public class MainActivity extends Activity {
    capturePhoto();return;
   }
   showPage(voicePage);
-  if(voiceLanguage.getSelectedItemPosition()==0){voiceText.setText(text);return;}
+  if(voiceLanguage.getSelectedItemPosition()==0){voiceText.setText(text);offerVoiceRename(text);return;}
   if(translator==null)translator=com.google.mlkit.nl.translate.Translation.getClient(
    new com.google.mlkit.nl.translate.TranslatorOptions.Builder().setSourceLanguage("ru").setTargetLanguage("de").build());
   voiceText.setText("");notice("Diktat wird ins Deutsche übersetzt …");
   translator.downloadModelIfNeeded().onSuccessTask(ignored->translator.translate(text))
-   .addOnSuccessListener(this,german->{if(version==speechVersion)voiceText.setText(german);})
+   .addOnSuccessListener(this,german->{if(version==speechVersion){voiceText.setText(german);offerVoiceRename(german);}})
    .addOnFailureListener(this,error->{if(version==speechVersion)notice("Übersetzung fehlgeschlagen. Für den ersten Modellabruf wird Internet benötigt.");});
  }
  @Override protected void onDestroy(){if(translator!=null)translator.close();super.onDestroy();}
