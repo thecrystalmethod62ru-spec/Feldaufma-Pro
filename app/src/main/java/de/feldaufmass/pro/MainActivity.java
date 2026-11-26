@@ -1676,6 +1676,19 @@ public class MainActivity extends Activity {
   LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);
   TextView geometryStatus=new TextView(this);geometryStatus.setText(crossings==0&&missingWidths==0?"Geometrie: keine Achsen-Selbstkreuzung erkannt; Flächenprüfung noch offen.":"Prüfung: "+crossings+" Achsen-Selbstkreuzung(en), "+missingWidths+" Abschnitt(e) ohne Grabenbreite. Keine automatische Abrechnung.");panel.addView(geometryStatus);
   TextView overlapStatus=new TextView(this);overlapStatus.setText(possibleOverlaps==0?"Außenkontur: keine Nähe-Konflikte zwischen getrennten Abschnitten erkannt (keine Flächenfreigabe).":"Außenkontur: "+possibleOverlaps+" mögliche Überlappung(en) zwischen getrennten Grabenabschnitten. Flächen manuell prüfen.");panel.addView(overlapStatus);
+  TextView nominalArea=new TextView(this);panel.addView(nominalArea);
+  Runnable refreshNominalArea=()->{
+   java.util.TreeSet<Double> boundariesArea=new java.util.TreeSet<>();boundariesArea.add(0.0);boundariesArea.add(route.measuredLength());
+   for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o==null)continue;double from=o.optDouble("from"),to=o.optDouble("to");if(Double.isFinite(from)&&Double.isFinite(to)&&from>=0&&to<=route.measuredLength()&&to>from){boundariesArea.add(from);boundariesArea.add(to);}}
+   java.util.ArrayList<Double> ordered=new java.util.ArrayList<>(boundariesArea);double area=0,unmeasured=0;boolean invalid=false;
+   for(int i=1;i<ordered.size();i++){double from=ordered.get(i-1),to=ordered.get(i),mid=(from+to)/2,w=widths[0];for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o!=null&&mid>=o.optDouble("from")&&mid<o.optDouble("to"))w=o.optDouble("width");}
+    if(!Double.isFinite(w)||w<=0){unmeasured+=to-from;invalid=true;}else area+=(to-from)*w;
+   }
+   String result=String.format(java.util.Locale.GERMANY,"Rechnerische Grabenfläche (Länge × Breite): %.2f m²",area);
+   if(invalid)result+="\\nNicht bemaßte Länge: "+String.format(java.util.Locale.GERMANY,"%.2f m",unmeasured);
+   nominalArea.setText(result+"\\nNur Kontrollwert, keine geometrische Vereinigungsfläche, keine Abrechnungsfreigabe.");
+  };
+  refreshNominalArea.run();
   TextView info=new TextView(this);info.setText("Gemessene Längen · Richtungen aus Skizze (nicht vermessen)");panel.addView(info);
   TextView widthHint=new TextView(this);widthHint.setText("Grabenbreite: "+(Double.isFinite(widths[0])?widths[0]+" m":"offen")+" · Nachschnitt links: "+(Double.isFinite(widths[1])?widths[1]+" m":"offen")+" · rechts: "+(Double.isFinite(widths[2])?widths[2]+" m":"offen")+"\nVariable Breiten: Abschnittskonturen an Knicken schematisch; keine Flächenberechnung.");panel.addView(widthHint);
   TextView surfaceHint=new TextView(this);surfaceHint.setText("Oberflächen: "+surfaces.length()+" gespeicherte Abschnitte · Standardfarben und Stationsmaße; ungültige Stationen werden ausgelassen.");panel.addView(surfaceHint);
@@ -1846,7 +1859,7 @@ public class MainActivity extends Activity {
      for(int i=0;i<widthSections.length();i++){org.json.JSONObject o=widthSections.optJSONObject(i);if(o!=null&&from<o.optDouble("to")&&to>o.optDouble("from")){notice("Breitenabschnitte dürfen sich nicht überschneiden.");return;}}
      org.json.JSONArray next=new org.json.JSONArray(widthSections.toString());next.put(new org.json.JSONObject().put("from",from).put("to",to).put("width",width));
      if(!getPreferences(0).edit().putString("metricWidthSections",next.toString()).commit()){notice("Speichern fehlgeschlagen.");return;}
-     widthSections.put(next.getJSONObject(next.length()-1));drawing.invalidate();edit.dismiss();notice("Breitenabschnitt gespeichert.");
+     widthSections.put(next.getJSONObject(next.length()-1));refreshNominalArea.run();drawing.invalidate();edit.dismiss();notice("Breitenabschnitt gespeichert.");
     }catch(Exception e){notice("Bitte gültige Maße eingeben.");}
    }));edit.show();
   });
@@ -1855,7 +1868,7 @@ public class MainActivity extends Activity {
    String[] labels=new String[widthSections.length()];for(int i=0;i<labels.length;i++){org.json.JSONObject o=widthSections.optJSONObject(i);labels[i]=o==null?"Ungültig":String.format(java.util.Locale.GERMANY,"%.2f – %.2f m · B %.2f m",o.optDouble("from"),o.optDouble("to"),o.optDouble("width"));}
    if(labels.length==0){notice("Keine Breitenabschnitte.");return;}
    new android.app.AlertDialog.Builder(this).setTitle("Abschnitt zum Löschen wählen").setItems(labels,(d,i)->new android.app.AlertDialog.Builder(this).setMessage(labels[i]+" löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(dd,ww)->{
-    try{org.json.JSONArray next=new org.json.JSONArray(widthSections.toString());next.remove(i);if(getPreferences(0).edit().putString("metricWidthSections",next.toString()).commit()){widthSections.remove(i);drawing.invalidate();}else notice("Speichern fehlgeschlagen.");}catch(Exception e){notice("Löschen fehlgeschlagen.");}
+    try{org.json.JSONArray next=new org.json.JSONArray(widthSections.toString());next.remove(i);if(getPreferences(0).edit().putString("metricWidthSections",next.toString()).commit()){widthSections.remove(i);refreshNominalArea.run();drawing.invalidate();}else notice("Speichern fehlgeschlagen.");}catch(Exception e){notice("Löschen fehlgeschlagen.");}
    }).show()).setNegativeButton("Schließen",null).show();
   });
   Button editLegend=new Button(this);editLegend.setText("Legende bearbeiten");panel.addView(editLegend);editLegend.setOnClickListener(v->route.editLegend());
