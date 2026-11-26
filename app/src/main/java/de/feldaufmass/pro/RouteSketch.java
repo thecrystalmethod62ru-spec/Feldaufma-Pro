@@ -15,6 +15,10 @@ import java.util.Locale;
 
 /** Coordinates describe a schematic only. Metres are entered in the field. */
 final class RouteSketch extends View {
+ static final int LAYER_ROUTE=1,LAYER_DIMENSIONS=2,LAYER_NAMES=4,LAYER_GPS=8,LAYER_PHOTOS=16,ALL_LAYERS=31;
+ int visibleLayers=ALL_LAYERS;
+ boolean layerVisible(int layer){return (visibleLayers&layer)!=0;}
+ void setVisibleLayers(int layers){visibleLayers=layers&ALL_LAYERS;invalidate();}
  static final double GPS_MOVE_ACCURACY_METRES=0.5;
  static boolean preciseGps(double accuracy){return Double.isFinite(accuracy)&&accuracy>0&&accuracy<=GPS_MOVE_ACCURACY_METRES;}
  static final class Vertex {
@@ -150,7 +154,8 @@ final class RouteSketch extends View {
   paint.setTextSize(13*density);
   for(int i=1;i<vertices.size();i++){
    PointF a=vertices.get(i-1).point,b=vertices.get(i).point;
-   paint.setColor(0xff13665f);paint.setStrokeWidth(4);line(c,a,b);
+   if(layerVisible(LAYER_ROUTE)){paint.setColor(0xff13665f);paint.setStrokeWidth(4);line(c,a,b);}
+   if(!layerVisible(LAYER_DIMENSIONS))continue;
    double metres=vertices.get(i).metres;
    String label=Double.isFinite(metres)?String.format(Locale.GERMANY,"%.2f m",metres):"Maß fehlt";
    float tx=left()+(a.x+b.x)*scale()/2,ty=top()+(a.y+b.y)*scale()/2-6*density;
@@ -160,12 +165,21 @@ final class RouteSketch extends View {
   }
   for(int i=0;i<vertices.size();i++){
    PointF p=vertices.get(i).point;
+   if(layerVisible(LAYER_ROUTE)){
    paint.setColor(i==highlight?0xffdf8c14:0xff13665f);
    c.drawCircle(left()+scale()*p.x,top()+scale()*p.y,5*density,paint);
    paint.setColor(Color.WHITE);c.drawCircle(left()+scale()*p.x,top()+scale()*p.y,2*density,paint);
-   String name=vertices.get(i).name;if(!name.isEmpty()){paint.setColor(0xff173c42);c.drawText(name,left()+scale()*p.x+8*density,top()+scale()*p.y+16*density,paint);}
+   }
+   Vertex vertex=vertices.get(i);float px=left()+scale()*p.x,py=top()+scale()*p.y;
+   if(layerVisible(LAYER_GPS)&&Double.isFinite(vertex.latitude)&&Double.isFinite(vertex.longitude)){
+    paint.setColor(0xff4285ef);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(2*density);c.drawCircle(px,py,8*density,paint);paint.setStyle(Paint.Style.FILL);
+   }
+   if(layerVisible(LAYER_PHOTOS)&&vertex.photos.length()>0){
+    float x=px+8*density,y=py-15*density;paint.setColor(0xff536c80);c.drawRoundRect(x,y,x+22*density,y+12*density,3*density,3*density,paint);paint.setColor(Color.WHITE);paint.setTextSize(10*density);c.drawText("F"+vertex.photos.length(),x+3*density,y+10*density,paint);paint.setTextSize(13*density);
+   }
+   String name=vertex.name;if(layerVisible(LAYER_NAMES)&&!name.isEmpty()){paint.setColor(0xff173c42);c.drawText(name,left()+scale()*p.x+8*density,top()+scale()*p.y+16*density,paint);}
   }
-  if(liveFix!=null){
+  if(layerVisible(LAYER_GPS)&&liveFix!=null){
    PointF gps=gpsPosition(liveFix.getLatitude(),liveFix.getLongitude(),-1);
    if(gps!=null){
     float x=left()+scale()*gps.x,y=top()+scale()*gps.y;
@@ -220,7 +234,7 @@ final class RouteSketch extends View {
    case MotionEvent.ACTION_DOWN:
     getParent().requestDisallowInterceptTouchEvent(true);
     stroke.clear();
-    if(moving || !editable)dragged=nearestPoint(event.getX(),event.getY());
+    if(moving || !editable)dragged=layerVisible(LAYER_ROUTE)?nearestPoint(event.getX(),event.getY()):-1;
     else if(!dimensioning)stroke.add(vertices.isEmpty()?p:vertices.get(vertices.size()-1).point);
     return true;
    case MotionEvent.ACTION_MOVE:
@@ -233,7 +247,7 @@ final class RouteSketch extends View {
      if(dragged>=0){
       if(moving){movePoint(dragged,p);if(changed!=null)changed.run();}
       if(pointSelected!=null)pointSelected.select(dragged);
-     }else if(!editable && selected!=null)selectSegment(p);
+     }else if(!editable && selected!=null&&layerVisible(LAYER_ROUTE))selectSegment(p);
      dragged=-1;
     }else if(dimensioning){
      selectSegment(p);
