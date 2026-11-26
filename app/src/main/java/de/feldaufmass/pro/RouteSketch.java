@@ -199,6 +199,34 @@ final class RouteSketch extends View {
   }
   c.restore();
  }
+ private void drawSurfaceDimensions(Canvas c,float d){
+  if(!layerVisible(LAYER_SURFACES)||!layerVisible(LAYER_DIMENSIONS))return;
+  java.util.TreeSet<Double> boundaries=new java.util.TreeSet<>();
+  for(int j=0;j<surfaceSections.length();j++){
+   org.json.JSONObject o=surfaceSections.optJSONObject(j);if(o==null)continue;
+   double from=o.optDouble("from"),to=o.optDouble("to");
+   if(Double.isFinite(from)&&Double.isFinite(to)&&from<to&&stationPoint(from)!=null&&stationPoint(to)!=null){boundaries.add(from);boundaries.add(to);}
+  }
+  Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);p.setTextSize(10*d);p.setStrokeWidth(d);
+  Double previous=null;
+  for(Double station:boundaries){
+   PointF at=stationPoint(station);if(at==null)continue;
+   float x=left()+scale()*at.x,y=top()+scale()*at.y;
+   p.setColor(0xff263238);c.drawLine(x,y-8*d,x,y+8*d,p);
+   if(previous!=null){
+    double mid=(previous+station)/2;boolean covered=false;
+    for(int j=0;j<surfaceSections.length();j++){org.json.JSONObject o=surfaceSections.optJSONObject(j);if(o!=null&&o.optDouble("from")<=mid&&o.optDouble("to")>=mid){covered=true;break;}}
+    PointF m=stationPoint(mid);
+    if(covered&&m!=null){
+     String label=String.format(Locale.GERMANY,"%.2f m",station-previous);
+     float tx=left()+scale()*m.x,ty=top()+scale()*m.y+22*d,w=p.measureText(label);
+     p.setColor(Color.WHITE);c.drawRect(tx-w/2-3*d,ty-11*d,tx+w/2+3*d,ty+3*d,p);
+     p.setColor(0xff263238);c.drawText(label,tx-w/2,ty,p);
+    }
+   }
+   previous=station;
+  }
+ }
  void drawSurfaceSections(Canvas c,float density){
   if(!layerVisible(LAYER_SURFACES))return;
   for(int j=0;j<surfaceSections.length();j++){
@@ -437,6 +465,7 @@ final class RouteSketch extends View {
    }
    String name=vertex.name;if(layerVisible(LAYER_NAMES)&&!name.isEmpty()){paint.setColor(0xff173c42);c.drawText(name,left()+scale()*p.x+8*density,top()+scale()*p.y+16*density,paint);}
   }
+  drawSurfaceDimensions(c,density);
   drawStationObjects(c,density);
   if(layerVisible(LAYER_GPS)&&liveFix!=null){
    PointF gps=gpsPosition(liveFix.getLatitude(),liveFix.getLongitude(),-1);
