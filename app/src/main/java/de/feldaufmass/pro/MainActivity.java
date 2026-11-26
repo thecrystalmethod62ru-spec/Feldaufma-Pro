@@ -627,12 +627,17 @@ public class MainActivity extends Activity {
   String[] sides={"Unbekannt","links","rechts","mittig"};Spinner side=choices(form,sides);if(old!=null)side.setSelection(Math.max(0,java.util.Arrays.asList(sides).indexOf(old.optString("side"))));
   String[] keys={"detailLength","detailWidth","detailDepth","detailOffset"},labels={"Länge (m)","Breite (m)","Tiefe (m)","Abstand zum Grabenrand (m)"};
   EditText[] fields=new EditText[keys.length];for(int j=0;j<fields.length;j++){fields[j]=new EditText(this);fields[j].setInputType(8194);fields[j].setHint(labels[j]+" – optional");if(old!=null)fields[j].setText(old.optString(keys[j],""));form.addView(fields[j]);addObjectMeasureSlider(form,fields[j],j==3?5:10,j==3?0:1);}
-  TextView quantities=sheetText("",14,false);quantities.setTextColor(0xff9edbd2);form.addView(quantities);
+  View separator=new View(this);separator.setBackgroundColor(0xff465452);LinearLayout.LayoutParams separatorParams=new LinearLayout.LayoutParams(-1,dp(1));separatorParams.setMargins(0,dp(12),0,dp(12));form.addView(separator,separatorParams);
+  LinearLayout quantities=new LinearLayout(this);quantities.setPadding(dp(4),dp(4),dp(4),dp(8));form.addView(quantities);
+  TextView[] results=new TextView[2];String[] resultLabels={"Fläche","Volumen"};
+  for(int k=0;k<2;k++){LinearLayout column=new LinearLayout(this);column.setOrientation(1);quantities.addView(column,new LinearLayout.LayoutParams(0,-2,1));TextView caption=sheetText(resultLabels[k],13,false);caption.setTextColor(0xffa4b9b5);column.addView(caption);results[k]=sheetText("—",24,true);results[k].setTextColor(k==0?0xffe3f0ed:0xff69cdbb);column.addView(results[k]);}
+  TextView quantityHint=sheetText("Geometrische Detailmengen – nicht zur Trasse addiert.",12,false);quantityHint.setTextColor(0xffa4b9b5);form.addView(quantityHint);
   Runnable updateQuantities=()->{
    double[] values={Double.NaN,Double.NaN,Double.NaN};
    for(int k=0;k<3;k++)try{double n=number(fields[k]);if(Double.isFinite(n)&&n>0)values[k]=n;}catch(Exception ignored){}
    double area=values[0]*values[1],volume=area*values[2];
-   quantities.setText("Fläche: "+(Double.isFinite(area)?csvNumber(area)+" m²":"—")+"   |   Volumen: "+(Double.isFinite(volume)?csvNumber(volume)+" m³":"—")+"\nGeometrische Detailmengen – nicht zur Trasse addiert.");
+   results[0].setText(Double.isFinite(area)?String.format(java.util.Locale.GERMANY,"%.2f m²",area):"—");
+   results[1].setText(Double.isFinite(volume)?String.format(java.util.Locale.GERMANY,"%.3f m³",volume):"—");
   };
   for(int k=0;k<3;k++)fields[k].addTextChangedListener(new android.text.TextWatcher(){
    public void beforeTextChanged(CharSequence value,int start,int count,int after){}
