@@ -61,6 +61,18 @@ public class ProjectStateTest {
   try{route.onTouchEvent(e);}finally{e.recycle();}
  }
  private void verifyProjectState(MainActivity activity) throws Exception {
+  activity.showPage(activity.measurePage);
+  assertFalse(activity.stoneLength.isShown());
+  assertTrue(activity.surface.isShown());
+  assertTrue(activity.handling.isShown());
+  activity.belagsToggle.performClick();
+  assertTrue(activity.underlying.isShown());
+  activity.stoneColor.setText("Grau");
+  activity.belagsToggle.performClick();
+  assertFalse(activity.stoneColor.isShown());
+  activity.openBelagsDetails();
+  assertTrue(activity.stoneColor.isShown());
+  assertEquals("Grau",activity.stoneColor.getText().toString());
   activity.length.setText("20");
   activity.width.setText("1");
   activity.depth.setText("2");

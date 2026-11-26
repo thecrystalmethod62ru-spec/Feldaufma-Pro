@@ -91,6 +91,21 @@ public class MainActivity extends Activity {
    }).show();
  }
 
+ LinearLayout belagsFields;
+ Button belagsToggle;
+
+ void setBelagsExpanded(boolean expanded){
+  belagsFields.setVisibility(expanded?View.VISIBLE:View.GONE);
+  belagsToggle.setText(expanded?"Belagsdetails ausblenden ▴":"Belagsdetails anzeigen ▾");
+ }
+
+ void openBelagsDetails(){
+  setBelagsExpanded(true);
+  showPage(measurePage);
+  belagsToggle.post(()->belagsToggle.requestRectangleOnScreen(
+    new android.graphics.Rect(0,0,belagsToggle.getWidth(),belagsToggle.getHeight()),true));
+ }
+
  void showSurfaceLayers(){
   SharedPreferences data=getPreferences(0);
   String material=covering.equals("Unbekannt")?"Material nicht erfasst":covering;
@@ -271,13 +286,21 @@ public class MainActivity extends Activity {
  surface=new Spinner(this);String[] types={"Unbekannt","Asphalt","Pflaster","Gehwegplatten","Unbefestigt","Betonpflaster – Rechteck","Betonpflaster – Quadrat","Doppel-T-Pflaster","Wellenverbundpflaster","Sechseckpflaster","Achteckpflaster","Verbundpflaster – sonstige","Betonpflaster – Mehrformat","Ökopflaster / Sickerpflaster","Rasengittersteine","Rasenfugenpflaster","Natursteinpflaster – Großpflaster","Natursteinpflaster – Kleinpflaster","Natursteinpflaster – Mosaikpflaster","Natursteinpflaster – sonstige","Klinkerpflaster","Ziegelpflaster","Beton-Gehwegplatten","Natursteinplatten","Waschbetonplatten","Taktilplatten – Rippen","Taktilplatten – Noppen","Rinnenpflaster","Schlackenpflaster","Holzpflaster","Sonstiges"};
  surface.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,types));root.addView(surface);
  surface.setSelection(Math.min(types.length-1,Math.max(0,getPreferences(0).getInt("surface",0))));
- stoneLength=field(root,"Steinlänge (cm, optional)","stoneLength",true);
- stoneWidth=field(root,"Steinbreite (cm, optional)","stoneWidth",true);
- stoneDepth=field(root,"Belagsstärke (cm, optional)","stoneDepth",true);
- stoneColor=field(root,"Farbe (optional)","stoneColor",false);
- pattern=field(root,"Verlegemuster (optional)","pattern",false);
- bedding=field(root,"Bettung – Material / Stärke (optional)","bedding",false);
- underlying=field(root,"Unterliegender Altbelag (z. B. Großpflaster)","underlying",false);
+ belagsToggle=new Button(this);
+ belagsToggle.setAllCaps(false);
+ root.addView(belagsToggle);
+ belagsFields=new LinearLayout(this);
+ belagsFields.setOrientation(LinearLayout.VERTICAL);
+ root.addView(belagsFields);
+ setBelagsExpanded(false);
+ belagsToggle.setOnClickListener(v->setBelagsExpanded(belagsFields.getVisibility()!=View.VISIBLE));
+ stoneLength=field(belagsFields,"Steinlänge (cm, optional)","stoneLength",true);
+ stoneWidth=field(belagsFields,"Steinbreite (cm, optional)","stoneWidth",true);
+ stoneDepth=field(belagsFields,"Belagsstärke (cm, optional)","stoneDepth",true);
+ stoneColor=field(belagsFields,"Farbe (optional)","stoneColor",false);
+ pattern=field(belagsFields,"Verlegemuster (optional)","pattern",false);
+ bedding=field(belagsFields,"Bettung – Material / Stärke (optional)","bedding",false);
+ underlying=field(belagsFields,"Unterliegender Altbelag (z. B. Großpflaster)","underlying",false);
  TextView handlingLabel=new TextView(this);handlingLabel.setText("Umgang mit Altbelag");root.addView(handlingLabel);
  handling=new Spinner(this);String[] options={"Nicht erfasst","Aufnahme","Aufnahme und Entsorgung","Aufnahme und Wiederverwendung","Wiederherstellung"};
  handling.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,options));root.addView(handling);handling.setSelection(Math.min(4,Math.max(0,getPreferences(0).getInt("handling",0))));
@@ -301,10 +324,10 @@ public class MainActivity extends Activity {
  sheetHeading(root,"Oberflächenaufbau");
  surfaceLayers=sheetText("",16,false);surfaceLayers.setLineSpacing(dp(6),1);root.addView(surfaceLayers);showSurfaceLayers();
  Button editLayers=new Button(this);editLayers.setText("Oberflächenaufbau bearbeiten");root.addView(editLayers);
- editLayers.setOnClickListener(v->{showPage(measurePage);surface.post(()->surface.requestRectangleOnScreen(new android.graphics.Rect(0,0,surface.getWidth(),surface.getHeight()),true));});
+ editLayers.setOnClickListener(v->openBelagsDetails());
  legend=new TextView(this);legend.setTextSize(14);root.addView(legend);
  root=segmentPage;
- Button editSurface=new Button(this);editSurface.setText("Belagsdetails bearbeiten");root.addView(editSurface);editSurface.setOnClickListener(v->showPage(measurePage));
+ Button editSurface=new Button(this);editSurface.setText("Belagsdetails bearbeiten");root.addView(editSurface);editSurface.setOnClickListener(v->openBelagsDetails());
  TextView segmentHeading=new TextView(this);segmentHeading.setText("Oberflächenabschnitte");segmentHeading.setTextSize(20);root.addView(segmentHeading);
  stationFrom=field(root,"Station von (m)","stationFrom",true);
  stationTo=field(root,"Station bis (m)","stationTo",true);
