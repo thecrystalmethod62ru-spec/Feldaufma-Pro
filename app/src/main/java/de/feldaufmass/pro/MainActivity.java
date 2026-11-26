@@ -1797,7 +1797,7 @@ public class MainActivity extends Activity {
      final android.graphics.Paint p=new android.graphics.Paint(3);
      @Override protected void onDraw(android.graphics.Canvas c){
       super.onDraw(c);float pad=24*getResources().getDisplayMetrics().density;
-      float w=getWidth()-2*pad,h=getHeight()-2*pad;if(w<=0||h<=0)return;
+      float w=getWidth()-2*pad,h=getHeight()-2*pad;if(w<=0||h<=0||!Double.isFinite(total)||total<=0)return;
       p.setTextSize(10*getResources().getDisplayMetrics().scaledDensity);
       p.setStrokeWidth(1);
       for(int i=0;i<=4;i++){
