@@ -107,6 +107,8 @@ final class RouteSketch extends View {
   }
   return text.toString();
  }
+ private android.location.Location liveFix;
+ void setLiveFix(android.location.Location fix){liveFix=fix;invalidate();}
  float zoom=1,centerX=.5f,centerY=.5f;
  boolean moving,gesture;
  int dragged=-1,angle=-1,highlight=-1;
@@ -155,6 +157,19 @@ final class RouteSketch extends View {
    paint.setColor(i==highlight?0xffdf8c14:0xff13665f);
    c.drawCircle(left()+scale()*p.x,top()+scale()*p.y,5*density,paint);
    paint.setColor(Color.WHITE);c.drawCircle(left()+scale()*p.x,top()+scale()*p.y,2*density,paint);
+  }
+  if(liveFix!=null){
+   PointF gps=gpsPosition(liveFix.getLatitude(),liveFix.getLongitude(),-1);
+   if(gps!=null){
+    float x=left()+scale()*gps.x,y=top()+scale()*gps.y;
+    paint.setColor(0x334285ef);c.drawCircle(x,y,15*density,paint);
+    paint.setColor(Color.WHITE);c.drawCircle(x,y,8*density,paint);
+    paint.setColor(0xff4285ef);c.drawCircle(x,y,6*density,paint);
+   }
+   String status=liveFix.hasAccuracy()?String.format(Locale.GERMANY,"GPS ± %.2f m",liveFix.getAccuracy()):"GPS: Genauigkeit unbekannt";
+   if(gps==null)status+=" · keine Planposition";
+   paint.setColor(Color.WHITE);c.drawRect(0,0,getWidth(),25*density,paint);
+   paint.setColor(0xff173c42);c.drawText(status,8*density,18*density,paint);
   }
   paint.setColor(0xff42799e);paint.setStrokeWidth(3);
   for(int i=1;i<stroke.size();i++)line(c,stroke.get(i-1),stroke.get(i));
