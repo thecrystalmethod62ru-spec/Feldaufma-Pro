@@ -229,6 +229,7 @@ final class RouteSketch extends View {
    cumulative+=metres;if(cumulative>boundaries.first()&&cumulative<boundaries.last())boundaries.add(cumulative);
   }
   Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);p.setTextSize(10*d);p.setStrokeWidth(d);
+  java.util.ArrayList<android.graphics.RectF> occupied=new java.util.ArrayList<>();
   Double previous=null;
   for(Double station:boundaries){
    if(previous!=null){
@@ -241,15 +242,28 @@ final class RouteSketch extends View {
      if(len>.1f){
       float ux=(bx-ax)/len,uy=(by-ay)/len,nx=-uy,ny=ux;
       if(ny<0||(Math.abs(ny)<.001f&&nx<0)){nx=-nx;ny=-ny;}
+      String label=String.format(Locale.GERMANY,"%.2f m",station-previous);
+      float w=p.measureText(label);
       float offset=25*d;
+      float halfW=Math.abs(ux)*(w/2+3*d)+Math.abs(uy)*12*d;
+      float halfH=Math.abs(uy)*(w/2+3*d)+Math.abs(ux)*12*d;
+      android.graphics.RectF bounds=new android.graphics.RectF();
+      for(int lane=0;lane<12;lane++){
+       offset=(25+lane*19)*d;
+       float cx=(ax+bx)/2+nx*offset,cy=(ay+by)/2+ny*offset;
+       bounds.set(cx-halfW,cy-halfH,cx+halfW,cy+halfH);
+       boolean collision=false;
+       for(android.graphics.RectF other:occupied)if(android.graphics.RectF.intersects(bounds,other)){collision=true;break;}
+       if(!collision)break;
+      }
+      occupied.add(new android.graphics.RectF(bounds));
       float x1=ax+nx*offset,y1=ay+ny*offset,x2=bx+nx*offset,y2=by+ny*offset;
       p.setColor(0xff263238);
       c.drawLine(ax+nx*7*d,ay+ny*7*d,x1+nx*4*d,y1+ny*4*d,p);
       c.drawLine(bx+nx*7*d,by+ny*7*d,x2+nx*4*d,y2+ny*4*d,p);
       c.drawLine(x1,y1,x2,y2,p);
       for(int k=0;k<2;k++){float x=k==0?x1:x2,y=k==0?y1:y2;c.drawLine(x-(ux+nx)*3*d,y-(uy+ny)*3*d,x+(ux+nx)*3*d,y+(uy+ny)*3*d,p);}
-      String label=String.format(Locale.GERMANY,"%.2f m",station-previous);
-      float tx=(x1+x2)/2,ty=(y1+y2)/2,w=p.measureText(label);
+      float tx=(x1+x2)/2,ty=(y1+y2)/2;
       float angle=(float)Math.toDegrees(Math.atan2(uy,ux));if(angle>90)angle-=180;if(angle<-90)angle+=180;
       c.save();c.translate(tx,ty);c.rotate(angle);
       p.setColor(Color.WHITE);c.drawRect(-w/2-2*d,-11*d,w/2+2*d,3*d,p);
