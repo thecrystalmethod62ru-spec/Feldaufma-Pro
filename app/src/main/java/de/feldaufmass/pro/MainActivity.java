@@ -1760,6 +1760,24 @@ public class MainActivity extends Activity {
    LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(dp(12),dp(8),dp(12),dp(8));
    TextView hint=new TextView(this);hint.setText("Lineare Stationsübersicht – keine maßstäbliche Montagegeometrie. Ohne gültige Station: "+missing);panel.addView(hint);
    if(outside>0)panel.addView(sheetText("Hinweis: "+outside+" Formstück-Mittelpunkte außerhalb der örtlichen Grabenbreite. Bauteilabmessungen prüfen.",14,true));
+   ElevationProfile montageGround=null;
+   try{
+    java.util.List<double[]> groundPoints=new java.util.ArrayList<>();
+    for(String line:getPreferences(0).getString("metricElevationPoints","").split("\\n")){
+     if(line.trim().isEmpty())continue;
+     String[] parts=line.split(";",-1);if(parts.length!=2)throw new IllegalArgumentException("Format Station;Höhe");
+     groundPoints.add(new double[]{Double.parseDouble(parts[0].trim().replace(',','.')),Double.parseDouble(parts[1].trim().replace(',','.'))});
+    }
+    montageGround=new ElevationProfile(groundPoints,total);
+   }catch(Exception ignored){}
+   int derivedElevations=0;
+   java.util.Map<org.json.JSONObject,Double> derivedTops=new java.util.IdentityHashMap<>();
+   if(montageGround!=null)for(org.json.JSONObject fitting:linked){
+    if(Double.isFinite(fitting.optDouble("topElevation")))continue;
+    double coverValue=fitting.optDouble("cover"),ground=montageGround.elevation(fitting.optDouble("station"));
+    if(Double.isFinite(coverValue)&&coverValue>=0&&Double.isFinite(ground)){derivedTops.put(fitting,ground-coverValue);derivedElevations++;}
+   }
+   if(derivedElevations>0)panel.addView(sheetText("Höhenkoten aus Tiefbau-GOK und Überdeckung berechnet: "+derivedElevations+". Gemeinsamen Höhenbezug prüfen.",14,false));
    int possibleConflicts=0, verticallySeparated=0;
    for(int i=0;i<linked.size();i++){
     org.json.JSONObject first=linked.get(i);
@@ -1778,6 +1796,8 @@ public class MainActivity extends Activity {
       // Cover is measured from the local surface; different stations may have different surface elevations.
       boolean comparable=delta<=0.001&&Double.isFinite(c1)&&c1>=0&&Double.isFinite(c2)&&c2>=0&&Double.isFinite(h1)&&h1>0&&Double.isFinite(h2)&&h2>0;
       double z1=first.optDouble("topElevation"),z2=second.optDouble("topElevation");
+      if(!Double.isFinite(z1)&&derivedTops.containsKey(first))z1=derivedTops.get(first);
+      if(!Double.isFinite(z2)&&derivedTops.containsKey(second))z2=derivedTops.get(second);
       boolean absolute=Double.isFinite(z1)&&Double.isFinite(z2)&&Double.isFinite(h1)&&h1>0&&Double.isFinite(h2)&&h2>0;
       boolean separated=absolute?(z1-h1>=z2||z2-h2>=z1):(comparable&&(c1+h1<=c2||c2+h2<=c1));
       if(separated)verticallySeparated++;else possibleConflicts++;
