@@ -121,6 +121,29 @@ final class RouteSketch extends View {
  }
  JSONArray stationObjects=new JSONArray(),surfaceSections=new JSONArray();
  void setStationLayers(JSONArray objects,JSONArray sections){stationObjects=objects;surfaceSections=sections;invalidate();}
+ boolean placingObject;
+ java.util.function.Consumer<java.util.ArrayList<StationHit>> stationSelected;
+ static final class StationHit{
+  final int segment;final double station,distance;
+  StationHit(int segment,double station,double distance){this.segment=segment;this.station=station;this.distance=distance;}
+ }
+ java.util.ArrayList<StationHit> stationCandidates(double x,double y,double tolerance){
+  java.util.ArrayList<StationHit> hits=new java.util.ArrayList<>();
+  double total=measuredLength();if(!Double.isFinite(total)||total<=0)return hits;
+  double start=0;
+  for(int i=1;i<vertices.size();i++){
+   Vertex a=vertices.get(i-1),b=vertices.get(i);
+   double dx=b.point.x-a.point.x,dy=b.point.y-a.point.y,den=dx*dx+dy*dy;
+   if(den>1e-12){
+    double f=Math.max(0,Math.min(1,((x-a.point.x)*dx+(y-a.point.y)*dy)/den));
+    double distance=Math.hypot(x-a.point.x-f*dx,y-a.point.y-f*dy);
+    if(distance<=tolerance)hits.add(new StationHit(i,start+f*b.metres,distance));
+   }
+   start+=b.metres;
+  }
+  hits.sort((a,b)->Double.compare(a.distance,b.distance));
+  return hits;
+ }
  PointF stationPoint(double station){
   double total=measuredLength();
   if(!Double.isFinite(total)||total<=0||!Double.isFinite(station)||station<0||station>total+1e-8)return null;
@@ -395,16 +418,19 @@ final class RouteSketch extends View {
    case MotionEvent.ACTION_DOWN:
     getParent().requestDisallowInterceptTouchEvent(true);
     stroke.clear();
+    if(placingObject){dragged=-1;return true;}
     if(moving || !editable)dragged=layerVisible(LAYER_ROUTE)?nearestPoint(event.getX(),event.getY()):-1;
     else if(!dimensioning)stroke.add(vertices.isEmpty()?p:vertices.get(vertices.size()-1).point);
     return true;
    case MotionEvent.ACTION_MOVE:
     if(Math.hypot(event.getX()-touchStartX,event.getY()-touchStartY)>android.view.ViewConfiguration.get(getContext()).getScaledTouchSlop())touchMoved=true;
+    if(placingObject)return true;
     if(moving && dragged>=0&&touchMoved)movePoint(dragged,p);
     if(!dimensioning && !stroke.isEmpty() && distance(stroke.get(stroke.size()-1),p)>.008){stroke.add(p);invalidate();}
     return true;
    case MotionEvent.ACTION_UP:
     getParent().requestDisallowInterceptTouchEvent(false);
+    if(placingObject){if(!touchMoved&&stationSelected!=null){double tolerance=24*getResources().getDisplayMetrics().density/scale();stationSelected.accept(stationCandidates((event.getX()-left())/scale(),(event.getY()-top())/scale(),tolerance));}performClick();invalidate();return true;}
     if(editable&&tappedPoint>=0&&!touchMoved&&pointSelected!=null){
      stroke.clear();dragged=-1;pointSelected.select(tappedPoint);tappedPoint=-1;performClick();invalidate();return true;
     }
