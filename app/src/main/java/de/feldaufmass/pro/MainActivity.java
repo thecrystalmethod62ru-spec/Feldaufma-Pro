@@ -1189,7 +1189,8 @@ public class MainActivity extends Activity {
   menu.getMenu().add(0,112,Menu.NONE,"Bautagesbericht");
   menu.getMenu().add(0,113,Menu.NONE,"Nachtragsmanagement");
   menu.getMenu().add(0,114,Menu.NONE,"PDF-Unterlagen analysieren");
-  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==114)choosePdfAnalysis();else if(item.getItemId()==113)showNachtraege();else if(item.getItemId()==112)showDailyReports();else if(item.getItemId()==111)exportPhotoReport();else if(item.getItemId()==110)exportX31();else if(item.getItemId()==109)exportReb();else if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
+  menu.getMenu().add(0,115,Menu.NONE,"Foto / Handskizze analysieren");
+  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==115)chooseImageAnalysis();else if(item.getItemId()==114)choosePdfAnalysis();else if(item.getItemId()==113)showNachtraege();else if(item.getItemId()==112)showDailyReports();else if(item.getItemId()==111)exportPhotoReport();else if(item.getItemId()==110)exportX31();else if(item.getItemId()==109)exportReb();else if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
   menu.show();
  }
  LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(dp(12),dp(8),dp(12),dp(8));return p;}
@@ -1951,6 +1952,54 @@ public class MainActivity extends Activity {
    }
   }return result;
  }
+ void chooseImageAnalysis(){
+  RouteSketch route=new RouteSketch(this,routeData());
+  java.util.ArrayList<String> files=new java.util.ArrayList<>(),labels=new java.util.ArrayList<>();
+  labels.add("Bilddatei / Handskizze auswählen");
+  for(int j=0;j<route.vertices.size();j++){RouteSketch.Vertex v=route.vertices.get(j);for(int k=0;k<v.photos.length();k++){files.add(v.photos.optString(k));labels.add("Punkt "+(j+1)+" · Foto "+(k+1)+(v.name.isEmpty()?"":" · "+v.name));}}
+  new android.app.AlertDialog.Builder(this).setTitle("Foto / Handskizze analysieren").setItems(labels.toArray(new String[0]),(d,w)->{
+   if(w==0){android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.setType("image/*");startActivityForResult(i,426);}
+   else analyzeImageDocument(photoUri(files.get(w-1)),labels.get(w));
+  }).setNegativeButton("Abbrechen",null).show();
+ }
+ android.graphics.Bitmap imageForOcr(android.net.Uri uri)throws Exception{
+  if(android.os.Build.VERSION.SDK_INT>=28){
+   return android.graphics.ImageDecoder.decodeBitmap(android.graphics.ImageDecoder.createSource(getContentResolver(),uri),(decoder,info,source)->{
+    int w=info.getSize().getWidth(),h=info.getSize().getHeight();float scale=Math.min(1f,2600f/Math.max(w,h));
+    decoder.setTargetSize(Math.max(1,Math.round(w*scale)),Math.max(1,Math.round(h*scale)));decoder.setAllocator(android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE);
+   });
+  }
+  android.graphics.BitmapFactory.Options options=new android.graphics.BitmapFactory.Options();options.inJustDecodeBounds=true;
+  try(java.io.InputStream in=getContentResolver().openInputStream(uri)){android.graphics.BitmapFactory.decodeStream(in,null,options);}
+  if(options.outWidth<=0||options.outHeight<=0)throw new java.io.IOException("Bild nicht lesbar");
+  options.inSampleSize=1;while(Math.max(options.outWidth,options.outHeight)/options.inSampleSize>2600)options.inSampleSize*=2;options.inJustDecodeBounds=false;
+  try(java.io.InputStream in=getContentResolver().openInputStream(uri)){return android.graphics.BitmapFactory.decodeStream(in,null,options);}
+ }
+ void analyzeImageDocument(android.net.Uri uri,String name){
+  String projectId=activeProject;notice("Bildtext wird lokal erkannt …");
+  new Thread(()->{
+   android.graphics.Bitmap bitmap=null;com.google.mlkit.vision.text.TextRecognizer recognizer=null;
+   try{
+    bitmap=imageForOcr(uri);if(bitmap==null)throw new java.io.IOException("Bild nicht lesbar");
+    recognizer=com.google.mlkit.vision.text.TextRecognition.getClient(com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS);
+    String raw=com.google.android.gms.tasks.Tasks.await(recognizer.process(com.google.mlkit.vision.common.InputImage.fromBitmap(bitmap,0))).getText();
+    final String recognized=raw.length()>50000?raw.substring(0,50000):raw;
+    runOnUiThread(()->{if(!isFinishing()&&!isDestroyed()&&projectId.equals(activeProject))reviewImageText(name,recognized);});
+   }catch(Exception e){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())notice("Bildanalyse fehlgeschlagen: "+e.getMessage());});}
+   finally{if(recognizer!=null)recognizer.close();if(bitmap!=null)bitmap.recycle();}
+  },"image-ocr").start();
+ }
+ void reviewImageText(String name,String recognized){
+  LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
+  form.addView(sheetText(name+"\nOCR – Handschrift kann falsch oder unvollständig erkannt werden. Bitte mit dem Original vergleichen.",14,true));
+  EditText content=new EditText(this);content.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);content.setMinLines(5);content.setText(recognized);form.addView(content);
+  form.addView(sheetText("Fehlende Bezeichnungen ergänzen, z. B. Grabenbreite 0,92 m. Einzelne unbeschriftete Zahlen werden nicht automatisch zugeordnet.",14,false));
+  new android.app.AlertDialog.Builder(this).setTitle("Erkannten Bildtext prüfen").setView(scroll).setNegativeButton("Abbrechen",null).setPositiveButton("Maße suchen",(d,w)->{
+   java.util.ArrayList<DocMeasure> matches=new java.util.ArrayList<>();
+   for(DocMeasure m:findDocumentMeasures(content.getText().toString(),1))matches.add(new DocMeasure(m.field,1,m.metres,"OCR / geprüfter Bildtext: "+m.evidence));
+   previewDocumentMeasures(name,"Bild / Handskizze · OCR-Text",matches);
+  }).show();
+ }
  void choosePdfAnalysis(){
   java.util.ArrayList<org.json.JSONObject> pdfs=new java.util.ArrayList<>();java.util.ArrayList<String> labels=new java.util.ArrayList<>();
   for(int j=0;j<documents.length();j++){org.json.JSONObject o=documents.optJSONObject(j);if(o==null||o.optString("uri").isEmpty())continue;
@@ -2034,13 +2083,13 @@ public class MainActivity extends Activity {
    picks[j]=choices(form,labels.toArray(new String[0]));
   }
   if(found.isEmpty())form.addView(sheetText("Keine eindeutigen Maßangaben gefunden. Scanqualität, Seitenlimit und Schreibweise prüfen.",14,false));
-  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("PDF – Maßvorschläge prüfen").setView(scroll).setNegativeButton("Schließen",null).setPositiveButton("Als Soll speichern",null).create();
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Maßvorschläge prüfen").setView(scroll).setNegativeButton("Schließen",null).setPositiveButton("Als Soll speichern",null).create();
   dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(b->{
    android.content.SharedPreferences.Editor ed=getPreferences(0).edit();StringBuilder source=new StringBuilder(name);int count=0;
    for(int j=0;j<picks.length;j++){int k=picks[j].getSelectedItemPosition()-1;if(k<0)continue;DocMeasure m=choicesByField.get(j).get(k);ed.putString(DOC_KEYS[j],java.math.BigDecimal.valueOf(m.metres).stripTrailingZeros().toPlainString());source.append("\n").append(DOC_LABELS[j]).append(": S. ").append(m.page).append(" · ").append(m.evidence);count++;}
    if(count==0){notice("Bitte mindestens einen Wert auswählen.");return;}
    ed.putString("sollSource",source.toString());if(!ed.commit()){notice("Sollwerte konnten nicht gespeichert werden.");return;}
-   recordProjectEvent("Sollwerte aus PDF übernommen");compareSoll();dialog.dismiss();notice("Sollwerte gespeichert. Istmaße unverändert.");
+   recordProjectEvent("Sollwerte aus Unterlage übernommen");compareSoll();dialog.dismiss();notice("Sollwerte gespeichert. Istmaße unverändert.");
   }));dialog.show();
  }
  void showDocuments(){StringBuilder b=new StringBuilder();for(int j=0;j<documents.length();j++){org.json.JSONObject o=documents.optJSONObject(j);if(o!=null)b.append(o.optString("name")).append(" – Soll / nicht ausgewertet\n");}documentsList.setText(b.length()==0?"Keine Unterlagen ausgewählt":b.toString());}
@@ -2448,6 +2497,7 @@ public class MainActivity extends Activity {
  try{startActivityForResult(i,410);}catch(android.content.ActivityNotFoundException e){Toast.makeText(this,"Keine Spracherkennung verfügbar.",Toast.LENGTH_LONG).show();}
  }
  @Override protected void onActivityResult(int request,int result,android.content.Intent data){super.onActivityResult(request,result,data);
+ if(request==426&&result==RESULT_OK&&data!=null&&data.getData()!=null){android.net.Uri uri=data.getData();String name=uri.getLastPathSegment();try(android.database.Cursor c=getContentResolver().query(uri,new String[]{android.provider.OpenableColumns.DISPLAY_NAME},null,null,null)){if(c!=null&&c.moveToFirst())name=c.getString(0);}catch(Exception ignored){}analyzeImageDocument(uri,name==null?"Bild":name);return;}
  if(request==425&&result==RESULT_OK&&data!=null&&data.getData()!=null){android.net.Uri uri=data.getData();String name=uri.getLastPathSegment();try(android.database.Cursor c=getContentResolver().query(uri,new String[]{android.provider.OpenableColumns.DISPLAY_NAME},null,null,null)){if(c!=null&&c.moveToFirst())name=c.getString(0);}catch(Exception ignored){}analyzePdfDocument(uri,name==null?"PDF":name);return;}
  if(request==424){if(result==RESULT_OK&&data!=null&&data.getData()!=null)writeNachtragPdf(data.getData());else pendingNachtragPdfId=null;return;}
  if(request==423){if(result==RESULT_OK&&data!=null&&data.getData()!=null)writeDailyPdf(data.getData());else pendingDailyPdfId=null;return;}
