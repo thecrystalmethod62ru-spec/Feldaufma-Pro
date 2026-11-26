@@ -1678,15 +1678,35 @@ public class MainActivity extends Activity {
   TextView overlapStatus=new TextView(this);overlapStatus.setText(possibleOverlaps==0?"Außenkontur: keine Nähe-Konflikte zwischen getrennten Abschnitten erkannt (keine Flächenfreigabe).":"Außenkontur: "+possibleOverlaps+" mögliche Überlappung(en) zwischen getrennten Grabenabschnitten. Flächen manuell prüfen.");panel.addView(overlapStatus);
   TextView nominalArea=new TextView(this);panel.addView(nominalArea);
   Runnable refreshNominalArea=()->{
-   java.util.TreeSet<Double> boundariesArea=new java.util.TreeSet<>();boundariesArea.add(0.0);boundariesArea.add(route.measuredLength());
-   for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o==null)continue;double from=o.optDouble("from"),to=o.optDouble("to");if(Double.isFinite(from)&&Double.isFinite(to)&&from>=0&&to<=route.measuredLength()&&to>from){boundariesArea.add(from);boundariesArea.add(to);}}
-   java.util.ArrayList<Double> ordered=new java.util.ArrayList<>(boundariesArea);double area=0,unmeasured=0;boolean invalid=false;
-   for(int i=1;i<ordered.size();i++){double from=ordered.get(i-1),to=ordered.get(i),mid=(from+to)/2,w=widths[0];for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o!=null&&mid>=o.optDouble("from")&&mid<o.optDouble("to"))w=o.optDouble("width");}
-    if(!Double.isFinite(w)||w<=0){unmeasured+=to-from;invalid=true;}else area+=(to-from)*w;
+   double total=route.measuredLength();
+   java.util.TreeSet<Double> cuts=new java.util.TreeSet<>();cuts.add(0.0);cuts.add(total);
+   for(org.json.JSONArray sections:new org.json.JSONArray[]{widthSections,surfaces})for(int j=0;j<sections.length();j++){
+    org.json.JSONObject o=sections.optJSONObject(j);if(o==null)continue;double from=o.optDouble("from",Double.NaN),to=o.optDouble("to",Double.NaN);
+    if(Double.isFinite(from)&&Double.isFinite(to)&&from>=0&&to<=total&&to>from){cuts.add(from);cuts.add(to);}
    }
-   String result=String.format(java.util.Locale.GERMANY,"Rechnerische Grabenfläche (Länge × Breite): %.2f m²",area);
-   if(invalid)result+="\\nNicht bemaßte Länge: "+String.format(java.util.Locale.GERMANY,"%.2f m",unmeasured);
-   nominalArea.setText(result+"\\nNur Kontrollwert, keine geometrische Vereinigungsfläche, keine Abrechnungsfreigabe.");
+   java.util.ArrayList<Double> stations=new java.util.ArrayList<>(cuts);
+   java.util.TreeMap<String,Double> bySurface=new java.util.TreeMap<>();
+   double area=0,unmeasured=0,unknownSurface=0;int surfaceConflicts=0;
+   for(int i=1;i<stations.size();i++){
+    double from=stations.get(i-1),to=stations.get(i),mid=(from+to)/2,w=widths[0];
+    for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o!=null&&mid>=o.optDouble("from",Double.NaN)&&mid<o.optDouble("to",Double.NaN))w=o.optDouble("width",Double.NaN);}
+    if(!Double.isFinite(w)||w<=0){unmeasured+=to-from;continue;}
+    double part=(to-from)*w;area+=part;
+    String surface=null;int matches=0;
+    for(int j=0;j<surfaces.length();j++){org.json.JSONObject o=surfaces.optJSONObject(j);if(o==null)continue;
+     double lo=o.optDouble("from",Double.NaN),hi=o.optDouble("to",Double.NaN);String name=o.optString("surface","").trim();
+     if(Double.isFinite(lo)&&Double.isFinite(hi)&&lo>=0&&hi<=total&&lo<=mid&&mid<hi&&!name.isEmpty()){surface=name;matches++;}
+    }
+    if(matches==1)bySurface.put(surface,bySurface.containsKey(surface)?bySurface.get(surface)+part:part);
+    else{unknownSurface+=part;if(matches>1)surfaceConflicts++;}
+   }
+   StringBuilder result=new StringBuilder(String.format(java.util.Locale.GERMANY,"Rechnerische Grabenfläche (Länge × Breite): %.2f m²",area));
+   for(java.util.Map.Entry<String,Double> item:bySurface.entrySet())result.append(String.format(java.util.Locale.GERMANY,"\\n%s: %.2f m²",item.getKey(),item.getValue()));
+   if(unknownSurface>0)result.append(String.format(java.util.Locale.GERMANY,"\\nOberfläche unklar / nicht zugeordnet: %.2f m²",unknownSurface));
+   if(unmeasured>0)result.append(String.format(java.util.Locale.GERMANY,"\\nNicht bemaßte Länge: %.2f m",unmeasured));
+   if(surfaceConflicts>0)result.append("\\nWarnung: überlappende Oberflächenzuordnungen.");
+   result.append("\\nNur rechnerischer Kontrollwert; keine Polygon-Vereinigung und keine Abrechnungsfreigabe.");
+   nominalArea.setText(result.toString());
   };
   refreshNominalArea.run();
   TextView info=new TextView(this);info.setText("Gemessene Längen · Richtungen aus Skizze (nicht vermessen)");panel.addView(info);
