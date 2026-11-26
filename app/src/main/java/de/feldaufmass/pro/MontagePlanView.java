@@ -35,6 +35,18 @@ final class MontagePlanView extends View {
 
     boolean hasPosition(int index) { return positions.get(index) != null; }
 
+    int fittingAt(float x,float y) {
+        int width=getWidth(),height=getHeight();
+        float unit=Math.min(width,height)/240f,pad=20*unit;
+        double dx=maxX-minX,dy=maxY-minY;
+        double scale=Math.min(dx==0?Double.POSITIVE_INFINITY:(width-2*pad)/dx,dy==0?Double.POSITIVE_INFINITY:(height-2*pad)/dy);
+        if(!Double.isFinite(scale)||scale<=0)return -1;
+        double left=(width-dx*scale)/2,top=(height-dy*scale)/2;
+        int hit=-1;double best=18*getResources().getDisplayMetrics().density;
+        for(int i=0;i<positions.size();i++){double[] p=positions.get(i);if(p==null)continue;double distance=Math.hypot(x-left-(p[0]-minX)*scale,y-top-(maxY-p[1])*scale);if(distance<best){best=distance;hit=i;}}
+        return hit;
+    }
+
     /** Nearest station on the measured polyline, in metres; NaN for an invalid view. */
     double stationAt(float x, float y) {
         int width=getWidth(), height=getHeight();
