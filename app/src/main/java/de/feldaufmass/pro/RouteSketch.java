@@ -213,7 +213,17 @@ final class RouteSketch extends View {
   }
   c.restore();
  }
+ private static class DimensionHit {
+  String key; android.graphics.RectF bounds;float nx,ny,offset;
+  DimensionHit(String k,android.graphics.RectF b,float x,float y,float o){key=k;bounds=b;nx=x;ny=y;offset=o;}
+ }
+ private final java.util.ArrayList<DimensionHit> dimensionHits=new java.util.ArrayList<>();
+ private final java.util.HashMap<String,Float> dimensionOffsets=new java.util.HashMap<>();
+ private DimensionHit activeDimension;
+ private float dimensionStartX,dimensionStartY;
+ private Float previousDimensionOffset;
  private void drawSurfaceDimensions(Canvas c,float d){
+  dimensionHits.clear();
   if(!layerVisible(LAYER_SURFACES)||!layerVisible(LAYER_SURFACE_DIMENSIONS))return;
   java.util.TreeSet<Double> boundaries=new java.util.TreeSet<>();
   for(int j=0;j<surfaceSections.length();j++){
@@ -256,6 +266,14 @@ final class RouteSketch extends View {
        for(android.graphics.RectF other:occupied)if(android.graphics.RectF.intersects(bounds,other)){collision=true;break;}
        if(!collision)break;
       }
+      String dimensionKey=Double.toString(previous)+":"+Double.toString(station);
+      Float manual=dimensionOffsets.get(dimensionKey);
+      if(manual!=null){
+       offset=manual*d;
+       float cx=(ax+bx)/2+nx*offset,cy=(ay+by)/2+ny*offset;
+       bounds.set(cx-halfW,cy-halfH,cx+halfW,cy+halfH);
+      }
+      dimensionHits.add(new DimensionHit(dimensionKey,new android.graphics.RectF(bounds),nx,ny,offset/d));
       occupied.add(new android.graphics.RectF(bounds));
       float x1=ax+nx*offset,y1=ay+ny*offset,x2=bx+nx*offset,y2=by+ny*offset;
       p.setColor(0xff263238);
@@ -579,6 +597,27 @@ final class RouteSketch extends View {
  @Override public boolean onTouchEvent(MotionEvent event){
   if(!editable && pointSelected==null)return false;
   int action=event.getActionMasked();
+  if(event.getPointerCount()>=2&&activeDimension!=null){if(previousDimensionOffset==null)dimensionOffsets.remove(activeDimension.key);else dimensionOffsets.put(activeDimension.key,previousDimensionOffset);activeDimension=null;}
+  if(editable&&moving&&!placingObject&&!editingObjects&&action==MotionEvent.ACTION_DOWN){
+   for(int i=dimensionHits.size()-1;i>=0;i--){
+    DimensionHit hit=dimensionHits.get(i);
+    if(hit.bounds.contains(event.getX(),event.getY())){
+     activeDimension=hit;previousDimensionOffset=dimensionOffsets.get(hit.key);dimensionStartX=event.getX();dimensionStartY=event.getY();getParent().requestDisallowInterceptTouchEvent(true);return true;
+    }
+   }
+  }
+  if(activeDimension!=null){
+   if(action==MotionEvent.ACTION_MOVE){
+    float d=getResources().getDisplayMetrics().density;
+    float delta=((event.getX()-dimensionStartX)*activeDimension.nx+(event.getY()-dimensionStartY)*activeDimension.ny)/d;
+    dimensionOffsets.put(activeDimension.key,Math.max(15,Math.min(260,activeDimension.offset+delta)));invalidate();return true;
+   }
+   if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL){
+    if(action==MotionEvent.ACTION_CANCEL){if(previousDimensionOffset==null)dimensionOffsets.remove(activeDimension.key);else dimensionOffsets.put(activeDimension.key,previousDimensionOffset);}
+    activeDimension=null;getParent().requestDisallowInterceptTouchEvent(false);invalidate();return true;
+   }
+   return true;
+  }
   if(event.getPointerCount()>=2){
    float x=(event.getX(0)+event.getX(1))/2,y=(event.getY(0)+event.getY(1))/2;
    float next=(float)Math.hypot(event.getX(0)-event.getX(1),event.getY(0)-event.getY(1));
