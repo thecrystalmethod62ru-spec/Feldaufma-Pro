@@ -5329,6 +5329,17 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   });
   ScrollView positionScroll=new ScrollView(this);positionScroll.setFillViewport(false);positionScroll.addView(form);
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(source.optString("name",source.optString("type"))+" – Lage").setView(positionScroll).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
+  Button fullscreen=new Button(this);fullscreen.setText("Vollbild");form.addView(fullscreen,2);
+  fullscreen.setOnClickListener(v->{
+   android.view.Window window=dialog.getWindow();if(window==null)return;
+   boolean full=fullscreen.getText().toString().equals("Vollbild");
+   window.setLayout(full?-1:-2,full?-1:-2);
+   window.getDecorView().setSystemUiVisibility(full?5894:0);
+   android.view.ViewGroup.LayoutParams lp=preview.getLayoutParams();
+   lp.height=full?Math.max(dp(160),getResources().getDisplayMetrics().heightPixels-dp(200)):dp(160);
+   preview.setLayoutParams(lp);fullscreen.setText(full?"Vollbild beenden":"Vollbild");
+   expandPreview.setText(full?"Querschnitt verkleinern":"Querschnitt vergrößern");
+  });
   dialog.setOnShowListener(x->dialog.getButton(-1).setOnClickListener(y->{
    if(!projectId.equals(activeProject)||!before.equals(extraUtilities().toString())){notice("Projektdaten geändert. Leitung erneut öffnen.");return;}
    try{
