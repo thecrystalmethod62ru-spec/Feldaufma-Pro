@@ -12,6 +12,56 @@ import static org.junit.Assert.*;
 
 @RunWith(AndroidJUnit4.class)
 public class ProjectStateTest {
+ @Test public void projectsRemainIsolatedAcrossRecreation(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   String a=java.util.UUID.randomUUID().toString(),b=java.util.UUID.randomUUID().toString();
+   final String[] original=new String[1],legacyRoute=new String[1],routeA=new String[1];
+   scenario.onActivity(activity->{
+    original[0]=activity.projectRegistry().getString("active",MainActivity.LEGACY_PROJECT);
+    legacyRoute[0]=activity.projectStorage(MainActivity.LEGACY_PROJECT).getString("routeSketch","[]");
+   });
+   try{
+    scenario.onActivity(activity->{
+     RouteSketch route=new RouteSketch(activity,"[[0.2,0.2,null],[0.6,0.4,12.5]]");
+     route.vertices.get(1).name="KVS";route.vertices.get(1).photos.put("isolated_test.jpg");
+     route.vertices.get(1).latitude=52;route.vertices.get(1).longitude=11;route.vertices.get(1).accuracy=.4;
+     routeA[0]=route.encode();
+     assertTrue(activity.projectStorage(a).edit().putString("project","Projekt A").putString("routeSketch",routeA[0]).putString("width","1.2").putString("objects","[{\"station\":5,\"type\":\"KVS\"}]").commit());
+     assertTrue(activity.projectStorage(b).edit().putString("project","Projekt B").putString("width","0.8").commit());
+     assertTrue(activity.projectRegistry().edit().putString("active",a).commit());
+    });
+    scenario.recreate();
+    scenario.onActivity(activity->{
+     assertEquals(a,activity.activeProject);assertEquals("Projekt A",activity.project.getText().toString());
+     assertEquals("1.2",activity.width.getText().toString());assertEquals(routeA[0],activity.routeData());
+     assertEquals(1,activity.objects.length());
+     assertTrue(activity.projectRegistry().edit().putString("active",b).commit());
+    });
+    scenario.recreate();
+    scenario.onActivity(activity->{
+     assertEquals(b,activity.activeProject);assertEquals("Projekt B",activity.project.getText().toString());
+     assertEquals("0.8",activity.width.getText().toString());assertEquals("[]",activity.routeData());
+     assertEquals(0,activity.objects.length());
+     assertTrue(activity.saveRoute(new RouteSketch(activity,"[[0.1,0.1,null],[0.8,0.8,30]]")));
+     assertTrue(activity.projectRegistry().edit().putString("active",a).commit());
+    });
+    scenario.recreate();
+    scenario.onActivity(activity->{
+     assertEquals(routeA[0],activity.routeData());
+     RouteSketch route=new RouteSketch(activity,activity.routeData());
+     assertEquals(12.5,route.measuredLength(),0);assertEquals("KVS",route.vertices.get(1).name);
+     assertEquals("isolated_test.jpg",route.vertices.get(1).photos.optString(0));assertEquals(.4,route.vertices.get(1).accuracy,0);
+     assertEquals(legacyRoute[0],activity.projectStorage(MainActivity.LEGACY_PROJECT).getString("routeSketch","[]"));
+     assertEquals(30,new RouteSketch(activity,activity.projectStorage(b).getString("routeSketch","[]")).measuredLength(),0);
+    });
+   }finally{
+    scenario.onActivity(activity->{
+     activity.projectRegistry().edit().putString("active",original[0]).commit();
+     activity.deleteSharedPreferences("project_"+a);activity.deleteSharedPreferences("project_"+b);
+    });
+   }
+  }
+ }
  @Test public void gpsUndoPreservesLaterMetadata(){
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    scenario.onActivity(activity->{
