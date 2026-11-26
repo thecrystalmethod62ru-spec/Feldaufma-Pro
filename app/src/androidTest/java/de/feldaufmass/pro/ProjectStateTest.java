@@ -12,6 +12,22 @@ import static org.junit.Assert.*;
 
 @RunWith(AndroidJUnit4.class)
 public class ProjectStateTest {
+ @Test public void gpsUndoPreservesLaterMetadata(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->{
+    RouteSketch route=new RouteSketch(activity,"[[0.2,0.5,null],[0.8,0.5,20]]");
+    RouteSketch.Vertex v=route.vertices.get(1);
+    v.latitude=52;v.longitude=11;v.accuracy=.4;v.rememberGpsMove();
+    v.point.set(.7f,.6f);v.latitude=52.001;v.name="KVS";v.photos.put("photo.jpg");v.metres=21;
+    RouteSketch restored=new RouteSketch(activity,route.encode());
+    RouteSketch.Vertex p=restored.vertices.get(1);
+    assertTrue(p.undoGpsMove());assertEquals(.8,p.point.x,.0001);assertEquals(.5,p.point.y,.0001);
+    assertEquals(52,p.latitude,0);assertEquals(11,p.longitude,0);assertEquals(.4,p.accuracy,0);
+    assertEquals("KVS",p.name);assertEquals("photo.jpg",p.photos.optString(0));assertEquals(21,p.metres,0);
+    assertFalse(p.undoGpsMove());
+   });
+  }
+ }
  @Test public void gpsCalibrationAndPointMetadata(){
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    scenario.onActivity(activity->{
