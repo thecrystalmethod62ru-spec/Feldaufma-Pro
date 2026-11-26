@@ -651,6 +651,27 @@ public class MainActivity extends Activity {
   panel.addView(scroll,new LinearLayout.LayoutParams(-1,Math.min(dp(300),Math.max(dp(100),route.getHeight()/2))));
   LinearLayout actions=new LinearLayout(this);panel.addView(actions);Button cancel=new Button(this),apply=new Button(this);cancel.setText("Abbrechen");apply.setText("Übernehmen");styleEditorButton(cancel,false);styleEditorButton(apply,true);actions.addView(cancel,new LinearLayout.LayoutParams(0,dp(48),1));actions.addView(apply,new LinearLayout.LayoutParams(0,dp(48),1));
   android.widget.PopupWindow dialog=new android.widget.PopupWindow(panel,Math.min(route.getWidth(),dp(420)),-2,true);dialog.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));dialog.setOutsideTouchable(true);dialog.setInputMethodMode(android.widget.PopupWindow.INPUT_METHOD_NEEDED);dialog.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);cancel.setOnClickListener(v->dialog.dismiss());
+  Runnable preview=()->{
+   try{
+    double st=number(station);if(!Double.isFinite(st)||st<0||st>route.measuredLength())return;
+    org.json.JSONObject candidate=old==null?new org.json.JSONObject():new org.json.JSONObject(old.toString());
+    String chosen=side.getSelectedItem().toString();candidate.put("station",st).put("type",type.getSelectedItem().toString()).put("side",chosen);
+    for(int k=0;k<fields.length;k++){candidate.remove(keys[k]);if(fields[k].length()==0)continue;try{double n=number(fields[k]);if(Double.isFinite(n)&&(k==3?n>=0&&(chosen.equals("links")||chosen.equals("rechts")):n>0))candidate.put(keys[k],n);}catch(Exception ignored){}}
+    org.json.JSONArray temporary=new org.json.JSONArray(draft.toString());if(index<0)temporary.put(candidate);else temporary.put(index,candidate);
+    route.setStationLayers(temporary,route.surfaceSections);
+   }catch(Exception ignored){}
+  };
+  android.text.TextWatcher previewWatcher=new android.text.TextWatcher(){
+   public void beforeTextChanged(CharSequence value,int start,int count,int after){}
+   public void onTextChanged(CharSequence value,int start,int before,int count){preview.run();}
+   public void afterTextChanged(android.text.Editable value){}
+  };
+  station.addTextChangedListener(previewWatcher);for(EditText field:fields)field.addTextChangedListener(previewWatcher);
+  android.widget.AdapterView.OnItemSelectedListener previewSelection=new android.widget.AdapterView.OnItemSelectedListener(){
+   public void onItemSelected(android.widget.AdapterView<?> parent,View view,int position,long id){preview.run();}
+   public void onNothingSelected(android.widget.AdapterView<?> parent){}
+  };side.setOnItemSelectedListener(previewSelection);type.setOnItemSelectedListener(previewSelection);
+  dialog.setOnDismissListener(()->route.setStationLayers(draft,route.surfaceSections));
   apply.setOnClickListener(btn->{
    try{
     double st=number(station),limit=route.measuredLength();if(!Double.isFinite(st)||!Double.isFinite(limit)||st<0||st>limit){station.setError("Station außerhalb der bemaßten Trasse");return;}
@@ -659,7 +680,7 @@ public class MainActivity extends Activity {
     for(int j=0;j<fields.length;j++){if(fields[j].length()==0){o.remove(keys[j]);continue;}double value=number(fields[j]);if(!Double.isFinite(value)||value<0||(j<3&&value==0)||(j==3&&!chosen.equals("links")&&!chosen.equals("rechts"))){fields[j].setError("Maß / Seite prüfen");return;}o.put(keys[j],fields[j].getText().toString());}
     if(old==null)draft.put(o);else if(draft.optJSONObject(index)==old){if(!overlapGeometry(old).equals(overlapGeometry(o)))o.remove("acceptedOverlap");draft.put(index,o);}else{notice("Objekt wurde geändert.");return;}refresh.run();dialog.dismiss();
    }catch(Exception e){notice("Station und Maße prüfen.");}
-  });dialog.showAtLocation(route,Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL,0,dp(8));
+  });dialog.showAtLocation(route,Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL,0,dp(8));preview.run();
  }
  void addObjectMeasureSlider(LinearLayout form,EditText field,int defaultMax,int minimumCm){
   android.widget.SeekBar bar=new android.widget.SeekBar(this);bar.setProgressTintList(android.content.res.ColorStateList.valueOf(0xff55c7b5));bar.setThumbTintList(android.content.res.ColorStateList.valueOf(0xff69cdbb));LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(4),dp(4),dp(4),0);
