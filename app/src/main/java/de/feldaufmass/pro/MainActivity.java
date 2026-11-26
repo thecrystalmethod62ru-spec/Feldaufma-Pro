@@ -1952,7 +1952,6 @@ public class MainActivity extends Activity {
   }return result;
  }
  void choosePdfAnalysis(){
-  if(android.os.Build.VERSION.SDK_INT<35){notice("PDF-Textanalyse benötigt Android 15 oder neuer.");return;}
   java.util.ArrayList<org.json.JSONObject> pdfs=new java.util.ArrayList<>();java.util.ArrayList<String> labels=new java.util.ArrayList<>();
   for(int j=0;j<documents.length();j++){org.json.JSONObject o=documents.optJSONObject(j);if(o==null||o.optString("uri").isEmpty())continue;
    if(o.optString("name").toLowerCase(java.util.Locale.ROOT).endsWith(".pdf")){pdfs.add(o);labels.add(o.optString("name"));}
@@ -1964,33 +1963,67 @@ public class MainActivity extends Activity {
   }).show();
  }
  void analyzePdfDocument(android.net.Uri uri,String name){
-  if(android.os.Build.VERSION.SDK_INT<35){notice("PDF-Textanalyse benötigt Android 15 oder neuer.");return;}
-  String projectId=activeProject;notice("PDF-Text wird lokal ausgewertet …");
+  new android.app.AlertDialog.Builder(this).setTitle("PDF auswerten")
+   .setItems(new String[]{"Automatisch – Text und OCR bei Bedarf","OCR – alle ausgewählten Seiten"},(d,w)->analyzePdfWithOcr(uri,name,w==1))
+   .setNegativeButton("Abbrechen",null).show();
+ }
+ void analyzePdfWithOcr(android.net.Uri uri,String name,boolean forceOcr){
+  String projectId=activeProject;notice("PDF wird lokal ausgewertet …");
   new Thread(()->{
    java.util.ArrayList<DocMeasure> results=new java.util.ArrayList<>();
-   int pages=0,read=0,chars=0;boolean limited=false;
-   try(android.os.ParcelFileDescriptor fd=getContentResolver().openFileDescriptor(uri,"r")){
+   int pages=0,read=0,chars=0,ocrPages=0,ocrFailed=0;boolean limited=false;
+   com.google.mlkit.vision.text.TextRecognizer recognizer=null;
+   try{
+    android.os.ParcelFileDescriptor fd=getContentResolver().openFileDescriptor(uri,"r");
     if(fd==null)throw new java.io.IOException("Datei nicht lesbar");
-    try(android.graphics.pdf.PdfRenderer renderer=new android.graphics.pdf.PdfRenderer(fd)){
+    android.graphics.pdf.PdfRenderer renderer;
+    try{renderer=new android.graphics.pdf.PdfRenderer(fd);}catch(Exception e){fd.close();throw e;}
+    try(android.graphics.pdf.PdfRenderer owned=renderer){
      pages=renderer.getPageCount();int max=Math.min(pages,100);
      for(int j=0;j<max;j++){
+      if(isDestroyed()||isFinishing())return;
       if(chars>=500000||results.size()>=200){limited=true;break;}
       try(android.graphics.pdf.PdfRenderer.Page page=renderer.openPage(j)){
-       StringBuilder text=new StringBuilder();for(android.graphics.pdf.content.PdfPageTextContent part:page.getTextContents()){if(text.length()>=100000)break;text.append(part.getText()).append("\n");}
-       chars+=text.length();if(!text.toString().trim().isEmpty())read++;
-       results.addAll(findDocumentMeasures(text.toString(),j+1));
+       StringBuilder nativeText=new StringBuilder();
+       if(!forceOcr&&android.os.Build.VERSION.SDK_INT>=35){
+        try{for(android.graphics.pdf.content.PdfPageTextContent part:page.getTextContents()){if(nativeText.length()>=100000)break;nativeText.append(part.getText()).append("\n");}}catch(Exception ignored){}
+       }
+       java.util.ArrayList<DocMeasure> matches=findDocumentMeasures(nativeText.toString(),j+1);
+       chars+=nativeText.length();boolean hasText=!nativeText.toString().trim().isEmpty();
+       results.addAll(matches);
+       if(forceOcr||matches.isEmpty()){
+        if(ocrPages>=20){limited=true;}
+        else{
+         ocrPages++;
+         android.graphics.Bitmap bitmap=null;
+         try{
+          if(recognizer==null)recognizer=com.google.mlkit.vision.text.TextRecognition.getClient(com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS);
+          float scale=Math.min(2.5f,2200f/Math.max(page.getWidth(),page.getHeight()));
+          bitmap=android.graphics.Bitmap.createBitmap(Math.max(1,Math.round(page.getWidth()*scale)),Math.max(1,Math.round(page.getHeight()*scale)),android.graphics.Bitmap.Config.ARGB_8888);
+          bitmap.eraseColor(android.graphics.Color.WHITE);
+          page.render(bitmap,null,null,android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+          com.google.mlkit.vision.text.Text recognized=com.google.android.gms.tasks.Tasks.await(recognizer.process(com.google.mlkit.vision.common.InputImage.fromBitmap(bitmap,0)));
+          String value=recognized.getText();if(value.length()>100000){value=value.substring(0,100000);limited=true;}
+          chars+=value.length();hasText|=!value.trim().isEmpty();
+          for(DocMeasure m:findDocumentMeasures(value,j+1))results.add(new DocMeasure(m.field,m.page,m.metres,"OCR: "+m.evidence));
+         }catch(Exception e){ocrFailed++;}
+         finally{if(bitmap!=null)bitmap.recycle();}
+        }
+       }
+       if(hasText)read++;
       }
      }limited|=pages>max;
     }
-    final String summary=read+" Seiten mit Text · "+pages+" Seiten insgesamt"+(limited?" · Analyse begrenzt":"");
+    final String summary=read+" Seiten mit Text · "+pages+" Seiten insgesamt · OCR: "+ocrPages+" Seiten"+(ocrFailed>0?" ("+ocrFailed+" fehlgeschlagen)":"")+(limited?" · Analyse begrenzt":"");
     runOnUiThread(()->{if(!isFinishing()&&!isDestroyed()&&projectId.equals(activeProject))previewDocumentMeasures(name,summary,results);});
    }catch(Exception e){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())notice("PDF konnte nicht gelesen werden: "+e.getMessage());});}
+   finally{if(recognizer!=null)recognizer.close();}
   },"pdf-analysis").start();
  }
  void previewDocumentMeasures(String name,String summary,java.util.ArrayList<DocMeasure> found){
   LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
   form.addView(sheetText(name+"\n"+summary,15,true));
-  form.addView(sheetText("Regelbasierte Textsuche, keine KI-/Zeichnungsinterpretation. Nur geprüfte Werte als Soll übernehmen. Istmaße bleiben unverändert.",14,false));
+  form.addView(sheetText("Textsuche und OCR, keine geometrische Zeichnungsinterpretation. OCR kann Ziffern und Einheiten falsch erkennen. Nur am Original geprüfte Werte als Soll übernehmen. Istmaße bleiben unverändert.",14,false));
   Spinner[] picks=new Spinner[DOC_KEYS.length];
   java.util.ArrayList<java.util.ArrayList<DocMeasure>> choicesByField=new java.util.ArrayList<>();
   for(int j=0;j<DOC_KEYS.length;j++){
@@ -2000,7 +2033,7 @@ public class MainActivity extends Activity {
    choicesByField.add(options);form.addView(sheetText(DOC_LABELS[j]+" (bisher Soll: "+getPreferences(0).getString(DOC_KEYS[j],"offen")+")",14,true));
    picks[j]=choices(form,labels.toArray(new String[0]));
   }
-  if(found.isEmpty())form.addView(sheetText("Keine eindeutigen Maßangaben gefunden. Bildscans benötigen eine separate Texterkennung.",14,false));
+  if(found.isEmpty())form.addView(sheetText("Keine eindeutigen Maßangaben gefunden. Scanqualität, Seitenlimit und Schreibweise prüfen.",14,false));
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("PDF – Maßvorschläge prüfen").setView(scroll).setNegativeButton("Schließen",null).setPositiveButton("Als Soll speichern",null).create();
   dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(b->{
    android.content.SharedPreferences.Editor ed=getPreferences(0).edit();StringBuilder source=new StringBuilder(name);int count=0;
