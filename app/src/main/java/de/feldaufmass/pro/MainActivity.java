@@ -2991,7 +2991,7 @@ public class MainActivity extends Activity {
   for(int i=0;i<rows.length();i++){org.json.JSONObject o=rows.optJSONObject(i);labels.add(o.optString("type")+" · "+o.optDouble("diameter")+" mm");}
   labels.add("+ Leitung / Kabel hinzufügen");
   new android.app.AlertDialog.Builder(this).setTitle("Mehrfachbelegung der Trasse").setItems(labels.toArray(new String[0]),(dialog,index)->{
-   if(index<rows.length()){new android.app.AlertDialog.Builder(this).setTitle(labels.get(index)).setMessage("Zusätzliche Leitung entfernen?").setNegativeButton("Abbrechen",null).setPositiveButton("Entfernen",(x,y)->{rows.remove(index);saveUtilities(rows);}).show();return;}
+   if(index<rows.length()){utilityMenu(index);return;}
    LinearLayout form=new LinearLayout(this);form.setOrientation(1);
    Spinner type=new Spinner(this);type.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Trinkwasser","Gas","Abwasser","Fernwärme","Stromkabel","Glasfaser","Kabelschutzrohr","Sonstige Leitung"}));form.addView(type);
    EditText diameter=new EditText(this);diameter.setHint("Außendurchmesser (mm)");diameter.setInputType(8194);form.addView(diameter);
@@ -2999,15 +2999,33 @@ public class MainActivity extends Activity {
    add.setOnShowListener(x->add.getButton(-1).setOnClickListener(y->{try{double mm=Double.parseDouble(diameter.getText().toString().replace(',','.'));if(!Double.isFinite(mm)||mm<=0)throw new Exception();org.json.JSONObject o=new org.json.JSONObject();o.put("type",type.getSelectedItem().toString());o.put("diameter",mm);rows.put(o);if(saveUtilities(rows))add.dismiss();}catch(Exception e){diameter.setError("Positiven Durchmesser eingeben");}}));add.show();
   }).setNegativeButton("Schließen",null).show();
  }
+ void utilityMenu(int index){
+  org.json.JSONArray rows=extraUtilities();org.json.JSONObject o=rows.optJSONObject(index);if(o==null)return;
+  new android.app.AlertDialog.Builder(this).setTitle(o.optString("name",o.optString("type"))).setItems(new String[]{"Eigenschaften bearbeiten","Leitung entfernen"},(dialog,choice)->{
+   if(choice==1){new android.app.AlertDialog.Builder(this).setMessage("Leitung entfernen?").setNegativeButton("Abbrechen",null).setPositiveButton("Entfernen",(x,y)->{rows.remove(index);saveUtilities(rows);}).show();return;}
+   LinearLayout form=new LinearLayout(this);form.setOrientation(1);
+   String[] keys={"name","type","material","dn","diameter"},titles={"Bezeichnung","Leitungsart","Material","DN / Kabeltyp","Außendurchmesser (mm)"};
+   EditText[] fields=new EditText[keys.length];for(int j=0;j<keys.length;j++){fields[j]=new EditText(this);fields[j].setHint(titles[j]);fields[j].setText(o.optString(keys[j],""));if(j==4)fields[j].setInputType(8194);form.addView(fields[j]);}
+   android.app.AlertDialog edit=new android.app.AlertDialog.Builder(this).setTitle("Leitung bearbeiten").setView(form).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
+   edit.setOnShowListener(x->edit.getButton(-1).setOnClickListener(y->{try{double mm=Double.parseDouble(fields[4].getText().toString().replace(',','.'));if(!Double.isFinite(mm)||mm<=0)throw new Exception();if(fields[1].length()==0){fields[1].setError("Leitungsart eingeben");return;}for(int j=0;j<4;j++)o.put(keys[j],fields[j].getText().toString().trim());o.put("diameter",mm);if(saveUtilities(rows))edit.dismiss();}catch(Exception e){fields[4].setError("Positiven Durchmesser eingeben");}}));edit.show();
+  }).show();
+ }
  boolean saveUtilities(org.json.JSONArray rows){
   boolean ok=getPreferences(0).edit().putString("extraUtilities",rows.toString()).commit();
   if(ok){if(profile!=null)profile.invalidate();}else notice("Leitungen konnten nicht gespeichert werden.");return ok;
  }
  class Profile extends View{
- Paint p=new Paint(3);Profile(){super(MainActivity.this);}
+ Paint p=new Paint(3);
+ final java.util.ArrayList<android.graphics.RectF> utilityHits=new java.util.ArrayList<>();
+ Profile(){super(MainActivity.this);setClickable(true);}
+ @Override public boolean performClick(){super.performClick();return true;}
+ @Override public boolean onTouchEvent(android.view.MotionEvent e){
+  if(e.getAction()==android.view.MotionEvent.ACTION_DOWN)return true;
+  if(e.getAction()==android.view.MotionEvent.ACTION_UP){performClick();float xx=e.getX()*360f/getWidth(),yy=e.getY()*300f/getHeight();for(int i=0;i<utilityHits.size();i++){android.graphics.RectF hit=utilityHits.get(i);if(hit!=null&&hit.contains(xx,yy)){utilityMenu(i);return true;}}return true;}return super.onTouchEvent(e);
+ }
  String m(double x){return String.format(java.util.Locale.GERMANY,"%.2f m",x);}
  void label(Canvas c,String s,float x,float y){p.setColor(Color.BLACK);p.setTextSize(12);c.drawText(s,x,y,p);}
- protected void onDraw(Canvas c){super.onDraw(c);if(w<=0||d<=0)return;
+ protected void onDraw(Canvas c){super.onDraw(c);utilityHits.clear();if(w<=0||d<=0)return;
  c.save();c.scale(getWidth()/360f,getHeight()/300f);
  double nl=Double.isFinite(left)?left:0,nr=Double.isFinite(right)?right:0;
  float scale=(float)Math.min(190/(w+nl+nr),155/d);
@@ -3033,7 +3051,7 @@ public class MainActivity extends Activity {
   if(gap<0||sum<=0){label(c,"Leitungen: Grabenbreite prüfen",20,224);}
   else{
    if(Double.isFinite(pipe)){float radius=(float)(pipe/2000*scale);p.setColor(0xff3686bc);c.drawCircle(cursor+radius,bottom-radius,radius,p);cursor+=2*radius+gap;}
-   for(int i=0;i<utilities.length();i++){org.json.JSONObject o=utilities.optJSONObject(i);float radius=(float)(o.optDouble("diameter",0)/2000*scale);String type=o.optString("type");p.setColor(type.equals("Gas")?0xffe9b63c:type.equals("Trinkwasser")?0xff3686bc:0xffc66d56);if(radius*2<=bottom-top)c.drawCircle(cursor+radius,bottom-radius,radius,p);else label(c,"Leitungstiefe prüfen",20,224);cursor+=2*radius+gap;}
+   for(int i=0;i<utilities.length();i++){org.json.JSONObject o=utilities.optJSONObject(i);float radius=(float)(o.optDouble("diameter",0)/2000*scale);String type=o.optString("type");p.setColor(type.equals("Gas")?0xffe9b63c:type.equals("Trinkwasser")?0xff3686bc:0xffc66d56);if(radius*2<=bottom-top){c.drawCircle(cursor+radius,bottom-radius,radius,p);utilityHits.add(new android.graphics.RectF(cursor,bottom-2*radius,cursor+2*radius,bottom));}else{utilityHits.add(null);label(c,"Leitungstiefe prüfen",20,224);}cursor+=2*radius+gap;}
   }
  }
 
