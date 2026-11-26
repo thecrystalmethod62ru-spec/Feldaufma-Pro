@@ -4249,6 +4249,21 @@ minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
     if(rows.length()>0){p.setTextSize(10);c.drawText("Braun: Verbau an Grabenkante (symbolisch)",36,height-65,p);}
    }catch(Exception ignored){}
    if(trenchWidth>0||widths.length()>0){
+    java.util.ArrayList<double[]> pdfDepthSections=new java.util.ArrayList<>();
+    double pdfDefaultDepth=d;
+    boolean pdfDepthValid=true;
+    try{
+     String defaultDepth=getPreferences(0).getString("metricMainExcavationDepth","").trim();
+     if(!defaultDepth.isEmpty()){pdfDefaultDepth=Double.parseDouble(defaultDepth.replace(',','.'));if(!Double.isFinite(pdfDefaultDepth)||pdfDefaultDepth<=0)throw new IllegalArgumentException();}
+     for(String line:getPreferences(0).getString("metricDepthSections","").split("\\n")){
+      if(line.trim().isEmpty())continue;
+      String[] parts=line.trim().split(";",-1);if(parts.length!=3)throw new IllegalArgumentException();
+      double[] v=new double[3];for(int k=0;k<3;k++){v[k]=Double.parseDouble(parts[k].trim().replace(',','.'));if(!Double.isFinite(v[k]))throw new IllegalArgumentException();}
+      if(v[0]<0||v[1]<=v[0]||v[1]>route.measuredLength()+1e-8||v[2]<=0)throw new IllegalArgumentException();
+      for(double[] old:pdfDepthSections)if(v[0]<old[1]&&v[1]>old[0])throw new IllegalArgumentException();
+      pdfDepthSections.add(v);
+     }
+    }catch(Exception e){pdfDepthValid=false;pdfDepthSections.clear();pdfDefaultDepth=Double.NaN;}
     org.json.JSONArray utilities=extraUtilities();
     int conflicts=utilityCollisionCount(utilities,route.measuredLength());
     if(conflicts>0){p.setColor(0xffb3261e);p.setTextSize(9);c.drawText("Profilprüfung: "+conflicts+" mögliche Leitungskollision(en)",36,height-137,p);}
@@ -4263,12 +4278,14 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
       RouteSketch.Vertex a=route.vertices.get(i-1),b=route.vertices.get(i);double len=b.metres,dx=b.point.x-a.point.x,dy=b.point.y-a.point.y,n=Math.hypot(dx,dy);if(n<=0||len<=0)continue;
       java.util.TreeSet<Double> cuts=new java.util.TreeSet<>();cuts.add(station);cuts.add(station+len);
       for(int k=0;k<widths.length();k++){org.json.JSONObject section=widths.optJSONObject(k);if(section==null)continue;for(double v:new double[]{section.optDouble("from"),section.optDouble("to")})if(v>station&&v<station+len)cuts.add(v);}
+      for(double[] section:pdfDepthSections)for(int k=0;k<2;k++)if(section[k]>station&&section[k]<station+len)cuts.add(section[k]);
       double routeFrom=row.optDouble("routeFrom",0),routeTo=row.optDouble("routeTo",Double.POSITIVE_INFINITY);
       if(routeFrom>station&&routeFrom<station+len)cuts.add(routeFrom);if(routeTo>station&&routeTo<station+len)cuts.add(routeTo);
       Double previous=null;
       for(double stop:cuts){if(previous==null){previous=stop;continue;}double begin=previous;previous=stop;double mid=(begin+stop)/2,bw=trenchWidth;if(mid<routeFrom||mid>=routeTo)continue;
        for(int k=0;k<widths.length();k++){org.json.JSONObject section=widths.optJSONObject(k);if(section!=null&&mid>=section.optDouble("from")&&mid<section.optDouble("to")&&section.optDouble("width")>0){bw=section.optDouble("width");break;}}
-       if(!Double.isFinite(bw)||bw<=0||utilityOutsideProfile(row,bw,d)){omitted=true;continue;}
+       double localDepth=pdfDefaultDepth;for(double[] section:pdfDepthSections)if(mid>=section[0]&&mid<section[1]){localDepth=section[2];break;}
+       if(!Double.isFinite(bw)||bw<=0||utilityOutsideProfile(row,bw,localDepth)){omitted=true;continue;}
        double shift=(bw/2-offset)/factor,nx=dy/n*shift,ny=-dx/n*shift,t1=(begin-station)/len,t2=(stop-station)/len;
        utilityLegend.put(type+" · "+String.format(java.util.Locale.GERMANY,"%.0f mm",diameter*1000),p.getColor());
        float x1=(float)(40+(a.point.x+dx*t1+nx-minX)*unit),y1=(float)(85+(a.point.y+dy*t1+ny-minY)*unit),x2=(float)(40+(a.point.x+dx*t2+nx-minX)*unit),y2=(float)(85+(a.point.y+dy*t2+ny-minY)*unit);
@@ -4286,6 +4303,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
      }
      if(truncated){p.setColor(INK);c.drawText("…",width-55,ly,p);}
     }
+    if(!pdfDepthValid){p.setColor(0xffb3261e);p.setTextSize(9);c.drawText("Tiefenabschnitte ungültig – Tiefenprüfung nicht möglich",36,height-98,p);}
     if(utilities.length()>0){p.setColor(INK);p.setTextSize(9);c.drawText(omitted?"Zusatzleitungen: ungültige Profillage oder fehlende Maße teilweise ausgelassen":"Zusatzleitungen: Profilversatz ab linker Kante; Verbindungen schematisch",36,height-110,p);}
    }
    p.setColor(INK);p.setStrokeWidth(1);float bar=(float)(50*72/25.4);float by=height-47;c.drawLine(40,by,40+bar,by,p);c.drawLine(40,by-4,40,by+4,p);c.drawLine(40+bar,by-4,40+bar,by+4,p);c.drawText("50 mm Kontrollmaß",40,by+17,p);
