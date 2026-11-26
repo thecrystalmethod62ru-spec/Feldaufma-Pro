@@ -1689,6 +1689,7 @@ public class MainActivity extends Activity {
  handling.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,options));root.addView(handling);handling.setSelection(Math.min(4,Math.max(0,getPreferences(0).getInt("handling",0))));
  baseInput=field(root,"Tragschichtstärke (m, optional)","base",true);
  pipeInput=field(root,"Rohr-Außendurchmesser (mm, optional)","pipe",true);
+ Button utilitiesButton=new Button(this);utilitiesButton.setText("Weitere Leitungen / Kabel");utilitiesButton.setAllCaps(false);root.addView(utilitiesButton);utilitiesButton.setOnClickListener(v->editUtilities());
  asphaltInput=field(root,"Asphaltstärke (m, optional)","asphalt",true);
  leftInput=field(root,"Nachschnitt links (m, optional)","left",true);
  rightInput=field(root,"Nachschnitt rechts (m, optional)","right",true);
@@ -2981,6 +2982,27 @@ public class MainActivity extends Activity {
  for(java.util.Map.Entry<String,Double> e:totals.entrySet())out.append(String.format(java.util.Locale.GERMANY,"%s gesamt: %.2f m² (Graben)\n",e.getKey(),e.getValue()));
  segmentsView.setText(out.toString());}
  double optional(EditText e)throws Exception{if(e.length()==0)return Double.NaN;double v=number(e);if(!Double.isFinite(v)||v<0)throw new Exception();return v;}
+ org.json.JSONArray extraUtilities(){
+  try{return new org.json.JSONArray(getPreferences(0).getString("extraUtilities","[]"));}catch(Exception e){return new org.json.JSONArray();}
+ }
+ void editUtilities(){
+  org.json.JSONArray rows=extraUtilities();
+  java.util.ArrayList<String> labels=new java.util.ArrayList<>();
+  for(int i=0;i<rows.length();i++){org.json.JSONObject o=rows.optJSONObject(i);labels.add(o.optString("type")+" · "+o.optDouble("diameter")+" mm");}
+  labels.add("+ Leitung / Kabel hinzufügen");
+  new android.app.AlertDialog.Builder(this).setTitle("Mehrfachbelegung der Trasse").setItems(labels.toArray(new String[0]),(dialog,index)->{
+   if(index<rows.length()){new android.app.AlertDialog.Builder(this).setTitle(labels.get(index)).setMessage("Zusätzliche Leitung entfernen?").setNegativeButton("Abbrechen",null).setPositiveButton("Entfernen",(x,y)->{rows.remove(index);saveUtilities(rows);}).show();return;}
+   LinearLayout form=new LinearLayout(this);form.setOrientation(1);
+   Spinner type=new Spinner(this);type.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Trinkwasser","Gas","Abwasser","Fernwärme","Stromkabel","Glasfaser","Kabelschutzrohr","Sonstige Leitung"}));form.addView(type);
+   EditText diameter=new EditText(this);diameter.setHint("Außendurchmesser (mm)");diameter.setInputType(8194);form.addView(diameter);
+   android.app.AlertDialog add=new android.app.AlertDialog.Builder(this).setTitle("Leitung hinzufügen").setView(form).setNegativeButton("Abbrechen",null).setPositiveButton("Hinzufügen",null).create();
+   add.setOnShowListener(x->add.getButton(-1).setOnClickListener(y->{try{double mm=Double.parseDouble(diameter.getText().toString().replace(',','.'));if(!Double.isFinite(mm)||mm<=0)throw new Exception();org.json.JSONObject o=new org.json.JSONObject();o.put("type",type.getSelectedItem().toString());o.put("diameter",mm);rows.put(o);if(saveUtilities(rows))add.dismiss();}catch(Exception e){diameter.setError("Positiven Durchmesser eingeben");}}));add.show();
+  }).setNegativeButton("Schließen",null).show();
+ }
+ boolean saveUtilities(org.json.JSONArray rows){
+  boolean ok=getPreferences(0).edit().putString("extraUtilities",rows.toString()).commit();
+  if(ok){if(profile!=null)profile.invalidate();}else notice("Leitungen konnten nicht gespeichert werden.");return ok;
+ }
  class Profile extends View{
  Paint p=new Paint(3);Profile(){super(MainActivity.this);}
  String m(double x){return String.format(java.util.Locale.GERMANY,"%.2f m",x);}
@@ -3002,7 +3024,18 @@ public class MainActivity extends Activity {
  }
  if(Double.isFinite(base)){p.setColor(0xffa6a6a6);c.drawRect(20,layerTop,340,layerTop+(float)(base*scale),p);}
  if(!covering.equals("Asphalt")&&!covering.equals("Unbekannt")&&!covering.equals("Unbefestigt")&&!covering.equals("Sonstiges")){p.setColor(0xff777777);c.drawLine(20,top,340,top,p);for(int i=20;i<340;i+=covering.contains("platten")||covering.contains("Platten")?28:12)c.drawLine(i,top-4,i,top,p);}
- if(Double.isFinite(pipe)){float radius=(float)(pipe/2000*scale);p.setColor(0xff3686bc);c.drawCircle(180,bottom-radius,radius,p);}
+ org.json.JSONArray utilities=extraUtilities();
+ if(utilities.length()==0){if(Double.isFinite(pipe)){float radius=(float)(pipe/2000*scale);p.setColor(0xff3686bc);c.drawCircle(180,bottom-radius,radius,p);}}
+ else{
+  double sum=Double.isFinite(pipe)?pipe/1000:0;for(int i=0;i<utilities.length();i++)sum+=utilities.optJSONObject(i).optDouble("diameter",0)/1000;
+  int count=utilities.length()+(Double.isFinite(pipe)?1:0);
+  float gap=(float)((w-sum)*scale/(count+1)),cursor=x+gap;
+  if(gap<0||sum<=0){label(c,"Leitungen: Grabenbreite prüfen",20,224);}
+  else{
+   if(Double.isFinite(pipe)){float radius=(float)(pipe/2000*scale);p.setColor(0xff3686bc);c.drawCircle(cursor+radius,bottom-radius,radius,p);cursor+=2*radius+gap;}
+   for(int i=0;i<utilities.length();i++){org.json.JSONObject o=utilities.optJSONObject(i);float radius=(float)(o.optDouble("diameter",0)/2000*scale);String type=o.optString("type");p.setColor(type.equals("Gas")?0xffe9b63c:type.equals("Trinkwasser")?0xff3686bc:0xffc66d56);if(radius*2<=bottom-top)c.drawCircle(cursor+radius,bottom-radius,radius,p);else label(c,"Leitungstiefe prüfen",20,224);cursor+=2*radius+gap;}
+  }
+ }
 
  p.setColor(Color.BLACK);p.setStrokeWidth(1);c.drawLine(x,top,x,bottom,p);c.drawLine(z,top,z,bottom,p);c.drawLine(x,bottom,z,bottom,p);
  c.drawLine(x,bottom+14,z,bottom+14,p);c.drawLine(x,bottom+8,x,bottom+20,p);c.drawLine(z,bottom+8,z,bottom+20,p);
@@ -3012,7 +3045,7 @@ public class MainActivity extends Activity {
  else label(c,"Nachschnitt: nicht vollständig erfasst",20,27);
  label(c,"Oberfläche: "+covering,20,238);
  label(c,Double.isFinite(topThickness)?"Belagsstärke: "+m(topThickness):"Belagsstärke: nicht erfasst",20,252);
- label(c,Double.isFinite(pipe)?"Rohr Ø "+pipe+" mm (Lage symbolisch)":"Rohrmaße: unbekannt",20,266);
+ label(c,utilities.length()>0?"Leitungen: "+(utilities.length()+(Double.isFinite(pipe)?1:0))+" (Lage symbolisch)":Double.isFinite(pipe)?"Rohr Ø "+pipe+" mm (Lage symbolisch)":"Rohrmaße: unbekannt",20,266);
  label(c,"Schematisch – keine Ausführungsplanung",20,282);c.restore();
  }}
  class Sketch extends View{Paint p=new Paint(3);Sketch(){super(MainActivity.this);setClickable(true);}
