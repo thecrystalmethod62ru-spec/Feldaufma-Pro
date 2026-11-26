@@ -328,7 +328,7 @@ final class RouteSketch extends View {
    double start=0;
    for(int i=1;i<vertices.size();i++){
     double end=start+vertices.get(i).metres,lo=Math.max(from,start),hi=Math.min(to,end);
-    if(hi>lo){PointF a=stationPoint(lo),b=stationPoint(hi);if(a!=null&&b!=null){line(c,a,b);surfaceHatch(c,a,b,density,surfacePattern(section.optString("surface")));}}
+    if(hi>lo){PointF a=stationPoint(lo),b=stationPoint(hi);if(a!=null&&b!=null){line(c,a,b);org.json.JSONObject style=settings.optJSONObject(section.optString("surface").trim());int hatch=style==null?0:style.optInt("hatch",0);if(hatch!=17)surfaceHatch(c,a,b,density,hatch>=1&&hatch<=16?hatch-1:surfacePattern(section.optString("surface")));}}
     start=end;
    }
   }
@@ -490,12 +490,17 @@ final class RouteSketch extends View {
      android.widget.LinearLayout.LayoutParams lp=new android.widget.LinearLayout.LayoutParams(0,(int)(36*getResources().getDisplayMetrics().density),1);lp.setMargins(2,2,2,2);strip.addView(swatch,lp);swatch.setOnClickListener(v->color.setText(hex));
     }
    }
+   android.widget.Spinner hatchChoice=new android.widget.Spinner(getContext());
+   String[] hatchNames={"Automatisch","Diagonal – eng","Diagonal – mittel","Diagonal – weit","Diagonal – sehr weit","Raster – eng","Raster – mittel","Raster – weit","Raster – sehr weit","Punkte – eng","Punkte – mittel","Punkte – weit","Punkte – sehr weit","Kreuz – eng","Kreuz – mittel","Kreuz – weit","Kreuz – sehr weit","Ohne Schraffur"};
+   android.widget.TextView hatchLabel=new android.widget.TextView(getContext());hatchLabel.setText("Schraffur");form.addView(hatchLabel);
+   hatchChoice.setAdapter(new android.widget.ArrayAdapter<String>(getContext(),android.R.layout.simple_spinner_dropdown_item,hatchNames));
+   hatchChoice.setSelection(Math.max(0,Math.min(17,old==null?0:old.optInt("hatch",0))));form.addView(hatchChoice);
    android.widget.EditText order=new android.widget.EditText(getContext());order.setInputType(2);order.setHint("Reihenfolge");order.setText(String.valueOf(old==null?index:old.optInt("order",index)));form.addView(order);
    android.widget.CheckBox visible=new android.widget.CheckBox(getContext());visible.setText("In Legende anzeigen");visible.setChecked(old==null||old.optBoolean("visible",true));form.addView(visible);
    android.app.AlertDialog edit=new android.app.AlertDialog.Builder(getContext()).setTitle(key).setView(form).setNegativeButton("Abbrechen",null).setNeutralButton("Standard",(x,y)->{settings.remove(key);saveLegend(settings);}).setPositiveButton("Übernehmen",null).create();
    edit.setOnShowListener(x->edit.getButton(-1).setOnClickListener(v->{
     try{String label=name.getText().toString().trim(),hex=color.getText().toString().trim();if(label.isEmpty()){name.setError("Bezeichnung eingeben");return;}if(!hex.matches("#[0-9a-fA-F]{6}")){color.setError("#RRGGBB eingeben");return;}
-     org.json.JSONObject item=new org.json.JSONObject();item.put("name",label);item.put("color",hex);item.put("order",Integer.parseInt(order.getText().toString()));item.put("visible",visible.isChecked());settings.put(key,item);if(saveLegend(settings))edit.dismiss();
+     org.json.JSONObject item=new org.json.JSONObject();item.put("name",label);item.put("color",hex);item.put("hatch",hatchChoice.getSelectedItemPosition());item.put("order",Integer.parseInt(order.getText().toString()));item.put("visible",visible.isChecked());settings.put(key,item);if(saveLegend(settings))edit.dismiss();
     }catch(Exception e){order.setError("Gültige Reihenfolge eingeben");}
    }));edit.show();
   }).setNegativeButton("Schließen",null).show();
