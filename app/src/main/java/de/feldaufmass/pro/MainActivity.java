@@ -3296,7 +3296,7 @@ public class MainActivity extends Activity {
  rightInput=field(root,"Nachschnitt rechts (m, optional)","right",true);
  Button save=new Button(this);save.setText("Berechnen und speichern");root.addView(save);
  root=quantityPage;
- result=new TextView(this);result.setTextSize(18);root.addView(result);detailQuantities=new TextView(this);root.addView(detailQuantities);
+ result=new TextView(this);result.setTextSize(18);root.addView(result);shoringQuantities=new TextView(this);root.addView(shoringQuantities);detailQuantities=new TextView(this);root.addView(detailQuantities);
  root=planPage;
  sketch=new Sketch();sketch.setBackgroundColor(Color.WHITE);root.addView(sketch,new LinearLayout.LayoutParams(-1,dp(280))); LinearLayout historyBar=new LinearLayout(this);root.addView(historyBar);undoObjectsButton=new Button(this);undoObjectsButton.setText("Rückgängig");historyBar.addView(undoObjectsButton,new LinearLayout.LayoutParams(0,-2,1));redoObjectsButton=new Button(this);redoObjectsButton.setText("Wiederholen");historyBar.addView(redoObjectsButton,new LinearLayout.LayoutParams(0,-2,1));undoObjectsButton.setOnClickListener(v->restoreObjectHistory(false));redoObjectsButton.setOnClickListener(v->restoreObjectHistory(true));updateHistoryButtons();
  Button edit=new Button(this);edit.setText("Trassenmaße bearbeiten");root.addView(edit);edit.setOnClickListener(v->showPage(measurePage));
@@ -3311,7 +3311,7 @@ public class MainActivity extends Activity {
    for(double[] e:entries){double a=(e[1]-e[0])*e[2],b=(e[1]-e[0])*e[3];left+=a;right+=b;report.append(String.format(java.util.Locale.GERMANY,"%.2f – %.2f m: L %.2f / R %.2f m²\n",e[0],e[1],a,b));}
    report.append(String.format(java.util.Locale.GERMANY,"\nLinks: %.2f m²\nRechts: %.2f m²\nGesamt: %.2f m²",left,right,left+right));resultText.setText(report.toString());
   };
-  Runnable saveVerbau=()->{org.json.JSONArray data=new org.json.JSONArray();for(double[] e:entries){org.json.JSONArray row=new org.json.JSONArray();for(double v:e)try{row.put(v);}catch(Exception ex){throw new IllegalArgumentException(ex);}data.put(row);}getPreferences(0).edit().putString("metricVerbauSections",data.toString()).apply();refreshVerbau.run();if(sketch!=null)sketch.invalidate();};
+  Runnable saveVerbau=()->{org.json.JSONArray data=new org.json.JSONArray();for(double[] e:entries){org.json.JSONArray row=new org.json.JSONArray();for(double v:e)try{row.put(v);}catch(Exception ex){throw new IllegalArgumentException(ex);}data.put(row);}getPreferences(0).edit().putString("metricVerbauSections",data.toString()).apply();refreshVerbau.run();if(sketch!=null)sketch.invalidate();refreshMainQuantities();if(livePreview!=null)livePreview.invalidate();};
   try{org.json.JSONArray data=new org.json.JSONArray(getPreferences(0).getString("metricVerbauSections","[]"));for(int i=0;i<data.length();i++){org.json.JSONArray row=data.getJSONArray(i);entries.add(new double[]{row.getDouble(0),row.getDouble(1),row.getDouble(2),row.getDouble(3)});}}catch(Exception ex){notice("Verbaudaten konnten nicht geladen werden.");return;}
   refreshVerbau.run();
   Button remove=new Button(this);remove.setText("Einzelnen Abschnitt löschen");fields.addView(remove);
@@ -3627,7 +3627,7 @@ public class MainActivity extends Activity {
  topThickness=topLayer; this.base=base; this.pipe=pipe; this.asphalt=asphalt; this.left=left; this.right=right;
  if(!getPreferences(0).edit().putString("stoneLength",stoneLength.getText().toString()).putString("stoneWidth",stoneWidth.getText().toString()).putString("stoneDepth",stoneDepth.getText().toString()).putString("stoneColor",stoneColor.getText().toString()).putString("pattern",pattern.getText().toString()).putString("bedding",bedding.getText().toString()).putString("underlying",underlying.getText().toString()).putInt("handling",handling.getSelectedItemPosition()).putInt("surface",surface.getSelectedItemPosition()).putString("base",baseInput.getText().toString()).putString("pipe",pipeInput.getText().toString()).putString("asphalt",asphaltInput.getText().toString()).putString("left",leftInput.getText().toString()).putString("right",rightInput.getText().toString()).putString("project",project.getText().toString()).putString("length",length.getText().toString()).putString("width",width.getText().toString()).putString("depth",depth.getText().toString()).commit())throw new Exception("Speichern fehlgeschlagen");
  projectHeader.setText(project.length()>0?project.getText().toString():"Feldaufmaß Pro");
- result.setText(String.format(java.util.Locale.GERMANY,"Aushub: %.2f m³\nGrundfläche: %.2f m²",l*w*d,l*w));StringBuilder details=new StringBuilder("Legende\nOberfläche: "+covering);
+ refreshMainQuantities();StringBuilder details=new StringBuilder("Legende\nOberfläche: "+covering);
  if(stoneLength.length()>0||stoneWidth.length()>0)details.append("\nSteinformat: "+(stoneLength.length()>0?stoneLength.getText():"?")+" × "+(stoneWidth.length()>0?stoneWidth.getText():"?")+" cm");
  if(stoneDepth.length()>0)details.append("\nBelagsstärke: "+stoneDepth.getText()+" cm");
  if(stoneColor.length()>0)details.append("\nFarbe: "+stoneColor.getText());
@@ -4078,6 +4078,7 @@ public class MainActivity extends Activity {
   }
   return pageNumber;
  }
+ TextView shoringQuantities;
  String shoringReport(){
   StringBuilder report=new StringBuilder();double leftArea=0,rightArea=0;
   try{
@@ -4093,6 +4094,12 @@ public class MainActivity extends Activity {
    report.append(String.format(java.util.Locale.GERMANY,"Verbau links: %.2f m² | rechts: %.2f m² | gesamt: %.2f m²\n\n",leftArea,rightArea,leftArea+rightArea));
   }catch(Exception ex){return "Verbaudaten konnten nicht vollständig ausgewertet werden.\n\n";}
   return report.toString();
+ }
+ void refreshMainQuantities(){
+  if(result==null)return;
+  String basic=l>0&&w>0&&d>0?String.format(java.util.Locale.GERMANY,"Aushub: %.2f m³\nGrundfläche: %.2f m²",l*w*d,l*w):"Trassenmaße fehlen";
+  result.setText(basic);
+  if(shoringQuantities!=null)shoringQuantities.setText(shoringReport());
  }
  void writePdf(android.net.Uri uri) {
   android.graphics.pdf.PdfDocument pdf=new android.graphics.pdf.PdfDocument();
