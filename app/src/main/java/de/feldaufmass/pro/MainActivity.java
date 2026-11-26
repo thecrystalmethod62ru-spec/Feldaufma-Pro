@@ -602,6 +602,54 @@ public class MainActivity extends Activity {
   tab.setOnClickListener(v->showPage(sheet));
  }
 
+ void showLongitudinalProfile(){
+  LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
+  RouteSketch route=new RouteSketch(this,routeData());
+  double measured=route.measuredLength();
+  boolean complete=Double.isFinite(measured)&&measured>0;
+  final double total=complete?measured:l,depth=d;
+  String caption=complete?"Stationierung aus bemaßter Skizze":"Stationierung aus gespeicherter Gesamttrassenlänge; Skizzenmaße unvollständig";
+  form.addView(sheetText(caption,14,false));
+  form.addView(sheetText("Relatives Tiefenprofil · keine Geländehöhen erfasst · keine Aussage zum Gefälle.",14,false));
+  if(!Double.isFinite(total)||total<=0||!Double.isFinite(depth)||depth<=0){
+   form.addView(sheetText("Zuerst gültige Trassenlänge und Grabentiefe speichern.",16,true));
+  }else{
+   View drawing=new View(this){
+    final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
+    void label(Canvas c,String s,float x,float y){p.setColor(INK);p.setTextSize(dp(11));c.drawText(s,x,y,p);}
+    protected void onDraw(Canvas c){
+     c.drawColor(Color.WHITE);
+     float left=dp(48),right=getWidth()-dp(18),top=dp(45),bottom=getHeight()-dp(55);
+     if(right<=left||bottom<=top)return;
+     p.setStrokeWidth(dp(1));p.setColor(0xffd9e3e5);
+     for(int k=0;k<=4;k++){float y=top+(bottom-top)*k/4f;c.drawLine(left,y,right,y,p);label(c,String.format(java.util.Locale.GERMANY,"%.2f",depth*k/4),dp(3),y+dp(4));p.setColor(0xffd9e3e5);}
+     p.setColor(0xffe6d9bf);c.drawRect(left,top,right,bottom,p);
+     p.setColor(0xff526570);p.setStrokeWidth(dp(3));c.drawLine(left,top,right,top,p);
+     p.setColor(TEAL);c.drawLine(left,bottom,right,bottom,p);
+     label(c,"OK Oberfläche (Bezug 0,00 m)",left,top-dp(10));
+     label(c,"Grabensohle",left,bottom-dp(8));
+     for(int k=0;k<=4;k++){float x=left+(right-left)*k/4f;p.setColor(0xff87979b);p.setStrokeWidth(dp(1));c.drawLine(x,bottom,x,bottom+dp(6),p);
+      String value=String.format(java.util.Locale.GERMANY,"%.1f",total*k/4);p.setTextSize(dp(11));label(c,value,Math.min(right-p.measureText(value),x),bottom+dp(20));}
+     label(c,"Station (m)",left,bottom+dp(38));
+     for(int k=0;k<objects.length();k++){
+      org.json.JSONObject o=objects.optJSONObject(k);if(o==null)continue;double st=o.optDouble("station");
+      if(!Double.isFinite(st)||st<0||st>total)continue;
+      float x=left+(right-left)*(float)(st/total);
+      p.setColor(0xffa65e19);p.setStrokeWidth(dp(1));c.drawLine(x,top,x,bottom,p);c.drawCircle(x,top,dp(3),p);
+      label(c,String.valueOf(k+1),Math.min(x+dp(3),right-dp(12)),top+dp(15+(k%3)*13));
+     }
+    }
+   };
+   form.addView(drawing,new LinearLayout.LayoutParams(-1,dp(260)));
+   form.addView(sheetText(String.format(java.util.Locale.GERMANY,"Trassenlänge %.2f m · Grabentiefe %.2f m",total,depth),16,true));
+   if(complete&&l>0&&Math.abs(total-l)>.01)form.addView(sheetText("Hinweis: Skizzenlänge und gespeicherte Gesamttrassenlänge weichen ab.",14,false));
+   StringBuilder entries=new StringBuilder("Stationen und Objekte\n");
+   if(complete){double station=0;for(int k=0;k<route.vertices.size();k++){RouteSketch.Vertex v=route.vertices.get(k);if(k>0)station+=v.metres;entries.append(String.format(java.util.Locale.GERMANY,"%.2f m – Punkt %d %s\n",station,k+1,v.name));}}
+   for(int k=0;k<objects.length();k++){org.json.JSONObject o=objects.optJSONObject(k);if(o==null)continue;double st=o.optDouble("station");entries.append(String.format(java.util.Locale.GERMANY,"%d · %.2f m – %s%s\n",k+1,st,o.optString("type"),Double.isFinite(st)&&st>=0&&st<=total?"":" (außerhalb Profil)"));}
+   form.addView(sheetText(entries.toString(),14,false));
+  }
+  new android.app.AlertDialog.Builder(this).setTitle("Längsschnitt").setView(scroll).setPositiveButton("Schließen",null).show();
+ }
  void showTools(){
   String[] names={"Maße","Beläge","Objekte","Unterlagen / PDF","Sprachassistent"};
   LinearLayout[] pages={measurePage,segmentPage,objectPage,documentsPage,voicePage};
@@ -612,7 +660,8 @@ public class MainActivity extends Activity {
   menu.getMenu().add(0,102,Menu.NONE,"Projekt wiederherstellen");
   menu.getMenu().add(0,103,Menu.NONE,"Projektverlauf");
   menu.getMenu().add(0,104,Menu.NONE,"Sicherungsversionen");
-  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
+  menu.getMenu().add(0,105,Menu.NONE,"Längsschnitt");
+  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
   menu.show();
  }
  LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(dp(12),dp(8),dp(12),dp(8));return p;}
@@ -767,6 +816,7 @@ public class MainActivity extends Activity {
  stationRows.setOrientation(LinearLayout.VERTICAL);
  planPage.addView(stationRows);
  root=profilePage;
+ actionButtonSingle(root,"Längsschnitt anzeigen",()->showLongitudinalProfile());
  TextView heading=new TextView(this);heading.setText("Regelprofil – Grabenquerschnitt");heading.setTextSize(20);root.addView(heading);
  LinearLayout layers=fold(root,"Oberflächenaufbau",true);
  surfaceLayers=sheetText("",16,false);surfaceLayers.setLineSpacing(dp(6),1);layers.addView(surfaceLayers);showSurfaceLayers();
