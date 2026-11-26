@@ -30,10 +30,10 @@ public class FittingReviewTest {
                 onView(withText("Zeile 2 · Muffe")).perform(click());
                 onView(withText("Zurück")).perform(click());
                 onView(withText("Zeile 1 · "+tee)).perform(click());
-                onView(withText("Zum Projekt hinzufügen")).perform(click());
+                onView(withText("Hinzufügen")).perform(click());
                 onView(withText("Zeile 1 · "+tee)).check(doesNotExist());
                 onView(withText("Zeile 2 · Muffe")).perform(click());
-                onView(withText("Zum Projekt hinzufügen")).perform(click());
+                onView(withText("Hinzufügen")).perform(click());
                 scenario.onActivity(activity->{
                     try {
                         JSONArray items=new JSONArray(activity.projectStorage(id).getString("montageFittings","[]"));
