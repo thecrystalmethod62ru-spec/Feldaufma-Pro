@@ -4260,8 +4260,10 @@ minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
       RouteSketch.Vertex a=route.vertices.get(i-1),b=route.vertices.get(i);double len=b.metres,dx=b.point.x-a.point.x,dy=b.point.y-a.point.y,n=Math.hypot(dx,dy);if(n<=0||len<=0)continue;
       java.util.TreeSet<Double> cuts=new java.util.TreeSet<>();cuts.add(station);cuts.add(station+len);
       for(int k=0;k<widths.length();k++){org.json.JSONObject section=widths.optJSONObject(k);if(section==null)continue;for(double v:new double[]{section.optDouble("from"),section.optDouble("to")})if(v>station&&v<station+len)cuts.add(v);}
+      double routeFrom=row.optDouble("routeFrom",0),routeTo=row.optDouble("routeTo",Double.POSITIVE_INFINITY);
+      if(routeFrom>station&&routeFrom<station+len)cuts.add(routeFrom);if(routeTo>station&&routeTo<station+len)cuts.add(routeTo);
       Double previous=null;
-      for(double stop:cuts){if(previous==null){previous=stop;continue;}double begin=previous;previous=stop;double mid=(begin+stop)/2,bw=trenchWidth;
+      for(double stop:cuts){if(previous==null){previous=stop;continue;}double begin=previous;previous=stop;double mid=(begin+stop)/2,bw=trenchWidth;if(mid<routeFrom||mid>=routeTo)continue;
        for(int k=0;k<widths.length();k++){org.json.JSONObject section=widths.optJSONObject(k);if(section!=null&&mid>=section.optDouble("from")&&mid<section.optDouble("to")&&section.optDouble("width")>0){bw=section.optDouble("width");break;}}
        if(!Double.isFinite(bw)||offset+diameter/2>bw){omitted=true;continue;}
        double shift=(bw/2-offset)/factor,nx=dy/n*shift,ny=-dx/n*shift,t1=(begin-station)/len,t2=(stop-station)/len;
@@ -4269,7 +4271,7 @@ minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
       }station+=len;
      }
     }
-    if(utilities.length()>0){p.setColor(INK);p.setTextSize(9);c.drawText(omitted?"Zusatzleitungen: ungültige Profilversätze teilweise ausgelassen":"Zusatzleitungen: Profilversatz ab linker Kante, durchgehend angenommen",36,height-110,p);}
+    if(utilities.length()>0){p.setColor(INK);p.setTextSize(9);c.drawText(omitted?"Zusatzleitungen: ungültige Profilversätze teilweise ausgelassen":"Zusatzleitungen: Profilversatz ab linker Kante; Stationsbereich sofern erfasst",36,height-110,p);}
    }
    p.setColor(INK);p.setStrokeWidth(1);float bar=(float)(50*72/25.4);float by=height-47;c.drawLine(40,by,40+bar,by,p);c.drawLine(40,by-4,40,by+4,p);c.drawLine(40+bar,by-4,40+bar,by+4,p);c.drawText("50 mm Kontrollmaß",40,by+17,p);
   }finally{pdf.finishPage(page);}
@@ -5188,6 +5190,10 @@ minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
    form.addView(sheetText(labels[i],14,true));fields[i]=new EditText(this);fields[i].setSingleLine(true);
    fields[i].setInputType(8194);fields[i].setText(source.optString(keys[i],""));form.addView(fields[i]);
   }
+  EditText stationFrom=new EditText(this),stationTo=new EditText(this);
+  stationFrom.setInputType(8194);stationTo.setInputType(8194);
+  stationFrom.setHint("Station von (m, optional)");stationTo.setHint("Station bis (m, optional)");
+  stationFrom.setText(source.optString("routeFrom",""));stationTo.setText(source.optString("routeTo",""));form.addView(stationFrom);form.addView(stationTo);
   CheckBox installed=new CheckBox(this);installed.setText("Einbau bestätigen und Länge in Materialliste übernehmen");
   installed.setChecked(source.optBoolean("installed",false));form.addView(installed);
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Leitungsmontage").setView(scroll)
@@ -5205,6 +5211,13 @@ minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
      updated.put(keys[i],value);
     }
     if(installed.isChecked()&&!updated.has("installedLength")){fields[2].setError("Gemessene Einbaulänge erforderlich");return;}
+    String fromRaw=stationFrom.getText().toString().trim(),toRaw=stationTo.getText().toString().trim();
+    if(fromRaw.isEmpty()&&toRaw.isEmpty()){updated.remove("routeFrom");updated.remove("routeTo");}
+    else{
+     double from,to;try{from=Double.parseDouble(fromRaw.replace(',','.'));to=Double.parseDouble(toRaw.replace(',','.'));}catch(Exception invalid){stationTo.setError("Beide Stationen eingeben");return;}
+     if(!Double.isFinite(from)||!Double.isFinite(to)||from<0||to<=from||(Double.isFinite(l)&&l>0&&to>l)){stationTo.setError("Ungültiger Stationsbereich");return;}
+     updated.put("routeFrom",from);updated.put("routeTo",to);
+    }
     updated.put("installed",installed.isChecked());
     if(!updated.has("id"))updated.put("id",java.util.UUID.randomUUID().toString());
     org.json.JSONArray next=new org.json.JSONArray(before);next.put(index,updated);
