@@ -17,6 +17,7 @@ public class MainActivity extends Activity {
  e.setText(getPreferences(0).getString(key,""));root.addView(e);return e;
  }
  double number(EditText e){return Double.parseDouble(e.getText().toString().replace(',','.'));}
+ LinearLayout documentsPage; TextView documentsList; org.json.JSONArray documents=new org.json.JSONArray();
  LinearLayout shell,body,planPage,measurePage,voicePage,profilePage,segmentPage,objectPage,quantityPage; TextView projectHeader;
  LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(16,12,16,12);return p;}
  int dp(int n){return (int)(n*getResources().getDisplayMetrics().density+.5f);}
@@ -27,9 +28,13 @@ public class MainActivity extends Activity {
  projectHeader=new TextView(this);projectHeader.setText("Feldaufmaß Pro");projectHeader.setTextColor(Color.WHITE);projectHeader.setTextSize(22);projectHeader.setPadding(dp(16),dp(12),dp(16),dp(12));projectHeader.setBackgroundColor(0xff203849);shell.addView(projectHeader);
  LinearLayout tabs=new LinearLayout(this);shell.addView(tabs);nav(tabs,"Zeichnung",()->showPage(planPage));nav(tabs,"Regelprofil",()->showPage(profilePage));nav(tabs,"Mengen",()->showPage(quantityPage));
  body=new LinearLayout(this);shell.addView(body,new LinearLayout.LayoutParams(-1,0,1));
- LinearLayout tools=new LinearLayout(this);shell.addView(tools);nav(tools,"Maße",()->showPage(measurePage));nav(tools,"Beläge",()->showPage(segmentPage));nav(tools,"Objekte",()->showPage(objectPage));
+ LinearLayout tools=new LinearLayout(this);shell.addView(tools);nav(tools,"Maße",()->showPage(measurePage));nav(tools,"Beläge",()->showPage(segmentPage));nav(tools,"Objekte",()->showPage(objectPage));nav(tools,"Unterlagen",()->showPage(documentsPage));
  Button voiceButton=new Button(this);voiceButton.setText("Sprachassistent");voiceButton.setAllCaps(false);shell.addView(voiceButton);voiceButton.setOnClickListener(v->showPage(voicePage));
  planPage=page();measurePage=page();voicePage=page();profilePage=page();segmentPage=page();objectPage=page();quantityPage=page();
+ documentsPage=page();TextView dh=new TextView(this);dh.setText("Ausführungsunterlagen – Soll");dh.setTextSize(22);documentsPage.addView(dh);
+ Button importDoc=new Button(this);importDoc.setText("Unterlagen hinzufügen");documentsPage.addView(importDoc);importDoc.setOnClickListener(v->{android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.putExtra(android.content.Intent.EXTRA_ALLOW_MULTIPLE,true);i.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION|android.content.Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);startActivityForResult(i,411);});
+ documentsList=new TextView(this);documentsPage.addView(documentsList);try{documents=new org.json.JSONArray(getPreferences(0).getString("documents","[]"));}catch(Exception ignored){}showDocuments();
+ TextView info=new TextView(this);info.setText("Unterlagen sind Planungsdaten (Soll). Automatische KI-Auswertung noch nicht verfügbar. Ist-Maße bleiben unverändert.");documentsPage.addView(info);
  LinearLayout root=voicePage;
  TextView title=new TextView(this);title.setText("Feldaufmaß Pro");title.setTextSize(28);root.addView(title);
  TextView voiceHeading=new TextView(this);voiceHeading.setText("Sprachassistent – Diktat");voiceHeading.setTextSize(20);root.addView(voiceHeading);
@@ -131,6 +136,8 @@ public class MainActivity extends Activity {
  void addObject(){try{double st=number(objectStation),total=number(length);if(!Double.isFinite(st)||!Double.isFinite(total)||total<=0||st<0||st>total)throw new Exception();org.json.JSONObject o=new org.json.JSONObject();o.put("station",st);o.put("type",objectType.getSelectedItem().toString());o.put("side",objectSide.getSelectedItem().toString());o.put("note",objectNote.getText().toString());objects.put(o);saveObjects();}catch(Exception e){Toast.makeText(this,"Objektstation außerhalb der Trasse oder ungültig.",Toast.LENGTH_LONG).show();}}
  void saveObjects(){getPreferences(0).edit().putString("objects",objects.toString()).apply();showObjects();sketch.invalidate();}
  void showObjects(){StringBuilder b=new StringBuilder();for(int i=0;i<objects.length();i++){org.json.JSONObject o=objects.optJSONObject(i);if(o!=null)b.append(String.format(java.util.Locale.GERMANY,"%.2f m | %s | %s | %s\n",o.optDouble("station"),o.optString("type"),o.optString("side"),o.optString("note")));}objectList.setText(b.toString());}
+ void showDocuments(){StringBuilder b=new StringBuilder();for(int j=0;j<documents.length();j++){org.json.JSONObject o=documents.optJSONObject(j);if(o!=null)b.append(o.optString("name")).append(" – Soll / nicht ausgewertet\n");}documentsList.setText(b.length()==0?"Keine Unterlagen ausgewählt":b.toString());}
+ void attachDocument(android.net.Uri uri,int flags){if(uri==null)return;try{for(int j=0;j<documents.length();j++){org.json.JSONObject old=documents.optJSONObject(j);if(old!=null&&uri.toString().equals(old.optString("uri")))return;}getContentResolver().takePersistableUriPermission(uri,flags&android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);String name=uri.getLastPathSegment();try(android.database.Cursor c=getContentResolver().query(uri,new String[]{android.provider.OpenableColumns.DISPLAY_NAME},null,null,null)){if(c!=null&&c.moveToFirst())name=c.getString(0);}org.json.JSONObject o=new org.json.JSONObject();o.put("uri",uri.toString());o.put("name",name);documents.put(o);getPreferences(0).edit().putString("documents",documents.toString()).apply();}catch(Exception e){Toast.makeText(this,"Unterlage konnte nicht dauerhaft verknüpft werden.",Toast.LENGTH_LONG).show();}}
  void startDictation(){
  android.content.Intent i=new android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
  i.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
@@ -139,6 +146,7 @@ public class MainActivity extends Activity {
  try{startActivityForResult(i,410);}catch(android.content.ActivityNotFoundException e){Toast.makeText(this,"Keine Spracherkennung verfügbar.",Toast.LENGTH_LONG).show();}
  }
  @Override protected void onActivityResult(int request,int result,android.content.Intent data){super.onActivityResult(request,result,data);
+ if(request==411&&result==RESULT_OK&&data!=null){if(data.getClipData()!=null){for(int j=0;j<data.getClipData().getItemCount();j++)attachDocument(data.getClipData().getItemAt(j).getUri(),data.getFlags());}else attachDocument(data.getData(),data.getFlags());showDocuments();return;}
  if(request==410&&result==RESULT_OK&&data!=null){java.util.ArrayList<String> values=data.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS);if(values!=null&&!values.isEmpty())voiceText.setText(values.get(0));}}
  void applyDictation(){
  String t=voiceText.getText().toString().toLowerCase(java.util.Locale.ROOT);
