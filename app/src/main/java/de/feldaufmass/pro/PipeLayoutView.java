@@ -58,7 +58,7 @@ public final class PipeLayoutView extends View {
             }
             p.setColor(conflict?0xffd32f2f:colors[i%colors.length]);c.drawCircle(x,y,r,p);
             p.setColor(0xffeeeeee);c.drawCircle(x,y,r-(float)(pipe.wall*scale),p);
-            p.setColor(conflict?0xffd32f2f:0xff777777);c.drawText(pipe.name,x-p.measureText(pipe.name)/2,y-r-4,p);
+            p.setColor(conflict?0xffd32f2f:0xff777777);String label=pipe.name+(pipe.fixed?" [fix]":"");c.drawText(label,x-p.measureText(label)/2,y-r-4,p);
         }
         // Dimension the selected pipe while dragging, or the only pipe in the section.
         int selected=dragged>=0?dragged:(pipes.size()==1?0:-1);
@@ -110,13 +110,13 @@ public final class PipeLayoutView extends View {
                 if(dragged>=0&&move!=null&&getParent()!=null)getParent().requestDisallowInterceptTouchEvent(true);
                 return true;
             case MotionEvent.ACTION_MOVE:
-                if(original!=null&&move!=null&&dragScale>0){
+                if(original!=null&&!original.fixed&&move!=null&&dragScale>0){
                     float dx=event.getX()-startX,dy=event.getY()-startY;
                     if(Math.hypot(dx,dy)>android.view.ViewConfiguration.get(getContext()).getScaledTouchSlop())moving=true;
                     if(moving){
                         double o=Math.round((original.offset+dx/dragScale)*1000)/1000.0;
                         double b=Math.max(0,Math.round((original.bedding-dy/dragScale)*1000)/1000.0);
-                        pipes.set(dragged,new PipeLayout.Pipe(original.name,o,original.diameter,original.wall,b,original.minGap,original.minCover));invalidate();
+                        pipes.set(dragged,new PipeLayout.Pipe(original.name,o,original.diameter,original.wall,b,original.minGap,original.minCover,original.fixed));invalidate();
                     }
                 }
                 return true;
