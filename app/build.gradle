@@ -4,7 +4,8 @@ android { namespace 'de.feldaufmass.pro'; compileSdk 35
  applicationId 'de.feldaufmass.pro'; minSdk 26; targetSdk 35; versionCode 1; versionName '0.1' }
 }
 
-dependencies { implementation 'androidx.core:core:1.13.1' }
+dependencies { implementation "com.google.mlkit:translate:17.0.3"
+ implementation 'androidx.core:core:1.13.1' }
 
 dependencies {
  androidTestImplementation 'androidx.test.ext:junit:1.2.1'

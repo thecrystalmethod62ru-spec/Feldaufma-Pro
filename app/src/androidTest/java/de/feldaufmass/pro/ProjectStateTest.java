@@ -74,6 +74,26 @@ public class ProjectStateTest {
    });
   }
  }
+ @Test public void savedPointsCanBeRealignedWithoutLosingMeasuresOrPhotos(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->{
+    RouteSketch original=new RouteSketch(activity,"[[0.4,0.4],[0.7,0.6,4.25]]");
+    String id=original.vertices.get(1).id;
+    original.vertices.get(1).photos.put("punkt_test.jpg");
+    for(int angle=0;angle<=90;angle+=15){
+     RouteSketch edited=new RouteSketch(activity,original.encode());
+     edited.angle=angle;
+     edited.movePoint(1,new android.graphics.PointF(.1f,.8f));
+     RouteSketch reopened=new RouteSketch(activity,edited.encode());
+     android.graphics.PointF p=reopened.vertices.get(1).point,a=reopened.vertices.get(0).point;
+     assertEquals(angle,Math.toDegrees(Math.atan2(Math.abs(p.y-a.y),Math.abs(p.x-a.x))),.001);
+     assertEquals(4.25,reopened.measuredLength(),0);
+     assertEquals(id,reopened.vertices.get(1).id);
+     assertEquals("punkt_test.jpg",reopened.vertices.get(1).photos.optString(0));
+    }
+   });
+  }
+ }
  private void touch(RouteSketch route,int action,float x,float y){
   android.view.MotionEvent e=android.view.MotionEvent.obtain(0,10,action,x,y,0);
   try{route.onTouchEvent(e);}finally{e.recycle();}

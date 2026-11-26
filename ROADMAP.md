@@ -28,3 +28,5 @@ Android, deutsche Oberfläche, Offline-first. Gemeinsame Objektdaten für Zeichn
 
 ## Abnahmekriterien
 Jede Funktion benötigt Build, Tests und Geräteprüfung. Geometrische Mengen sind keine freigegebenen Abrechnungsmengen. Keine ungeprüfte automatische Zuordnung oder Übermittlung vertraulicher Unterlagen.
+
+- [ ] GPS-Koordinaten mit Trassenpunkten verknüpfen und den zugehörigen Zeichnungspunkt beim Verschieben des Kartenpunkts automatisch aktualisieren.

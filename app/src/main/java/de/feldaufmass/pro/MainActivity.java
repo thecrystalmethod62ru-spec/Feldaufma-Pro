@@ -28,9 +28,14 @@ public class MainActivity extends Activity {
  void refreshRoute(){
   routePreviewBox.removeAllViews();
   RouteSketch preview=new RouteSketch(this,routeData());
-  if(preview.vertices.size()<2){routeSummary.setText("Noch keine Trasse skizziert.");return;}
-  routePreviewBox.addView(preview,new LinearLayout.LayoutParams(-1,dp(200)));
+  preview.pointSelected=i->{selectedPoint=preview.vertices.get(i).id;refreshRoute();pointMenu();};
+  preview.selected=i->measureSegment(preview,i);
+  preview.changed=()->{saveRoute(preview);refreshRoute();};
+  preview.highlight=findPoint(preview,selectedPoint);
+  if(!preview.vertices.isEmpty() && !routeData().equals(preview.encode()))saveRoute(preview);
+  routePreviewBox.addView(preview,new LinearLayout.LayoutParams(-1,dp(300)));
   double total=preview.measuredLength();
+  if(preview.vertices.size()<2){routeSummary.setText("Trasse mit dem Finger zeichnen");return;}
   routeSummary.setText((preview.vertices.size()-1)+" Abschnitte · "+
     (Double.isFinite(total)?"Bemaßte Länge: "+reportMeasure(total):"Bemaßung unvollständig"));
  }
@@ -54,18 +59,23 @@ public class MainActivity extends Activity {
   dialog.show();
  }
 
- void editRoute(){
+ void editRoute(boolean measure){
   LinearLayout form=page();
   ScrollView scroll=new ScrollView(this);scroll.addView(form);
   RouteSketch route=new RouteSketch(this,routeData());route.editable=true;
   TextView hint=sheetText("Trasse mit dem Finger zeichnen. Weitere Striche verlängern das Ende.",15,false);
   form.addView(hint);
   form.addView(route,new LinearLayout.LayoutParams(-1,dp(260)));
-  Switch mode=new Switch(this);mode.setText("Abschnitte bemaßen");form.addView(mode);
-  mode.setOnCheckedChangeListener((button,checked)->{
-   route.dimensioning=checked;
-   hint.setText(checked?"Eine Linie oder einen Abschnitt unten antippen.":"Trasse mit dem Finger zeichnen. Weitere Striche verlängern das Ende.");
+  Spinner mode=choices(form,new String[]{"Zeichnen","Maß eintragen","Punkte verschieben"});
+  Spinner angles=choices(form,new String[]{"Freier Winkel","0°","15°","30°","45°","60°","75°","90°"});
+  angles.setVisibility(View.GONE);
+  onChoice(angles,index->route.angle=index==0?-1:(index-1)*15);
+  onChoice(mode,index->{
+   route.dimensioning=index==1;route.moving=index==2;
+   angles.setVisibility(route.moving?View.VISIBLE:View.GONE);
+   hint.setText(new String[]{"Mit einem Finger zeichnen, mit zwei Fingern zoomen oder verschieben.","Abschnitt zum Bemaßen antippen.","Punkt ziehen. Der Winkel gilt zur Waagerechten am benachbarten Punkt."}[index]);
   });
+  mode.setSelection(measure?1:0);
   Button remove=new Button(this);remove.setText("Letzten Abschnitt entfernen");form.addView(remove);
   LinearLayout list=page();form.addView(list);
   route.selected=i->measureSegment(route,i);
@@ -75,8 +85,8 @@ public class MainActivity extends Activity {
    String[] lines=route.measurements().split("\n");
    for(int i=1;i<route.vertices.size();i++){
     int index=i;
-    Button measure=new Button(this);measure.setAllCaps(false);measure.setText(lines[i-1]);
-    measure.setOnClickListener(v->measureSegment(route,index));list.addView(measure);
+    Button measureButton=new Button(this);measureButton.setAllCaps(false);measureButton.setText(lines[i-1]);
+    measureButton.setOnClickListener(v->measureSegment(route,index));list.addView(measureButton);
    }
   };
   remove.setOnClickListener(v->{
@@ -87,10 +97,22 @@ public class MainActivity extends Activity {
   route.changed.run();
   new android.app.AlertDialog.Builder(this).setTitle("Trasse skizzieren").setView(scroll)
    .setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",(dialog,which)->{
-    getPreferences(0).edit().putString("routeSketch",route.encode()).apply();refreshRoute();
+    saveRoute(route);refreshRoute();
    }).show();
  }
 
+ void saveRoute(RouteSketch route){getPreferences(0).edit().putString("routeSketch",route.encode()).apply();}
+ Spinner choices(LinearLayout parent,String[] labels){
+  Spinner spinner=new Spinner(this);
+  spinner.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,labels));
+  parent.addView(spinner);return spinner;
+ }
+ void onChoice(Spinner spinner,java.util.function.IntConsumer action){
+  spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
+   public void onItemSelected(AdapterView<?> parent,View view,int index,long id){action.accept(index);}
+   public void onNothingSelected(AdapterView<?> parent){}
+  });
+ }
  LinearLayout belagsFields;
  Button belagsToggle;
 
@@ -187,7 +209,7 @@ public class MainActivity extends Activity {
   tab.setAllCaps(false);
   tab.setSingleLine(true);
   tab.setText(name);
-  bar.addView(tab);
+  bar.addView(tab,new LinearLayout.LayoutParams(0,-2,1));
   sheetTabs.put(sheet,tab);
   tab.setOnClickListener(v->showPage(sheet));
  }
@@ -234,15 +256,16 @@ public class MainActivity extends Activity {
  }
 
  public void onCreate(Bundle b){super.onCreate(b);
+ if(b!=null){selectedPoint=b.getString("selectedPoint");pendingPoint=b.getString("pendingPoint");pendingPhoto=b.getString("pendingPhoto");}
  shell=page();shell.setPadding(0,0,0,0);shell.setBackgroundColor(0xfff4f6f8);setContentView(shell);fitSystemPanels(shell);
  planPage=page();measurePage=page();voicePage=page();profilePage=page();segmentPage=page();objectPage=page();quantityPage=page();
  LinearLayout header=new LinearLayout(this);
  header.setGravity(Gravity.CENTER_VERTICAL);
  header.setPadding(dp(16),dp(4),dp(8),dp(4));
- header.setBackgroundColor(INK);
+ header.setBackgroundColor(Color.WHITE);
  shell.addView(header);
  projectHeader=sheetText("Feldaufmaß Pro",22,true);
- projectHeader.setTextColor(Color.WHITE);
+ projectHeader.setTextColor(INK);
  projectHeader.setMaxLines(2);
  projectHeader.setEllipsize(android.text.TextUtils.TruncateAt.END);
  header.addView(projectHeader,new LinearLayout.LayoutParams(0,-2,1));
@@ -251,22 +274,22 @@ public class MainActivity extends Activity {
  toolsMenu.setText("Werkzeuge");
  header.addView(toolsMenu);
  toolsMenu.setOnClickListener(v->showTools());
- HorizontalScrollView tabsScroll=new HorizontalScrollView(this);
- tabsScroll.setHorizontalScrollBarEnabled(false);
- shell.addView(tabsScroll);
- LinearLayout tabs=new LinearLayout(this);
- tabsScroll.addView(tabs);
- addSheetTab(tabs,"Übersicht",planPage);
- addSheetTab(tabs,"Regelprofil",profilePage);
+ LinearLayout tabs=new LinearLayout(this);shell.addView(tabs);
+ addSheetTab(tabs,"Trasse",planPage);
+ addSheetTab(tabs,"Profile",profilePage);
  addSheetTab(tabs,"Mengen",quantityPage);
  body=new LinearLayout(this);shell.addView(body,new LinearLayout.LayoutParams(-1,0,1));
- sheetHeading(planPage,"Gesamtübersicht");
- addOverview();
- sheetHeading(planPage,"Trassenverlauf");
+ LinearLayout dock=new LinearLayout(this);dock.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);
+ dock.setBackgroundColor(Color.WHITE);shell.addView(dock);
+ ImageButton assistant=new ImageButton(this);assistant.setImageResource(android.R.drawable.ic_btn_speak_now);
+ assistant.setContentDescription("Sprachassistent starten");dock.addView(assistant,new LinearLayout.LayoutParams(dp(52),dp(48)));
+ assistant.setOnClickListener(v->startDictation());
  routePreviewBox=page();planPage.addView(routePreviewBox);
  routeSummary=sheetText("",15,false);planPage.addView(routeSummary);
- Button drawRoute=new Button(this);drawRoute.setText("Trasse skizzieren / bemaßen");planPage.addView(drawRoute);
- drawRoute.setOnClickListener(v->editRoute());refreshRoute();
+ LinearLayout actions=new LinearLayout(this);planPage.addView(actions);
+ actionButton(actions,"Maß eintragen",()->editRoute(true));actionButton(actions,"Trasse zeichnen",()->editRoute(false));
+ refreshRoute();
+ addOverview();
  sheetHeading(planPage,"Lineare Stationierung");
  sheetHeading(quantityPage,"Mengenermittlung");
  sheetHeading(measurePage,"Trassenmaße");
@@ -288,11 +311,16 @@ public class MainActivity extends Activity {
  LinearLayout root=voicePage;
  TextView title=new TextView(this);title.setText("Feldaufmaß Pro");title.setTextSize(28);root.addView(title);
  TextView voiceHeading=new TextView(this);voiceHeading.setText("Sprachassistent – Diktat");voiceHeading.setTextSize(20);root.addView(voiceHeading);
- voiceLanguage=new Spinner(this);voiceLanguage.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Deutsch","Русский"}));root.addView(voiceLanguage);
+ voiceLanguage=new Spinner(this);voiceLanguage.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Deutsch","Russisch"}));root.addView(voiceLanguage);voiceLanguage.setSelection(getPreferences(0).getInt("dictationLanguage",1));onChoice(voiceLanguage,index->getPreferences(0).edit().putInt("dictationLanguage",index).apply());
  Button mic=new Button(this);mic.setText("Spracheingabe starten");root.addView(mic);
  voiceText=new EditText(this);voiceText.setHint("Diktat prüfen oder bearbeiten");root.addView(voiceText);
  Button applyVoice=new Button(this);applyVoice.setText("Maße aus Diktat übernehmen");root.addView(applyVoice);
  mic.setOnClickListener(v->startDictation());applyVoice.setOnClickListener(v->applyDictation());
+ actionButtonSingle(root,"Als Objektbemerkung verwenden",()->{
+  String note=voiceText.getText().toString().trim();
+  if(note.isEmpty())return;
+  objectNote.append((objectNote.length()==0?"":"\n")+note);showPage(objectPage);
+ });
  root=measurePage;
  project=field(root,"Projekt / Baustelle","project",false);
  length=field(root,"Trassenlänge (m)","length",true);
@@ -343,9 +371,9 @@ public class MainActivity extends Activity {
  planPage.addView(stationRows);
  root=profilePage;
  TextView heading=new TextView(this);heading.setText("Regelprofil – Grabenquerschnitt");heading.setTextSize(20);root.addView(heading);
- sheetHeading(root,"Oberflächenaufbau");
- surfaceLayers=sheetText("",16,false);surfaceLayers.setLineSpacing(dp(6),1);root.addView(surfaceLayers);showSurfaceLayers();
- Button editLayers=new Button(this);editLayers.setText("Oberflächenaufbau bearbeiten");root.addView(editLayers);
+ LinearLayout layers=fold(root,"Oberflächenaufbau",true);
+ surfaceLayers=sheetText("",16,false);surfaceLayers.setLineSpacing(dp(6),1);layers.addView(surfaceLayers);showSurfaceLayers();
+ Button editLayers=new Button(this);editLayers.setText("Oberflächenaufbau bearbeiten");layers.addView(editLayers);
  editLayers.setOnClickListener(v->openBelagsDetails());
  legend=new TextView(this);legend.setTextSize(14);root.addView(legend);
  root=segmentPage;
@@ -374,12 +402,32 @@ public class MainActivity extends Activity {
  objectList=new TextView(this);root.addView(objectList);showObjects();
  Button undo=new Button(this);undo.setText("Letztes Objekt entfernen");root.addView(undo);undo.setOnClickListener(v->{if(objects.length()>0){objects.remove(objects.length()-1);saveObjects();}});
  root=profilePage;
- profile=new Profile();root.addView(profile,new LinearLayout.LayoutParams(-1,(int)(300*getResources().getDisplayMetrics().density)));
- profileSlider(profilePage,"Grabenbreite",width,10,600);
- profileSlider(profilePage,"Grabentiefe",depth,10,800);
- profileSlider(profilePage,"Nachschnitt links",leftInput,0,200);
- profileSlider(profilePage,"Nachschnitt rechts",rightInput,0,200);
+ profile=new Profile();root.addView(profile,1,new LinearLayout.LayoutParams(-1,(int)(300*getResources().getDisplayMetrics().density)));
+ LinearLayout sizes=fold(profilePage,"Grabenmaße",false);
+ profileSlider(sizes,"Grabenbreite",width,10,600);
+ profileSlider(sizes,"Grabentiefe",depth,10,800);
+ profileSlider(sizes,"Nachschnitt links",leftInput,0,200);
+ profileSlider(sizes,"Nachschnitt rechts",rightInput,0,200);
+ LinearLayout pipeDetails=fold(profilePage,"Rohr und Bettung",false);
+ profilePage.removeView(legend);pipeDetails.addView(legend);
+ actionButtonSingle(profilePage,"Speichern",()->calculate());
  save.setOnClickListener(v->{if(calculate())showPage(planPage);});if(length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);
+ }
+ void actionButton(LinearLayout bar,String label,Runnable action){
+  Button button=actionButtonSingle(bar,label,action);button.setLayoutParams(new LinearLayout.LayoutParams(0,-2,1));
+ }
+ Button actionButtonSingle(LinearLayout bar,String label,Runnable action){
+  Button button=new Button(this);button.setAllCaps(false);button.setText(label);
+  button.setBackgroundTintList(android.content.res.ColorStateList.valueOf(TEAL));button.setTextColor(Color.WHITE);
+  button.setOnClickListener(v->action.run());bar.addView(button);return button;
+ }
+ LinearLayout fold(LinearLayout parent,String title,boolean expanded){
+  Button toggle=new Button(this);toggle.setAllCaps(false);toggle.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);
+  toggle.setText(title+(expanded?" ▴":" ▾"));parent.addView(toggle);
+  LinearLayout content=page();parent.addView(content);content.setVisibility(expanded?View.VISIBLE:View.GONE);
+  toggle.setOnClickListener(v->{boolean open=content.getVisibility()!=View.VISIBLE;
+   content.setVisibility(open?View.VISIBLE:View.GONE);toggle.setText(title+(open?" ▴":" ▾"));});
+  return content;
  }
  void profileSlider(LinearLayout page,String name,EditText target,int min,int max){
  TextView label=new TextView(this);page.addView(label);SeekBar bar=new SeekBar(this);bar.setMax(max-min);page.addView(bar);
@@ -522,6 +570,83 @@ public class MainActivity extends Activity {
  }
  void showDocuments(){StringBuilder b=new StringBuilder();for(int j=0;j<documents.length();j++){org.json.JSONObject o=documents.optJSONObject(j);if(o!=null)b.append(o.optString("name")).append(" – Soll / nicht ausgewertet\n");}documentsList.setText(b.length()==0?"Keine Unterlagen ausgewählt":b.toString());}
  void attachDocument(android.net.Uri uri,int flags){if(uri==null)return;try{for(int j=0;j<documents.length();j++){org.json.JSONObject old=documents.optJSONObject(j);if(old!=null&&uri.toString().equals(old.optString("uri")))return;}getContentResolver().takePersistableUriPermission(uri,flags&android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);String name=uri.getLastPathSegment();try(android.database.Cursor c=getContentResolver().query(uri,new String[]{android.provider.OpenableColumns.DISPLAY_NAME},null,null,null)){if(c!=null&&c.moveToFirst())name=c.getString(0);}org.json.JSONObject o=new org.json.JSONObject();o.put("uri",uri.toString());o.put("name",name);documents.put(o);getPreferences(0).edit().putString("documents",documents.toString()).apply();}catch(Exception e){Toast.makeText(this,"Unterlage konnte nicht dauerhaft verknüpft werden.",Toast.LENGTH_LONG).show();}}
+ String selectedPoint,pendingPoint,pendingPhoto;
+ int findPoint(RouteSketch route,String id){
+  for(int i=0;i<route.vertices.size();i++)if(route.vertices.get(i).id.equals(id))return i;
+  return -1;
+ }
+ void pointMenu(){
+  RouteSketch route=new RouteSketch(this,routeData());int index=findPoint(route,selectedPoint);
+  if(index<0)return;
+  org.json.JSONArray photos=route.vertices.get(index).photos;
+  String[] labels=new String[1+photos.length()];labels[0]="Foto aufnehmen";
+  for(int i=0;i<photos.length();i++)labels[i+1]="Foto "+(i+1)+" öffnen";
+  new android.app.AlertDialog.Builder(this).setTitle("Trassenpunkt "+(index+1)).setItems(labels,(dialog,i)->{
+   if(i==0)capturePhoto();else {
+    android.content.Intent view=new android.content.Intent(android.content.Intent.ACTION_VIEW);
+    view.setDataAndType(photoUri(photos.optString(i-1)),"image/jpeg");
+    view.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+    try{startActivity(view);}catch(android.content.ActivityNotFoundException e){notice("Keine Bildanzeige verfügbar.");}
+   }
+  }).show();
+ }
+ android.net.Uri photoUri(String file){
+  return androidx.core.content.FileProvider.getUriForFile(this,getPackageName()+".photos",new java.io.File(getFilesDir(),"photos/"+file));
+ }
+ void notice(String text){Toast.makeText(this,text,Toast.LENGTH_LONG).show();}
+ void capturePhoto(){
+  RouteSketch route=new RouteSketch(this,routeData());
+  if(route.vertices.isEmpty()){notice("Zuerst eine Trasse zeichnen und speichern.");return;}
+  if(findPoint(route,selectedPoint)<0){
+   String[] labels=new String[route.vertices.size()];
+   for(int i=0;i<labels.length;i++)labels[i]="Trassenpunkt "+(i+1);
+   new android.app.AlertDialog.Builder(this).setTitle("Punkt für Foto wählen").setItems(labels,(dialog,i)->{
+    selectedPoint=route.vertices.get(i).id;refreshRoute();capturePhoto();
+   }).show();return;
+  }
+  java.io.File dir=new java.io.File(getFilesDir(),"photos");
+  try{
+   dir.mkdirs();java.io.File file=java.io.File.createTempFile("punkt_",".jpg",dir);
+   pendingPhoto=file.getName();pendingPoint=selectedPoint;android.net.Uri uri=photoUri(pendingPhoto);
+   android.content.Intent camera=new android.content.Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+   camera.putExtra(android.provider.MediaStore.EXTRA_OUTPUT,uri);
+   camera.setClipData(android.content.ClipData.newRawUri("Foto",uri));
+   camera.addFlags(android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION|android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+   startActivityForResult(camera,413);
+  }catch(Exception e){finishPhoto(false);notice("Kamera konnte nicht geöffnet werden.");}
+ }
+ void finishPhoto(boolean success){
+  if(pendingPhoto==null)return;
+  java.io.File file=new java.io.File(getFilesDir(),"photos/"+pendingPhoto);
+  RouteSketch route=new RouteSketch(this,routeData());int index=findPoint(route,pendingPoint);
+  if(success && index>=0 && file.length()>0){
+   route.vertices.get(index).photos.put(pendingPhoto);saveRoute(route);refreshRoute();notice("Foto an Trassenpunkt "+(index+1)+" angehängt.");
+  }else{file.delete();if(success)notice("Foto konnte nicht zugeordnet werden.");}
+  pendingPoint=null;pendingPhoto=null;
+ }
+ @Override protected void onSaveInstanceState(Bundle out){
+  super.onSaveInstanceState(out);out.putString("selectedPoint",selectedPoint);
+  out.putString("pendingPoint",pendingPoint);out.putString("pendingPhoto",pendingPhoto);
+ }
+ com.google.mlkit.nl.translate.Translator translator;
+ int speechVersion;
+ void handleSpeech(String text){
+  int version=++speechVersion;
+  String normalized=text.toLowerCase(java.util.Locale.ROOT);
+  if(normalized.matches(".*(?:сделай|сделать|сними|прикрепи|прицепи|mach|nimm|nehme|aufnehmen).*?(?:фото|снимок|foto).*") ||
+     normalized.matches(".*(?:сфотографируй|fotografier|foto aufnehmen).*")){
+   capturePhoto();return;
+  }
+  showPage(voicePage);
+  if(voiceLanguage.getSelectedItemPosition()==0){voiceText.setText(text);return;}
+  if(translator==null)translator=com.google.mlkit.nl.translate.Translation.getClient(
+   new com.google.mlkit.nl.translate.TranslatorOptions.Builder().setSourceLanguage("ru").setTargetLanguage("de").build());
+  voiceText.setText("");notice("Diktat wird ins Deutsche übersetzt …");
+  translator.downloadModelIfNeeded().onSuccessTask(ignored->translator.translate(text))
+   .addOnSuccessListener(this,german->{if(version==speechVersion)voiceText.setText(german);})
+   .addOnFailureListener(this,error->{if(version==speechVersion)notice("Übersetzung fehlgeschlagen. Für den ersten Modellabruf wird Internet benötigt.");});
+ }
+ @Override protected void onDestroy(){if(translator!=null)translator.close();super.onDestroy();}
  void startDictation(){
  android.content.Intent i=new android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
  i.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
@@ -530,9 +655,10 @@ public class MainActivity extends Activity {
  try{startActivityForResult(i,410);}catch(android.content.ActivityNotFoundException e){Toast.makeText(this,"Keine Spracherkennung verfügbar.",Toast.LENGTH_LONG).show();}
  }
  @Override protected void onActivityResult(int request,int result,android.content.Intent data){super.onActivityResult(request,result,data);
+ if(request==413){finishPhoto(result==RESULT_OK);return;}
  if(request==412&&result==RESULT_OK&&data!=null&&data.getData()!=null){writePdf(data.getData());return;}
  if(request==411&&result==RESULT_OK&&data!=null){if(data.getClipData()!=null){for(int j=0;j<data.getClipData().getItemCount();j++)attachDocument(data.getClipData().getItemAt(j).getUri(),data.getFlags());}else attachDocument(data.getData(),data.getFlags());showDocuments();return;}
- if(request==410&&result==RESULT_OK&&data!=null){java.util.ArrayList<String> values=data.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS);if(values!=null&&!values.isEmpty())voiceText.setText(values.get(0));}}
+ if(request==410&&result==RESULT_OK&&data!=null){java.util.ArrayList<String> values=data.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS);if(values!=null&&!values.isEmpty())handleSpeech(values.get(0));}}
  void applyDictation(){
  String t=voiceText.getText().toString().toLowerCase(java.util.Locale.ROOT);
  String[] names={"(?:grabenbreite|breite|ширина(?: траншеи)?)","(?:grabentiefe|tiefe|глубина(?: траншеи)?)","(?:trassenlänge|länge|длина(?: трассы)?)"};
