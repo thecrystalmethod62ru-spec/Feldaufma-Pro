@@ -2046,7 +2046,7 @@ public class MainActivity extends Activity {
   });
   mirror.setOnCheckedChangeListener((button,checked)->updatePreview.run());updatePreview.run();
   android.widget.ScrollView scroll=new android.widget.ScrollView(this);scroll.addView(panel);
-  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(fitting.label).setView(scroll).setNegativeButton("Zurück",(d,w)->{if(reviewResult!=null)reviewResult.accept(false);else if(original==null)showMontageCatalog();else showMontageInventory();}).setPositiveButton(original==null?"Zum Projekt hinzufügen":"Änderungen speichern",null).create();
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(fitting.label).setView(scroll).setNegativeButton("Zurück",(d,w)->{if(reviewResult!=null)reviewResult.accept(false);else if(original==null)showMontageCatalog();else showMontageInventory();}).setPositiveButton(original==null?"Hinzufügen":"Speichern",null).create();
   if(reviewResult!=null)dialog.setOnCancelListener(d->reviewResult.accept(false));
   if(original!=null)dialog.setButton(android.app.AlertDialog.BUTTON_NEUTRAL,"Entfernen",(android.content.DialogInterface.OnClickListener)(d,w)->
    new android.app.AlertDialog.Builder(this).setTitle("Formstück entfernen?")
@@ -3607,7 +3607,7 @@ public class MainActivity extends Activity {
   java.util.ArrayList<double[]> entries=new java.util.ArrayList<>();
   Runnable refreshVerbau=()->{
    StringBuilder report=new StringBuilder();double left=0,right=0;
-   for(double[] e:entries){double a=(e[1]-e[0])*e[2],b=(e[1]-e[0])*e[3];left+=a;right+=b;report.append(String.format(java.util.Locale.GERMANY,"%.2f – %.2f m: L %.2f / R %.2f m²\n",e[0],e[1],a,b));}
+   for(double[] e:entries){double a=(e[1]-e[0])*e[2],rightArea=(e[1]-e[0])*e[3];left+=a;right+=rightArea;report.append(String.format(java.util.Locale.GERMANY,"%.2f – %.2f m: L %.2f / R %.2f m²\n",e[0],e[1],a,rightArea));}
    report.append(String.format(java.util.Locale.GERMANY,"\nLinks: %.2f m²\nRechts: %.2f m²\nGesamt: %.2f m²",left,right,left+right));resultText.setText(report.toString());
   };
   Runnable saveVerbau=()->{org.json.JSONArray data=new org.json.JSONArray();for(double[] e:entries){org.json.JSONArray row=new org.json.JSONArray();for(double v:e)try{row.put(v);}catch(Exception ex){throw new IllegalArgumentException(ex);}data.put(row);}getPreferences(0).edit().putString("metricVerbauSections",data.toString()).apply();refreshVerbau.run();if(sketch!=null)sketch.invalidate();refreshMainQuantities();if(livePreview!=null)livePreview.invalidate();if(profile!=null)profile.invalidate();};
@@ -3758,7 +3758,7 @@ public class MainActivity extends Activity {
    if(rows.length()==0){notice("Keine Abschnittsprofile vorhanden.");return;}
    java.util.List<org.json.JSONObject> sorted=new java.util.ArrayList<>();
    for(int i=0;i<rows.length();i++)sorted.add(rows.getJSONObject(i));
-   sorted.sort((a,b)->Double.compare(a.optDouble("from"),b.optDouble("from")));
+   sorted.sort((a,otherSection)->Double.compare(a.optDouble("from"),otherSection.optDouble("from")));
    double total=0,covered=0,last=0;
    StringBuilder report=new StringBuilder("Aushub – rechteckig, brutto\n\n");
    for(org.json.JSONObject row:sorted){
@@ -3800,7 +3800,7 @@ public class MainActivity extends Activity {
      LinearLayout body=new LinearLayout(this);body.setOrientation(1);
      PipeLayoutView view=new PipeLayoutView(this);view.setLayoutData(pipes,bw,bd);
      body.addView(view,new LinearLayout.LayoutParams(-1,dp(300)));
-     TextView info=new TextView(this);info.setText(android.text.TextUtils.join("\n",PipeLayout.dimensions(pipes,bw,bd)));body.addView(info);
+     TextView sectionInfo=new TextView(this);sectionInfo.setText(android.text.TextUtils.join("\n",PipeLayout.dimensions(pipes,bw,bd)));body.addView(sectionInfo);
      ScrollView scroll=new ScrollView(this);scroll.addView(body);
      new android.app.AlertDialog.Builder(this).setTitle(labels[index]).setView(scroll).setPositiveButton("Schließen",null).setNeutralButton("Löschen",(preview,which)->{
       new android.app.AlertDialog.Builder(this).setTitle("Abschnittsprofil löschen?").setMessage(labels[index]).setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(confirm,choice)->{
@@ -3820,7 +3820,7 @@ public class MainActivity extends Activity {
       android.text.TextWatcher draftWatcher=new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){updateDraft.run();}public void afterTextChanged(android.text.Editable e){}};
       newWidth.addTextChangedListener(draftWatcher);newDepth.addTextChangedListener(draftWatcher);updateDraft.run();
       android.app.AlertDialog editor=new android.app.AlertDialog.Builder(this).setTitle(labels[index]).setView(fields).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
-      editor.setOnShowListener(open->editor.getButton(-1).setOnClickListener(save->{
+      editor.setOnShowListener(open->editor.getButton(-1).setOnClickListener(saveSectionButton->{
        try{new PipeLayoutStore(getPreferences(0)).saveSection(p.getDouble("from"),p.getDouble("to"),number(newWidth),number(newDepth),pipes);if(sketch!=null)sketch.invalidate();editor.dismiss();notice("Abschnittsprofil aktualisiert.");}
        catch(Exception ex){newDepth.setError(ex.getMessage());}
       }));editor.show();
