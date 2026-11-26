@@ -504,12 +504,52 @@ public class MainActivity extends Activity {
    }catch(Exception e){distance.setError("Abstand prüfen");}
   }));dialog.show();
  }
- void editRoute(boolean measure){
+ void showFullscreenRoute(android.app.AlertDialog editor,LinearLayout form,RouteSketch route,Spinner mode,Spinner angles,LinearLayout historyBar){
+  // Move the existing views, not a second sketch: unsaved data and undo history stay shared.
+  View[] views={route,mode,angles,historyBar};
+  int[] positions=new int[views.length];android.view.ViewGroup.LayoutParams[] params=new android.view.ViewGroup.LayoutParams[views.length];
+  for(int j=0;j<views.length;j++){if(views[j].getParent()!=form)return;positions[j]=form.indexOfChild(views[j]);params[j]=views[j].getLayoutParams();}
+  android.app.Dialog full=new android.app.Dialog(this,android.R.style.Theme_Material_Light_NoActionBar){
+   @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused&&getWindow()!=null){androidx.core.view.WindowInsetsControllerCompat c=androidx.core.view.WindowCompat.getInsetsController(getWindow(),getWindow().getDecorView());c.setSystemBarsBehavior(androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);c.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars());}}
+  };
+  full.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+  LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setBackgroundColor(Color.WHITE);
+  LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);root.addView(header);
+  Button back=new Button(this),save=new Button(this);back.setAllCaps(false);save.setAllCaps(false);back.setText("Vollbild beenden");save.setText("Speichern");
+  header.addView(back,new LinearLayout.LayoutParams(0,-2,1));header.addView(save,new LinearLayout.LayoutParams(0,-2,1));
+  for(View view:views)form.removeView(view);
+  LinearLayout controls=new LinearLayout(this);root.addView(controls);
+  controls.addView(mode,new LinearLayout.LayoutParams(0,-2,1));controls.addView(angles,new LinearLayout.LayoutParams(0,-2,1));
+  root.addView(route,new LinearLayout.LayoutParams(-1,0,1));
+  root.addView(historyBar,new LinearLayout.LayoutParams(-1,-2));
+  full.setContentView(root);
+  full.setOnDismissListener(d->{
+   for(View view:views){android.view.ViewParent parent=view.getParent();if(parent instanceof android.view.ViewGroup)((android.view.ViewGroup)parent).removeView(view);}
+   // Original positions are ascending; restore before other controls.
+   for(int j=0;j<views.length;j++)form.addView(views[j],Math.min(positions[j],form.getChildCount()),params[j]);
+   route.invalidate();
+  });
+  back.setOnClickListener(v->full.dismiss());
+  save.setOnClickListener(v->{full.dismiss();if(editor.isShowing())editor.getButton(-1).performClick();});
+  android.view.Window window=full.getWindow();
+  if(window!=null){
+   androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window,false);
+   androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root,(view,insets)->{
+    androidx.core.graphics.Insets safe=insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.displayCutout()|androidx.core.view.WindowInsetsCompat.Type.systemBars()|androidx.core.view.WindowInsetsCompat.Type.ime());
+    view.setPadding(safe.left,safe.top,safe.right,safe.bottom);return insets;
+   });
+  }
+  full.show();
+  if(window!=null){window.setLayout(-1,-1);androidx.core.view.WindowInsetsControllerCompat c=androidx.core.view.WindowCompat.getInsetsController(window,root);c.setSystemBarsBehavior(androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);c.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars());androidx.core.view.ViewCompat.requestApplyInsets(root);}
+ }
+ void editRoute(boolean measure){editRoute(measure,false);}
+ void editRoute(boolean measure,boolean startFullscreen){
   LinearLayout form=page();
   ScrollView scroll=new ScrollView(this);scroll.addView(form);
   RouteSketch route=new RouteSketch(this,routeData());route.editable=true;
   TextView hint=sheetText("Trasse mit dem Finger zeichnen. Weitere Striche verlängern das Ende.",15,false);
   form.addView(hint);
+  Button fullscreen=new Button(this);fullscreen.setAllCaps(false);fullscreen.setText("⛶ Vollbild");form.addView(fullscreen);
   form.addView(route,new LinearLayout.LayoutParams(-1,dp(260)));
   String template=getPreferences(0).getString("routeUnderlay","");
   if(!template.isEmpty()){
@@ -585,7 +625,9 @@ public class MainActivity extends Activity {
    history.record(route.encode());
    if(persistRouteHistory(history)){boolean saved=getPreferences(0).edit().putString("sketchCalibration",calibration[0].toString()).commit();refreshRoute();editor.dismiss();notice(saved?"Trasse gespeichert.":"Trasse gespeichert, Kalibrierung nicht gespeichert.");}
   }));
+  fullscreen.setOnClickListener(v->showFullscreenRoute(editor,form,route,mode,angles,historyBar));
   editor.show();
+  if(startFullscreen)fullscreen.performClick();
  }
 
  boolean saveRoute(RouteSketch route){try{RouteEditHistory history=loadRouteHistory(routeData());history.record(route.encode());return persistRouteHistory(history);}catch(RuntimeException e){notice("Trasse konnte nicht gespeichert werden.");return false;}}
@@ -1361,6 +1403,7 @@ public class MainActivity extends Activity {
  routeSummary=sheetText("",15,false);planPage.addView(routeSummary);
  LinearLayout actions=new LinearLayout(this);planPage.addView(actions);
  actionButton(actions,"Maß eintragen",()->editRoute(true));actionButton(actions,"Trasse zeichnen",()->editRoute(false));
+ actionButton(planPage,"Vollbild zeichnen",()->editRoute(false,true));
  refreshRoute();
  addOverview();
  sheetHeading(planPage,"Lineare Stationierung");
