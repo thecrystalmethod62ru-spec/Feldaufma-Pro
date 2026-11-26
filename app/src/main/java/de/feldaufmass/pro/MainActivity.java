@@ -5311,6 +5311,9 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  org.json.JSONArray utilities=dragRows==null?extraUtilities():dragRows;
  int conflicts=utilityCollisionCount(utilities,Double.isFinite(l)&&l>0?l:Double.POSITIVE_INFINITY);
  if(conflicts>0){p.setColor(0xffb3261e);p.setTextSize(11);c.drawText("Achtung: "+conflicts+" mögliche Leitungskollision(en)",20,40,p);}
+ int outside=0;
+ for(int i=0;i<utilities.length();i++){org.json.JSONObject u=utilities.optJSONObject(i);if(u==null)continue;double radius=u.optDouble("diameter")/2000,ox=u.optDouble("offset"),oy=u.optDouble("axisDepth");if(!Double.isFinite(radius)||radius<=0)continue;if(radius*2>w||radius*2>d||(Double.isFinite(ox)&&(ox-radius< -1e-8||ox+radius>w+1e-8))||(Double.isFinite(oy)&&(oy-radius< -1e-8||oy+radius>d+1e-8)))outside++;}
+ if(outside>0){p.setColor(0xffb3261e);p.setTextSize(11);c.drawText("Profilgrenzen verletzt: "+outside+" Leitung(en)",20,52,p);}
 
  if(utilities.length()==0){if(Double.isFinite(previewPipe)){float radius=(float)(previewPipe/2000*scale);p.setColor(0xff3686bc);c.drawCircle(180,bottom-radius,radius,p);}}
  else{
