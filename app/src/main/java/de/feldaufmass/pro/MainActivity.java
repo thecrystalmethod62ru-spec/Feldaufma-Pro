@@ -1795,6 +1795,12 @@ public class MainActivity extends Activity {
   pipeProfileInput.setHint("Rohrprofil: Außendurchmesser;Wandstärke;Bettung (m)");
   pipeProfileInput.setText(overlapPrefs.getString("metricPipeProfile",""));
   panel.addView(pipeProfileInput);
+  final EditText minimumCoverInput=new EditText(this);
+  minimumCoverInput.setHint("Mindestüberdeckung (m), optional");
+  minimumCoverInput.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+  minimumCoverInput.setText(overlapPrefs.getString("metricMinimumCover",""));
+  panel.addView(minimumCoverInput);
+
   final TextView pipeProfileStatus=new TextView(this);panel.addView(pipeProfileStatus);
   final double[][] pipeDimensions={null};
   final java.util.List<double[]> profileData=new java.util.ArrayList<>();
@@ -1958,6 +1964,19 @@ public class MainActivity extends Activity {
     double minCover=Double.POSITIVE_INFINITY;
     for(double[] v:profileData)minCover=Math.min(minCover,new PipeSection(0,v[1],dims[2],dims[0],dims[1]).cover);
     pipeProfileStatus.setText(Double.isFinite(minCover)?String.format(java.util.Locale.GERMANY,"Kleinste Rohrüberdeckung: %.2f m%s",minCover,minCover<0?" – Rohr ragt über GOK":""):"Rohrprofil: Grabentiefe fehlt");
+    if(!minimumCoverInput.getText().toString().trim().isEmpty()){
+     double minimum=Double.parseDouble(minimumCoverInput.getText().toString().trim().replace(',','.'));
+     if(!Double.isFinite(minimum)||minimum<0)throw new IllegalArgumentException("Ungültige Mindestüberdeckung");
+     double station=0;StringBuilder warnings=new StringBuilder();
+     for(double[] v:profileData){
+      PipeSection section=new PipeSection(0,v[1],dims[2],dims[0],dims[1]);
+      if(!section.meetsCover(minimum))warnings.append(String.format(java.util.Locale.GERMANY,"\nStation %.2f–%.2f m: Überdeckung %.2f m < %.2f m",station,station+v[0],section.cover,minimum));
+      station+=v[0];
+     }
+     if(profileData.isEmpty())warnings.append("\nKeine Prüfung ohne Grabentiefe.");
+     else if(warnings.length()==0)warnings.append("\nEingegebene Mindestüberdeckung eingehalten.");
+     pipeProfileStatus.append(warnings.toString());
+    }
    }catch(Exception ex){pipeProfileStatus.setText("Rohrprofil: "+ex.getMessage());}
    longitudinalProfile.invalidate();
    java.util.TreeSet<Double> cuts=new java.util.TreeSet<>();cuts.add(0.0);cuts.add(total);
@@ -2074,6 +2093,11 @@ public class MainActivity extends Activity {
    }
    nominalArea.setText(result.toString());
   };
+  minimumCoverInput.addTextChangedListener(new android.text.TextWatcher(){
+   public void beforeTextChanged(CharSequence s,int start,int count,int after){}
+   public void onTextChanged(CharSequence s,int start,int before,int count){}
+   public void afterTextChanged(android.text.Editable e){overlapPrefs.edit().putString("metricMinimumCover",e.toString()).apply();refreshNominalArea.run();}
+  });
   pipeProfileInput.addTextChangedListener(new android.text.TextWatcher(){
    public void beforeTextChanged(CharSequence s,int start,int count,int after){}
    public void onTextChanged(CharSequence s,int start,int before,int count){}
