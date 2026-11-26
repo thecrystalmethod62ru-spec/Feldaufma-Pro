@@ -1705,7 +1705,7 @@ public class MainActivity extends Activity {
   String[] overlapModes={"Nur Kontrollwerte","Überlappung beibehalten (Brutto)","Überlappung abziehen (Netto)"};
   overlapMode.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,overlapModes));
   panel.addView(overlapMode);
-  TextView overlapLegend=new TextView(this);overlapLegend.setText("Orange: Überlappung bemaßter Abschnittsstreifen (ohne Eckergänzungen)");panel.addView(overlapLegend);
+  TextView overlapLegend=new TextView(this);overlapLegend.setText("Orange: Überlappung bemaßter Abschnittsstreifen (ohne Eckergänzungen) · Grün: alternative abgeschrägte Eckergänzung");panel.addView(overlapLegend);
   final SharedPreferences overlapPrefs=projectStorage(activeProject);
   int storedOverlapMode=0;
   try{storedOverlapMode=overlapPrefs.getInt("metricOverlapMode",0);}catch(ClassCastException ignored){}
@@ -1944,6 +1944,7 @@ public class MainActivity extends Activity {
      if(f>=0&&t<=overlapStation&&t>f){overlapCuts.add(f);overlapCuts.add(t);}
     }
     java.util.ArrayList<Double> oc=new java.util.ArrayList<>(overlapCuts);
+    double[] previousStrip=null;
     for(int k=1;k<oc.size();k++){
      double f=oc.get(k-1),t=oc.get(k),mid=(f+t)/2,w=widthAt(mid),l=cutAt(mid,"left",widths[1]),r=cutAt(mid,"right",widths[2]);
      if(!Double.isFinite(w)||w<=0||!Double.isFinite(l)||l<0||!Double.isFinite(r)||r<0)continue;
@@ -1953,6 +1954,16 @@ public class MainActivity extends Activity {
      double[][] pts={{u[0]+nx*lo,u[1]+ny*lo},{v[0]+nx*lo,v[1]+ny*lo},{v[0]+nx*hi,v[1]+ny*hi},{u[0]+nx*hi,u[1]+ny*hi}};
      android.graphics.Path strip=new android.graphics.Path();
      for(int q=0;q<4;q++){float x=(float)(ox+pts[q][0]*scale),y=(float)(oy-pts[q][1]*scale);if(q==0)strip.moveTo(x,y);else strip.lineTo(x,y);}strip.close();
+     double[] currentStrip={u[0],u[1],v[0],v[1],hi,-lo};
+     if(previousStrip!=null){
+      double[][] corner=StripOverlap.cornerFiller(previousStrip,currentStrip);
+      if(corner!=null){
+       android.graphics.Path patch=new android.graphics.Path();
+       for(int q=0;q<corner.length;q++){float x=(float)(ox+corner[q][0]*scale),y=(float)(oy-corner[q][1]*scale);if(q==0)patch.moveTo(x,y);else patch.lineTo(x,y);}
+       patch.close();pen.setStyle(android.graphics.Paint.Style.FILL);pen.setColor(0x9948a868);c.drawPath(patch,pen);
+      }
+     }
+     previousStrip=currentStrip;
      android.graphics.Path intersection=new android.graphics.Path();
      if(intersection.op(covered,strip,android.graphics.Path.Op.INTERSECT))repeated.op(intersection,android.graphics.Path.Op.UNION);
      covered.op(strip,android.graphics.Path.Op.UNION);
