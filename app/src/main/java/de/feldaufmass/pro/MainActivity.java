@@ -2194,6 +2194,12 @@ public class MainActivity extends Activity {
         offset.setHint("Achslage zur Grabenmitte (m)");offset.setText(String.valueOf(pipe.offset));
         bedding.setHint("Rohrunterkante über Grabensohle (m)");bedding.setText(String.valueOf(pipe.bedding));
         offset.setEnabled(!pipe.fixed);bedding.setEnabled(!pipe.fixed);fields.addView(offset);fields.addView(bedding);
+        final EditText diameterInput=new EditText(this),wallInput=new EditText(this);
+        diameterInput.setHint("Außendurchmesser (m)");diameterInput.setText(String.valueOf(pipe.diameter));
+        wallInput.setHint("Wandstärke (m)");wallInput.setText(String.valueOf(pipe.wall));
+        fields.addView(diameterInput);fields.addView(wallInput);
+        utilitySlider(fields,diameterInput,"Außendurchmesser (m)",0.001,Math.max(pipe.diameter,Math.max(bw,bd)),0.001,true);
+        utilitySlider(fields,wallInput,"Wandstärke (m)",0,Math.max(pipe.wall,pipe.diameter/2),0.001,true);
         final EditText gapInput=new EditText(this),coverInput=new EditText(this);
         gapInput.setHint("Rohr-Mindestabstand (m)");gapInput.setText(String.valueOf(pipe.minGap));
         coverInput.setHint("Rohr-Mindestüberdeckung (m)");coverInput.setText(String.valueOf(pipe.minCover));
@@ -2209,11 +2215,11 @@ public class MainActivity extends Activity {
          double o=number(offset),b=number(bedding),g=number(gapInput),c=number(coverInput);
          if(!Double.isFinite(o+b+g+c)||b<0||g<0||c<0)throw new IllegalArgumentException("Ungültige Maße");
          java.util.List<PipeLayout.Pipe> draft=new java.util.ArrayList<>(pipes);
-         draft.set(index,new PipeLayout.Pipe(pipe.name,o,pipe.diameter,pipe.wall,b,g,c,pipe.fixed));
+         draft.set(index,new PipeLayout.Pipe(pipe.name,o,number(diameterInput),number(wallInput),b,g,c,pipe.fixed));
          livePreview.setLayoutData(draft,bw,bd);livePreview.setRequirements(requirements[0],requirements[1]);
          liveWarnings.setText(android.text.TextUtils.join("\n",PipeLayout.warnings(draft,bw,bd,requirements[0],requirements[1])));
         }catch(Exception ex){liveWarnings.setText("Maße prüfen");}};
-        for(EditText f:new EditText[]{offset,bedding,gapInput,coverInput})f.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){previewUpdate.run();}public void afterTextChanged(android.text.Editable e){}});
+        for(EditText f:new EditText[]{offset,bedding,gapInput,coverInput,diameterInput,wallInput})f.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){previewUpdate.run();}public void afterTextChanged(android.text.Editable e){}});
         previewUpdate.run();
         ScrollView editScroll=new ScrollView(this);editScroll.addView(fields);
         final android.app.AlertDialog edit=new android.app.AlertDialog.Builder(this).setTitle("Rohrlage bearbeiten").setView(editScroll).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
@@ -2222,7 +2228,7 @@ public class MainActivity extends Activity {
           double o=Double.parseDouble(offset.getText().toString().trim().replace(',','.'));
           double b=Double.parseDouble(bedding.getText().toString().trim().replace(',','.'));
           java.util.List<PipeLayout.Pipe> next=new java.util.ArrayList<>(pipes);
-          next.set(index,new PipeLayout.Pipe(pipe.name,o,pipe.diameter,pipe.wall,b,Double.parseDouble(gapInput.getText().toString().trim().replace(',','.')),Double.parseDouble(coverInput.getText().toString().trim().replace(',','.')),pipe.fixed));
+          next.set(index,new PipeLayout.Pipe(pipe.name,o,number(diameterInput),number(wallInput),b,Double.parseDouble(gapInput.getText().toString().trim().replace(',','.')),Double.parseDouble(coverInput.getText().toString().trim().replace(',','.')),pipe.fixed));
           multiPipeStore.save(next);pipes.clear();pipes.addAll(next);refresh.run();edit.dismiss();
          }catch(Exception ex){bedding.setError("Ungültige Lage oder Speicherfehler: "+ex.getMessage());}
         }));edit.show();return;
