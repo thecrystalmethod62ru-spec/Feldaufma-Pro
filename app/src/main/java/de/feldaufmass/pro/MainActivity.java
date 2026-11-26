@@ -1705,7 +1705,7 @@ public class MainActivity extends Activity {
   String[] overlapModes={"Nur Kontrollwerte","Überlappung beibehalten (Brutto)","Überlappung abziehen (Netto)"};
   overlapMode.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,overlapModes));
   panel.addView(overlapMode);
-  TextView overlapLegend=new TextView(this);overlapLegend.setText("Orange: Überlappung bemaßter Abschnittsstreifen (ohne Eckergänzungen) · Grün: alternative abgeschrägte Eckergänzung");panel.addView(overlapLegend);
+  TextView overlapLegend=new TextView(this);overlapLegend.setText("Orange: Überlappung bemaßter Abschnittsstreifen (ohne Eckergänzungen) · Grün: gewählte Eckergänzung (Kontrollmodell)");panel.addView(overlapLegend);
   final SharedPreferences overlapPrefs=projectStorage(activeProject);
   int storedOverlapMode=0;
   try{storedOverlapMode=overlapPrefs.getInt("metricOverlapMode",0);}catch(ClassCastException ignored){}
@@ -1817,7 +1817,8 @@ public class MainActivity extends Activity {
      }
      savedCornerMode[0]=position;
     }
-    refreshNominalArea.run();
+    refreshNominalArea.run();panel.invalidate();
+    for(int i=0;i<panel.getChildCount();i++)panel.getChildAt(i).invalidate();
    }
    @Override public void onNothingSelected(android.widget.AdapterView<?> parent){}
   });
@@ -1977,7 +1978,7 @@ public class MainActivity extends Activity {
      for(int q=0;q<4;q++){float x=(float)(ox+pts[q][0]*scale),y=(float)(oy-pts[q][1]*scale);if(q==0)strip.moveTo(x,y);else strip.lineTo(x,y);}strip.close();
      double[] currentStrip={u[0],u[1],v[0],v[1],hi,-lo};
      if(previousStrip!=null){
-      double[][] corner=StripOverlap.cornerFiller(previousStrip,currentStrip);
+      double[][] corner=savedCornerMode[0]==2?StripOverlap.miterCorner(previousStrip,currentStrip):savedCornerMode[0]==1?StripOverlap.cornerFiller(previousStrip,currentStrip):null;
       if(corner!=null){
        android.graphics.Path patch=new android.graphics.Path();
        for(int q=0;q<corner.length;q++){float x=(float)(ox+corner[q][0]*scale),y=(float)(oy-corner[q][1]*scale);if(q==0)patch.moveTo(x,y);else patch.lineTo(x,y);}
