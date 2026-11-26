@@ -2082,6 +2082,10 @@ public class MainActivity extends Activity {
         gapInput.setHint("Rohr-Mindestabstand (m)");gapInput.setText(String.valueOf(pipe.minGap));
         coverInput.setHint("Rohr-Mindestüberdeckung (m)");coverInput.setText(String.valueOf(pipe.minCover));
         fields.addView(gapInput);fields.addView(coverInput);
+        utilitySlider(fields,offset,"Achslage (m)",-bw/2,bw/2,0.01,!pipe.fixed);
+        utilitySlider(fields,bedding,"Rohrunterkante (m)",0,bd,0.01,!pipe.fixed);
+        utilitySlider(fields,gapInput,"Mindestabstand (m)",0,bw,0.01,true);
+        utilitySlider(fields,coverInput,"Mindestüberdeckung (m)",0,bd,0.01,true);
         final android.app.AlertDialog edit=new android.app.AlertDialog.Builder(this).setTitle("Rohrlage bearbeiten").setView(fields).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
         edit.setOnShowListener(ignored->edit.getButton(-1).setOnClickListener(button->{
          try{
@@ -3116,6 +3120,8 @@ public class MainActivity extends Activity {
  profileSlider(sizes,"Nachschnitt links",leftInput,0,200);
  profileSlider(sizes,"Nachschnitt rechts",rightInput,0,200);
  LinearLayout pipeDetails=fold(profilePage,"Rohr und Bettung",false);
+ utilitySlider(pipeDetails,pipeInput,"Rohr-Außendurchmesser (mm)",1,2000,1,true);
+ actionButtonSingle(pipeDetails,"Weitere Leitungen / Kabel",()->editUtilities());
  profilePage.removeView(legend);pipeDetails.addView(legend);
  actionButtonSingle(profilePage,"Speichern",()->calculate());
  save.setOnClickListener(v->{if(calculate())showPage(planPage);});if(length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);
@@ -3135,6 +3141,15 @@ public class MainActivity extends Activity {
   toggle.setOnClickListener(v->{boolean open=content.getVisibility()!=View.VISIBLE;
    content.setVisibility(open?View.VISIBLE:View.GONE);toggle.setText(title+(open?" ▴":" ▾"));});
   return content;
+ }
+ void utilitySlider(LinearLayout form,EditText field,String label,double min,double max,double step,boolean enabled){
+  TextView title=new TextView(this);title.setText(label);form.addView(title);
+  SeekBar bar=new SeekBar(this);bar.setMax((int)Math.ceil((max-min)/step));bar.setEnabled(enabled);form.addView(bar);
+  field.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL|(min<0?android.text.InputType.TYPE_NUMBER_FLAG_SIGNED:0));
+  Runnable sync=()->{try{double value=Double.parseDouble(field.getText().toString().replace(',','.'));if(Double.isFinite(value))bar.setProgress((int)Math.round((value-min)/step));}catch(Exception ignored){}};
+  field.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){sync.run();}public void afterTextChanged(android.text.Editable e){}});
+  bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onStartTrackingTouch(SeekBar b){}public void onStopTrackingTouch(SeekBar b){}public void onProgressChanged(SeekBar b,int p,boolean user){if(user)field.setText(String.format(java.util.Locale.GERMANY,step>=1?"%.0f":"%.2f",Math.min(max,min+p*step)));}});
+  sync.run();
  }
  void profileSlider(LinearLayout page,String name,EditText target,int min,int max){
  TextView label=new TextView(this);page.addView(label);SeekBar bar=new SeekBar(this);bar.setMax(max-min);page.addView(bar);
@@ -4484,7 +4499,7 @@ public class MainActivity extends Activity {
    if(index<rows.length()){utilityMenu(index);return;}
    LinearLayout form=new LinearLayout(this);form.setOrientation(1);
    Spinner type=new Spinner(this);type.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Trinkwasser","Gas","Abwasser","Fernwärme","Stromkabel","Glasfaser","Kabelschutzrohr","Sonstige Leitung"}));form.addView(type);
-   EditText diameter=new EditText(this);diameter.setHint("Außendurchmesser (mm)");diameter.setInputType(8194);form.addView(diameter);
+   EditText diameter=new EditText(this);diameter.setHint("Außendurchmesser (mm)");diameter.setInputType(8194);form.addView(diameter);utilitySlider(form,diameter,"Außendurchmesser (mm)",1,2000,1,true);
    android.app.AlertDialog add=new android.app.AlertDialog.Builder(this).setTitle("Leitung hinzufügen").setView(form).setNegativeButton("Abbrechen",null).setPositiveButton("Hinzufügen",null).create();
    add.setOnShowListener(x->add.getButton(-1).setOnClickListener(y->{try{double mm=Double.parseDouble(diameter.getText().toString().replace(',','.'));if(!Double.isFinite(mm)||mm<=0)throw new Exception();org.json.JSONObject o=new org.json.JSONObject();o.put("id",java.util.UUID.randomUUID().toString()).put("type",type.getSelectedItem().toString());o.put("diameter",mm);rows.put(o);if(saveUtilities(rows))add.dismiss();}catch(Exception e){diameter.setError("Positiven Durchmesser eingeben");}}));add.show();
   }).setNegativeButton("Schließen",null).show();
@@ -4497,6 +4512,7 @@ public class MainActivity extends Activity {
    LinearLayout form=new LinearLayout(this);form.setOrientation(1);
    String[] keys={"name","type","material","dn","diameter"},titles={"Bezeichnung","Leitungsart","Material","DN / Kabeltyp","Außendurchmesser (mm)"};
    EditText[] fields=new EditText[keys.length];for(int j=0;j<keys.length;j++){fields[j]=new EditText(this);fields[j].setHint(titles[j]);fields[j].setText(o.optString(keys[j],""));if(j==4)fields[j].setInputType(8194);form.addView(fields[j]);}
+   utilitySlider(form,fields[4],"Außendurchmesser (mm)",1,2000,1,true);
    android.app.AlertDialog edit=new android.app.AlertDialog.Builder(this).setTitle("Leitung bearbeiten").setView(form).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
    edit.setOnShowListener(x->edit.getButton(-1).setOnClickListener(y->{try{double mm=Double.parseDouble(fields[4].getText().toString().replace(',','.'));if(!Double.isFinite(mm)||mm<=0)throw new Exception();if(fields[1].length()==0){fields[1].setError("Leitungsart eingeben");return;}for(int j=0;j<4;j++)o.put(keys[j],fields[j].getText().toString().trim());o.put("diameter",mm);if(saveUtilities(rows))edit.dismiss();}catch(Exception e){fields[4].setError("Positiven Durchmesser eingeben");}}));edit.show();
   }).show();
