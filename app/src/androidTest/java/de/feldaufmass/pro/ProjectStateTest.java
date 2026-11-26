@@ -6,18 +6,20 @@ import android.os.ParcelFileDescriptor;
 import java.io.File;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.Robolectric;
-import org.robolectric.RobolectricTestRunner;
-import org.robolectric.annotation.Config;
-import org.robolectric.annotation.GraphicsMode;
+import androidx.test.core.app.ActivityScenario;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import static org.junit.Assert.*;
 
-@RunWith(RobolectricTestRunner.class)
-@Config(sdk = 34)
-@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@RunWith(AndroidJUnit4.class)
 public class ProjectStateTest {
  @Test public void detailHistoryAndExportUseSavedGeometry() throws Exception {
-  MainActivity activity = Robolectric.buildActivity(MainActivity.class).setup().get();
+  try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+   scenario.onActivity(activity -> {
+    try { verifyProjectState(activity); } catch (Exception e) { throw new AssertionError(e); }
+   });
+  }
+ }
+ private void verifyProjectState(MainActivity activity) throws Exception {
   activity.length.setText("20");
   activity.width.setText("1");
   activity.depth.setText("2");
