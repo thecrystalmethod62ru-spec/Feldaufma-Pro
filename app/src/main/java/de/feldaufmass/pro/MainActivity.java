@@ -2460,14 +2460,30 @@ public class MainActivity extends Activity {
   new android.app.AlertDialog.Builder(this).setTitle("Soll-Leitungen aus Text erkennen").setView(input)
    .setNegativeButton("Abbrechen",null).setPositiveButton("Text prüfen",(d,w)->{
     java.util.List<PlanTextParser.Candidate> candidates=PlanTextParser.parse(input.getText().toString());
-    StringBuilder result=new StringBuilder("Ungeprüfte Soll-Vorschläge – keine Übernahme in die Abrechnung.\n\n");
-    if(candidates.isEmpty())result.append("Keine eindeutigen Leitungsbezeichnungen gefunden.");
+    if(candidates.isEmpty()){notice("Keine eindeutigen Leitungsbezeichnungen gefunden.");return;}
+    LinearLayout review=new LinearLayout(this);review.setOrientation(1);
+    TextView hint=new TextView(this);hint.setText("Soll-Vorschläge prüfen. Keine Übernahme in Ist-Mengen oder Abrechnung.");review.addView(hint);
+    java.util.ArrayList<EditText[]> fields=new java.util.ArrayList<>();
     for(PlanTextParser.Candidate c:candidates){
-     result.append(c.type).append(" · DN ").append(c.nominalDiameter.isEmpty()?"unbekannt":c.nominalDiameter)
-      .append(" · ").append(c.material.isEmpty()?"Material unbekannt":c.material)
-      .append("\nZeile ").append(c.lineNumber).append(": ").append(c.sourceLine).append("\n\n");
+     TextView source=new TextView(this);source.setText("Zeile "+c.lineNumber+": "+c.sourceLine);review.addView(source);
+     EditText type=new EditText(this);type.setHint("Leitungsart");type.setText(c.type);review.addView(type);
+     EditText dn=new EditText(this);dn.setHint("DN (optional)");dn.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);dn.setText(c.nominalDiameter);review.addView(dn);
+     EditText material=new EditText(this);material.setHint("Material (optional)");material.setText(c.material);review.addView(material);
+     fields.add(new EditText[]{type,dn,material});
     }
-    new android.app.AlertDialog.Builder(this).setTitle("Erkannte Soll-Leitungen").setMessage(result.toString()).setPositiveButton("Schließen",null).show();
+    android.widget.ScrollView scroll=new android.widget.ScrollView(this);scroll.addView(review);
+    android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Soll-Leitungen bearbeiten").setView(scroll).setNegativeButton("Abbrechen",null).setPositiveButton("Vorschau",null).create();
+    dialog.setOnShowListener(x->dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+     StringBuilder summary=new StringBuilder("Geprüfte Eingaben – nur Vorschau, noch nicht gespeichert.\n\n");
+     for(EditText[] row:fields){
+      String type=row[0].getText().toString().trim(),dn=row[1].getText().toString().trim(),material=row[2].getText().toString().trim();
+      if(type.isEmpty()){row[0].setError("Leitungsart erforderlich");return;}
+      if(!dn.isEmpty()&&!dn.matches("[1-9][0-9]{0,3}")){row[1].setError("DN zwischen 1 und 9999 eingeben");return;}
+      summary.append(type).append(" · DN ").append(dn.isEmpty()?"unbekannt":dn).append(" · ").append(material.isEmpty()?"Material unbekannt":material).append("\n");
+     }
+     new android.app.AlertDialog.Builder(this).setTitle("Soll-Vorschau").setMessage(summary.toString()).setPositiveButton("Zurück",null).show();
+    }));
+    dialog.show();
    }).show();
  }
  void choosePlanDocument(){
