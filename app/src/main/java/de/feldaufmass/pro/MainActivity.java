@@ -1823,6 +1823,8 @@ public class MainActivity extends Activity {
   EditText dn=new EditText(this);dn.setHint("DN (optional)");dn.setInputType(2);panel.addView(dn);
   EditText material=new EditText(this);material.setHint("Werkstoff (optional)");panel.addView(material);
   EditText rotation=new EditText(this);rotation.setHint("Drehwinkel (°)");rotation.setInputType(8194|4096);rotation.setText("0");panel.addView(rotation);
+  android.widget.SeekBar rotationSlider=new android.widget.SeekBar(this);rotationSlider.setMax(360);rotationSlider.setContentDescription("Drehwinkel 0 bis 360 Grad");panel.addView(rotationSlider);
+  rotationSlider.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(android.widget.SeekBar bar,int progress,boolean fromUser){if(fromUser)rotation.setText(String.valueOf(progress));}public void onStartTrackingTouch(android.widget.SeekBar bar){}public void onStopTrackingTouch(android.widget.SeekBar bar){}});
   android.widget.CheckBox mirror=new android.widget.CheckBox(this);mirror.setText("Spiegeln");panel.addView(mirror);
   EditText station=new EditText(this);station.setHint("Station Tiefbau (m, optional)");station.setInputType(8194);panel.addView(station);
   Button pickStation=new Button(this);pickStation.setText("Station aus Projekt wählen");panel.addView(pickStation);
@@ -1844,7 +1846,7 @@ public class MainActivity extends Activity {
    panel.addView(sheetText("Quelle: "+original.optString("sourceName")+" · Zeile "+original.optInt("sourceLineNumber")+"\n"+original.optString("sourceLine"),14,false));
   }
   Runnable updatePreview=()->{
-   try{preview.setRotation((float)MontageCatalog.normalizeRotation(Double.parseDouble(rotation.getText().toString().trim().replace(',','.'))));}
+   try{double degrees=MontageCatalog.normalizeRotation(Double.parseDouble(rotation.getText().toString().trim().replace(',','.')));preview.setRotation((float)degrees);if(!rotationSlider.isPressed())rotationSlider.setProgress((int)Math.round(degrees));}
    catch(IllegalArgumentException invalid){preview.setRotation(0);}
    preview.setScaleX(mirror.isChecked()?-1:1);
   };
