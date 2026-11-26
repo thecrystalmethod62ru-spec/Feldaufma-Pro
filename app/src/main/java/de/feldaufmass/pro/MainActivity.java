@@ -2993,7 +2993,13 @@ public class MainActivity extends Activity {
  p.setColor(0xffb7a48a);c.drawRect(20,top,340,bottom,p);
  p.setColor(0xffeee2cc);c.drawRect(x,top,z,bottom,p);
  float layerTop=top;
- if(Double.isFinite(topThickness)){p.setColor(covering.equals("Asphalt")?0xff454950:0xff85796d);layerTop=top+(float)(topThickness*scale);c.drawRect(20,top,340,layerTop,p);}
+ if(Double.isFinite(topThickness)){
+ RouteSketch style=new RouteSketch(MainActivity.this,"[]");style.bindDimensionProject(activeProject);
+ org.json.JSONObject settings=style.legendSettings();
+ p.setColor(style.configuredSurfaceColor(covering,settings));layerTop=top+(float)(topThickness*scale);c.drawRect(20,top,340,layerTop,p);
+ int hatch=style.configuredHatch(covering,settings);
+ if(hatch>=0&&layerTop>top){c.save();c.clipRect(20,top,340,layerTop);float band=12*getResources().getDisplayMetrics().density;for(float yy=top+band/2;yy<layerTop+band/2;yy+=band){c.save();c.translate(20,yy);style.drawHatchBand(c,320,band/12,hatch);c.restore();}c.restore();}
+ }
  if(Double.isFinite(base)){p.setColor(0xffa6a6a6);c.drawRect(20,layerTop,340,layerTop+(float)(base*scale),p);}
  if(!covering.equals("Asphalt")&&!covering.equals("Unbekannt")&&!covering.equals("Unbefestigt")&&!covering.equals("Sonstiges")){p.setColor(0xff777777);c.drawLine(20,top,340,top,p);for(int i=20;i<340;i+=covering.contains("platten")||covering.contains("Platten")?28:12)c.drawLine(i,top-4,i,top,p);}
  if(Double.isFinite(pipe)){float radius=(float)(pipe/2000*scale);p.setColor(0xff3686bc);c.drawCircle(180,bottom-radius,radius,p);}
