@@ -590,16 +590,26 @@ public class MainActivity extends Activity {
    if(fix==null){notice("Keine GPS-Position verfügbar. Bitte erneut versuchen.");return;}
    RouteSketch route=new RouteSketch(this,routeData());int index=findPoint(route,id);if(index<0)return;
    RouteSketch.Vertex point=route.vertices.get(index);
-   // Der schematische Plan besitzt noch keine georeferenzierte Transformation.
-   String info=String.format(java.util.Locale.GERMANY,"GPS-Genauigkeit: ± %.1f m",fix.getAccuracy());
-   new android.app.AlertDialog.Builder(this).setTitle("GPS-Punkt zuordnen")
-    .setMessage(info+(fix.getAccuracy()>5?"\nGPS-Genauigkeit gering.":"")+"\nDie Zeichnung ist noch nicht georeferenziert. Verschieben auf GPS ist erst nach Kalibrierung möglich.")
-    .setNegativeButton("Abbrechen",null).setPositiveButton("Manuellen Punkt beibehalten",(d,w)->{
-     RouteSketch latest=new RouteSketch(this,routeData());int i=findPoint(latest,id);if(i<0)return;
-     RouteSketch.Vertex v=latest.vertices.get(i);v.latitude=fix.getLatitude();v.longitude=fix.getLongitude();v.accuracy=fix.getAccuracy();
-     if(saveRoute(latest)){refreshRoute();notice("GPS-Koordinaten gespeichert.");}
-    }).show();
+   boolean precise=fix.hasAccuracy()&&RouteSketch.preciseGps(fix.getAccuracy());
+   android.graphics.PointF target=precise?route.gpsPosition(fix.getLatitude(),fix.getLongitude(),index):null;
+   String info=fix.hasAccuracy()?String.format(java.util.Locale.GERMANY,"GPS-Genauigkeit: ± %.2f m",fix.getAccuracy()):"GPS-Genauigkeit unbekannt";
+   android.app.AlertDialog.Builder choice=new android.app.AlertDialog.Builder(this).setTitle("GPS-Punkt zuordnen")
+    .setMessage(info+(target!=null?"\nPunkt kann verschoben werden.":!precise?"\nVerschieben gesperrt: Genauigkeit muss höchstens 0,50 m betragen.":"\nVerschieben nicht möglich: Kalibrierung fehlt oder Position außerhalb der Zeichnung."))
+    .setNegativeButton("Abbrechen",null).setPositiveButton("Manuellen Punkt beibehalten",(d,w)->storeGps(id,fix,false));
+   if(target!=null)choice.setNeutralButton("Auf GPS verschieben",(d,w)->storeGps(id,fix,true));
+   choice.show();
   });}catch(RuntimeException e){notice("GPS konnte nicht gestartet werden.");}
+ }
+ void storeGps(String id,android.location.Location fix,boolean move){
+  RouteSketch latest=new RouteSketch(this,routeData());int i=findPoint(latest,id);if(i<0)return;
+  RouteSketch.Vertex v=latest.vertices.get(i);
+  if(move){
+   android.graphics.PointF target=fix.hasAccuracy()&&RouteSketch.preciseGps(fix.getAccuracy())?latest.gpsPosition(fix.getLatitude(),fix.getLongitude(),i):null;
+   if(target==null){notice("GPS-Verschiebung nicht möglich.");return;}
+   v.point.set(target);
+  }
+  v.latitude=fix.getLatitude();v.longitude=fix.getLongitude();v.accuracy=fix.hasAccuracy()?fix.getAccuracy():Double.NaN;
+  if(saveRoute(latest)){refreshRoute();notice(move?"Punkt auf GPS-Position verschoben.":"GPS-Koordinaten gespeichert.");}
  }
  @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] results){
   super.onRequestPermissionsResult(requestCode,permissions,results);
