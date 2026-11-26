@@ -1791,13 +1791,57 @@ public class MainActivity extends Activity {
      boxes.add(new double[]{st,z,bottom,Double.isFinite(len)&&len>0?len:0});
      low=Math.min(low,bottom);high=Math.max(high,z);
     }
-    final double base=low,range=Math.max(0.1,high-low);
+    final java.util.List<double[]> trenchBottom=new java.util.ArrayList<>();
+    try{
+     String raw=getPreferences(0).getString("metricMainExcavationDepth","").trim();
+     double defaultDepth=raw.isEmpty()?Double.NaN:Double.parseDouble(raw.replace(',','.'));
+     if(!raw.isEmpty()&&(!Double.isFinite(defaultDepth)||defaultDepth<=0))throw new IllegalArgumentException();
+     java.util.List<double[]> sections=new java.util.ArrayList<>();
+     java.util.TreeSet<Double> cuts=new java.util.TreeSet<>();
+     for(double[] point:ground)cuts.add(point[0]);
+     for(String line:getPreferences(0).getString("metricDepthSections","").split("\\n")){
+      if(line.trim().isEmpty())continue;
+      String[] parts=line.split(";",-1);if(parts.length!=3)throw new IllegalArgumentException();
+      double[] v=new double[3];for(int k=0;k<3;k++){v[k]=Double.parseDouble(parts[k].trim().replace(',','.'));if(!Double.isFinite(v[k]))throw new IllegalArgumentException();}
+      if(v[0]<0||v[1]>total||v[0]>=v[1]||v[2]<=0)throw new IllegalArgumentException();
+      for(double[] old:sections)if(v[0]<old[1]&&old[0]<v[1])throw new IllegalArgumentException();
+      sections.add(v);cuts.add(v[0]);cuts.add(v[1]);
+     }
+     Double previous=null;
+     for(double end:cuts){
+      if(previous!=null){
+       double start=previous,mid=(start+end)/2,depth=defaultDepth;
+       for(double[] v:sections)if(mid>=v[0]&&mid<v[1])depth=v[2];
+       double z1=profile.elevation(start)-depth,z2=profile.elevation(end)-depth;
+       if(Double.isFinite(z1)&&Double.isFinite(z2))trenchBottom.add(new double[]{start,z1,end,z2});
+      }
+      previous=end;
+     }
+    }catch(Exception invalid){trenchBottom.clear();}
+    for(double[] segment:trenchBottom)low=Math.min(low,Math.min(segment[1],segment[3]));
+    final java.util.Set<double[]> belowBottom=java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<double[],Boolean>());
+    int unknownBottom=0;
+    for(double[] box:boxes){
+     if(box[2]>=box[1]){unknownBottom++;continue;}
+     boolean known=false;
+     for(double[] segment:trenchBottom){
+      if(box[0]<segment[0]||box[0]>segment[2])continue;
+      double z=segment[1]+(segment[3]-segment[1])*(box[0]-segment[0])/(segment[2]-segment[0]);
+      known=true;
+      if(box[2]<z-0.001)belowBottom.add(box);
+     }
+     if(!known)unknownBottom++;
+    }
+    if(!belowBottom.isEmpty())panel.addView(sheetText("Achtung: "+belowBottom.size()+" Formstücke reichen an ihrer Station unter die Grabensohle. Rote Markierung; Maße prüfen.",14,true));
+    if(unknownBottom>0)panel.addView(sheetText("Grabensohlenprüfung nicht möglich für "+unknownBottom+" Formstücke (Tiefe oder Bauhöhe fehlt).",13,false));
+    final double margin=Math.max(0.05,(high-low)*0.08);
+    final double base=low-margin,range=Math.max(0.1,high-low+2*margin);
     panel.addView(sheetText("Längsschnitt – Formstücke und GOK (schematisch, überhöht)",16,true));
     android.view.View longitudinalView=new android.view.View(this){
      final android.graphics.Paint p=new android.graphics.Paint(3);
      @Override protected void onDraw(android.graphics.Canvas c){
       super.onDraw(c);float pad=24*getResources().getDisplayMetrics().density;
-      float w=getWidth()-2*pad,h=getHeight()-2*pad;if(w<=0||h<=0)return;
+      float w=getWidth()-2*pad,h=getHeight()-2*pad;if(w<=0||h<=0||!Double.isFinite(total)||total<=0)return;
       p.setTextSize(10*getResources().getDisplayMetrics().scaledDensity);
       p.setStrokeWidth(1);
       for(int i=0;i<=4;i++){
@@ -1818,12 +1862,15 @@ public class MainActivity extends Activity {
        c.drawText(String.format(java.util.Locale.GERMANY,"%+.1f %%",profile.fallPercent(a[0],b[0])),x,Math.max(12,y-7),p);
       }
       p.setTextAlign(android.graphics.Paint.Align.LEFT);
+      p.setColor(0xff62b5db);p.setStrokeWidth(2);
+      for(double[] segment:trenchBottom)c.drawLine(pad+(float)(segment[0]/total*w),pad+(float)((1-(segment[1]-base)/range)*h),pad+(float)(segment[2]/total*w),pad+(float)((1-(segment[3]-base)/range)*h),p);
       p.setColor(0xffeab65d);
-      for(double[] b:boxes){float x=pad+(float)(b[0]/total*w),y=pad+(float)((1-(b[1]-base)/range)*h),bottom=pad+(float)((1-(b[2]-base)/range)*h),half=(float)(b[3]/total*w/2);if(half>0&&bottom>y)c.drawRect(x-half,y,x+half,bottom,p);else c.drawCircle(x,y,4,p);}
+      for(double[] b:boxes){p.setColor(belowBottom.contains(b)?0xffef5350:0xffeab65d);float x=pad+(float)(b[0]/total*w),y=pad+(float)((1-(b[1]-base)/range)*h),bottom=pad+(float)((1-(b[2]-base)/range)*h),half=(float)(b[3]/total*w/2);if(half>0&&bottom>y)c.drawRect(x-half,y,x+half,bottom,p);else c.drawCircle(x,y,4,p);}
      }
     };
     longitudinalView.setBackgroundColor(0xff111111);
     panel.addView(longitudinalView,new android.widget.LinearLayout.LayoutParams(-1,(int)(220*getResources().getDisplayMetrics().density)));
+    panel.addView(sheetText(trenchBottom.isEmpty()?"Grabensohle nicht darstellbar: gültige Tiefen und Höhen erforderlich.":"Blau: Grabensohle aus Tiefbau-Tiefen; fehlende Abschnitte bleiben offen.",13,false));
     panel.addView(sheetText("Darstellbare Formstücke: "+boxes.size()+" / "+linked.size()+". Fehlende Abmessungen als Punkt.",13,false));
    }
    if(derivedElevations>0)panel.addView(sheetText("Höhenkoten aus Tiefbau-GOK und Überdeckung berechnet: "+derivedElevations+". Gemeinsamen Höhenbezug prüfen.",14,false));
