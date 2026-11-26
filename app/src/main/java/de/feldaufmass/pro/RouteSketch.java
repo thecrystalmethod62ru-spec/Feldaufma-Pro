@@ -246,7 +246,7 @@ final class RouteSketch extends View {
   dimensionProject=project;dimensionOffsets.clear();
   try{
    org.json.JSONObject data=new org.json.JSONObject(getContext().getSharedPreferences("dimension_layout",0).getString(project,"{}"));
-   java.util.Iterator<String> keys=data.keys();while(keys.hasNext()){String k=keys.next();double v=data.optDouble(k);if(Double.isFinite(v)&&v>=15&&v<=260)dimensionOffsets.put(k,(float)v);}
+   java.util.Iterator<String> keys=data.keys();while(keys.hasNext()){String k=keys.next();double v=data.optDouble(k);if(Double.isFinite(v)&&(k.startsWith("route:")?Math.abs(v)<=1000:v>=15&&v<=260))dimensionOffsets.put(k,(float)v);}
   }catch(Exception ignored){}
   invalidate();
  }
@@ -259,13 +259,13 @@ final class RouteSketch extends View {
   return ok;
  }
  void resetDimensionLayout(){
-  new android.app.AlertDialog.Builder(getContext()).setTitle("Maßpositionen zurücksetzen?").setMessage("Alle Oberflächenmaße werden wieder automatisch angeordnet. Messwerte bleiben unverändert.").setNegativeButton("Abbrechen",null).setPositiveButton("Zurücksetzen",(dialog,which)->{java.util.HashMap<String,Float> old=new java.util.HashMap<>(dimensionOffsets);dimensionOffsets.clear();if(!saveDimensionLayout())dimensionOffsets.putAll(old);invalidate();}).show();
+  new android.app.AlertDialog.Builder(getContext()).setTitle("Maßpositionen zurücksetzen?").setMessage("Alle Maßbeschriftungen werden wieder automatisch angeordnet. Messwerte bleiben unverändert.").setNegativeButton("Abbrechen",null).setPositiveButton("Zurücksetzen",(dialog,which)->{java.util.HashMap<String,Float> old=new java.util.HashMap<>(dimensionOffsets);dimensionOffsets.clear();if(!saveDimensionLayout())dimensionOffsets.putAll(old);invalidate();}).show();
  }
  private DimensionHit activeDimension;
  private float dimensionStartX,dimensionStartY;
- private Float previousDimensionOffset;
+ private Float previousDimensionOffset,previousRouteX,previousRouteY;
+ private void restoreDimensionDrag(){String k=activeDimension.key;if(k.startsWith("route:")){if(previousRouteX==null)dimensionOffsets.remove(k+":x");else dimensionOffsets.put(k+":x",previousRouteX);if(previousRouteY==null)dimensionOffsets.remove(k+":y");else dimensionOffsets.put(k+":y",previousRouteY);}else if(previousDimensionOffset==null)dimensionOffsets.remove(k);else dimensionOffsets.put(k,previousDimensionOffset);}
  private void drawSurfaceDimensions(Canvas c,float d){
-  dimensionHits.clear();
   if(!layerVisible(LAYER_SURFACES)||!layerVisible(LAYER_SURFACE_DIMENSIONS))return;
   java.util.TreeSet<Double> boundaries=new java.util.TreeSet<>();
   for(int j=0;j<surfaceSections.length();j++){
@@ -574,6 +574,7 @@ final class RouteSketch extends View {
   drawUnderlay(c);
   float density=getResources().getDisplayMetrics().density;
   paint.setTextSize(13*density);
+  dimensionHits.clear();
   drawSurfaceSections(c,density);
   for(int i=1;i<vertices.size();i++){
    PointF a=vertices.get(i-1).point,b=vertices.get(i).point;
@@ -582,6 +583,8 @@ final class RouteSketch extends View {
    double metres=vertices.get(i).metres;
    String label=Double.isFinite(metres)?String.format(Locale.GERMANY,"%.2f m",metres):"Maß fehlt";
    float tx=left()+(a.x+b.x)*scale()/2,ty=top()+(a.y+b.y)*scale()/2-6*density;
+   String key="route:"+i;tx+=density*dimensionOffsets.getOrDefault(key+":x",0f);ty+=density*dimensionOffsets.getOrDefault(key+":y",0f);
+   dimensionHits.add(new DimensionHit(key,new android.graphics.RectF(tx-4*density,ty-16*density,tx+paint.measureText(label)+4*density,ty+5*density),0,0,0));
    paint.setColor(Double.isFinite(metres)?Color.WHITE:0xffffcf73);
    c.drawRoundRect(tx-2*density,ty-14*density,tx+paint.measureText(label)+2*density,ty+3*density,4,4,paint);
    paint.setColor(0xff173c42);c.drawText(label,tx,ty,paint);
@@ -669,24 +672,25 @@ final class RouteSketch extends View {
  @Override public boolean onTouchEvent(MotionEvent event){
   if(!editable && pointSelected==null)return false;
   int action=event.getActionMasked();
-  if(event.getPointerCount()>=2&&activeDimension!=null){if(previousDimensionOffset==null)dimensionOffsets.remove(activeDimension.key);else dimensionOffsets.put(activeDimension.key,previousDimensionOffset);activeDimension=null;}
+  if(event.getPointerCount()>=2&&activeDimension!=null){restoreDimensionDrag();activeDimension=null;}
   if(editable&&moving&&!placingObject&&!editingObjects&&action==MotionEvent.ACTION_DOWN){
    for(int i=dimensionHits.size()-1;i>=0;i--){
     DimensionHit hit=dimensionHits.get(i);
     if(hit.bounds.contains(event.getX(),event.getY())){
-     activeDimension=hit;previousDimensionOffset=dimensionOffsets.get(hit.key);dimensionStartX=event.getX();dimensionStartY=event.getY();getParent().requestDisallowInterceptTouchEvent(true);return true;
+     activeDimension=hit;previousDimensionOffset=dimensionOffsets.get(hit.key);previousRouteX=dimensionOffsets.get(hit.key+":x");previousRouteY=dimensionOffsets.get(hit.key+":y");dimensionStartX=event.getX();dimensionStartY=event.getY();getParent().requestDisallowInterceptTouchEvent(true);return true;
     }
    }
   }
   if(activeDimension!=null){
    if(action==MotionEvent.ACTION_MOVE){
     float d=getResources().getDisplayMetrics().density;
+    if(activeDimension.key.startsWith("route:")){dimensionOffsets.put(activeDimension.key+":x",Math.max(-1000,Math.min(1000,(previousRouteX==null?0:previousRouteX)+(event.getX()-dimensionStartX)/d)));dimensionOffsets.put(activeDimension.key+":y",Math.max(-1000,Math.min(1000,(previousRouteY==null?0:previousRouteY)+(event.getY()-dimensionStartY)/d)));invalidate();return true;}
     float delta=((event.getX()-dimensionStartX)*activeDimension.nx+(event.getY()-dimensionStartY)*activeDimension.ny)/d;
     dimensionOffsets.put(activeDimension.key,Math.max(15,Math.min(260,activeDimension.offset+delta)));invalidate();return true;
    }
    if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL){
-    if(action==MotionEvent.ACTION_CANCEL){if(previousDimensionOffset==null)dimensionOffsets.remove(activeDimension.key);else dimensionOffsets.put(activeDimension.key,previousDimensionOffset);}
-    if(action==MotionEvent.ACTION_UP&&!saveDimensionLayout()){if(previousDimensionOffset==null)dimensionOffsets.remove(activeDimension.key);else dimensionOffsets.put(activeDimension.key,previousDimensionOffset);}
+    if(action==MotionEvent.ACTION_CANCEL){restoreDimensionDrag();}
+    if(action==MotionEvent.ACTION_UP&&!saveDimensionLayout()){restoreDimensionDrag();}
     activeDimension=null;getParent().requestDisallowInterceptTouchEvent(false);invalidate();return true;
    }
    return true;
