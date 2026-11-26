@@ -3025,6 +3025,21 @@ public class MainActivity extends Activity {
      c.drawText(String.format(java.util.Locale.GERMANY,"St. %.2f",station),x,labelY,pen);
     }
     pen.setTextAlign(android.graphics.Paint.Align.LEFT);
+    java.util.TreeSet<Double> warningCuts=new java.util.TreeSet<>();
+    double warningTotal=route.measuredLength(),warningStation=0;
+    warningCuts.add(0.0);
+    for(int k=1;k<route.vertices.size();k++){warningStation+=route.vertices.get(k).metres;warningCuts.add(warningStation);}
+    for(int k=0;k<widthSections.length();k++){org.json.JSONObject section=widthSections.optJSONObject(k);if(section!=null)for(String key:new String[]{"from","to"}){double value=section.optDouble(key);if(value>0&&value<warningTotal)warningCuts.add(value);}}
+    org.json.JSONArray warningUtilities=extraUtilities();
+    for(int k=0;k<warningUtilities.length();k++){org.json.JSONObject u=warningUtilities.optJSONObject(k);if(u!=null)for(String key:new String[]{"routeFrom","routeTo"}){double value=u.optDouble(key);if(value>0&&value<warningTotal)warningCuts.add(value);}}
+    Double warningPrevious=null;
+    for(double stop:warningCuts){
+     if(warningPrevious==null){warningPrevious=stop;continue;}
+     double begin=warningPrevious;warningPrevious=stop;double mid=(begin+stop)/2;
+     boolean invalid=false;
+     for(int k=0;k<warningUtilities.length();k++){org.json.JSONObject u=warningUtilities.optJSONObject(k);if(u!=null&&mid>=u.optDouble("routeFrom",0)&&mid<u.optDouble("routeTo",Double.POSITIVE_INFINITY)&&utilityOutsideProfile(u,widthAt(mid),Double.NaN)){invalid=true;break;}}
+     if(invalid){double[] u=model.station(begin),v=model.station(stop);if(u!=null&&v!=null){pen.setColor(0xffb3261e);pen.setStrokeWidth(dp(4));c.drawLine((float)(ox+u[0]*scale),(float)(oy-u[1]*scale),(float)(ox+v[0]*scale),(float)(oy-v[1]*scale),pen);}}
+    }
     pen.setColor(0xffe6a23c);
     for(double[] p:montagePoints)c.drawCircle((float)(ox+p[0]*scale),(float)(oy-p[1]*scale),dp(5),pen);
     if(previewActive&&downHit>=0&&downHit<branchHits.size()){
