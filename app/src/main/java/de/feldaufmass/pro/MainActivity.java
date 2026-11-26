@@ -868,6 +868,7 @@ public class MainActivity extends Activity {
    if(selectVoicePoint(text))capturePhoto();return;
   }
   if(offerVoiceObjectDimensions(text)||offerVoiceSurface(text)||offerVoiceObject(text)||offerVoiceSegment(text)||offerVoicePointAction(text))return;
+  if(offerProfileBatch(text,false))return;
   showPage(voicePage);
   if(voiceLanguage.getSelectedItemPosition()==0){voiceText.setText(text);offerVoiceRename(text);return;}
   if(translator==null)translator=com.google.mlkit.nl.translate.Translation.getClient(
@@ -908,14 +909,40 @@ public class MainActivity extends Activity {
   }
   new android.app.AlertDialog.Builder(this).setTitle("Ассистент — недостающие данные").setMessage(b.length()==0?"Основные проверяемые размеры заполнены.":b.toString()).setNegativeButton("Уточню позже",null).setPositiveButton("Ответить",(d,w)->{showPage(voicePage);voiceText.requestFocus();}).show();
  }
- void applyDictation(){
- String t=voiceText.getText().toString().toLowerCase(java.util.Locale.ROOT);
- String[] names={"(?:grabenbreite|breite|ширина(?: траншеи)?)","(?:grabentiefe|tiefe|глубина(?: траншеи)?)","(?:trassenlänge|länge|длина(?: трассы)?)"};
- EditText[] targets={width,depth,length};String[] proposed=new String[3];StringBuilder preview=new StringBuilder();
- for(int j=0;j<names.length;j++){java.util.regex.Matcher m=java.util.regex.Pattern.compile(names[j]+"\\s*[:=]?\\s*(?:ist\\s+)?(\\d+(?:[.,]\\d+)?)\\s*(zentimeter|cm|сантиметр[а-я]*|см|millimeter|mm|мм|meter|метр[а-я]*|m|м)(?![\\p{L}])").matcher(t);
- if(m.find()){double v=Double.parseDouble(m.group(1).replace(',','.'));String unit=m.group(2);if(unit.startsWith("zentimeter")||unit.equals("cm")||unit.startsWith("сантиметр")||unit.equals("см"))v/=100;else if(unit.equals("mm")||unit.equals("мм")||unit.equals("millimeter"))v/=1000;if(v>0&&Double.isFinite(v)){proposed[j]=String.format(java.util.Locale.GERMANY,"%.3f",v);preview.append(new String[]{"Breite","Tiefe","Länge"}[j]+": "+proposed[j]+" m\n");}}}
- if(preview.length()==0){Toast.makeText(this,"Keine eindeutigen Maße mit Einheit erkannt.",Toast.LENGTH_LONG).show();return;}
- new android.app.AlertDialog.Builder(this).setTitle("Erkannte Maße prüfen").setMessage(preview.toString()).setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",(dialog,which)->{for(int j=0;j<3;j++)if(proposed[j]!=null)targets[j].setText(proposed[j]);}).show();
+ void applyDictation(){offerProfileBatch(voiceText.getText().toString(),true);}
+ boolean offerProfileBatch(String message,boolean warn){
+  String t=message.toLowerCase(java.util.Locale.ROOT);
+  String[] names={"(?:grabenbreite|ширин[аой]\\s+траншеи|траншея\\s+шириной)","(?:grabentiefe|глубин[аой]\\s+траншеи|траншея\\s+глубиной)","(?:trassenlänge|длина\\s+трассы)","(?:asphaltstärke|asphaltdicke|толщина\\s+асфальта|асфальт)","(?:nachschnitt\\s+links|nachschnitt\\s+слева|подрезка\\s+слева)","(?:nachschnitt\\s+rechts|nachschnitt\\s+справа|подрезка\\s+справа)"};
+  EditText[] targets={width,depth,length,asphaltInput,leftInput,rightInput};
+  String[] keys={"width","depth","length","asphalt","left","right"};
+  String[] labels={"Grabenbreite","Grabentiefe","Trassenlänge","Asphaltstärke","Nachschnitt links","Nachschnitt rechts"};
+  String[] proposed=new String[targets.length];StringBuilder preview=new StringBuilder();boolean conflict=false;
+  for(int j=0;j<names.length;j++){
+   java.util.regex.Matcher m=java.util.regex.Pattern.compile(names[j]+"\\s*[:=]?\\s*(?:ist\\s+)?(\\d+(?:[.,]\\d+)?)\\s*(zentimeter|cm|сантиметр[а-я]*|см|millimeter|mm|мм|meter|метр[а-я]*|m|м)(?![\\p{L}])").matcher(t);
+   while(m.find()){
+    double v=Double.parseDouble(m.group(1).replace(',','.'));String unit=m.group(2);
+    if(unit.equals("cm")||unit.equals("см")||unit.startsWith("сантиметр")||unit.equals("zentimeter"))v/=100;
+    else if(unit.equals("mm")||unit.equals("мм")||unit.equals("millimeter"))v/=1000;
+    if(!Double.isFinite(v)||v<0||(j<4&&v==0))continue;
+    String next=java.math.BigDecimal.valueOf(v).stripTrailingZeros().toPlainString().replace('.',',');
+    if(proposed[j]!=null&&!proposed[j].equals(next))conflict=true;
+    proposed[j]=next;
+   }
+   if(proposed[j]!=null){preview.append(labels[j]).append(": ").append(proposed[j]).append(" m");
+    if(targets[j].length()>0)preview.append(" (bisher: ").append(targets[j].getText()).append(" m)");
+    preview.append("\n");}
+  }
+  if(conflict){notice("Обнаружены противоречивые размеры. Уточни значения.");return true;}
+  if(preview.length()==0){if(warn)notice("Не распознаны однозначные размеры траншеи или покрытия.");return false;}
+  new android.app.AlertDialog.Builder(this).setTitle("Проверь распознанные размеры").setMessage(preview+"\nДругие сведения из сообщения пока не обработаны.")
+   .setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",(d,w)->{
+    android.content.SharedPreferences.Editor ed=getPreferences(0).edit();
+    for(int j=0;j<targets.length;j++)if(proposed[j]!=null)ed.putString(keys[j],proposed[j]);
+    if(!ed.commit()){notice("Speichern fehlgeschlagen.");return;}
+    for(int j=0;j<targets.length;j++)if(proposed[j]!=null)targets[j].setText(proposed[j]);
+    if(length.length()>0&&width.length()>0&&depth.length()>0)calculate();
+    showMissingAssistantData();
+   }).show();return true;
  }
  void addSegment(){try{
  double start=number(stationFrom),end=number(stationTo),total=l,gw=number(width);
