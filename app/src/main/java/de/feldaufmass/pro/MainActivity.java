@@ -686,6 +686,15 @@ public class MainActivity extends Activity {
   Button objectTools=new Button(this);objectTools.setAllCaps(false);objectTools.setText("□\nObjekte");tools.addView(objectTools,new LinearLayout.LayoutParams(0,-2,1));objectTools.setOnClickListener(v->openObjects.run());
   for(Button b:new Button[]{back,mic,measureList,resetZoom,legendEdit,objectTools})styleEditorButton(b,false);
   styleEditorButton(save,true);LinearLayout.LayoutParams saveParams=new LinearLayout.LayoutParams(-1,dp(48));saveParams.setMargins(dp(10),dp(4),dp(10),dp(8));root.addView(save,saveParams);
+  Button canvasToggle=new Button(this);canvasToggle.setText("⛶");canvasToggle.setContentDescription("Zeichenfläche maximieren");styleEditorButton(canvasToggle,false);
+  header.addView(canvasToggle,new LinearLayout.LayoutParams(dp(44),dp(48)));
+  android.widget.FrameLayout canvasFrame=new android.widget.FrameLayout(this);
+  int canvasIndex=root.indexOfChild(route);root.removeView(route);root.addView(canvasFrame,canvasIndex,new LinearLayout.LayoutParams(-1,0,1));
+  canvasFrame.addView(route,new android.widget.FrameLayout.LayoutParams(-1,-1));
+  Button restoreTools=new Button(this);restoreTools.setText("☰");restoreTools.setContentDescription("Werkzeuge anzeigen");styleEditorButton(restoreTools,false);
+  android.widget.FrameLayout.LayoutParams floating=new android.widget.FrameLayout.LayoutParams(dp(44),dp(44),Gravity.TOP|Gravity.RIGHT);floating.setMargins(dp(4),dp(4),dp(4),dp(4));canvasFrame.addView(restoreTools,floating);restoreTools.setVisibility(View.GONE);
+  canvasToggle.setOnClickListener(v->{for(View bar:new View[]{header,controls,historyBar,tools,save})bar.setVisibility(View.GONE);restoreTools.setVisibility(View.VISIBLE);});
+  restoreTools.setOnClickListener(v->{for(View bar:new View[]{header,controls,historyBar,tools,save})bar.setVisibility(View.VISIBLE);restoreTools.setVisibility(View.GONE);});
   full.setContentView(root);
   full.setOnDismissListener(d->{
    pendingEditorSpeech=null;route.darkEditor=false;
