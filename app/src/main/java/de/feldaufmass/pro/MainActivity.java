@@ -8,7 +8,7 @@ import android.content.SharedPreferences;
 
 public class MainActivity extends Activity {
  EditText project,length,width,depth; TextView result; Sketch sketch;
- EditText voiceText; Spinner voiceLanguage;
+ EditText objectStation,objectNote; Spinner objectType,objectSide; TextView objectList; org.json.JSONArray objects=new org.json.JSONArray(); EditText voiceText; Spinner voiceLanguage;
  double l,w,d,asphalt,left,right; EditText asphaltInput,leftInput,rightInput; Profile profile; Spinner surface; EditText stoneLength,stoneWidth,stoneDepth,stoneColor,pattern,bedding,underlying; Spinner handling; TextView legend; EditText stationFrom,stationTo; TextView segmentsView; org.json.JSONArray segments=new org.json.JSONArray(); EditText baseInput,pipeInput; double base=Double.NaN,pipe=Double.NaN; String covering="Unbekannt";
  EditText field(LinearLayout root,String label,String key,boolean numeric){
  TextView t=new TextView(this);t.setText(label);root.addView(t);
@@ -64,6 +64,15 @@ public class MainActivity extends Activity {
  addSegment.setOnClickListener(v->addSegment());
  removeSegment.setOnClickListener(v->{if(segments.length()>0){segments.remove(segments.length()-1);persistSegments();}});
  showSegments();
+ TextView oh=new TextView(this);oh.setText("Trassenobjekte");oh.setTextSize(20);root.addView(oh);
+ objectType=new Spinner(this);objectType.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Hausanschluss","Suchschachtung","Startgrube","Zielgrube","KVS","Hindernis","Kernbohrung","Knickpunkt"}));root.addView(objectType);
+ objectStation=field(root,"Objektstation (m)","objectStation",true);
+ objectSide=new Spinner(this);objectSide.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Unbekannt","links","rechts","mittig"}));root.addView(objectSide);
+ objectNote=field(root,"Objektdetails / Bemerkung","objectNote",false);
+ try{objects=new org.json.JSONArray(getPreferences(0).getString("objects","[]"));}catch(Exception ignored){}
+ Button ob=new Button(this);ob.setText("Objekt hinzufügen");root.addView(ob);ob.setOnClickListener(v->addObject());
+ objectList=new TextView(this);root.addView(objectList);showObjects();
+ Button undo=new Button(this);undo.setText("Letztes Objekt entfernen");root.addView(undo);undo.setOnClickListener(v->{if(objects.length()>0){objects.remove(objects.length()-1);saveObjects();}});
  profile=new Profile();root.addView(profile,new LinearLayout.LayoutParams(-1,(int)(300*getResources().getDisplayMetrics().density)));
  save.setOnClickListener(v->calculate());if(length.length()>0&&width.length()>0&&depth.length()>0)calculate();
  }
@@ -83,6 +92,9 @@ public class MainActivity extends Activity {
  if(handling.getSelectedItemPosition()>0)details.append("\n"+handling.getSelectedItem());
  legend.setText(details.toString());sketch.invalidate();profile.invalidate();
  }catch(Exception e){result.setText("Bitte gültige positive Maße eingeben.");}}
+ void addObject(){try{double st=number(objectStation),total=number(length);if(!Double.isFinite(st)||!Double.isFinite(total)||total<=0||st<0||st>total)throw new Exception();org.json.JSONObject o=new org.json.JSONObject();o.put("station",st);o.put("type",objectType.getSelectedItem().toString());o.put("side",objectSide.getSelectedItem().toString());o.put("note",objectNote.getText().toString());objects.put(o);saveObjects();}catch(Exception e){Toast.makeText(this,"Objektstation außerhalb der Trasse oder ungültig.",Toast.LENGTH_LONG).show();}}
+ void saveObjects(){getPreferences(0).edit().putString("objects",objects.toString()).apply();showObjects();sketch.invalidate();}
+ void showObjects(){StringBuilder b=new StringBuilder();for(int i=0;i<objects.length();i++){org.json.JSONObject o=objects.optJSONObject(i);if(o!=null)b.append(String.format(java.util.Locale.GERMANY,"%.2f m | %s | %s | %s\n",o.optDouble("station"),o.optString("type"),o.optString("side"),o.optString("note")));}objectList.setText(b.toString());}
  void startDictation(){
  android.content.Intent i=new android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
  i.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
@@ -154,6 +166,6 @@ public class MainActivity extends Activity {
  c.save();c.clipRect(a,65,b,125);
  for(int row=0;row<3;row++){float y=65+row*20;c.drawLine(a,y,b,y,p);for(float x=a-(row%2)*step/2;x<b;x+=step)c.drawLine(x,y,x,y+20,p);}
  c.restore();}
-p.setColor(Color.BLACK);p.setStrokeWidth(2);c.drawLine(a,95,b,95,p);c.drawLine(a,160,b,160,p);c.drawLine(a,150,a,170,p);c.drawLine(b,150,b,170,p);p.setTextSize(22);c.drawText("0,00 m",a,45,p);c.drawText(String.format(java.util.Locale.GERMANY,"%.2f m",l),Math.max(a,b-110),45,p);c.drawText("Breite: "+w+" m",a,200,p);c.drawText("Schematisch – nicht maßstäblich",a,245,p);}
+p.setColor(Color.BLACK);p.setStrokeWidth(2);c.drawLine(a,95,b,95,p);if(l>0){for(int i=0;i<objects.length();i++){org.json.JSONObject o=objects.optJSONObject(i);if(o==null)continue;double st=o.optDouble("station");if(st<0||st>l)continue;float x=a+(b-a)*(float)(st/l);p.setColor(0xff246eaa);c.drawCircle(x,95,6,p);p.setColor(Color.BLACK);}}c.drawLine(a,160,b,160,p);c.drawLine(a,150,a,170,p);c.drawLine(b,150,b,170,p);p.setTextSize(22);c.drawText("0,00 m",a,45,p);c.drawText(String.format(java.util.Locale.GERMANY,"%.2f m",l),Math.max(a,b-110),45,p);c.drawText("Breite: "+w+" m",a,200,p);c.drawText("Schematisch – nicht maßstäblich",a,245,p);}
  }
 }
