@@ -22,7 +22,7 @@ public final class PipeLayoutView extends View {
     public interface Move { void move(int index,double offset,double bedding); }
     private Move move;
     private int dragged=-1;
-    private float startX,startY,dragScale;
+    private float startX,startY,dragScale,dragCx,dragBottom;
     private PipeLayout.Pipe original;
     private boolean moving;
     public void setMove(Move move){this.move=move;}
@@ -38,8 +38,9 @@ public final class PipeLayoutView extends View {
         double extent=width/2,above=depth;
         for(PipeLayout.Pipe pipe:pipes){extent=Math.max(extent,Math.abs(pipe.offset)+pipe.diameter/2);above=Math.max(above,pipe.bedding+pipe.diameter);}
         scale=(float)Math.min((getWidth()-2*pad)/(2*extent),(getHeight()-2*pad)/above);
+        if(dragged>=0&&dragScale>0){scale=dragScale;cx=dragCx;bottom=dragBottom;}
+        else{cx=getWidth()/2f;bottom=getHeight()-pad;}
         if(scale<=0)return;
-        cx=getWidth()/2f;bottom=getHeight()-pad;
         float left=cx-(float)(width*scale/2),right=cx+(float)(width*scale/2),top=bottom-(float)(depth*scale);
         p.setColor(0x33b79b70);c.drawRect(left,top,right,bottom,p);
         p.setColor(0xff68945d);p.setStrokeWidth(3);c.drawLine(left,top,right,top,p);
@@ -105,9 +106,14 @@ public final class PipeLayoutView extends View {
     @Override public boolean onTouchEvent(MotionEvent event){
         switch(event.getActionMasked()){
             case MotionEvent.ACTION_DOWN:
-                dragged=hit(event.getX(),event.getY());startX=event.getX();startY=event.getY();dragScale=scale;moving=false;
+                dragged=hit(event.getX(),event.getY());startX=event.getX();startY=event.getY();dragScale=scale;dragCx=cx;dragBottom=bottom;moving=false;
                 original=dragged>=0?pipes.get(dragged):null;
                 if(dragged>=0&&move!=null&&getParent()!=null)getParent().requestDisallowInterceptTouchEvent(true);
+                return true;
+            case MotionEvent.ACTION_POINTER_DOWN:
+                if(dragged>=0&&original!=null)pipes.set(dragged,original);
+                dragged=-1;original=null;moving=false;invalidate();
+                if(getParent()!=null)getParent().requestDisallowInterceptTouchEvent(false);
                 return true;
             case MotionEvent.ACTION_MOVE:
                 if(original!=null&&!original.fixed&&move!=null&&dragScale>0){
@@ -131,7 +137,7 @@ public final class PipeLayoutView extends View {
                 break;
             default:return true;
         }
-        dragged=-1;original=null;moving=false;
+        dragged=-1;original=null;moving=false;invalidate();
         if(getParent()!=null)getParent().requestDisallowInterceptTouchEvent(false);
         return true;
     }
