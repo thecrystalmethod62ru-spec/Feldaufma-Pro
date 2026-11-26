@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, development]
   workflow_dispatch:
 permissions:
   contents: read
@@ -42,6 +42,15 @@ jobs:
           script: |
             adb shell cmd overlay enable-exclusive --user current --category com.android.internal.systemui.navbar.threebutton
             gradle :app:connectedDebugAndroidTest --rerun-tasks --stacktrace
+      - name: Upload Android test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-test-diagnostics
+          path: |
+            app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:
           name: Feldaufmass-Pro-v0.1
