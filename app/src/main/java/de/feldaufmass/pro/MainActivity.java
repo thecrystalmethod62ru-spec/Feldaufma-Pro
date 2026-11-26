@@ -2222,8 +2222,14 @@ public class MainActivity extends Activity {
         for(EditText f:new EditText[]{offset,bedding,gapInput,coverInput,diameterInput,wallInput})f.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){previewUpdate.run();}public void afterTextChanged(android.text.Editable e){}});
         previewUpdate.run();
         ScrollView editScroll=new ScrollView(this);editScroll.addView(fields);
-        final android.app.AlertDialog edit=new android.app.AlertDialog.Builder(this).setTitle("Rohrlage bearbeiten").setView(editScroll).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
-        edit.setOnShowListener(ignored->edit.getButton(-1).setOnClickListener(button->{
+        final android.widget.LinearLayout sheet=new android.widget.LinearLayout(this);sheet.setOrientation(1);sheet.setBackgroundColor(0xff202827);
+        sheet.addView(editScroll,new android.widget.LinearLayout.LayoutParams(-1,0,1));
+        android.widget.LinearLayout actions=new android.widget.LinearLayout(this);sheet.addView(actions);
+        Button cancel=new Button(this),apply=new Button(this);cancel.setText("Abbrechen");apply.setText("Speichern");actions.addView(cancel,new android.widget.LinearLayout.LayoutParams(0,-2,1));actions.addView(apply,new android.widget.LinearLayout.LayoutParams(0,-2,1));
+        final android.widget.PopupWindow edit=new android.widget.PopupWindow(sheet,Math.min(dp(420),getResources().getDisplayMetrics().widthPixels),Math.min(dp(360),getResources().getDisplayMetrics().heightPixels/2),true);
+        edit.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0xff202827));edit.setOutsideTouchable(true);edit.setInputMethodMode(android.widget.PopupWindow.INPUT_METHOD_NEEDED);
+        cancel.setOnClickListener(button->edit.dismiss());
+        apply.setOnClickListener(button->{
          try{
           double o=Double.parseDouble(offset.getText().toString().trim().replace(',','.'));
           double b=Double.parseDouble(bedding.getText().toString().trim().replace(',','.'));
@@ -2231,7 +2237,7 @@ public class MainActivity extends Activity {
           next.set(index,new PipeLayout.Pipe(pipe.name,o,number(diameterInput),number(wallInput),b,Double.parseDouble(gapInput.getText().toString().trim().replace(',','.')),Double.parseDouble(coverInput.getText().toString().trim().replace(',','.')),pipe.fixed));
           multiPipeStore.save(next);pipes.clear();pipes.addAll(next);refresh.run();edit.dismiss();
          }catch(Exception ex){bedding.setError("Ungültige Lage oder Speicherfehler: "+ex.getMessage());}
-        }));edit.show();return;
+        });edit.showAtLocation(cross,Gravity.BOTTOM|Gravity.RIGHT,0,0);return;
        }
        Runnable change=()->{
         java.util.List<PipeLayout.Pipe> next=new java.util.ArrayList<>(pipes);
