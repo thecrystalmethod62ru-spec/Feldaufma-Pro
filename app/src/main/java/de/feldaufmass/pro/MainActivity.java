@@ -116,7 +116,7 @@ public class MainActivity extends Activity {
  profileSlider(profilePage,"Grabentiefe",depth,10,800);
  profileSlider(profilePage,"Nachschnitt links",leftInput,0,200);
  profileSlider(profilePage,"Nachschnitt rechts",rightInput,0,200);
- save.setOnClickListener(v->{calculate();showPage(planPage);});if(length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);
+ save.setOnClickListener(v->{if(calculate())showPage(planPage);});if(length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);
  }
  void profileSlider(LinearLayout page,String name,EditText target,int min,int max){
  TextView label=new TextView(this);page.addView(label);SeekBar bar=new SeekBar(this);bar.setMax(max-min);page.addView(bar);
@@ -128,11 +128,13 @@ public class MainActivity extends Activity {
  exact.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){if(busy[0])return;try{double v=number(exact);if(!Double.isFinite(v)||v<min/100.0||v>max/100.0)return;busy[0]=true;target.setText(s);label.setText(name+" · "+s+" m");bar.setProgress((int)Math.round(v*100)-min);busy[0]=false;calculate();}catch(Exception e){busy[0]=false;}}public void afterTextChanged(android.text.Editable e){}});
  sync.run();
  }
- void calculate(){try{l=number(length);w=number(width);d=number(depth);if(!Double.isFinite(l*w*d)||l<=0||w<=0||d<=0)throw new Exception();
+ boolean calculate(){try{double l=number(length),w=number(width),d=number(depth);if(!Double.isFinite(l*w*d)||l<=0||w<=0||d<=0)throw new Exception();
  optional(stoneLength);optional(stoneWidth);optional(stoneDepth);
- covering=surface.getSelectedItem().toString();base=optional(baseInput);pipe=optional(pipeInput);if(Double.isFinite(pipe)&&(pipe<=0||pipe/1000>w||pipe/1000>d))throw new Exception();
- asphalt=optional(asphaltInput);left=optional(leftInput);right=optional(rightInput);if(Double.isFinite(asphalt)&&asphalt>d)throw new Exception();
+ String covering=surface.getSelectedItem().toString();double base=optional(baseInput),pipe=optional(pipeInput);if(Double.isFinite(pipe)&&(pipe<=0||pipe/1000>w||pipe/1000>d))throw new Exception();
+ double asphalt=optional(asphaltInput),left=optional(leftInput),right=optional(rightInput);if(Double.isFinite(asphalt)&&asphalt>d)throw new Exception();
  if(Double.isFinite(base)&&base+(Double.isFinite(asphalt)?asphalt:0)>d)throw new Exception();
+ this.l=l; this.w=w; this.d=d; this.covering=covering;
+ this.base=base; this.pipe=pipe; this.asphalt=asphalt; this.left=left; this.right=right;
  getPreferences(0).edit().putString("stoneLength",stoneLength.getText().toString()).putString("stoneWidth",stoneWidth.getText().toString()).putString("stoneDepth",stoneDepth.getText().toString()).putString("stoneColor",stoneColor.getText().toString()).putString("pattern",pattern.getText().toString()).putString("bedding",bedding.getText().toString()).putString("underlying",underlying.getText().toString()).putInt("handling",handling.getSelectedItemPosition()).putInt("surface",surface.getSelectedItemPosition()).putString("base",baseInput.getText().toString()).putString("pipe",pipeInput.getText().toString()).putString("asphalt",asphaltInput.getText().toString()).putString("left",leftInput.getText().toString()).putString("right",rightInput.getText().toString()).putString("project",project.getText().toString()).putString("length",length.getText().toString()).putString("width",width.getText().toString()).putString("depth",depth.getText().toString()).apply();
  projectHeader.setText(project.length()>0?project.getText().toString():"Feldaufmaß Pro");
  result.setText(String.format(java.util.Locale.GERMANY,"Aushub: %.2f m³\nGrundfläche: %.2f m²",l*w*d,l*w));StringBuilder details=new StringBuilder("Legende\nOberfläche: "+covering);
@@ -143,14 +145,14 @@ public class MainActivity extends Activity {
  if(bedding.length()>0)details.append("\nBettung: "+bedding.getText());
  if(underlying.length()>0)details.append("\nAltbelag darunter: "+underlying.getText());
  if(handling.getSelectedItemPosition()>0)details.append("\n"+handling.getSelectedItem());
- compareSoll();showObjects();refreshDetailQuantities();legend.setText(details.toString());sketch.invalidate();profile.invalidate();
- }catch(Exception e){result.setText("Bitte gültige positive Maße eingeben.");}}
+ compareSoll();showObjects();refreshDetailQuantities();legend.setText(details.toString());sketch.invalidate();profile.invalidate();return true;
+ }catch(Exception e){Toast.makeText(this,"Maße prüfen. Stand wurde nicht gespeichert.",Toast.LENGTH_SHORT).show();return false;}}
  void detailObject(int index){org.json.JSONObject o=objects.optJSONObject(index);if(o==null)return;LinearLayout form=page();Spinner mode=new Spinner(this);mode.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Draufsicht","Querschnitt","Längsschnitt"}));form.addView(mode);EditText a=new EditText(this),b=new EditText(this),h=new EditText(this);EditText[] es={a,b,h};String[] keys={"detailLength","detailWidth","detailDepth"},labels={"Länge (m)","Breite (m)","Tiefe (m)"};for(int j=0;j<3;j++){es[j].setInputType(8194);es[j].setHint(labels[j]);es[j].setText(o.optString(keys[j],""));form.addView(es[j]);}View preview=new View(this){Paint p=new Paint(3);protected void onDraw(Canvas c){float x=getWidth()/2f,y=getHeight()/2f; p.setColor(0xffdce9f4);c.drawRect(x-85,y-45,x+85,y+45,p);p.setColor(0xff203849);p.setStyle(Paint.Style.STROKE);c.drawRect(x-85,y-45,x+85,y+45,p);p.setStyle(Paint.Style.FILL);p.setTextSize(18);c.drawText(mode.getSelectedItem().toString()+" – schematisch",12,24,p);c.drawText((mode.getSelectedItemPosition()==1?b:a).getText()+" m",x-35,y-55,p);c.drawText((mode.getSelectedItemPosition()==0?b:h).getText()+" m",x+90,y,p);}};form.addView(preview,new LinearLayout.LayoutParams(-1,dp(180)));for(EditText e:es)e.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int count,int after){}public void onTextChanged(CharSequence s,int st,int before,int count){preview.invalidate();}public void afterTextChanged(android.text.Editable e){}});mode.setSelection(Math.max(0,Math.min(2,o.optInt("detailMode",0))));mode.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onItemSelected(android.widget.AdapterView<?> p,View v,int pos,long id){preview.invalidate();}public void onNothingSelected(android.widget.AdapterView<?> p){}});android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Detailzeichnung – "+o.optString("type")+" / "+o.optString("station")+" m").setView(form).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(btn->{try{for(EditText e:es){if(e.length()>0){double n=number(e);if(!Double.isFinite(n)||n<=0){e.setError("Positives Maß erforderlich");return;}}}for(int j=0;j<3;j++)o.put(keys[j],es[j].getText().toString());o.put("detailMode",mode.getSelectedItemPosition());saveObjects();dialog.dismiss();}catch(Exception e){Toast.makeText(this,"Detail konnte nicht gespeichert werden",Toast.LENGTH_LONG).show();}}));dialog.show();}
- void editObject(int index){org.json.JSONObject o=objects.optJSONObject(index);if(o==null)return;LinearLayout form=page();EditText st=new EditText(this);st.setInputType(8194);st.setHint("Station (m)");st.setText(o.optString("station"));form.addView(st);EditText note=new EditText(this);note.setHint("Bemerkung");note.setText(o.optString("note"));form.addView(note);android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(o.optString("type")+" bearbeiten").setView(form).setNeutralButton("Detailzeichnung",(v,j)->detailObject(index)).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(b->{try{double x=number(st),total=number(length);if(!Double.isFinite(x)||!Double.isFinite(total)||x<0||x>total)throw new Exception();o.put("station",x);o.put("note",note.getText().toString());saveObjects();dialog.dismiss();}catch(Exception e){st.setError("Station außerhalb der Trasse");}}));dialog.show();}
+ void editObject(int index){org.json.JSONObject o=objects.optJSONObject(index);if(o==null)return;LinearLayout form=page();EditText st=new EditText(this);st.setInputType(8194);st.setHint("Station (m)");st.setText(o.optString("station"));form.addView(st);EditText note=new EditText(this);note.setHint("Bemerkung");note.setText(o.optString("note"));form.addView(note);android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(o.optString("type")+" bearbeiten").setView(form).setNeutralButton("Detailzeichnung",(v,j)->detailObject(index)).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(b->{try{double x=number(st),total=l;if(!Double.isFinite(x)||!Double.isFinite(total)||x<0||x>total)throw new Exception();o.put("station",x);o.put("note",note.getText().toString());saveObjects();dialog.dismiss();}catch(Exception e){st.setError("Station außerhalb der Trasse");}}));dialog.show();}
  double detailNumber(org.json.JSONObject o,String key){try{return Double.parseDouble(o.optString(key).replace(',','.'));}catch(Exception e){return Double.NaN;}}
  double detailExtent(org.json.JSONObject o){try{double v=Double.parseDouble(o.optString("detailLength","").replace(',','.'));return Double.isFinite(v)&&v>0?v:0;}catch(Exception e){return 0;}}
  boolean objectWarning(int index){org.json.JSONObject o=objects.optJSONObject(index);if(o==null)return false;double x=o.optDouble("station"),a=detailExtent(o)/2;if(!Double.isFinite(x)||x-a<0||x+a>l)return true;for(int j=0;j<objects.length();j++){org.json.JSONObject q=objects.optJSONObject(j);if(j==index||q==null)continue;double y=q.optDouble("station"),b=detailExtent(q)/2;if(!Double.isFinite(y))continue;if(o.optString("side").equals(q.optString("side"))&&(Math.abs(x-y)<0.01||Math.abs(x-y)<a+b))return true;}return false;}
- void addObject(){try{double st=number(objectStation),total=number(length);if(!Double.isFinite(st)||!Double.isFinite(total)||total<=0||st<0||st>total)throw new Exception();org.json.JSONObject o=new org.json.JSONObject();o.put("station",st);o.put("type",objectType.getSelectedItem().toString());o.put("side",objectSide.getSelectedItem().toString());o.put("note",objectNote.getText().toString());objects.put(o);saveObjects();}catch(Exception e){Toast.makeText(this,"Objektstation außerhalb der Trasse oder ungültig.",Toast.LENGTH_LONG).show();}}
+ void addObject(){try{double st=number(objectStation),total=l;if(!Double.isFinite(st)||!Double.isFinite(total)||total<=0||st<0||st>total)throw new Exception();org.json.JSONObject o=new org.json.JSONObject();o.put("station",st);o.put("type",objectType.getSelectedItem().toString());o.put("side",objectSide.getSelectedItem().toString());o.put("note",objectNote.getText().toString());objects.put(o);saveObjects();}catch(Exception e){Toast.makeText(this,"Objektstation außerhalb der Trasse oder ungültig.",Toast.LENGTH_LONG).show();}}
  void updateHistoryButtons(){if(undoObjectsButton!=null)undoObjectsButton.setEnabled(!undoObjects.isEmpty());if(redoObjectsButton!=null)redoObjectsButton.setEnabled(!redoObjects.isEmpty());}
  void persistObjects(){getPreferences(0).edit().putString("objects",objects.toString()).apply();showObjects();refreshDetailQuantities();sketch.invalidate();updateHistoryButtons();}
  void saveObjects(){String old=getPreferences(0).getString("objects","[]");if(!old.equals(objects.toString())){undoObjects.push(old);while(undoObjects.size()>50)undoObjects.removeLast();redoObjects.clear();}persistObjects();}
@@ -161,8 +163,66 @@ public class MainActivity extends Activity {
  void showObjects(){StringBuilder b=new StringBuilder();for(int i=0;i<objects.length();i++){org.json.JSONObject o=objects.optJSONObject(i);if(o!=null)b.append(String.format(java.util.Locale.GERMANY,"%.2f m | %s | %s | %s\n",o.optDouble("station"),o.optString("type"),o.optString("side"),o.optString("note")+detailSummary(o)+(objectWarning(i)?" | ⚠ Station prüfen":"")));}objectList.setText(b.toString());}
  void saveSoll(){try{EditText[] fields={sollLength,sollWidth,sollDepth,sollAsphalt};String[] keys={"sollLength","sollWidth","sollDepth","sollAsphalt"};for(EditText e:fields){if(e.length()>0){double n=number(e);if(!Double.isFinite(n)||n<=0)throw new Exception();}}android.content.SharedPreferences.Editor ed=getPreferences(0).edit();for(int i=0;i<fields.length;i++)ed.putString(keys[i],fields[i].getText().toString());ed.putString("sollSource",sollSource.getText().toString()).apply();compareSoll();}catch(Exception e){Toast.makeText(this,"Bitte gültige positive Soll-Maße eingeben.",Toast.LENGTH_LONG).show();}}
  void compareSoll(){if(sollComparison==null||length==null||asphaltInput==null)return;EditText[] actual={length,width,depth,asphaltInput};String[] keys={"sollLength","sollWidth","sollDepth","sollAsphalt"};String[] names={"Trassenlänge","Grabenbreite","Grabentiefe","Asphaltstärke"};StringBuilder b=new StringBuilder("Soll / Ist – Abweichungen (Ist minus Soll)\n");for(int i=0;i<keys.length;i++){b.append(names[i]).append(": ");try{double p=Double.parseDouble(getPreferences(0).getString(keys[i],"").replace(',','.'));double a=number(actual[i]);if(!Double.isFinite(a)||a<=0)throw new Exception();b.append(String.format(java.util.Locale.GERMANY,"Soll %.2f m | Ist %.2f m | Δ %+.2f m",p,a,a-p));}catch(Exception e){b.append("Nicht vollständig erfasst");}b.append("\n");}sollComparison.setText(b.toString());}
- void exportPdf(){android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.setType("application/pdf");i.putExtra(android.content.Intent.EXTRA_TITLE,"Feldaufmass.pdf");startActivityForResult(i,412);}
- void writePdf(android.net.Uri uri){try(android.graphics.pdf.PdfDocument pdf=new android.graphics.pdf.PdfDocument();java.io.OutputStream out=getContentResolver().openOutputStream(uri,"w")){if(out==null)throw new java.io.IOException();android.graphics.pdf.PdfDocument.Page pg=pdf.startPage(new android.graphics.pdf.PdfDocument.PageInfo.Builder(595,842,1).create());Canvas c=pg.getCanvas();Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);p.setColor(Color.BLACK);p.setTextSize(22);c.drawText("Feldaufmaß Pro – Entwurf",36,48,p);p.setTextSize(13);String[] labels={"Projekt","Trassenlänge (m)","Grabenbreite (m)","Grabentiefe (m)","Asphaltstärke (m)","Nachschnitt links (m)","Nachschnitt rechts (m)"};EditText[] values={project,length,width,depth,asphaltInput,leftInput,rightInput};int y=80;for(int j=0;j<labels.length;j++){String v=values[j].getText().toString();c.drawText(labels[j]+": "+(v.isEmpty()?"Nicht erfasst":v),36,y,p);y+=22;}try{double a=number(length),b=number(width),h=number(depth);if(Double.isFinite(a*b*h)&&a>0&&b>0&&h>0)c.drawText(String.format(java.util.Locale.GERMANY,"Geometrisches Grabenvolumen: %.2f m³",a*b*h),36,y+12,p);}catch(Exception ignored){}c.drawText("Vorläufige Maße – vor Abrechnung prüfen.",36,780,p);pdf.finishPage(pg);pdf.writeTo(out);Toast.makeText(this,"PDF gespeichert",Toast.LENGTH_SHORT).show();}catch(Exception e){Toast.makeText(this,"PDF konnte nicht gespeichert werden.",Toast.LENGTH_LONG).show();}}
+ void exportPdf(){if(!calculate()){showPage(measurePage);return;}android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.setType("application/pdf");i.putExtra(android.content.Intent.EXTRA_TITLE,"Feldaufmass.pdf");startActivityForResult(i,412);}
+ void drawReportView(Canvas canvas, View view, int top, int width, int height) {
+  canvas.save();
+  canvas.translate(36,top);
+  view.layout(0,0,width,height);
+  view.draw(canvas);
+  canvas.restore();
+ }
+
+ void writePdf(android.net.Uri uri) {
+  android.graphics.pdf.PdfDocument pdf=new android.graphics.pdf.PdfDocument();
+  try(java.io.OutputStream out=getContentResolver().openOutputStream(uri,"wt")) {
+   if(out==null)throw new java.io.IOException();
+   Paint pen=new Paint(Paint.ANTI_ALIAS_FLAG);
+   android.graphics.pdf.PdfDocument.Page page=pdf.startPage(new android.graphics.pdf.PdfDocument.PageInfo.Builder(595,842,1).create());
+   try {
+    Canvas canvas=page.getCanvas();
+    pen.setTextSize(19);
+    canvas.drawText("Feldaufmaß Pro – Entwurf",36,40,pen);
+    pen.setTextSize(13);
+    canvas.drawText(projectHeader.getText().toString(),36,64,pen);
+    canvas.drawText("Zeichnung",36,96,pen);
+    drawReportView(canvas,new Sketch(),100,523,260);
+    canvas.drawText("Regelprofil",36,390,pen);
+    drawReportView(canvas,new Profile(),408,360,300);
+    canvas.drawText("Vorläufige Maße – vor Abrechnung prüfen.",36,786,pen);
+   } finally {pdf.finishPage(page);}
+   String report=result.getText()+"\n"+legend.getText()+"\n"+
+    "Nachschnitt links: "+reportMeasure(left)+" | rechts: "+reportMeasure(right)+"\n"+
+    "Asphaltstärke: "+reportMeasure(asphalt)+"\nTragschicht: "+reportMeasure(base)+"\n\n"+
+    "Trassenobjekte\n"+objectList.getText()+detailQuantities.getText()+"\n\n"+segmentsView.getText();
+   android.text.TextPaint textPaint=new android.text.TextPaint(Paint.ANTI_ALIAS_FLAG);
+   textPaint.setTextSize(12);
+   android.text.StaticLayout layout=android.text.StaticLayout.Builder.obtain(report,0,report.length(),textPaint,523).build();
+   int line=0, pageNumber=2;
+   while(line<layout.getLineCount()){
+    int top=layout.getLineTop(line), end=line+1;
+    while(end<layout.getLineCount() && layout.getLineBottom(end)-top<=720)end++;
+    page=pdf.startPage(new android.graphics.pdf.PdfDocument.PageInfo.Builder(595,842,pageNumber++).create());
+    try {
+     Canvas canvas=page.getCanvas();
+     canvas.drawText("Mengen und Details – Seite "+(pageNumber-1),36,40,pen);
+     canvas.translate(36,64);
+     canvas.clipRect(0,0,523,layout.getLineTop(end)-top);
+     canvas.translate(0,-top);
+     layout.draw(canvas);
+    } finally {pdf.finishPage(page);}
+    line=end;
+   }
+   pdf.writeTo(out);
+  } catch(Exception e) {
+   Toast.makeText(this,"PDF konnte nicht gespeichert werden.",Toast.LENGTH_LONG).show();
+   return;
+  } finally {pdf.close();}
+  Toast.makeText(this,"PDF gespeichert",Toast.LENGTH_SHORT).show();
+ }
+
+ String reportMeasure(double value){
+  return Double.isFinite(value)?String.format(java.util.Locale.GERMANY,"%.2f m",value):"nicht erfasst";
+ }
  void showDocuments(){StringBuilder b=new StringBuilder();for(int j=0;j<documents.length();j++){org.json.JSONObject o=documents.optJSONObject(j);if(o!=null)b.append(o.optString("name")).append(" – Soll / nicht ausgewertet\n");}documentsList.setText(b.length()==0?"Keine Unterlagen ausgewählt":b.toString());}
  void attachDocument(android.net.Uri uri,int flags){if(uri==null)return;try{for(int j=0;j<documents.length();j++){org.json.JSONObject old=documents.optJSONObject(j);if(old!=null&&uri.toString().equals(old.optString("uri")))return;}getContentResolver().takePersistableUriPermission(uri,flags&android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);String name=uri.getLastPathSegment();try(android.database.Cursor c=getContentResolver().query(uri,new String[]{android.provider.OpenableColumns.DISPLAY_NAME},null,null,null)){if(c!=null&&c.moveToFirst())name=c.getString(0);}org.json.JSONObject o=new org.json.JSONObject();o.put("uri",uri.toString());o.put("name",name);documents.put(o);getPreferences(0).edit().putString("documents",documents.toString()).apply();}catch(Exception e){Toast.makeText(this,"Unterlage konnte nicht dauerhaft verknüpft werden.",Toast.LENGTH_LONG).show();}}
  void startDictation(){
@@ -186,7 +246,7 @@ public class MainActivity extends Activity {
  new android.app.AlertDialog.Builder(this).setTitle("Erkannte Maße prüfen").setMessage(preview.toString()).setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",(dialog,which)->{for(int j=0;j<3;j++)if(proposed[j]!=null)targets[j].setText(proposed[j]);}).show();
  }
  void addSegment(){try{
- double start=number(stationFrom),end=number(stationTo),total=number(length),gw=number(width);
+ double start=number(stationFrom),end=number(stationTo),total=l,gw=number(width);
  if(!Double.isFinite(start+end+total+gw)||start<0||end<=start||end>total||gw<=0)throw new Exception();
  double a=optional(leftInput),b=optional(rightInput);
  for(int i=0;i<segments.length();i++){org.json.JSONObject old=segments.getJSONObject(i);if(start<old.getDouble("to")&&end>old.getDouble("from")){Toast.makeText(this,"Abschnitte dürfen sich nicht überschneiden.",Toast.LENGTH_LONG).show();return;}}
