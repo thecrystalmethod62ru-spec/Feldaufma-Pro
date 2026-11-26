@@ -1791,7 +1791,8 @@ public class MainActivity extends Activity {
      boxes.add(new double[]{st,z,bottom,Double.isFinite(len)&&len>0?len:0});
      low=Math.min(low,bottom);high=Math.max(high,z);
     }
-    final double base=low,range=Math.max(0.1,high-low);
+    final double margin=Math.max(0.05,(high-low)*0.08);
+    final double base=low-margin,range=Math.max(0.1,high-low+2*margin);
     panel.addView(sheetText("Längsschnitt – Formstücke und GOK (schematisch, überhöht)",16,true));
     android.view.View longitudinalView=new android.view.View(this){
      final android.graphics.Paint p=new android.graphics.Paint(3);
