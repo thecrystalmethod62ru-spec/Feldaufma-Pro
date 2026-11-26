@@ -1633,7 +1633,21 @@ public class MainActivity extends Activity {
   final double[] widths={Double.NaN,Double.NaN,Double.NaN};
   String[] widthKeys={"width","left","right"};
   for(int i=0;i<widthKeys.length;i++){try{double v=Double.parseDouble(getPreferences(0).getString(widthKeys[i],"").trim().replace(',','.'));if(Double.isFinite(v)&&v>=0&&(i!=0||v>0))widths[i]=v;}catch(Exception ignored){}}
+  int crossings=0;
+  for(int i=1;i<model.vertices.size();i++)for(int j=i+2;j<model.vertices.size();j++){
+   double[] a1=model.vertices.get(i-1),a2=model.vertices.get(i),b1=model.vertices.get(j-1),b2=model.vertices.get(j);
+   double rx=a2[0]-a1[0],ry=a2[1]-a1[1],sx=b2[0]-b1[0],sy=b2[1]-b1[1],den=rx*sy-ry*sx;
+   if(Math.abs(den)<1e-10)continue;
+   double qx=b1[0]-a1[0],qy=b1[1]-a1[1],t=(qx*sy-qy*sx)/den,u=(qx*ry-qy*rx)/den;
+   if(t>1e-8&&t<1-1e-8&&u>1e-8&&u<1-1e-8)crossings++;
+  }
+  int missingWidths=0;double totalLength=route.measuredLength();
+  java.util.TreeSet<Double> widthCuts=new java.util.TreeSet<>();widthCuts.add(0.0);widthCuts.add(totalLength);
+  for(int i=0;i<widthSections.length();i++){org.json.JSONObject o=widthSections.optJSONObject(i);if(o==null)continue;double from=o.optDouble("from"),to=o.optDouble("to");if(Double.isFinite(from)&&Double.isFinite(to)&&from>=0&&to<=totalLength&&to>from){widthCuts.add(from);widthCuts.add(to);}}
+  java.util.ArrayList<Double> orderedCuts=new java.util.ArrayList<>(widthCuts);
+  for(int i=1;i<orderedCuts.size();i++){double mid=(orderedCuts.get(i-1)+orderedCuts.get(i))/2;boolean defined=false;for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o!=null&&mid>=o.optDouble("from")&&mid<o.optDouble("to")&&o.optDouble("width")>0)defined=true;}if(!defined&&!Double.isFinite(widths[0]))missingWidths++;}
   LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);
+  TextView geometryStatus=new TextView(this);geometryStatus.setText(crossings==0&&missingWidths==0?"Geometrie: keine Achsen-Selbstkreuzung erkannt; Flächenprüfung noch offen.":"Prüfung: "+crossings+" Achsen-Selbstkreuzung(en), "+missingWidths+" Abschnitt(e) ohne Grabenbreite. Keine automatische Abrechnung.");panel.addView(geometryStatus);
   TextView info=new TextView(this);info.setText("Gemessene Längen · Richtungen aus Skizze (nicht vermessen)");panel.addView(info);
   TextView widthHint=new TextView(this);widthHint.setText("Grabenbreite: "+(Double.isFinite(widths[0])?widths[0]+" m":"offen")+" · Nachschnitt links: "+(Double.isFinite(widths[1])?widths[1]+" m":"offen")+" · rechts: "+(Double.isFinite(widths[2])?widths[2]+" m":"offen")+"\nVariable Breiten: Abschnittskonturen an Knicken schematisch; keine Flächenberechnung.");panel.addView(widthHint);
   TextView surfaceHint=new TextView(this);surfaceHint.setText("Oberflächen: "+surfaces.length()+" gespeicherte Abschnitte · Standardfarben und Stationsmaße; ungültige Stationen werden ausgelassen.");panel.addView(surfaceHint);
