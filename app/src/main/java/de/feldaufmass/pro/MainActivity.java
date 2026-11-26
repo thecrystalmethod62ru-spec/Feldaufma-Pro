@@ -3298,7 +3298,19 @@ public class MainActivity extends Activity {
    }
    report.append(String.format(java.util.Locale.GERMANY,"Summe: %.3f m³\nErfasste Länge: %.2f m",total,covered));
    if(l>0){if(last>l)report.append("\nAchtung: Profil endet außerhalb der Trasse.");else report.append(String.format(java.util.Locale.GERMANY,"\nNicht erfasste Länge: %.2f m",Math.max(0,l-covered)));}
-   report.append("\n\nNur gespeicherte Abschnittsprofile; keine Abzüge oder Böschungen. Nicht zusätzlich zum allgemeinen Aushub addieren.");
+   if(l>0&&last<=l){
+    double remaining=Math.max(0,l-covered);
+    if(remaining<=0.000001)report.append(String.format(java.util.Locale.GERMANY,"\nGesamtaushub: %.3f m³",total));
+    else{
+     try{
+      double standardWidth=number(width),standardDepth=number(depth);
+      if(!Double.isFinite(standardWidth)||!Double.isFinite(standardDepth)||standardWidth<=0||standardDepth<=0)throw new IllegalArgumentException();
+      double remainderVolume=remaining*standardWidth*standardDepth;
+      report.append(String.format(java.util.Locale.GERMANY,"\nResttrasse (allgemeines Regelprofil): %.2f × %.2f × %.2f = %.3f m³\nGesamtaushub: %.3f m³",remaining,standardWidth,standardDepth,remainderVolume,total+remainderVolume));
+     }catch(Exception ex){report.append("\nGesamtaushub nicht ermittelbar: allgemeine Grabenmaße fehlen.");}
+    }
+   }
+   report.append("\n\nBrutto, rechteckig; keine Abzüge oder Böschungen. Abschnittsbezogene Sondermaße außerhalb dieser Profile sind nicht berücksichtigt. Nicht zusätzlich zum allgemeinen Aushub addieren.");
    TextView resultText=new TextView(this);resultText.setPadding(dp(16),dp(12),dp(16),dp(12));resultText.setText(report.toString());ScrollView scroll=new ScrollView(this);scroll.addView(resultText);
    new android.app.AlertDialog.Builder(this).setTitle("Mengenermittlung – Abschnittsprofile").setView(scroll).setPositiveButton("Schließen",null).show();
   }catch(Exception ex){notice("Mengenermittlung: "+ex.getMessage());}
