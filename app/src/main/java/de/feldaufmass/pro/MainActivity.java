@@ -749,13 +749,32 @@ public class MainActivity extends Activity {
   if(i<0||i>=route.vertices.size()){notice("Bitte zuerst einen Trassenpunkt auswählen.");return;}
   renamePoint(route.vertices.get(i).id,m.group(2).trim());
  }
+ boolean selectVoicePoint(String text){
+  java.util.regex.Matcher m=java.util.regex.Pattern.compile("(?iu)(?:trassenpunkt|punkt|точк[ауеи]|точке)\\s+(\\d+)").matcher(text);
+  RouteSketch route=new RouteSketch(this,routeData());
+  if(m.find()){int i;try{i=Integer.parseInt(m.group(1))-1;}catch(NumberFormatException e){return false;}
+   if(i<0||i>=route.vertices.size()){notice("Trassenpunkt nicht gefunden.");return false;}
+   selectedPoint=route.vertices.get(i).id;
+  }
+  if(findPoint(route,selectedPoint)<0){notice("Bitte zuerst einen Trassenpunkt auswählen.");return false;}
+  return true;
+ }
+ boolean offerVoicePointAction(String text){
+  String t=text.toLowerCase(java.util.Locale.ROOT);
+  boolean gps=t.matches(".*(?:gps|гпс|координат).*")&&t.matches(".*(?:mess|zuordn|erfass|привяж|измер|запиш|сохрани).*");
+  boolean undo=t.matches(".*(?:gps|гпс).*")&&t.matches(".*(?:rückgängig|отмени|отменить).*");
+  if(!gps&&!undo)return false;
+  if(selectVoicePoint(text)){if(undo)undoGps(selectedPoint);else assignGps(selectedPoint);}
+  return true;
+ }
  void handleSpeech(String text){
   int version=++speechVersion;
   String normalized=text.toLowerCase(java.util.Locale.ROOT);
   if(normalized.matches(".*(?:сделай|сделать|сними|прикрепи|прицепи|mach|nimm|nehme|aufnehmen).*?(?:фото|снимок|foto).*") ||
      normalized.matches(".*(?:сфотографируй|fotografier|foto aufnehmen).*")){
-   capturePhoto();return;
+   if(selectVoicePoint(text))capturePhoto();return;
   }
+  if(offerVoicePointAction(text))return;
   showPage(voicePage);
   if(voiceLanguage.getSelectedItemPosition()==0){voiceText.setText(text);offerVoiceRename(text);return;}
   if(translator==null)translator=com.google.mlkit.nl.translate.Translation.getClient(
