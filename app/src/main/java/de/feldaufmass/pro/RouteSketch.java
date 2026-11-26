@@ -247,7 +247,18 @@ final class RouteSketch extends View {
   return Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy);
  }
  private void line(Canvas c,PointF a,PointF b){c.drawLine(left()+scale()*a.x,top()+scale()*a.y,left()+scale()*b.x,top()+scale()*b.y,paint);}
- @Override private android.graphics.Bitmap underlay;
+ static double calibrationFactor(Vertex a,Vertex b,double known){
+  if(a==null||b==null||!Double.isFinite(known)||known<=0)return Double.NaN;
+  double span=Math.hypot(a.point.x-b.point.x,a.point.y-b.point.y);
+  return span>=.01&&Double.isFinite(known/span)?known/span:Double.NaN;
+ }
+ double estimatedSegment(int endpoint,double factor){
+  if(endpoint<1||endpoint>=vertices.size()||!Double.isFinite(factor)||factor<=0)return Double.NaN;
+  Vertex a=vertices.get(endpoint-1),b=vertices.get(endpoint);
+  double v=Math.hypot(a.point.x-b.point.x,a.point.y-b.point.y)*factor;
+  return Double.isFinite(v)&&v>0?v:Double.NaN;
+ }
+ private android.graphics.Bitmap underlay;
  private int underlayAlpha=150;
  private boolean underlayVisible=true;
  private final Paint underlayPaint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
@@ -262,7 +273,7 @@ final class RouteSketch extends View {
   underlayPaint.setAlpha(underlayAlpha);
   c.drawBitmap(underlay,null,new android.graphics.RectF(x,y,x+w,y+h),underlayPaint);
  }
- protected void onDraw(Canvas c){
+ @Override protected void onDraw(Canvas c){
   c.drawColor(Color.WHITE);
   paint.setStrokeWidth(1);paint.setColor(0xffe5eceb);
   for(int i=0;i<=10;i++){
