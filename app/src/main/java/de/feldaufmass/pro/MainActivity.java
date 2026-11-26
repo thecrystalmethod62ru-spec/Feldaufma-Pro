@@ -1716,25 +1716,31 @@ public class MainActivity extends Activity {
     labels[0]="Abzweigung hinzufügen";
     for(int j=0;j<branches.size();j++)labels[j+1]=branches.get(j).name+" · "+branches.get(j).station+" m";
     new android.app.AlertDialog.Builder(this).setTitle("Trassenverzweigungen").setItems(labels,(dialog,index)->{
-     if(index>0){
-      RouteBranch branch=branches.get(index-1);
-      new android.app.AlertDialog.Builder(this).setTitle(branch.name).setMessage("Länge: "+branch.length()+" m · Fläche (brutto nominal): "+branch.nominalArea()+" m²")
-       .setNegativeButton("Schließen",null).setPositiveButton("Löschen",(d,w)->{
-        try{branches.remove(index-1);branchStore.save(branches);notice("Abzweigung gelöscht");for(int k=0;k<panel.getChildCount();k++)panel.getChildAt(k).invalidate();}catch(Exception ex){notice("Speichern fehlgeschlagen: "+ex.getMessage());}
-       }).show();return;
-     }
+     final RouteBranch existing=index>0?branches.get(index-1):null;
      android.widget.LinearLayout fields=new android.widget.LinearLayout(this);fields.setOrientation(android.widget.LinearLayout.VERTICAL);
      String[] hints={"Bezeichnung","Anschlussstation (m)","Länge (m)","Richtung (Grad, +X = 0°)","Grabenbreite (m)","Grabentiefe (m)","Oberfläche"};
      EditText[] inputs=new EditText[hints.length];
      for(int j=0;j<hints.length;j++){inputs[j]=new EditText(this);inputs[j].setSingleLine(true);inputs[j].setHint(hints[j]);fields.addView(inputs[j]);}
+     if(existing!=null){
+      try{
+       org.json.JSONObject data=existing.toJson();
+       if(data.getJSONArray("lengths").length()!=1){notice("Mehrteilige Abzweigung noch nicht bearbeitbar");return;}
+       String[] values={existing.name,Double.toString(existing.station),Double.toString(existing.length()),Double.toString(data.getJSONArray("directions").getDouble(0)),Double.toString(existing.width),Double.toString(existing.depth),existing.surface};
+       for(int j=0;j<values.length;j++)inputs[j].setText(values[j]);
+      }catch(Exception ex){notice("Abzweigung konnte nicht geöffnet werden");return;}
+     }
      android.widget.ScrollView scroll=new android.widget.ScrollView(this);scroll.addView(fields);
-     android.app.AlertDialog entry=new android.app.AlertDialog.Builder(this).setTitle("Abzweigung hinzufügen").setView(scroll).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
+     android.app.AlertDialog.Builder builder=new android.app.AlertDialog.Builder(this).setTitle(existing==null?"Abzweigung hinzufügen":"Abzweigung bearbeiten").setView(scroll).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null);
+     if(existing!=null)builder.setNeutralButton("Löschen",(d,w)->new android.app.AlertDialog.Builder(this).setMessage("Abzweigung wirklich löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(dd,ww)->{
+      try{java.util.List<RouteBranch> updated=branchStore.load();updated.removeIf(item->item.id.equals(existing.id));branchStore.save(updated);for(int k=0;k<panel.getChildCount();k++)panel.getChildAt(k).invalidate();notice("Abzweigung gelöscht");}catch(Exception ex){notice("Speichern fehlgeschlagen: "+ex.getMessage());}
+     }).show());
+     android.app.AlertDialog entry=builder.create();
      entry.setOnShowListener(d->entry.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(b->{
       try{
        double[] n=new double[5];for(int j=0;j<5;j++)n[j]=Double.parseDouble(inputs[j+1].getText().toString().trim().replace(',','.'));
        if(n[0]>route.measuredLength())throw new IllegalArgumentException("Station außerhalb der Haupttrasse");
-       RouteBranch branch=new RouteBranch(java.util.UUID.randomUUID().toString(),inputs[0].getText().toString(),n[0],n[3],n[4],inputs[6].getText().toString(),new double[]{n[1]},new double[]{n[2]});
-       java.util.List<RouteBranch> updated=branchStore.load();updated.add(branch);branchStore.save(updated);entry.dismiss();notice("Abzweigung gespeichert");for(int k=0;k<panel.getChildCount();k++)panel.getChildAt(k).invalidate();
+       RouteBranch branch=new RouteBranch(existing==null?java.util.UUID.randomUUID().toString():existing.id,inputs[0].getText().toString(),n[0],n[3],n[4],inputs[6].getText().toString(),new double[]{n[1]},new double[]{n[2]});
+       java.util.List<RouteBranch> updated=branchStore.load();if(existing==null)updated.add(branch);else{int found=-1;for(int j=0;j<updated.size();j++)if(updated.get(j).id.equals(existing.id)){found=j;break;}if(found<0)throw new IllegalStateException("Abzweigung nicht gefunden");updated.set(found,branch);}branchStore.save(updated);entry.dismiss();notice("Abzweigung gespeichert");for(int k=0;k<panel.getChildCount();k++)panel.getChildAt(k).invalidate();
       }catch(Exception ex){notice("Eingaben prüfen: "+ex.getMessage());}
      }));entry.show();
     }).setNegativeButton("Schließen",null).show();
