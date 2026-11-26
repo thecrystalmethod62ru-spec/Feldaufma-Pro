@@ -1707,6 +1707,39 @@ public class MainActivity extends Activity {
   panel.addView(overlapMode);
   TextView overlapLegend=new TextView(this);overlapLegend.setText("Orange: Überlappung bemaßter Abschnittsstreifen (ohne Eckergänzungen) · Grün: gewählte Eckergänzung (Kontrollmodell)");panel.addView(overlapLegend);
   final SharedPreferences overlapPrefs=projectStorage(activeProject);
+  final RouteBranchStore branchStore=new RouteBranchStore(overlapPrefs);
+  Button branchEditor=new Button(this);branchEditor.setText("Abzweigungen verwalten");panel.addView(branchEditor);
+  branchEditor.setOnClickListener(v->{
+   try{
+    java.util.List<RouteBranch> branches=branchStore.load();
+    String[] labels=new String[branches.size()+1];
+    labels[0]="Abzweigung hinzufügen";
+    for(int j=0;j<branches.size();j++)labels[j+1]=branches.get(j).name+" · "+branches.get(j).station+" m";
+    new android.app.AlertDialog.Builder(this).setTitle("Trassenverzweigungen").setItems(labels,(dialog,index)->{
+     if(index>0){
+      RouteBranch branch=branches.get(index-1);
+      new android.app.AlertDialog.Builder(this).setTitle(branch.name).setMessage("Länge: "+branch.length()+" m · Fläche (brutto nominal): "+branch.nominalArea()+" m²")
+       .setNegativeButton("Schließen",null).setPositiveButton("Löschen",(d,w)->{
+        try{branches.remove(index-1);branchStore.save(branches);notice("Abzweigung gelöscht");}catch(Exception ex){notice("Speichern fehlgeschlagen: "+ex.getMessage());}
+       }).show();return;
+     }
+     android.widget.LinearLayout fields=new android.widget.LinearLayout(this);fields.setOrientation(android.widget.LinearLayout.VERTICAL);
+     String[] hints={"Bezeichnung","Anschlussstation (m)","Länge (m)","Richtung (Grad, +X = 0°)","Grabenbreite (m)","Grabentiefe (m)","Oberfläche"};
+     EditText[] inputs=new EditText[hints.length];
+     for(int j=0;j<hints.length;j++){inputs[j]=new EditText(this);inputs[j].setSingleLine(true);inputs[j].setHint(hints[j]);fields.addView(inputs[j]);}
+     android.widget.ScrollView scroll=new android.widget.ScrollView(this);scroll.addView(fields);
+     android.app.AlertDialog entry=new android.app.AlertDialog.Builder(this).setTitle("Abzweigung hinzufügen").setView(scroll).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
+     entry.setOnShowListener(d->entry.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(b->{
+      try{
+       double[] n=new double[5];for(int j=0;j<5;j++)n[j]=Double.parseDouble(inputs[j+1].getText().toString().trim().replace(',','.'));
+       if(n[0]>route.measuredLength())throw new IllegalArgumentException("Station außerhalb der Haupttrasse");
+       RouteBranch branch=new RouteBranch(java.util.UUID.randomUUID().toString(),inputs[0].getText().toString(),n[0],n[3],n[4],inputs[6].getText().toString(),new double[]{n[1]},new double[]{n[2]});
+       java.util.List<RouteBranch> updated=branchStore.load();updated.add(branch);branchStore.save(updated);entry.dismiss();notice("Abzweigung gespeichert");
+      }catch(Exception ex){notice("Eingaben prüfen: "+ex.getMessage());}
+     }));entry.show();
+    }).setNegativeButton("Schließen",null).show();
+   }catch(Exception ex){notice("Abzweigungen konnten nicht geladen werden: "+ex.getMessage());}
+  });
   int storedOverlapMode=0;
   try{storedOverlapMode=overlapPrefs.getInt("metricOverlapMode",0);}catch(ClassCastException ignored){}
   final int[] savedOverlapMode={Math.max(0,Math.min(2,storedOverlapMode))};
