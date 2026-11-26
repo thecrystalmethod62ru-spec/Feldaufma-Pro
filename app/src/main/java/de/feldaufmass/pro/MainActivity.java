@@ -3281,6 +3281,24 @@ public class MainActivity extends Activity {
  root=planPage;
  sketch=new Sketch();sketch.setBackgroundColor(Color.WHITE);root.addView(sketch,new LinearLayout.LayoutParams(-1,dp(280))); LinearLayout historyBar=new LinearLayout(this);root.addView(historyBar);undoObjectsButton=new Button(this);undoObjectsButton.setText("Rückgängig");historyBar.addView(undoObjectsButton,new LinearLayout.LayoutParams(0,-2,1));redoObjectsButton=new Button(this);redoObjectsButton.setText("Wiederholen");historyBar.addView(redoObjectsButton,new LinearLayout.LayoutParams(0,-2,1));undoObjectsButton.setOnClickListener(v->restoreObjectHistory(false));redoObjectsButton.setOnClickListener(v->restoreObjectHistory(true));updateHistoryButtons();
  Button edit=new Button(this);edit.setText("Trassenmaße bearbeiten");root.addView(edit);edit.setOnClickListener(v->showPage(measurePage));
+ actionButtonSingle(planPage,"Bodenaustausch und Entsorgung",()->{
+  LinearLayout fields=new LinearLayout(this);fields.setOrientation(1);
+  String[] hints={"Bodenaushub fest (m³), ohne Oberbau","Wiederverwendbarer Boden fest (m³)","Benötigte Verfüllung verdichtet (m³)","Auflockerungsfaktor Entsorgung","Lieferfaktor Ersatzmaterial"};
+  EditText[] inputs=new EditText[hints.length];
+  for(int i=0;i<hints.length;i++){inputs[i]=new EditText(this);inputs[i].setHint(hints[i]);inputs[i].setInputType(8194);fields.addView(inputs[i]);}
+  TextView resultText=new TextView(this);fields.addView(resultText);
+  Button calculate=new Button(this);calculate.setText("Berechnen");fields.addView(calculate);
+  calculate.setOnClickListener(button->{
+   try{
+    double[] v=new double[5];for(int i=0;i<v.length;i++){v[i]=number(inputs[i]);if(!Double.isFinite(v[i])||v[i]<0)throw new IllegalArgumentException("Ungültige Eingabe: "+hints[i]);}
+    if(v[1]>v[0]||v[3]<1||v[4]<1)throw new IllegalArgumentException("Wiederverwendung und Faktoren prüfen");
+    double reuse=Math.min(v[1],v[2]),disposal=v[0]-reuse,replacement=v[2]-reuse;
+    resultText.setText(String.format(java.util.Locale.GERMANY,"Wiedereinbau (angenommen 1:1): %.3f m³\nEntsorgung fest: %.3f m³\nEntsorgung lose: %.3f m³\nErsatzmaterial verdichtet: %.3f m³\nLiefermenge lose: %.3f m³\n\nAnnahme: Festvolumen des wiederverwendeten Bodens entspricht dem verdichteten Einbauvolumen. Faktoren projektspezifisch prüfen.",reuse,disposal,disposal*v[3],replacement,replacement*v[4]));
+   }catch(Exception ex){resultText.setText("Berechnung nicht möglich: "+ex.getMessage());}
+  });
+  ScrollView scroll=new ScrollView(this);scroll.addView(fields);
+  new android.app.AlertDialog.Builder(this).setTitle("Bodenbilanz – Vorberechnung").setView(scroll).setPositiveButton("Schließen",null).show();
+ });
  actionButtonSingle(planPage,"Leitungszone und Verfüllung",()->{
   try{
    org.json.JSONArray rows=new PipeLayoutStore(getPreferences(0)).sections();
