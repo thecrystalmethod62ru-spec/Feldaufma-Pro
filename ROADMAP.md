@@ -30,3 +30,11 @@ Android, deutsche Oberfläche, Offline-first. Gemeinsame Objektdaten für Zeichn
 Jede Funktion benötigt Build, Tests und Geräteprüfung. Geometrische Mengen sind keine freigegebenen Abrechnungsmengen. Keine ungeprüfte automatische Zuordnung oder Übermittlung vertraulicher Unterlagen.
 
 - [ ] GPS-Koordinaten mit Trassenpunkten verknüpfen und den zugehörigen Zeichnungspunkt beim Verschieben des Kartenpunkts automatisch aktualisieren.
+
+## Rohrleitungsbau – Montage (eigenständiges Modul)
+- [ ] Montagezeichnung mit Stationierung, Rohrlängen, Winkeln und Verbindungspunkten; Verknüpfung zur Trasse.
+- [ ] Rohre mit DN, Außendurchmesser, Werkstoff, SDR und PN; Formstücke und Armaturen mit individuellen Eigenschaften.
+- [ ] Verbindungsregister mit Schweiß-, Steck- und Flanschverbindungen, eindeutigen IDs und Fotodokumentation.
+- [ ] Materialliste aus bestätigten Montageobjekten, getrennt von Erdbaumengen und Soll-Planung.
+- [ ] Prüfprotokolle für Druckprüfung, Spülung und Desinfektion als Dokumentation, keine automatische technische Freigabe.
+- [ ] Projektbezogene Offline-Speicherung, Bearbeitung, Sicherung und PDF-Export.
