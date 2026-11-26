@@ -4138,6 +4138,8 @@ public class MainActivity extends Activity {
   double factor=route.uniformMetresPerUnit();if(!Double.isFinite(factor))return pageNumber;
   double minX=Double.POSITIVE_INFINITY,minY=minX,maxX=Double.NEGATIVE_INFINITY,maxY=maxX;
   for(RouteSketch.Vertex v:route.vertices){minX=Math.min(minX,v.point.x);minY=Math.min(minY,v.point.y);maxX=Math.max(maxX,v.point.x);maxY=Math.max(maxY,v.point.y);}
+  double trenchWidth=Double.isFinite(w)&&w>0?w:0;
+  double margin=trenchWidth/(2*factor);minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
   int denominator=0,width=595,height=842,format=4;double unit=0;
   int[][] formats={{595,842},{842,1191},{1191,1684},{1684,2384},{2384,3370}};
   search:for(int candidate:new int[]{100,200,500,1000,2000,5000}){
@@ -4151,7 +4153,13 @@ public class MainActivity extends Activity {
   android.graphics.pdf.PdfDocument.Page page=pdf.startPage(new android.graphics.pdf.PdfDocument.PageInfo.Builder(width,height,pageNumber++).create());
   try{
    Canvas c=page.getCanvas();Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);p.setColor(INK);p.setTextSize(16);c.drawText("Trassenachse – Maßstab 1:"+denominator,36,40,p);
-   p.setTextSize(10);c.drawText("A"+format+" · Druck in tatsächlicher Größe (100 %) · nur Trassenachse",36,58,p);
+   p.setTextSize(10);c.drawText("A"+format+" · Druckgröße 100 % · "+(trenchWidth>0?"Grabenbreite "+reportMeasure(trenchWidth):"nur Trassenachse"),36,58,p);
+   if(trenchWidth>0){
+    p.setColor(0xffded4c3);p.setStrokeWidth((float)(trenchWidth/factor*unit));p.setStrokeJoin(Paint.Join.ROUND);p.setStrokeCap(Paint.Cap.BUTT);p.setStyle(Paint.Style.STROKE);
+    android.graphics.Path trench=new android.graphics.Path();
+    for(int i=0;i<route.vertices.size();i++){RouteSketch.Vertex v=route.vertices.get(i);float x=(float)(40+(v.point.x-minX)*unit),y=(float)(85+(v.point.y-minY)*unit);if(i==0)trench.moveTo(x,y);else trench.lineTo(x,y);}
+    c.drawPath(trench,p);p.setStyle(Paint.Style.FILL);p.setStrokeCap(Paint.Cap.BUTT);
+   }
    p.setColor(TEAL);p.setStrokeWidth(1.5f);
    for(int i=1;i<route.vertices.size();i++){RouteSketch.Vertex a=route.vertices.get(i-1),b=route.vertices.get(i);c.drawLine((float)(40+(a.point.x-minX)*unit),(float)(85+(a.point.y-minY)*unit),(float)(40+(b.point.x-minX)*unit),(float)(85+(b.point.y-minY)*unit),p);}
    p.setColor(INK);p.setStrokeWidth(1);float bar=(float)(50*72/25.4);float by=height-47;c.drawLine(40,by,40+bar,by,p);c.drawLine(40,by-4,40,by+4,p);c.drawLine(40+bar,by-4,40+bar,by+4,p);c.drawText("50 mm Kontrollmaß",40,by+17,p);
