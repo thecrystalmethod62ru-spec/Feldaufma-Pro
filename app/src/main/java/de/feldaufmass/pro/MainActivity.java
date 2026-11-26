@@ -621,15 +621,20 @@ public class MainActivity extends Activity {
   org.json.JSONObject old=index<0?null:draft.optJSONObject(index);if(index>=0&&old==null)return;
   double total=route.measuredLength();
   if(!Double.isFinite(total)||total<=0){notice("Zuerst die Trasse vollständig bemaßen, damit Stationen eindeutig sind.");return;}
-  LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
+  LinearLayout form=new LinearLayout(this);form.setOrientation(1);form.setPadding(dp(8),0,dp(8),0);ScrollView scroll=new ScrollView(this);scroll.addView(form);
   java.util.ArrayList<String> types=new java.util.ArrayList<>(java.util.Arrays.asList("Hausanschluss","Suchschachtung","Hindernis","Startgrube","Zielgrube","KVS","Knickpunkt"));if(old!=null&&!types.contains(old.optString("type")))types.add(old.optString("type"));Spinner type=choices(form,types.toArray(new String[0]));if(old!=null)type.setSelection(types.indexOf(old.optString("type")));
   EditText station=new EditText(this);station.setInputType(8194);station.setHint("Station in m (0 – "+csvNumber(total)+")");if(Double.isFinite(suggestedStation)){station.setText(java.math.BigDecimal.valueOf(suggestedStation).stripTrailingZeros().toPlainString().replace('.',','));}if(old!=null)station.setText(old.optString("station"));form.addView(station);
   String[] sides={"Unbekannt","links","rechts","mittig"};Spinner side=choices(form,sides);if(old!=null)side.setSelection(Math.max(0,java.util.Arrays.asList(sides).indexOf(old.optString("side"))));
   String[] keys={"detailLength","detailWidth","detailDepth","detailOffset"},labels={"Länge (m)","Breite (m)","Tiefe (m)","Abstand zum Grabenrand (m)"};
   EditText[] fields=new EditText[keys.length];for(int j=0;j<fields.length;j++){fields[j]=new EditText(this);fields[j].setInputType(8194);fields[j].setHint(labels[j]+" – optional");if(old!=null)fields[j].setText(old.optString(keys[j],""));form.addView(fields[j]);}
   EditText note=new EditText(this);note.setHint("Bemerkung");if(old!=null)note.setText(old.optString("note"));form.addView(note);
-  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(old==null?"Objekt an Station hinzufügen":"Objekt bearbeiten / verschieben").setView(scroll).setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",null).create();
-  dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(b->{
+  LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(dp(12),dp(10),dp(12),dp(10));panel.setBackground(editorShape(0xff202827,16));
+  TextView heading=sheetText(old==null?"Objekt hinzufügen":"Objekt bearbeiten",17,true);heading.setTextColor(0xffe3f0ed);panel.addView(heading);
+  for(EditText field:new EditText[]{station,note,fields[0],fields[1],fields[2],fields[3]}){field.setTextColor(0xffe3f0ed);field.setHintTextColor(0xffa4b9b5);field.setTextSize(14);}
+  panel.addView(scroll,new LinearLayout.LayoutParams(-1,Math.min(dp(300),Math.max(dp(100),route.getHeight()/2))));
+  LinearLayout actions=new LinearLayout(this);panel.addView(actions);Button cancel=new Button(this),apply=new Button(this);cancel.setText("Abbrechen");apply.setText("Übernehmen");styleEditorButton(cancel,false);styleEditorButton(apply,true);actions.addView(cancel,new LinearLayout.LayoutParams(0,dp(48),1));actions.addView(apply,new LinearLayout.LayoutParams(0,dp(48),1));
+  android.widget.PopupWindow dialog=new android.widget.PopupWindow(panel,Math.min(route.getWidth(),dp(420)),-2,true);dialog.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));dialog.setOutsideTouchable(true);dialog.setInputMethodMode(android.widget.PopupWindow.INPUT_METHOD_NEEDED);dialog.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);cancel.setOnClickListener(v->dialog.dismiss());
+  apply.setOnClickListener(btn->{
    try{
     double st=number(station),limit=route.measuredLength();if(!Double.isFinite(st)||!Double.isFinite(limit)||st<0||st>limit){station.setError("Station außerhalb der bemaßten Trasse");return;}
     String chosen=side.getSelectedItem().toString();
@@ -637,7 +642,7 @@ public class MainActivity extends Activity {
     for(int j=0;j<fields.length;j++){if(fields[j].length()==0){o.remove(keys[j]);continue;}double value=number(fields[j]);if(!Double.isFinite(value)||value<0||(j<3&&value==0)||(j==3&&!chosen.equals("links")&&!chosen.equals("rechts"))){fields[j].setError("Maß / Seite prüfen");return;}o.put(keys[j],fields[j].getText().toString());}
     if(old==null)draft.put(o);else if(draft.optJSONObject(index)==old){if(!overlapGeometry(old).equals(overlapGeometry(o)))o.remove("acceptedOverlap");draft.put(index,o);}else{notice("Objekt wurde geändert.");return;}refresh.run();dialog.dismiss();
    }catch(Exception e){notice("Station und Maße prüfen.");}
-  }));dialog.show();
+  });dialog.showAtLocation(route,Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL,0,dp(8));
  }
  android.graphics.drawable.GradientDrawable editorShape(int color,int radius){
   android.graphics.drawable.GradientDrawable shape=new android.graphics.drawable.GradientDrawable();shape.setColor(color);shape.setCornerRadius(dp(radius));return shape;
