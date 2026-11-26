@@ -604,15 +604,19 @@ public class MainActivity extends Activity {
   String[] labels=new String[route.vertices.size()-2];
   for(int i=1;i<route.vertices.size()-1;i++){RouteSketch.Vertex p=route.vertices.get(i);labels[i-1]="Punkt "+(i+1)+(p.name.isEmpty()?"":" · "+p.name);}
   new android.app.AlertDialog.Builder(this).setTitle("Punkt löschen und Trasse verbinden").setItems(labels,(d,which)->{
-   int index=which+1;RouteSketch.Vertex p=route.vertices.get(index);
-   new android.app.AlertDialog.Builder(this).setTitle(labels[which]+" löschen?")
-    .setMessage("Die Nachbarpunkte werden direkt verbunden. Die beiden bisherigen Abschnittsmaße werden verworfen; das neue Maß muss eingetragen werden. Punktname, GPS-Daten und Fotozuordnungen dieses Punktes entfallen. Rückgängig bleibt möglich.")
-    .setNegativeButton("Abbrechen",null).setPositiveButton("Löschen und verbinden",(a,b)->{
-     if(index>=route.vertices.size()-1||route.vertices.get(index)!=p)return;
-     route.vertices.remove(index);route.vertices.get(index).metres=Double.NaN;
-     route.highlight=-1;route.dragged=-1;if(route.changed!=null)route.changed.run();route.invalidate();
-    }).show();
+   confirmDeleteRoutePoint(route,which+1);
   }).setNegativeButton("Abbrechen",null).show();
+ }
+ void confirmDeleteRoutePoint(RouteSketch route,int index){
+  if(index<=0||index>=route.vertices.size()-1){notice("Nur Zwischenpunkte können verbunden werden.");return;}
+  RouteSketch.Vertex p=route.vertices.get(index);
+  new android.app.AlertDialog.Builder(this).setTitle("Punkt "+(index+1)+" löschen?")
+   .setMessage("Die Nachbarpunkte werden direkt verbunden. Die beiden bisherigen Abschnittsmaße werden verworfen; das neue Maß muss eingetragen werden. Punktname, GPS-Daten und Fotozuordnungen dieses Punktes entfallen. Rückgängig bleibt möglich.")
+   .setNegativeButton("Abbrechen",null).setPositiveButton("Löschen und verbinden",(a,b)->{
+    if(index>=route.vertices.size()-1||route.vertices.get(index)!=p)return;
+    route.vertices.remove(index);route.vertices.get(index).metres=Double.NaN;
+    route.highlight=-1;route.dragged=-1;if(route.changed!=null)route.changed.run();route.invalidate();
+   }).show();
  }
  void editRoute(boolean measure){editRoute(measure,false);}
  void editRoute(boolean measure,boolean startFullscreen){
@@ -663,6 +667,15 @@ public class MainActivity extends Activity {
   Button clearScale=new Button(this);clearScale.setAllCaps(false);clearScale.setText("Kalibrierung entfernen");form.addView(clearScale);
   LinearLayout list=page();form.addView(list);
   route.selected=i->measureSegment(route,i);
+  route.pointSelected=i->{
+   if(i<0||i>=route.vertices.size())return;
+   route.highlight=i;route.invalidate();
+   RouteSketch.Vertex p=route.vertices.get(i);
+   android.app.AlertDialog.Builder menu=new android.app.AlertDialog.Builder(this).setTitle("Punkt "+(i+1)+(p.name.isEmpty()?"":" · "+p.name)).setNegativeButton("Schließen",null);
+   if(i>0&&i<route.vertices.size()-1)menu.setItems(new String[]{"Punkt löschen und verbinden"},(d,w)->confirmDeleteRoutePoint(route,i));
+   else menu.setMessage("Start- oder Endpunkt. Kein Verbinden zweier Nachbarpunkte möglich.");
+   menu.show();
+  };
   Runnable refreshEditor=()->{
    undo.setEnabled(!history.undo.isEmpty());redo.setEnabled(!history.redo.isEmpty());
    remove.setEnabled(route.vertices.size()>1);deletePoint.setEnabled(route.vertices.size()>2);
