@@ -959,7 +959,8 @@ public class MainActivity extends Activity {
   menu.getMenu().add(0,107,Menu.NONE,"Mengen als CSV exportieren");
   menu.getMenu().add(0,108,Menu.NONE,"Leistungsverzeichnis");
   menu.getMenu().add(0,109,Menu.NONE,"DA11 exportieren (Test)");
-  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==109)exportReb();else if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
+  menu.getMenu().add(0,110,Menu.NONE,"GAEB X31 exportieren (Test)");
+  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==110)exportX31();else if(item.getItemId()==109)exportReb();else if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
   menu.show();
  }
  LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(dp(12),dp(8),dp(12),dp(8));return p;}
@@ -1399,6 +1400,25 @@ public class MainActivity extends Activity {
   return out.toString();
  }
  String pendingRebData;
+ String pendingX31Data;
+ void exportX31(){
+  if(!calculate()){showPage(measurePage);return;}
+  try{
+   String xml=GaebX31Export.write(projectHeader.getText().toString(),rebData());
+   new android.app.AlertDialog.Builder(this).setTitle("GAEB X31 exportieren – Testformat")
+    .setMessage("GAEB DA XML 3.3, REB 23.003 (2009), Formel 91, OZ 00.00.0000. Keine Mengenabzüge. Keine eingebetteten Anlagen. Vor Verwendung mit GAEB-XML-Checker und Ziel-AVA prüfen.")
+    .setNegativeButton("Abbrechen",null).setPositiveButton("Testdatei speichern",(d,w)->{
+     pendingX31Data=xml;android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.setType("application/octet-stream");i.putExtra(android.content.Intent.EXTRA_TITLE,"Feldaufmass.x31");startActivityForResult(i,421);
+    }).show();
+  }catch(Exception e){notice("X31 nicht exportiert: "+e.getMessage());}
+ }
+ void writeX31(android.net.Uri uri){
+  String xml=pendingX31Data;pendingX31Data=null;if(xml==null){notice("Export erneut starten.");return;}
+  try(java.io.OutputStream stream=getContentResolver().openOutputStream(uri,"wt")){
+   if(stream==null)throw new java.io.IOException();
+   stream.write(xml.getBytes(java.nio.charset.StandardCharsets.UTF_8));stream.flush();notice("X31-Testdatei gespeichert.");
+  }catch(Exception e){notice("X31 konnte nicht gespeichert werden.");}
+ }
  void exportReb(){
   if(!calculate()){showPage(measurePage);return;}
   try{
@@ -1916,6 +1936,7 @@ public class MainActivity extends Activity {
  try{startActivityForResult(i,410);}catch(android.content.ActivityNotFoundException e){Toast.makeText(this,"Keine Spracherkennung verfügbar.",Toast.LENGTH_LONG).show();}
  }
  @Override protected void onActivityResult(int request,int result,android.content.Intent data){super.onActivityResult(request,result,data);
+ if(request==421){if(result==RESULT_OK&&data!=null&&data.getData()!=null)writeX31(data.getData());else pendingX31Data=null;return;}
  if(request==420){if(result==RESULT_OK&&data!=null&&data.getData()!=null)writeReb(data.getData());else pendingRebData=null;return;}
  if(request==419&&result==RESULT_OK&&data!=null&&data.getData()!=null){importGaeb(data.getData());return;}
  if(request==418&&result==RESULT_OK&&data!=null&&data.getData()!=null){writeCsv(data.getData());return;}
