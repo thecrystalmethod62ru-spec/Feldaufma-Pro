@@ -5293,7 +5293,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
        undoByUtility.put(selected[0],new java.util.ArrayDeque<>(positionHistory));redoByUtility.put(selected[0],new java.util.ArrayDeque<>(redoHistory));
        selected[0]=hit;current[0]=rows.optJSONObject(hit);offset.setText(current[0].optString("offset",""));depth.setText(current[0].optString("axisDepth",""));
        positionHistory.clear();redoHistory.clear();if(undoByUtility.containsKey(hit))positionHistory.addAll(undoByUtility.get(hit));if(redoByUtility.containsKey(hit))redoHistory.addAll(redoByUtility.get(hit));undoPosition.setEnabled(!positionHistory.isEmpty());redoPosition.setEnabled(!redoHistory.isEmpty());
-       notice(current[0].optString("name",current[0].optString("type")));invalidate();return true;
+       notice(current[0].optString("name",current[0].optString("type")));invalidate();x=read(offset);y=read(depth);if(!Double.isFinite(x)||!Double.isFinite(y))return true;
       }
       if(groupMode[0]&&group.size()>1){try{current[0].put("offset",x);current[0].put("axisDepth",y);groupUndo.push(rows.toString());if(groupUndo.size()>50)groupUndo.removeLast();groupRedo.clear();}catch(Exception ex){return true;}positionHistory.clear();redoHistory.clear();undoPosition.setEnabled(false);redoPosition.setEnabled(false);}else{redoHistory.clear();redoPosition.setEnabled(false);positionHistory.push(new String[]{offset.getText().toString(),depth.getText().toString()});if(positionHistory.size()>50)positionHistory.removeLast();undoPosition.setEnabled(true);}
       grabX=e.getX()-dragLeft-x*dragScale;grabY=e.getY()-dragTop-y*dragScale;dragging=true;getParent().requestDisallowInterceptTouchEvent(true);return true;
