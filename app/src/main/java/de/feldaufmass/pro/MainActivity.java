@@ -1188,6 +1188,22 @@ public class MainActivity extends Activity {
     String station=String.format(java.util.Locale.GERMANY,"%.1f",total*k/4);p.setTextSize(dp(10));label(c,station,Math.min(x,right-p.measureText(station)),bottom+dp(15));
    }
    label(c,absolute?"Höhe (m)":"Rel. Höhe (m)",left,dp(15));label(c,"Station (m)",left,bottom+dp(32));
+   // Station bands show presence only, not vertical installation depth.
+   try{
+    org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("metricVerbauSections","[]"));
+    p.setColor(0xffa65e19);p.setStrokeWidth(dp(3));
+    boolean shown=false;
+    for(int j=0;j<rows.length();j++){
+     org.json.JSONArray row=rows.optJSONArray(j);if(row==null)continue;
+     double from=row.optDouble(0),to=row.optDouble(1);
+     if(!Double.isFinite(from)||!Double.isFinite(to)||from<0||to>total||to<=from)continue;
+     float x1=left+(right-left)*(float)(from/total),x2=left+(right-left)*(float)(to/total);
+     if(row.optDouble(2,0)>0){c.drawLine(x1,top-dp(10),x2,top-dp(10),p);shown=true;}
+     if(row.optDouble(3,0)>0){c.drawLine(x1,top-dp(4),x2,top-dp(4),p);shown=true;}
+    }
+    if(shown){label(c,"L",left-dp(14),top-dp(8));label(c,"R",left-dp(14),top-dp(2));}
+   }catch(Exception ignored){}
+
    if(!absolute){float y=top+(bottom-top)*(float)(hi/span);p.setColor(colors[0]);p.setStrokeWidth(dp(2));c.drawLine(left,y,right,y,p);}
    for(int k=0;k<3;k++){
     if(!absolute&&k!=1)continue;
@@ -4066,6 +4082,7 @@ public class MainActivity extends Activity {
     int[] colors={0xff65717a,0xffa65e19,TEAL};
     for(int k=0;k<labels.length;k++){pen.setColor(colors[k]);pen.setStrokeWidth(3);c.drawLine(36,550+k*20,60,550+k*20,pen);pen.setColor(INK);c.drawText(labels[k],68,554+k*20,pen);}
    }else c.drawText("Keine darstellbaren Höhen- oder Tiefenmesswerte.",36,125,pen);
+   pen.setTextSize(11);if(!shoringReport().isEmpty())c.drawText("Verbau: Stationsbänder L/R, keine Höhenlage.",36,630,pen);
    pen.setTextSize(11);c.drawText("Vertikal überhöht / nicht maßstäblich. Keine Extrapolation.",36,740,pen);
    c.drawText("Fehlende Höhenwerte bleiben offen. Vor Abrechnung prüfen.",36,758,pen);
    c.drawText("Seite "+(pageNumber-1),500,805,pen);
