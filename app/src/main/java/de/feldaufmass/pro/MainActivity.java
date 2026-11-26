@@ -2223,6 +2223,7 @@ public class MainActivity extends Activity {
         previewUpdate.run();
         ScrollView editScroll=new ScrollView(this);editScroll.addView(fields);
         final android.widget.LinearLayout sheet=new android.widget.LinearLayout(this);sheet.setOrientation(1);sheet.setBackgroundColor(0xff202827);
+        TextView dragHandle=new TextView(this);dragHandle.setText("☰  Leitung bearbeiten");dragHandle.setTextColor(Color.WHITE);dragHandle.setPadding(dp(12),dp(8),dp(12),dp(8));dragHandle.setContentDescription("Einstellungsfenster verschieben");sheet.addView(dragHandle);
         sheet.addView(editScroll,new android.widget.LinearLayout.LayoutParams(-1,0,1));
         android.widget.LinearLayout actions=new android.widget.LinearLayout(this);sheet.addView(actions);
         Button cancel=new Button(this),apply=new Button(this);cancel.setText("Abbrechen");apply.setText("Speichern");actions.addView(cancel,new android.widget.LinearLayout.LayoutParams(0,-2,1));actions.addView(apply,new android.widget.LinearLayout.LayoutParams(0,-2,1));
@@ -2237,7 +2238,23 @@ public class MainActivity extends Activity {
           next.set(index,new PipeLayout.Pipe(pipe.name,o,number(diameterInput),number(wallInput),b,Double.parseDouble(gapInput.getText().toString().trim().replace(',','.')),Double.parseDouble(coverInput.getText().toString().trim().replace(',','.')),pipe.fixed));
           multiPipeStore.save(next);pipes.clear();pipes.addAll(next);refresh.run();edit.dismiss();
          }catch(Exception ex){bedding.setError("Ungültige Lage oder Speicherfehler: "+ex.getMessage());}
-        });edit.showAtLocation(cross,Gravity.BOTTOM|Gravity.RIGHT,0,0);return;
+        });edit.showAtLocation(cross,Gravity.TOP|Gravity.LEFT,Math.max(0,getResources().getDisplayMetrics().widthPixels-edit.getWidth()),Math.max(0,getResources().getDisplayMetrics().heightPixels-edit.getHeight()-dp(48)));
+        dragHandle.setOnTouchListener(new View.OnTouchListener(){
+         float downX,downY;int baseX,baseY;
+         public boolean onTouch(View view,android.view.MotionEvent event){
+          switch(event.getActionMasked()){
+           case android.view.MotionEvent.ACTION_DOWN:
+            downX=event.getRawX();downY=event.getRawY();int[] location=new int[2];sheet.getLocationOnScreen(location);baseX=location[0];baseY=location[1];return true;
+           case android.view.MotionEvent.ACTION_MOVE:
+            android.graphics.Rect bounds=new android.graphics.Rect();cross.getWindowVisibleDisplayFrame(bounds);
+            int x=Math.max(bounds.left,Math.min(Math.max(bounds.left,bounds.right-edit.getWidth()),baseX+Math.round(event.getRawX()-downX)));
+            int y=Math.max(bounds.top,Math.min(Math.max(bounds.top,bounds.bottom-edit.getHeight()),baseY+Math.round(event.getRawY()-downY)));
+            edit.update(x,y,-1,-1);return true;
+           case android.view.MotionEvent.ACTION_UP:case android.view.MotionEvent.ACTION_CANCEL:return true;
+           default:return true;
+          }
+         }
+        });return;
        }
        Runnable change=()->{
         java.util.List<PipeLayout.Pipe> next=new java.util.ArrayList<>(pipes);
