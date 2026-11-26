@@ -785,7 +785,8 @@ public class MainActivity extends Activity {
   menu.getMenu().add(0,104,Menu.NONE,"Sicherungsversionen");
   menu.getMenu().add(0,105,Menu.NONE,"Längsschnitt");
   menu.getMenu().add(0,106,Menu.NONE,"DXF exportieren");
-  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
+  menu.getMenu().add(0,107,Menu.NONE,"Mengen als CSV exportieren");
+  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
   menu.show();
  }
  LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(dp(12),dp(8),dp(12),dp(8));return p;}
@@ -1165,6 +1166,55 @@ public class MainActivity extends Activity {
  void showObjects(){refreshOverview();StringBuilder b=new StringBuilder();for(int i=0;i<objects.length();i++){org.json.JSONObject o=objects.optJSONObject(i);if(o!=null)b.append(String.format(java.util.Locale.GERMANY,"%.2f m | %s | %s | %s\n",o.optDouble("station"),o.optString("type"),o.optString("side"),o.optString("note")+detailSummary(o)+overlapStatus(i)));}objectList.setText(b.toString());}
  void saveSoll(){try{EditText[] fields={sollLength,sollWidth,sollDepth,sollAsphalt};String[] keys={"sollLength","sollWidth","sollDepth","sollAsphalt"};for(EditText e:fields){if(e.length()>0){double n=number(e);if(!Double.isFinite(n)||n<=0)throw new Exception();}}android.content.SharedPreferences.Editor ed=getPreferences(0).edit();for(int i=0;i<fields.length;i++)ed.putString(keys[i],fields[i].getText().toString());ed.putString("sollSource",sollSource.getText().toString()).apply();compareSoll();}catch(Exception e){Toast.makeText(this,"Bitte gültige positive Soll-Maße eingeben.",Toast.LENGTH_LONG).show();}}
  void compareSoll(){if(sollComparison==null||length==null||asphaltInput==null)return;EditText[] actual={length,width,depth,asphaltInput};String[] keys={"sollLength","sollWidth","sollDepth","sollAsphalt"};String[] names={"Trassenlänge","Grabenbreite","Grabentiefe","Asphaltstärke"};StringBuilder b=new StringBuilder("Soll / Ist – Abweichungen (Ist minus Soll)\n");for(int i=0;i<keys.length;i++){b.append(names[i]).append(": ");try{double p=Double.parseDouble(getPreferences(0).getString(keys[i],"").replace(',','.'));double a=number(actual[i]);if(!Double.isFinite(a)||a<=0)throw new Exception();b.append(String.format(java.util.Locale.GERMANY,"Soll %.2f m | Ist %.2f m | Δ %+.2f m",p,a,a-p));}catch(Exception e){b.append("Nicht vollständig erfasst");}b.append("\n");}sollComparison.setText(b.toString());}
+ static String csvNumber(double n){return Double.isFinite(n)?String.format(java.util.Locale.GERMANY,"%.3f",n):"";}
+ static String csvText(String value){
+  String safe=value==null?"":value.replace("\r"," ").replace("\n"," ");
+  String trimmed=safe.trim();
+  if(!trimmed.isEmpty()&&"=+-@".indexOf(trimmed.charAt(0))>=0)safe="'"+safe;
+  return "\""+safe.replace("\"","\"\"")+"\"";
+ }
+ static void csvRow(java.io.Writer out,String project,String group,String label,double from,double to,double len,double width,double depth,double quantity,String unit,String note)throws java.io.IOException{
+  String[] fields={csvText(project),csvText(group),csvText(label),csvNumber(from),csvNumber(to),csvNumber(len),csvNumber(width),csvNumber(depth),csvNumber(quantity),csvText(unit),csvText(note)};
+  out.write(String.join(";",fields));out.write("\r\n");
+ }
+ void exportCsv(){
+  if(!calculate()){showPage(measurePage);return;}
+  new android.app.AlertDialog.Builder(this).setTitle("Mengen als CSV exportieren")
+   .setMessage("Excel-kompatible CSV mit Semikolon und Dezimalkomma. Haupttrasse, Belagsabschnitte und Detailmengen sind getrennte Gruppen, nicht addierbar. Keine automatische LV-Zuordnung oder Mengenabzüge.")
+   .setNegativeButton("Abbrechen",null).setPositiveButton("Exportieren",(dialog,which)->{
+    android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);
+    i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.setType("text/csv");i.putExtra(android.content.Intent.EXTRA_TITLE,"Feldaufmass_Mengen.csv");startActivityForResult(i,418);
+   }).show();
+ }
+ void writeCsvData(java.io.Writer out)throws java.io.IOException{
+  final double n=Double.NaN;String name=projectHeader.getText().toString();
+  out.write('\ufeff');out.write("Projekt;Gruppe;Bezeichnung;Station von (m);Station bis (m);Länge (m);Breite (m);Tiefe (m);Menge;Einheit;Hinweis\r\n");
+  csvRow(out,name,"Haupttrasse","Aushub – geometrisch",0,l,l,w,d,l*w*d,"m³","Gesamtquader; keine Abzüge");
+  csvRow(out,name,"Haupttrasse","Grundfläche",0,l,l,w,n,l*w,"m²","Bezugsfläche, nicht zu anderen Flächen addieren");
+  if(Double.isFinite(left)&&Double.isFinite(right))csvRow(out,name,"Haupttrasse","Fläche mit Nachschnitt",0,l,l,w+left+right,n,l*(w+left+right),"m²","Alternative Bezugsfläche, nicht zusätzlich zur Grundfläche");
+  for(int j=0;j<segments.length();j++){
+   org.json.JSONObject o=segments.optJSONObject(j);if(o==null)continue;double a=o.optDouble("from"),b=o.optDouble("to"),width=o.optDouble("width"),len=b-a;
+   boolean valid=Double.isFinite(a)&&Double.isFinite(b)&&a>=0&&b<=l&&len>0&&Double.isFinite(width)&&width>0;
+   csvRow(out,name,"Belagsabschnitt",o.optString("surface"),a,b,len,width,n,valid?len*width:n,"m²",valid?"Grabenfläche; Teilfläche der Haupttrasse":"Stationsgrenzen / Breite prüfen");
+   double cut=o.optDouble("cutWidth");if(Double.isFinite(cut)&&cut>0)csvRow(out,name,"Belagsabschnitt",o.optString("surface")+" mit Nachschnitt",a,b,len,cut,n,valid?len*cut:n,"m²","Alternative Fläche, nicht zusätzlich");
+  }
+  for(int j=0;j<objects.length();j++){
+   org.json.JSONObject o=objects.optJSONObject(j);if(o==null)continue;double st=o.optDouble("station"),a=detailNumber(o,"detailLength"),b=detailNumber(o,"detailWidth"),h=detailNumber(o,"detailDepth");
+   String label=(j+1)+" "+o.optString("type"),note="Detailmenge, nicht addieren; "+o.optString("side")+overlapStatus(j)+"; "+o.optString("note");
+   boolean area=Double.isFinite(a*b)&&a>0&&b>0;
+   csvRow(out,name,"Objektdetail",label+" – Fläche",st,n,a,b,n,area?a*b:n,"m²",note);
+   csvRow(out,name,"Objektdetail",label+" – Körpervolumen",st,n,a,b,h,area&&Double.isFinite(a*b*h)&&h>0?a*b*h:n,"m³",note);
+  }
+  out.flush();
+ }
+ void writeCsv(android.net.Uri uri){
+  if(!calculate())return;
+  try(java.io.OutputStream stream=getContentResolver().openOutputStream(uri,"wt")){
+   if(stream==null)throw new java.io.IOException();
+   java.io.Writer writer=new java.io.BufferedWriter(new java.io.OutputStreamWriter(stream,java.nio.charset.StandardCharsets.UTF_8));
+   writeCsvData(writer);notice("CSV gespeichert.");
+  }catch(Exception e){notice("CSV konnte nicht gespeichert werden.");}
+ }
  void exportDxf(){
   RouteSketch route=new RouteSketch(this,routeData());
   if(route.vertices.size()<2){notice("Zuerst eine Trasse zeichnen.");return;}
@@ -1621,6 +1671,7 @@ public class MainActivity extends Activity {
  try{startActivityForResult(i,410);}catch(android.content.ActivityNotFoundException e){Toast.makeText(this,"Keine Spracherkennung verfügbar.",Toast.LENGTH_LONG).show();}
  }
  @Override protected void onActivityResult(int request,int result,android.content.Intent data){super.onActivityResult(request,result,data);
+ if(request==418&&result==RESULT_OK&&data!=null&&data.getData()!=null){writeCsv(data.getData());return;}
  if((request==416||request==417)&&result==RESULT_OK&&data!=null&&data.getData()!=null){writeDxf(data.getData(),request==416);return;}
  if(request==415&&result==RESULT_OK&&data!=null&&data.getData()!=null){importProjectBackup(data.getData());return;}
  if(request==414&&result==RESULT_OK&&data!=null&&data.getData()!=null){exportProjectBackup(data.getData());return;}
