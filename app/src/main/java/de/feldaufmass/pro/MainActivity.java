@@ -1615,6 +1615,7 @@ public class MainActivity extends Activity {
  Button cloudImport=new Button(this);cloudImport.setText("Aus SecureCloud importieren");documentsPage.addView(cloudImport);cloudImport.setOnClickListener(v->importDoc.performClick());
  documentsList=new TextView(this);documentsPage.addView(documentsList);try{documents=new org.json.JSONArray(getPreferences(0).getString("documents","[]"));}catch(Exception ignored){}showDocuments();
  TextView info=new TextView(this);info.setText("Unterlagen sind Planungsdaten (Soll). Automatische KI-Auswertung noch nicht verfügbar. Ist-Maße bleiben unverändert.");documentsPage.addView(info);
+ Button planAssistant=new Button(this);planAssistant.setText("KI-Planassistent – Unterlagen prüfen");documentsPage.addView(planAssistant);planAssistant.setOnClickListener(v->choosePlanDocument());
  TextView sh=new TextView(this);sh.setText("Soll-Maße aus Ausführungsunterlagen");sh.setTextSize(20);documentsPage.addView(sh);
  sollLength=field(documentsPage,"Trassenlänge Soll (m)","sollLength",true);
  sollWidth=field(documentsPage,"Grabenbreite Soll (m)","sollWidth",true);
@@ -2450,6 +2451,35 @@ public class MainActivity extends Activity {
    ed.putString("sollSource",source.toString());if(!ed.commit()){notice("Sollwerte konnten nicht gespeichert werden.");return;}
    recordProjectEvent("Sollwerte aus Unterlage übernommen");compareSoll();dialog.dismiss();notice("Sollwerte gespeichert. Istmaße unverändert.");
   }));dialog.show();
+ }
+ void choosePlanDocument(){
+  if(documents.length()==0){notice("Bitte zuerst Ausführungsunterlagen hinzufügen.");return;}
+  String[] names=new String[documents.length()];for(int j=0;j<names.length;j++)names[j]=documents.optJSONObject(j).optString("name");
+  new android.app.AlertDialog.Builder(this).setTitle("Ausführungsplan auswählen").setItems(names,(dialog,index)->previewPlanDocument(documents.optJSONObject(index))).setNegativeButton("Abbrechen",null).show();
+ }
+ void previewPlanDocument(org.json.JSONObject doc){
+  android.net.Uri uri=android.net.Uri.parse(doc.optString("uri"));
+  String name=doc.optString("name"),mime=getContentResolver().getType(uri);
+  if(!"application/pdf".equals(mime)&&!name.toLowerCase(java.util.Locale.ROOT).endsWith(".pdf")){notice("Planvorschau derzeit nur für PDF verfügbar. Andere Formate bleiben verknüpft.");return;}
+  LinearLayout form=new LinearLayout(this);form.setOrientation(1);
+  TextView status=new TextView(this);status.setText("Soll-Plan · Vorschau, noch keine automatische Erkennung");form.addView(status);
+  android.widget.ImageView image=new android.widget.ImageView(this);image.setAdjustViewBounds(true);form.addView(image,new LinearLayout.LayoutParams(-1,dp(360)));
+  Button next=new Button(this);next.setText("Nächste Seite");form.addView(next);
+  Button prev=new Button(this);prev.setText("Vorherige Seite");form.addView(prev);
+  final int[] page={0};
+  Runnable render=()->{
+   try(android.os.ParcelFileDescriptor fd=getContentResolver().openFileDescriptor(uri,"r");android.graphics.pdf.PdfRenderer pdf=new android.graphics.pdf.PdfRenderer(fd)){
+    page[0]=Math.max(0,Math.min(pdf.getPageCount()-1,page[0]));
+    try(android.graphics.pdf.PdfRenderer.Page p=pdf.openPage(page[0])){
+     float scale=Math.min(1600f/p.getWidth(),1600f/p.getHeight());
+     android.graphics.Bitmap bitmap=android.graphics.Bitmap.createBitmap(Math.max(1,(int)(p.getWidth()*scale)),Math.max(1,(int)(p.getHeight()*scale)),android.graphics.Bitmap.Config.ARGB_8888);
+     bitmap.eraseColor(Color.WHITE);p.render(bitmap,null,null,android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);image.setImageBitmap(bitmap);
+     status.setText("Soll-Plan · Seite "+(page[0]+1)+" / "+pdf.getPageCount()+" · nicht ausgewertet");prev.setEnabled(page[0]>0);next.setEnabled(page[0]+1<pdf.getPageCount());
+    }
+   }catch(Exception e){status.setText("PDF nicht lesbar. Bitte Unterlage erneut verknüpfen.");}
+  };
+  next.setOnClickListener(v->{page[0]++;render.run();});prev.setOnClickListener(v->{page[0]--;render.run();});
+  new android.app.AlertDialog.Builder(this).setTitle(name).setView(form).setPositiveButton("Schließen",null).show();render.run();
  }
  void showDocuments(){StringBuilder b=new StringBuilder();for(int j=0;j<documents.length();j++){org.json.JSONObject o=documents.optJSONObject(j);if(o!=null)b.append(o.optString("name")).append(" – Soll / nicht ausgewertet\n");}documentsList.setText(b.length()==0?"Keine Unterlagen ausgewählt":b.toString());}
  void attachDocument(android.net.Uri uri,int flags){if(uri==null)return;try{for(int j=0;j<documents.length();j++){org.json.JSONObject old=documents.optJSONObject(j);if(old!=null&&uri.toString().equals(old.optString("uri")))return;}getContentResolver().takePersistableUriPermission(uri,flags&android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);String name=uri.getLastPathSegment();try(android.database.Cursor c=getContentResolver().query(uri,new String[]{android.provider.OpenableColumns.DISPLAY_NAME},null,null,null)){if(c!=null&&c.moveToFirst())name=c.getString(0);}org.json.JSONObject o=new org.json.JSONObject();o.put("uri",uri.toString());o.put("name",name);documents.put(o);getPreferences(0).edit().putString("documents",documents.toString()).apply();}catch(Exception e){Toast.makeText(this,"Unterlage konnte nicht dauerhaft verknüpft werden.",Toast.LENGTH_LONG).show();}}
