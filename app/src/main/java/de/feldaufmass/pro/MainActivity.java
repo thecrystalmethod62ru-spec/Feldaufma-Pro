@@ -375,7 +375,7 @@ public class MainActivity extends Activity {
  }
  void refreshRoute(){
   routePreviewBox.removeAllViews();
-  RouteSketch preview=new RouteSketch(this,routeData());
+  RouteSketch preview=new RouteSketch(this,routeData());preview.bindDimensionProject(activeProject);
   livePreview=preview;preview.setVisibleLayers(drawingLayers());preview.setLiveFix(liveFix);
   preview.pointSelected=i->{selectedPoint=preview.vertices.get(i).id;refreshRoute();pointMenu();};
   preview.selected=i->measureSegment(preview,i);
@@ -709,7 +709,7 @@ public class MainActivity extends Activity {
  void editRoute(boolean measure,boolean startFullscreen){
   LinearLayout form=page();
   ScrollView scroll=new ScrollView(this);scroll.addView(form);
-  RouteSketch route=new RouteSketch(this,routeData());route.editable=true;
+  RouteSketch route=new RouteSketch(this,routeData());route.editable=true;route.bindDimensionProject(activeProject);
   TextView hint=sheetText("Trasse mit dem Finger zeichnen. Weitere Striche verlängern das Ende.",15,false);
   form.addView(hint);
   Button fullscreen=new Button(this);fullscreen.setAllCaps(false);fullscreen.setText("⛶ Vollbild");form.addView(fullscreen);
@@ -753,6 +753,7 @@ public class MainActivity extends Activity {
   Button undo=new Button(this),redo=new Button(this);undo.setAllCaps(false);redo.setAllCaps(false);undo.setText("Rückgängig");redo.setText("Wiederholen");
   historyBar.addView(undo,new LinearLayout.LayoutParams(0,-2,1));historyBar.addView(redo,new LinearLayout.LayoutParams(0,-2,1));
   Button legendEdit=new Button(this);legendEdit.setAllCaps(false);legendEdit.setText("Legende bearbeiten");form.addView(legendEdit);legendEdit.setOnClickListener(v->route.editLegend());
+  Button resetDimensions=new Button(this);resetDimensions.setAllCaps(false);resetDimensions.setText("Maßpositionen zurücksetzen");historyBar.addView(resetDimensions,new LinearLayout.LayoutParams(0,-2,1));resetDimensions.setOnClickListener(v->route.resetDimensionLayout());
   Button deletePoint=new Button(this);deletePoint.setAllCaps(false);deletePoint.setText("Punkt löschen");historyBar.addView(deletePoint,new LinearLayout.LayoutParams(0,-2,1));deletePoint.setOnClickListener(v->deleteRoutePoint(route));
   Button remove=new Button(this);remove.setText("Letzten Abschnitt entfernen");form.addView(remove);
   final org.json.JSONObject[] calibration={savedSketchCalibration()};
