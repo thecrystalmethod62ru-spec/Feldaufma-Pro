@@ -2789,7 +2789,13 @@ public class MainActivity extends Activity {
       boolean warning=false;for(double[] interval:utilityWarningIntervals)if(station>=interval[0]&&station<=interval[1]){warning=true;break;}
       String[] actions=warning?new String[]{"Leitungen prüfen / bearbeiten","Abzweigung hinzufügen"}:new String[]{"Abzweigung hinzufügen"};
       final boolean hasWarning=warning;
-      new android.app.AlertDialog.Builder(MainActivity.this).setTitle(String.format(java.util.Locale.GERMANY,"Station %.3f m",station)).setItems(actions,(dialog,which)->{if(hasWarning&&which==0){editUtilities();invalidate();return;}requestedBranchStation[0]=station;branchEditor.performClick();}).setNegativeButton("Abbrechen",null).show();
+      new android.app.AlertDialog.Builder(MainActivity.this).setTitle(String.format(java.util.Locale.GERMANY,"Station %.3f m",station)).setItems(actions,(dialog,which)->{if(hasWarning&&which==0){
+       org.json.JSONArray rows=extraUtilities();java.util.ArrayList<String> labels=new java.util.ArrayList<>();java.util.ArrayList<Integer> indices=new java.util.ArrayList<>();
+       for(int k=0;k<rows.length();k++){org.json.JSONObject u=rows.optJSONObject(k);if(u!=null&&station>=u.optDouble("routeFrom",0)&&station<=u.optDouble("routeTo",Double.POSITIVE_INFINITY)){indices.add(k);labels.add(u.optString("name",u.optString("type"))+" · "+u.optDouble("diameter")+" mm");}}
+       if(indices.isEmpty()){notice("Keine Leitung an dieser Station");return;}
+       if(indices.size()==1){editUtilityPosition(indices.get(0),()->invalidate());return;}
+       new android.app.AlertDialog.Builder(MainActivity.this).setTitle("Leitung an dieser Station wählen").setItems(labels.toArray(new String[0]),(dd,ii)->editUtilityPosition(indices.get(ii),()->invalidate())).setNegativeButton("Abbrechen",null).show();return;
+      }requestedBranchStation[0]=station;branchEditor.performClick();}).setNegativeButton("Abbrechen",null).show();
      }
      return true;
     }
@@ -5241,6 +5247,24 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
    android.app.AlertDialog add=new android.app.AlertDialog.Builder(this).setTitle("Leitung hinzufügen").setView(form).setNegativeButton("Abbrechen",null).setPositiveButton("Hinzufügen",null).create();
    add.setOnShowListener(x->add.getButton(-1).setOnClickListener(y->{try{double mm=Double.parseDouble(diameter.getText().toString().replace(',','.'));if(!Double.isFinite(mm)||mm<=0)throw new Exception();org.json.JSONObject o=new org.json.JSONObject();o.put("id",java.util.UUID.randomUUID().toString()).put("type",type.getSelectedItem().toString());o.put("diameter",mm);rows.put(o);if(saveUtilities(rows))add.dismiss();}catch(Exception e){diameter.setError("Positiven Durchmesser eingeben");}}));add.show();
   }).setNegativeButton("Schließen",null).show();
+ }
+ void editUtilityPosition(int index,Runnable refresh){
+  org.json.JSONArray rows=extraUtilities();org.json.JSONObject source=rows.optJSONObject(index);if(source==null)return;
+  String before=rows.toString(),projectId=activeProject;
+  LinearLayout form=new LinearLayout(this);form.setOrientation(1);
+  EditText offset=new EditText(this),depth=new EditText(this);
+  EditText[] fields={offset,depth};String[] keys={"offset","axisDepth"},labels={"Abstand vom linken Grabenrand (m)","Achstiefe (m)"};
+  for(int i=0;i<2;i++){fields[i].setInputType(8194);fields[i].setHint(labels[i]);fields[i].setText(source.optString(keys[i],""));form.addView(fields[i]);double existing=source.optDouble(keys[i],0);utilitySlider(form,fields[i],labels[i],0,Math.max(10,Double.isFinite(existing)?existing:0),0.01,true);}
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(source.optString("name",source.optString("type"))+" – Lage").setView(form).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
+  dialog.setOnShowListener(x->dialog.getButton(-1).setOnClickListener(y->{
+   if(!projectId.equals(activeProject)||!before.equals(extraUtilities().toString())){notice("Projektdaten geändert. Leitung erneut öffnen.");return;}
+   try{
+    org.json.JSONObject updated=new org.json.JSONObject(source.toString());
+    for(int i=0;i<2;i++){double value;try{value=Double.parseDouble(fields[i].getText().toString().trim().replace(',','.'));if(!Double.isFinite(value)||value<0)throw new NumberFormatException();}catch(Exception ex){fields[i].setError("Gültiges Maß eingeben");return;}updated.put(keys[i],value);}
+    org.json.JSONArray next=new org.json.JSONArray(before);next.put(index,updated);
+    if(saveUtilities(next)){recordProjectEvent("Leitungslage geändert");dialog.dismiss();if(refresh!=null)refresh.run();}
+   }catch(Exception ex){notice("Leitungslage konnte nicht gespeichert werden.");}
+  }));dialog.show();
  }
  void utilityMenu(int index){
   org.json.JSONArray rows=extraUtilities();org.json.JSONObject o=rows.optJSONObject(index);if(o==null)return;
