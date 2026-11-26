@@ -8,6 +8,7 @@ import android.content.SharedPreferences;
 
 public class MainActivity extends Activity {
  EditText project,length,width,depth; TextView result; Sketch sketch;
+ EditText voiceText; Spinner voiceLanguage;
  double l,w,d,asphalt,left,right; EditText asphaltInput,leftInput,rightInput; Profile profile; Spinner surface; EditText stoneLength,stoneWidth,stoneDepth,stoneColor,pattern,bedding,underlying; Spinner handling; TextView legend; EditText stationFrom,stationTo; TextView segmentsView; org.json.JSONArray segments=new org.json.JSONArray(); EditText baseInput,pipeInput; double base=Double.NaN,pipe=Double.NaN; String covering="Unbekannt";
  EditText field(LinearLayout root,String label,String key,boolean numeric){
  TextView t=new TextView(this);t.setText(label);root.addView(t);
@@ -19,6 +20,12 @@ public class MainActivity extends Activity {
  public void onCreate(Bundle b){super.onCreate(b);
  ScrollView scroll=new ScrollView(this);LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setPadding(24,32,24,24);scroll.addView(root);setContentView(scroll);
  TextView title=new TextView(this);title.setText("Feldaufmaß Pro");title.setTextSize(28);root.addView(title);
+ TextView voiceHeading=new TextView(this);voiceHeading.setText("Sprachassistent – Diktat");voiceHeading.setTextSize(20);root.addView(voiceHeading);
+ voiceLanguage=new Spinner(this);voiceLanguage.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Deutsch","Русский"}));root.addView(voiceLanguage);
+ Button mic=new Button(this);mic.setText("Spracheingabe starten");root.addView(mic);
+ voiceText=new EditText(this);voiceText.setHint("Diktat prüfen oder bearbeiten");root.addView(voiceText);
+ Button applyVoice=new Button(this);applyVoice.setText("Maße aus Diktat übernehmen");root.addView(applyVoice);
+ mic.setOnClickListener(v->startDictation());applyVoice.setOnClickListener(v->applyDictation());
  project=field(root,"Projekt / Baustelle","project",false);
  length=field(root,"Trassenlänge (m)","length",true);
  width=field(root,"Grabenbreite (m)","width",true);
@@ -76,6 +83,24 @@ public class MainActivity extends Activity {
  if(handling.getSelectedItemPosition()>0)details.append("\n"+handling.getSelectedItem());
  legend.setText(details.toString());sketch.invalidate();profile.invalidate();
  }catch(Exception e){result.setText("Bitte gültige positive Maße eingeben.");}}
+ void startDictation(){
+ android.content.Intent i=new android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+ i.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+ i.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE,voiceLanguage.getSelectedItemPosition()==0?"de-DE":"ru-RU");
+ i.putExtra(android.speech.RecognizerIntent.EXTRA_PREFER_OFFLINE,true);
+ try{startActivityForResult(i,410);}catch(android.content.ActivityNotFoundException e){Toast.makeText(this,"Keine Spracherkennung verfügbar.",Toast.LENGTH_LONG).show();}
+ }
+ @Override protected void onActivityResult(int request,int result,android.content.Intent data){super.onActivityResult(request,result,data);
+ if(request==410&&result==RESULT_OK&&data!=null){java.util.ArrayList<String> values=data.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS);if(values!=null&&!values.isEmpty())voiceText.setText(values.get(0));}}
+ void applyDictation(){
+ String t=voiceText.getText().toString().toLowerCase(java.util.Locale.ROOT);
+ String[] names={"(?:grabenbreite|breite|ширина(?: траншеи)?)","(?:grabentiefe|tiefe|глубина(?: траншеи)?)","(?:trassenlänge|länge|длина(?: трассы)?)"};
+ EditText[] targets={width,depth,length};String[] proposed=new String[3];StringBuilder preview=new StringBuilder();
+ for(int j=0;j<names.length;j++){java.util.regex.Matcher m=java.util.regex.Pattern.compile(names[j]+"\\s*[:=]?\\s*(?:ist\\s+)?(\\d+(?:[.,]\\d+)?)\\s*(zentimeter|cm|сантиметр[а-я]*|см|millimeter|mm|мм|meter|метр[а-я]*|m|м)(?![\\p{L}])").matcher(t);
+ if(m.find()){double v=Double.parseDouble(m.group(1).replace(',','.'));String unit=m.group(2);if(unit.startsWith("zentimeter")||unit.equals("cm")||unit.startsWith("сантиметр")||unit.equals("см"))v/=100;else if(unit.equals("mm")||unit.equals("мм")||unit.equals("millimeter"))v/=1000;if(v>0&&Double.isFinite(v)){proposed[j]=String.format(java.util.Locale.GERMANY,"%.3f",v);preview.append(new String[]{"Breite","Tiefe","Länge"}[j]+": "+proposed[j]+" m\n");}}}
+ if(preview.length()==0){Toast.makeText(this,"Keine eindeutigen Maße mit Einheit erkannt.",Toast.LENGTH_LONG).show();return;}
+ new android.app.AlertDialog.Builder(this).setTitle("Erkannte Maße prüfen").setMessage(preview.toString()).setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",(dialog,which)->{for(int j=0;j<3;j++)if(proposed[j]!=null)targets[j].setText(proposed[j]);}).show();
+ }
  void addSegment(){try{
  double start=number(stationFrom),end=number(stationTo),total=number(length),gw=number(width);
  if(!Double.isFinite(start+end+total+gw)||start<0||end<=start||end>total||gw<=0)throw new Exception();
