@@ -29,6 +29,7 @@ final class RouteSketch extends View {
   void rememberGpsMove(){gpsUndo=new JSONArray();for(double n:new double[]{point.x,point.y,latitude,longitude,accuracy})gpsUndo.put(Double.isFinite(n)?(Object)n:org.json.JSONObject.NULL);}
   boolean undoGpsMove(){if(gpsUndo==null||gpsUndo.length()!=5)return false;double x=gpsUndo.optDouble(0,Double.NaN),y=gpsUndo.optDouble(1,Double.NaN);if(!Double.isFinite(x)||!Double.isFinite(y))return false;point.set((float)x,(float)y);latitude=gpsUndo.optDouble(2,Double.NaN);longitude=gpsUndo.optDouble(3,Double.NaN);accuracy=gpsUndo.optDouble(4,Double.NaN);gpsUndo=null;return true;}
   JSONArray photos=new JSONArray();
+  org.json.JSONObject photoMetadata=new org.json.JSONObject();
   double latitude=Double.NaN,longitude=Double.NaN,accuracy=Double.NaN;
   double metres; // Length of the incoming segment, NaN if unmeasured.
   Vertex(PointF point,double metres){this.point=point;this.metres=metres;}
@@ -51,7 +52,7 @@ final class RouteSketch extends View {
     v.id=row.optString(3,v.id);
     if(row.optJSONArray(4)!=null)v.photos=row.optJSONArray(4);
     v.latitude=row.optDouble(5,Double.NaN);v.longitude=row.optDouble(6,Double.NaN);v.accuracy=row.optDouble(7,Double.NaN);
-    v.name=row.optString(8,"");v.gpsUndo=row.optJSONArray(9);
+    v.name=row.optString(8,"");v.gpsUndo=row.optJSONArray(9);if(row.optJSONObject(10)!=null)v.photoMetadata=row.optJSONObject(10);
     vertices.add(v);
    }
   }catch(JSONException e){vertices.clear();}
@@ -65,7 +66,7 @@ final class RouteSketch extends View {
     row.put(Double.isFinite(v.metres)?(Object)v.metres:org.json.JSONObject.NULL);
     row.put(v.id).put(v.photos);
     for(double n:new double[]{v.latitude,v.longitude,v.accuracy})row.put(Double.isFinite(n)?(Object)n:org.json.JSONObject.NULL);
-    row.put(v.name);row.put(v.gpsUndo==null?org.json.JSONObject.NULL:v.gpsUndo);
+    row.put(v.name);row.put(v.gpsUndo==null?org.json.JSONObject.NULL:v.gpsUndo);if(v.photoMetadata.length()>0)row.put(v.photoMetadata);
     rows.put(row);
    }
   }catch(JSONException e){throw new IllegalStateException(e);}
