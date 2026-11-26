@@ -66,4 +66,29 @@ public final class PipeLayout {
         }
         return result;
     }
+
+    /** Proposes a centered single-row layout, preserving each pipe's bedding.
+     * Returns an empty list if this conservative arrangement cannot satisfy the limits.
+     * Does not modify the input list.
+     */
+    public static List<Pipe> proposeRow(List<Pipe> pipes,double width,double depth,double clearance,double minCover){
+        warnings(pipes,width,depth,clearance,minCover);
+        List<Pipe> result=new ArrayList<>();
+        double total=0;
+        for(int i=0;i<pipes.size();i++){
+            Pipe a=pipes.get(i);
+            total+=a.diameter;
+            if(i>0)total+=Math.max(clearance,Math.max(a.minGap,pipes.get(i-1).minGap));
+        }
+        if(total>width+EPS)return result;
+        double cursor=-total/2;
+        for(int i=0;i<pipes.size();i++){
+            Pipe a=pipes.get(i);
+            if(i>0)cursor+=Math.max(clearance,Math.max(a.minGap,pipes.get(i-1).minGap));
+            result.add(new Pipe(a.name,cursor+a.diameter/2,a.diameter,a.wall,a.bedding,a.minGap,a.minCover));
+            cursor+=a.diameter;
+        }
+        if(!warnings(result,width,depth,clearance,minCover).isEmpty())return new ArrayList<>();
+        return result;
+    }
 }
