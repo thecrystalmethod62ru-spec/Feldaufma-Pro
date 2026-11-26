@@ -1614,13 +1614,26 @@ public class MainActivity extends Activity {
   RouteSketch route=new RouteSketch(this,routeData());
   if(!DxfExport.metricAvailable(route)){notice("Zuerst alle Trassenabschnitte bemaßen und gültige Richtungen zeichnen.");return;}
   DxfExport model=new DxfExport(new java.io.StringWriter(),route,true);
+  final java.util.ArrayList<double[]> montagePoints=new java.util.ArrayList<>();
+  try{
+   org.json.JSONArray items=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));
+   int n=model.vertices.size();double[] xs=new double[n],ys=new double[n],ls=new double[n-1];
+   for(int i=0;i<n;i++){xs[i]=model.vertices.get(i)[0];ys[i]=-model.vertices.get(i)[1];if(i>0)ls[i-1]=route.vertices.get(i).metres;}
+   for(int i=0;i<items.length();i++){org.json.JSONObject o=items.optJSONObject(i);if(o==null)continue;try{
+    MontageRouteGeometry.Position pos=MontageRouteGeometry.locate(xs,ys,ls,o.optDouble("station",Double.NaN),o.optDouble("offset",0));
+    if(pos.atCorner&&o.optDouble("offset",0)!=0)continue;
+    montagePoints.add(new double[]{pos.x,-pos.y});
+   }catch(IllegalArgumentException ignored){}}
+  }catch(Exception e){notice("Montage-Zuordnung konnte nicht vollständig gelesen werden.");}
   LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);
   TextView info=new TextView(this);info.setText("Gemessene Längen · Richtungen aus Skizze (nicht vermessen)");panel.addView(info);
+  TextView montageHint=new TextView(this);montageHint.setText("Montage: "+montagePoints.size()+" darstellbare Stationspunkte. Fehlender Versatz = Achse (Vorschau); Eckversatz nicht dargestellt.");panel.addView(montageHint);
   android.view.View drawing=new android.view.View(this){
    final android.graphics.Paint pen=new android.graphics.Paint(3);
    @Override protected void onDraw(android.graphics.Canvas c){
     super.onDraw(c);double minX=0,maxX=0,minY=0,maxY=0;
     for(double[] p:model.vertices){minX=Math.min(minX,p[0]);maxX=Math.max(maxX,p[0]);minY=Math.min(minY,p[1]);maxY=Math.max(maxY,p[1]);}
+    for(double[] p:montagePoints){minX=Math.min(minX,p[0]);maxX=Math.max(maxX,p[0]);minY=Math.min(minY,p[1]);maxY=Math.max(maxY,p[1]);}
     double scale=Math.min((getWidth()-dp(48))/Math.max(.001,maxX-minX),(getHeight()-dp(64))/Math.max(.001,maxY-minY));if(!Double.isFinite(scale)||scale<=0)return;
     double ox=(getWidth()-(maxX-minX)*scale)/2-minX*scale,oy=(getHeight()-(maxY-minY)*scale)/2+maxY*scale;
     for(int i=1;i<model.vertices.size();i++){
@@ -1629,6 +1642,8 @@ public class MainActivity extends Activity {
      pen.setColor(0xff398bda);pen.setStrokeWidth(dp(2));c.drawLine(ax,ay,bx,by,pen);
      pen.setTextSize(dp(12));pen.setColor(0xff777777);c.drawText(String.format(java.util.Locale.GERMANY,"%.2f m",route.vertices.get(i).metres),(ax+bx)/2,(ay+by)/2-dp(8),pen);
     }
+    pen.setColor(0xffe6a23c);
+    for(double[] p:montagePoints)c.drawCircle((float)(ox+p[0]*scale),(float)(oy-p[1]*scale),dp(5),pen);
     double bar=Math.pow(10,Math.floor(Math.log10((getWidth()/4.0)/scale)));
     if(Double.isFinite(bar)&&bar>0){float end=dp(12)+(float)(bar*scale);pen.setColor(0xff777777);pen.setStrokeWidth(dp(2));c.drawLine(dp(12),getHeight()-dp(12),end,getHeight()-dp(12),pen);pen.setTextSize(dp(11));c.drawText(String.format(java.util.Locale.GERMANY,"%.3g m",bar),dp(12),getHeight()-dp(18),pen);}
    }
