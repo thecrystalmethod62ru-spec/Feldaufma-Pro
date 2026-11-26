@@ -1717,6 +1717,27 @@ public class MainActivity extends Activity {
       if(pass==1)for(int j=0;j<surfaces.length();j++){org.json.JSONObject o=surfaces.optJSONObject(j);if(o!=null&&mid>=o.optDouble("from")&&mid<o.optDouble("to")&&!o.optString("surface").trim().isEmpty())color=route.configuredSurfaceColor(o.optString("surface"),route.legendSettings());}
       pen.setColor(color);c.drawPath(shape,pen);
      }
+     // Join neighboring offset strips at bends. These patches are visual only.
+     double bendStation=0;
+     for(int i=1;i<model.vertices.size()-1;i++){
+      bendStation+=route.vertices.get(i).metres;
+      double[] prev=model.vertices.get(i-1),corner=model.vertices.get(i),next=model.vertices.get(i+1);
+      double d1x=corner[0]-prev[0],d1y=corner[1]-prev[1],d2x=next[0]-corner[0],d2y=next[1]-corner[1];
+      double n1=Math.hypot(d1x,d1y),n2=Math.hypot(d2x,d2y);if(n1<=0||n2<=0)continue;
+      double ax=-d1y/n1,ay=d1x/n1,bx=-d2y/n2,by=d2x/n2;
+      double before=widthAt(Math.max(0,bendStation-0.000001)),after=widthAt(Math.min(total-0.000001,bendStation+0.000001));
+      if(!Double.isFinite(before)||!Double.isFinite(after))continue;
+      for(int pass=0;pass<2;pass++){
+       double lo1=-before/2-(pass==0?right:0),hi1=before/2+(pass==0?left:0);
+       double lo2=-after/2-(pass==0?right:0),hi2=after/2+(pass==0?left:0);
+       android.graphics.Path patch=new android.graphics.Path();
+       double[][] q={{corner[0]+ax*lo1,corner[1]+ay*lo1},{corner[0]+bx*lo2,corner[1]+by*lo2},{corner[0]+bx*hi2,corner[1]+by*hi2},{corner[0]+ax*hi1,corner[1]+ay*hi1}};
+       for(int k=0;k<4;k++){float x=(float)(ox+q[k][0]*scale),y=(float)(oy-q[k][1]*scale);if(k==0)patch.moveTo(x,y);else patch.lineTo(x,y);}patch.close();
+       int color=pass==0?0xff777e86:0xffb79b70;
+       if(pass==1)for(int j=0;j<surfaces.length();j++){org.json.JSONObject o=surfaces.optJSONObject(j);if(o!=null&&bendStation>=o.optDouble("from")&&bendStation<o.optDouble("to")&&!o.optString("surface").trim().isEmpty())color=route.configuredSurfaceColor(o.optString("surface"),route.legendSettings());}
+       pen.setColor(color);c.drawPath(patch,pen);
+      }
+     }
      for(int j=0;j<widthSections.length();j++){org.json.JSONObject o=widthSections.optJSONObject(j);if(o==null)continue;double from=o.optDouble("from"),to=o.optDouble("to"),w=o.optDouble("width");if(!(from>=0&&to<=total&&to>from&&Double.isFinite(w)&&w>0))continue;double[] q=model.station((from+to)/2);if(q==null)continue;pen.setColor(0xff555555);pen.setTextSize(dp(11));c.drawText(String.format(java.util.Locale.GERMANY,"B %.2f m",w),(float)(ox+q[0]*scale),(float)(oy-q[1]*scale-dp(38)),pen);}
     }
     for(int i=1;i<model.vertices.size();i++){
