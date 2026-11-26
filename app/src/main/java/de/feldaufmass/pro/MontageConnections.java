@@ -51,7 +51,8 @@ final class MontageConnections {
     }
 
     void writePdf(android.net.Uri target) {
-        try (android.graphics.pdf.PdfDocument pdf = new android.graphics.pdf.PdfDocument()) {
+        android.graphics.pdf.PdfDocument pdf = new android.graphics.pdf.PdfDocument();
+        try {
             JSONArray rows = new JSONArray(prefs.getString(KEY, "[]"));
             if (rows.length() == 0) { activity.notice("Keine Verbindungen erfasst."); return; }
             String project = prefs.getString("project", "Projekt");
@@ -78,6 +79,7 @@ final class MontageConnections {
             }
             activity.notice("Verbindungsregister gespeichert.");
         } catch (Exception e) { activity.notice("Verbindungsregister konnte nicht exportiert werden."); }
+        finally { pdf.close(); }
     }
 
     private void actions(JSONArray rows, int index) {

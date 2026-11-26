@@ -12,6 +12,24 @@ import static org.junit.Assert.*;
 
 @RunWith(AndroidJUnit4.class)
 public class ProjectStateTest {
+ @Test public void metricDxfPositionsMontageOnSharedRoute(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->{
+    try{
+     RouteSketch route=new RouteSketch(activity,"[[0.1,0.5,null],[0.5,0.5,8],[0.5,0.8,4]]");
+     java.io.StringWriter out=new java.io.StringWriter();
+     DxfExport model=new DxfExport(out,route,true);
+     assertArrayEquals(new double[]{3,-.5},model.mountingPoint(3,.5),.000001);
+     assertNull(model.mountingPoint(8,.5));assertNull(model.mountingPoint(13,0));
+     org.json.JSONObject tee=new org.json.JSONObject().put("type","TEE").put("station",3).put("offset",.5);
+     org.json.JSONObject joint=new org.json.JSONObject().put("number","S-101").put("type","Steckverbindung").put("station",12);
+     model.write("Test",new org.json.JSONArray(),new org.json.JSONArray(),new org.json.JSONArray().put(tee),new org.json.JSONArray().put(joint));
+     assertTrue(out.toString().contains("T-Stueck - Station 3.000 m"));
+     assertTrue(out.toString().contains("S-101 Steckverbindung - Station 12.000 m"));
+    }catch(Exception e){throw new AssertionError(e);}
+   });
+  }
+ }
  @Test public void exportConnectionsWithMissingPhotoKeepsBothPages(){
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    scenario.onActivity(activity->{

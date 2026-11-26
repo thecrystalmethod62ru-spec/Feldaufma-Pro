@@ -1746,13 +1746,11 @@ public class MainActivity extends Activity {
   final java.util.ArrayList<double[]> montagePoints=new java.util.ArrayList<>();
   try{
    org.json.JSONArray items=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));
-   int n=model.vertices.size();double[] xs=new double[n],ys=new double[n],ls=new double[n-1];
-   for(int i=0;i<n;i++){xs[i]=model.vertices.get(i)[0];ys[i]=-model.vertices.get(i)[1];if(i>0)ls[i-1]=route.vertices.get(i).metres;}
-   for(int i=0;i<items.length();i++){org.json.JSONObject o=items.optJSONObject(i);if(o==null)continue;try{
-    MontageRouteGeometry.Position pos=MontageRouteGeometry.locate(xs,ys,ls,o.optDouble("station",Double.NaN),o.optDouble("offset",0));
-    if(pos.atCorner&&o.optDouble("offset",0)!=0)continue;
-    montagePoints.add(new double[]{pos.x,-pos.y});
-   }catch(IllegalArgumentException ignored){}}
+   for(int i=0;i<items.length();i++){
+    org.json.JSONObject row=items.optJSONObject(i);if(row==null)continue;
+    double[] point=model.mountingPoint(row.optDouble("station",Double.NaN),row.optDouble("offset",0));
+    if(point!=null)montagePoints.add(point);
+   }
   }catch(Exception e){notice("Montage-Zuordnung konnte nicht vollständig gelesen werden.");}
   final org.json.JSONArray surfaces;
   org.json.JSONArray loadedSurfaces;try{loadedSurfaces=new org.json.JSONArray(getPreferences(0).getString("segments","[]"));}catch(Exception e){loadedSurfaces=new org.json.JSONArray();notice("Oberflächen konnten nicht gelesen werden.");}surfaces=loadedSurfaces;
@@ -3390,7 +3388,9 @@ public class MainActivity extends Activity {
   try(java.io.OutputStream stream=getContentResolver().openOutputStream(uri,"wt")){
    if(stream==null)throw new java.io.IOException();
    java.io.Writer writer=new java.io.BufferedWriter(new java.io.OutputStreamWriter(stream,java.nio.charset.StandardCharsets.US_ASCII));
-   new DxfExport(writer,route,metric).write(projectHeader.getText().toString(),objects,segments);
+   org.json.JSONArray fittings=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));
+   org.json.JSONArray connections=new org.json.JSONArray(getPreferences(0).getString(MontageConnections.KEY,"[]"));
+   new DxfExport(writer,route,metric).write(projectHeader.getText().toString(),objects,segments,fittings,connections);
    writer.flush();notice("DXF gespeichert.");
   }catch(Exception e){notice("DXF konnte nicht gespeichert werden.");}
  }
