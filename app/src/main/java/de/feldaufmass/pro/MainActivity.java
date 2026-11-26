@@ -860,6 +860,27 @@ public class MainActivity extends Activity {
    android.content.SharedPreferences.Editor ed=getPreferences(0).edit();String[] keys={"asphalt","stoneDepth","base","bedding"};for(int j=0;j<4;j++)if(values[j]!=null)ed.putString(keys[j],values[j]);if(ed.commit())notice("Schichtangaben gespeichert. Belagsart im Regelprofil prüfen.");else notice("Speichern fehlgeschlagen.");
   }).show();return true;
  }
+ boolean offerVoiceNewPoint(String text){
+  java.util.regex.Matcher m=java.util.regex.Pattern.compile("(?iu)^(?:добавь точку|новая точка|neuer punkt|punkt hinzufügen)\\s+(\\d+(?:[.,]\\d+)?)\\s*(метр[а-я]*|м|meter|m)\\s+(вправо|влево|вверх|вниз|nach rechts|nach links|nach oben|nach unten)[.!]?$").matcher(text.trim());
+  if(!m.matches())return false;
+  double metres=Double.parseDouble(m.group(1).replace(',','.'));
+  if(!Double.isFinite(metres)||metres<=0){notice("Positive Länge erforderlich.");return true;}
+  String direction=m.group(3).toLowerCase(java.util.Locale.ROOT);
+  int dx=direction.equals("вправо")||direction.equals("nach rechts")?1:direction.equals("влево")||direction.equals("nach links")?-1:0;
+  int dy=direction.equals("вниз")||direction.equals("nach unten")?1:direction.equals("вверх")||direction.equals("nach oben")?-1:0;
+  RouteSketch route=new RouteSketch(this,routeData());
+  if(route.vertices.isEmpty()){notice("Bitte zuerst einen Startpunkt zeichnen.");return true;}
+  RouteSketch.Vertex last=route.vertices.get(route.vertices.size()-1);
+  float x=last.point.x+dx*.12f,y=last.point.y+dy*.12f;
+  if(x<0||x>1||y<0||y>1){notice("Zeichnungsrand erreicht. Bitte Punkt manuell setzen.");return true;}
+  String label=dx>0?"rechts":dx<0?"links":dy>0?"unten":"oben";
+  String original=route.encode();
+  new android.app.AlertDialog.Builder(this).setTitle("Trassenpunkt hinzufügen").setMessage(String.format(java.util.Locale.GERMANY,"Abschnitt %.2f m · nach %s\nRichtung in der Skizze, nicht geografisch.",metres,label)).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",(d,w)->{
+   RouteSketch latest=new RouteSketch(this,routeData());if(!original.equals(latest.encode())){notice("Trasse wurde geändert. Bitte erneut versuchen.");return;}
+   RouteSketch.Vertex v=new RouteSketch.Vertex(new android.graphics.PointF(x,y),metres);latest.vertices.add(v);
+   if(saveRoute(latest)){selectedPoint=v.id;refreshRoute();notice("Trassenpunkt gespeichert.");}
+  }).show();return true;
+ }
  void handleSpeech(String text){
   int version=++speechVersion;
   if(offerAssistantAnswer(text))return;
@@ -868,7 +889,7 @@ public class MainActivity extends Activity {
      normalized.matches(".*(?:сфотографируй|fotografier|foto aufnehmen|foto machen|foto erstellen|foto anhängen|foto hinzufügen|foto aufnehmen).*")){
    if(selectVoicePoint(text))capturePhoto();return;
   }
-  if(offerVoiceObjectDimensions(text)||offerVoiceSurface(text)||offerVoiceObject(text)||offerVoiceSegment(text)||offerVoicePointAction(text))return;
+  if(offerVoiceNewPoint(text)||offerVoiceObjectDimensions(text)||offerVoiceSurface(text)||offerVoiceObject(text)||offerVoiceSegment(text)||offerVoicePointAction(text))return;
   if(offerProfileBatch(text,false))return;
   showPage(voicePage);
   if(voiceLanguage.getSelectedItemPosition()==0){voiceText.setText(text);offerVoiceRename(text);return;}
@@ -876,7 +897,7 @@ public class MainActivity extends Activity {
    new com.google.mlkit.nl.translate.TranslatorOptions.Builder().setSourceLanguage("ru").setTargetLanguage("de").build());
   voiceText.setText("");notice("Diktat wird ins Deutsche übersetzt …");
   translator.downloadModelIfNeeded().onSuccessTask(ignored->translator.translate(text))
-   .addOnSuccessListener(this,german->{if(version==speechVersion){voiceText.setText(german);if(!offerVoiceObjectDimensions(german)&&!offerVoiceSurface(german)&&!offerVoiceObject(german)&&!offerVoiceSegment(german))offerVoiceRename(german);}})
+   .addOnSuccessListener(this,german->{if(version==speechVersion){voiceText.setText(german);if(!offerVoiceNewPoint(german)&&!offerVoiceObjectDimensions(german)&&!offerVoiceSurface(german)&&!offerVoiceObject(german)&&!offerVoiceSegment(german))offerVoiceRename(german);}})
    .addOnFailureListener(this,error->{if(version==speechVersion)notice("Übersetzung fehlgeschlagen. Für den ersten Modellabruf wird Internet benötigt.");});
  }
  @Override protected void onDestroy(){if(translator!=null)translator.close();super.onDestroy();}
