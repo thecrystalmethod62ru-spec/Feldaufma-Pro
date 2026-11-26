@@ -224,6 +224,9 @@ final class RouteSketch extends View {
  void setLiveFix(android.location.Location fix){liveFix=fix;invalidate();}
  float zoom=1,centerX=.5f,centerY=.5f;
  boolean moving,gesture;
+ private int tappedPoint=-1;
+ private float touchStartX,touchStartY;
+ private boolean touchMoved;
  int dragged=-1,angle=-1,highlight=-1;
  float span,focusX,focusY;
  SegmentListener pointSelected;
@@ -379,7 +382,7 @@ final class RouteSketch extends View {
    if(gesture && action==MotionEvent.ACTION_MOVE && span>0)zoomAt(next/span,focusX,focusY,x,y);
    gesture=true;span=next;focusX=x;focusY=y;stroke.clear();dragged=-1;invalidate();return true;
   }
-  if(action==MotionEvent.ACTION_DOWN)gesture=false;
+  if(action==MotionEvent.ACTION_DOWN){gesture=false;touchMoved=false;touchStartX=event.getX();touchStartY=event.getY();tappedPoint=editable&&pointSelected!=null&&layerVisible(LAYER_ROUTE)?nearestPoint(touchStartX,touchStartY):-1;}
   if(gesture){
    if(action==MotionEvent.ACTION_UP || action==MotionEvent.ACTION_CANCEL)getParent().requestDisallowInterceptTouchEvent(false);
    return true;
@@ -393,15 +396,19 @@ final class RouteSketch extends View {
     else if(!dimensioning)stroke.add(vertices.isEmpty()?p:vertices.get(vertices.size()-1).point);
     return true;
    case MotionEvent.ACTION_MOVE:
-    if(moving && dragged>=0)movePoint(dragged,p);
+    if(Math.hypot(event.getX()-touchStartX,event.getY()-touchStartY)>android.view.ViewConfiguration.get(getContext()).getScaledTouchSlop())touchMoved=true;
+    if(moving && dragged>=0&&touchMoved)movePoint(dragged,p);
     if(!dimensioning && !stroke.isEmpty() && distance(stroke.get(stroke.size()-1),p)>.008){stroke.add(p);invalidate();}
     return true;
    case MotionEvent.ACTION_UP:
     getParent().requestDisallowInterceptTouchEvent(false);
+    if(editable&&tappedPoint>=0&&!touchMoved&&pointSelected!=null){
+     stroke.clear();dragged=-1;pointSelected.select(tappedPoint);tappedPoint=-1;performClick();invalidate();return true;
+    }
     if(moving || !editable){
      if(dragged>=0){
-      if(moving){movePoint(dragged,p);if(changed!=null)changed.run();}
-      if(pointSelected!=null)pointSelected.select(dragged);
+      if(moving&&touchMoved){movePoint(dragged,p);if(changed!=null)changed.run();}
+      if(!editable&&pointSelected!=null)pointSelected.select(dragged);
      }else if(!editable && selected!=null&&layerVisible(LAYER_ROUTE))selectSegment(p);
      dragged=-1;
     }else if(dimensioning){
