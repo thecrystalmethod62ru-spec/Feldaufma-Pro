@@ -137,7 +137,7 @@ public class MainActivity extends Activity {
   }
   if(manifest==null||!"FeldaufmassPro".equals(manifest.optString("format"))||manifest.optInt("version")!=1)throw new java.io.IOException("Unbekanntes Sicherungsformat");
   org.json.JSONObject fields=manifest.getJSONObject("preferences");
-  java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","sollUtilities","montageFittings","metricWidthSections","objectUndo","objectRedo","elevationPoints","lvPositions","dailyReports","nachtraege","routeUnderlay","routeUnderlayTransform","sketchCalibration","independentGpsTrack","importedGpsReference"));
+  java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","sollUtilities","montageFittings","metricWidthSections","objectUndo","objectRedo","elevationPoints","lvPositions","dailyReports","nachtraege","routeUnderlay","routeUnderlayTransform","sketchCalibration","independentGpsTrack","importedGpsReference",UTILITY_SHEETS_KEY));
   strings.addAll(java.util.Arrays.asList("metricAreaCorrection","metricAreaCorrectionReason","metricCrossSectionDimensions",
       "metricDepthSections","metricElevationPoints","metricMainExcavationDepth","metricMinimumCover","metricPipeMinGap",
       "metricPipeMinCover","metricPipeProfile","extraUtilities",MontageProtocols.KEY,MontageConnections.KEY,PipeLayoutStore.KEY,PipeLayoutStore.SECTION_KEY,"metricVerbauSections",RouteBranchStore.KEY));
@@ -162,6 +162,7 @@ public class MainActivity extends Activity {
       org.json.JSONArray items=row.optJSONArray(4);if(items==null)continue;
       for(int k=0;k<items.length();k++){String old=items.getString(k),replacement=photos.get(old);if(replacement==null)throw new java.io.IOException("Foto fehlt");used.add(old);items.put(k,replacement);org.json.JSONObject meta=row.optJSONObject(10);if(meta!=null&&meta.has(old)){Object photoMeta=meta.remove(old);meta.put(replacement,photoMeta);}}
      }v=rows.toString();
+    }else if(key.equals(UTILITY_SHEETS_KEY)){org.json.JSONArray sheets=new org.json.JSONArray(v);if(sheets.length()>MAX_UTILITY_SHEETS)throw new java.io.IOException("Zu viele Planblätter");for(int j=0;j<sheets.length();j++){org.json.JSONObject row=sheets.getJSONObject(j);String old=row.getString("file"),replacement=photos.get(old);if(replacement==null)throw new java.io.IOException("Planblatt fehlt");used.add(old);row.put("file",replacement);for(String field:new String[]{"x","y","scale","rotation","alpha"}){double value=row.getDouble(field);if(!Double.isFinite(value)||("scale".equals(field)&&(value<.1||value>5))||("alpha".equals(field)&&(value<0||value>255))||(("x".equals(field)||"y".equals(field))&&Math.abs(value)>2)||("rotation".equals(field)&&Math.abs(value)>180))throw new java.io.IOException("Ungültige Planblatt-Ausrichtung");}}v=sheets.toString();
     }else if(key.equals("routeUnderlay")){if(!v.isEmpty()){String replacement=photos.get(v);if(replacement==null)throw new java.io.IOException("Zeichenvorlage fehlt");used.add(v);v=replacement;}}
     else if(key.equals("documents")){
      org.json.JSONArray docs=new org.json.JSONArray(v);for(int j=0;j<docs.length();j++){org.json.JSONObject doc=docs.getJSONObject(j);doc.remove("uri");doc.put("name",doc.optString("name")+" (neu verknüpfen)");}v=docs.toString();
@@ -233,6 +234,7 @@ public class MainActivity extends Activity {
    }
   }
   Object template=snapshot.get("routeUnderlay");if(template instanceof String&&!((String)template).isEmpty()){String filename=(String)template;if(!filename.matches("[A-Za-z0-9._-]+")||filename.equals(".")||filename.equals(".."))throw new java.io.IOException("Ungültige Vorlage");photos.add(filename);}
+  Object sheetsData=snapshot.get(UTILITY_SHEETS_KEY);if(sheetsData instanceof String){org.json.JSONArray sheets=new org.json.JSONArray((String)sheetsData);for(int j=0;j<sheets.length();j++){String name=sheets.getJSONObject(j).getString("file");if(!name.matches("[A-Za-z0-9._-]+")||name.equals(".")||name.equals(".."))throw new java.io.IOException("Ungültiger Planblattname");photos.add(name);}}
   for(String reportKey:new String[]{"dailyReports","nachtraege",MontageConnections.KEY}){
   Object reportsData=snapshot.get(reportKey);
   if(reportsData instanceof String){org.json.JSONArray reports=new org.json.JSONArray((String)reportsData);for(int j=0;j<reports.length();j++){org.json.JSONArray items=dailyPhotos(reports.getJSONObject(j));for(int k=0;k<items.length();k++){String name=items.getJSONObject(k).getString("file");if(!name.matches("[A-Za-z0-9._-]+")||name.equals(".")||name.equals(".."))throw new java.io.IOException("Ungültiger Fotodateiname");photos.add(name);}}}
@@ -542,13 +544,14 @@ public class MainActivity extends Activity {
    prefs.edit().putInt(activeProject,mask).putBoolean("gpsDeviationLayerMigrated:"+activeProject,true).apply();
   }
   if(!prefs.getBoolean("gpsReferenceLayerMigrated:"+activeProject,false)){mask|=RouteSketch.LAYER_GPS_REFERENCE;prefs.edit().putInt(activeProject,mask).putBoolean("gpsReferenceLayerMigrated:"+activeProject,true).apply();}
+  if(!prefs.getBoolean("utilitySheetsMigrated:"+activeProject,false)){mask|=RouteSketch.LAYER_SCHACHTSCHEINE;prefs.edit().putInt(activeProject,mask).putBoolean("utilitySheetsMigrated:"+activeProject,true).apply();}
   return mask;
  }
  void showDrawingLayers(){showDrawingLayers(null);}
  void showDrawingLayers(RouteSketch editorRoute){
   final String project=activeProject;
-  String[] labels={"Leitungsverlauf / Punkte","Bemaßung","Punktnamen","GPS / Standort","Fotodokumentation","Objekte","Oberflächen","Oberflächenbemaßung","GPS-Aufzeichnung","GPS-Abweichungen","GPX-Referenz"};
-  int[] masks={RouteSketch.LAYER_ROUTE,RouteSketch.LAYER_DIMENSIONS,RouteSketch.LAYER_NAMES,RouteSketch.LAYER_GPS,RouteSketch.LAYER_PHOTOS,RouteSketch.LAYER_OBJECTS,RouteSketch.LAYER_SURFACES,RouteSketch.LAYER_SURFACE_DIMENSIONS,RouteSketch.LAYER_GPS_TRACK,RouteSketch.LAYER_GPS_DEVIATIONS,RouteSketch.LAYER_GPS_REFERENCE};
+  String[] labels={"Leitungsverlauf / Punkte","Bemaßung","Punktnamen","GPS / Standort","Fotodokumentation","Objekte","Oberflächen","Oberflächenbemaßung","GPS-Aufzeichnung","GPS-Abweichungen","GPX-Referenz","Schachtscheine / Fremdmedien"};
+  int[] masks={RouteSketch.LAYER_ROUTE,RouteSketch.LAYER_DIMENSIONS,RouteSketch.LAYER_NAMES,RouteSketch.LAYER_GPS,RouteSketch.LAYER_PHOTOS,RouteSketch.LAYER_OBJECTS,RouteSketch.LAYER_SURFACES,RouteSketch.LAYER_SURFACE_DIMENSIONS,RouteSketch.LAYER_GPS_TRACK,RouteSketch.LAYER_GPS_DEVIATIONS,RouteSketch.LAYER_GPS_REFERENCE,RouteSketch.LAYER_SCHACHTSCHEINE};
   boolean[] checked=new boolean[labels.length];int current=drawingLayers();
   java.util.function.IntConsumer apply=mask->{if(!project.equals(activeProject)){notice("Projekt geändert. Ebenen erneut öffnen.");return;}if(applyDrawingLayers(mask)&&editorRoute!=null)editorRoute.setVisibleLayers(mask);};
   for(int j=0;j<labels.length;j++)checked[j]=(current&masks[j])!=0;
@@ -594,7 +597,7 @@ public class MainActivity extends Activity {
  void refreshRoute(){
   routePreviewBox.removeAllViews();
   RouteSketch preview=new RouteSketch(this,routeData());preview.darkPreview=true;preview.bindDimensionProject(activeProject);
-  livePreview=preview;preview.setVisibleLayers(drawingLayers());preview.setLiveFix(liveFix);preview.setIndependentGpsTrack(gpsTrack());preview.setImportedGpsReference(importedGpsReference());
+  livePreview=preview;preview.setVisibleLayers(drawingLayers());loadUtilitySheets(preview);preview.setLiveFix(liveFix);preview.setIndependentGpsTrack(gpsTrack());preview.setImportedGpsReference(importedGpsReference());
   preview.pointSelected=i->{selectedPoint=preview.vertices.get(i).id;refreshRoute();pointMenu();};
   preview.selected=i->measureSegment(preview,i);
   preview.changed=()->{saveRoute(preview);refreshRoute();};
@@ -716,6 +719,99 @@ public class MainActivity extends Activity {
    }
   }catch(Exception ignored){}
   notice("Trasse konnte nicht gespeichert werden. Bitte erneut versuchen.");return false;
+ }
+ static final String UTILITY_SHEETS_KEY="utilityPlanSheets";
+ static final int MAX_UTILITY_SHEETS=12;
+ final android.util.LruCache<String,android.graphics.Bitmap> utilityBitmaps=new android.util.LruCache<>(MAX_UTILITY_SHEETS);
+ org.json.JSONArray utilitySheets()throws org.json.JSONException{return new org.json.JSONArray(getPreferences(0).getString(UTILITY_SHEETS_KEY,"[]"));}
+ void loadUtilitySheets(RouteSketch route){
+  if(route==null)return;
+  java.util.List<RouteSketch.UtilitySheet> list=new java.util.ArrayList<>();
+  try{org.json.JSONArray rows=utilitySheets();for(int j=0;j<rows.length();j++){
+   org.json.JSONObject row=rows.getJSONObject(j);if(!row.optBoolean("visible",true))continue;
+   String name=row.getString("file");android.graphics.Bitmap bitmap=utilityBitmaps.get(name);
+   if(bitmap==null){bitmap=reportPhoto(name);if(bitmap!=null)utilityBitmaps.put(name,bitmap);}
+   if(bitmap!=null)list.add(new RouteSketch.UtilitySheet(bitmap,(float)row.optDouble("x",0),(float)row.optDouble("y",0),(float)row.optDouble("scale",1),(float)row.optDouble("rotation",0),row.optInt("alpha",140)));
+  }}catch(Exception e){notice("Schachtscheine konnten nicht vollständig geladen werden.");}
+  route.setUtilitySheets(list);
+ }
+ void refreshUtilitySheets(){loadUtilitySheets(livePreview);loadUtilitySheets(activeRouteEditor);}
+ boolean saveUtilitySheets(org.json.JSONArray rows){
+  if(!getPreferences(0).edit().putString(UTILITY_SHEETS_KEY,rows.toString()).commit()){notice("Schachtscheine konnten nicht gespeichert werden.");return false;}
+  refreshUtilitySheets();return true;
+ }
+ void showUtilitySheets(){
+  try{
+   final String projectId=activeProject;
+   org.json.JSONArray rows=utilitySheets();
+   LinearLayout form=page();
+   form.addView(sheetText("Bestandspläne / Fremdmedien: manuell ausrichten. Lage und Aktualität beim Netzbetreiber prüfen. Keine Freigabe zum Schachten.",14,false));
+   actionButtonSingle(form,"PDF / Foto hinzufügen",()->{
+    if(!projectId.equals(activeProject))return;
+    if(rows.length()>=MAX_UTILITY_SHEETS){notice("Maximal 12 Planblätter je Projekt.");return;}
+    android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.setType("*/*");i.putExtra(android.content.Intent.EXTRA_MIME_TYPES,new String[]{"image/*","application/pdf"});startActivityForResult(i,454);
+   });
+   final android.app.AlertDialog[] dialog={null};
+   for(int j=0;j<rows.length();j++){
+    org.json.JSONObject row=rows.getJSONObject(j);final int index=j;
+    Button button=actionButtonSingle(form,row.optString("name","Planblatt")+(row.optBoolean("visible",true)?" · sichtbar":" · ausgeblendet"),()->{if(!projectId.equals(activeProject))return;dialog[0].dismiss();editUtilitySheet(index);});button.setAllCaps(false);
+   }
+   ScrollView scroll=new ScrollView(this);scroll.addView(form);
+   dialog[0]=new android.app.AlertDialog.Builder(this).setTitle("Schachtscheine ("+rows.length()+")").setView(scroll).setPositiveButton("Schließen",null).create();dialog[0].show();
+   Button add=(Button)form.getChildAt(1);add.setOnClickListener(v->{if(!projectId.equals(activeProject))return;if(rows.length()>=MAX_UTILITY_SHEETS){notice("Maximal 12 Planblätter je Projekt.");return;}dialog[0].dismiss();android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.setType("*/*");i.putExtra(android.content.Intent.EXTRA_MIME_TYPES,new String[]{"image/*","application/pdf"});startActivityForResult(i,454);});
+  }catch(Exception e){notice("Schachtscheine konnten nicht gelesen werden.");}
+ }
+ void editUtilitySheet(int index){
+  try{
+   final String projectId=activeProject;org.json.JSONArray rows=utilitySheets();String original=rows.toString();org.json.JSONObject row=rows.getJSONObject(index);
+   LinearLayout form=page();RouteSketch preview=new RouteSketch(this,activeRouteEditor==null?routeData():activeRouteEditor.encode());preview.darkPreview=true;preview.setVisibleLayers(RouteSketch.LAYER_ROUTE|RouteSketch.LAYER_SCHACHTSCHEINE);form.addView(preview,new LinearLayout.LayoutParams(-1,dp(240)));
+   android.graphics.Bitmap bitmap=reportPhoto(row.getString("file"));
+   if(bitmap==null){notice("Planblatt fehlt. Bitte neu importieren.");return;}
+   CheckBox visible=new CheckBox(this);visible.setText("Planblatt anzeigen");visible.setChecked(row.optBoolean("visible",true));form.addView(visible);
+   String[] keys={"x","y","scale","rotation","alpha"},labels={"Horizontal","Vertikal","Maßstab","Drehung","Deckkraft"};
+   float[] mins={-2,-2,.1f,-180,0},maxs={2,2,5,180,255},values={(float)row.optDouble("x",0),(float)row.optDouble("y",0),(float)row.optDouble("scale",1),(float)row.optDouble("rotation",0),row.optInt("alpha",140)};
+   Runnable update=()->preview.setUtilitySheets(visible.isChecked()?java.util.Collections.singletonList(new RouteSketch.UtilitySheet(bitmap,values[0],values[1],values[2],values[3],Math.round(values[4]))):java.util.Collections.emptyList());
+   visible.setOnCheckedChangeListener((b,on)->update.run());
+   for(int j=0;j<keys.length;j++){final int k=j;TextView label=sheetText(labels[j],14,false);form.addView(label);SeekBar bar=new SeekBar(this);bar.setMax(1000);bar.setProgress(Math.round((values[j]-mins[j])*1000/(maxs[j]-mins[j])));form.addView(bar);bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onStartTrackingTouch(SeekBar b){}public void onStopTrackingTouch(SeekBar b){}public void onProgressChanged(SeekBar b,int p,boolean user){if(user){values[k]=mins[k]+(maxs[k]-mins[k])*p/1000f;update.run();}}});}
+   update.run();ScrollView scroll=new ScrollView(this);scroll.addView(form);
+   new android.app.AlertDialog.Builder(this).setTitle(row.optString("name","Schachtschein")).setView(scroll).setNegativeButton("Abbrechen",null).setNeutralButton("Entfernen",(d,b)->new android.app.AlertDialog.Builder(this).setMessage("Planblatt aus Projekt entfernen? Trasse bleibt unverändert.").setNegativeButton("Abbrechen",null).setPositiveButton("Entfernen",(x,y)->{try{if(!projectId.equals(activeProject)||!utilitySheets().toString().equals(original))return;rows.remove(index);if(saveUtilitySheets(rows))showUtilitySheets();}catch(Exception e){notice("Entfernen fehlgeschlagen.");}}).show()).setPositiveButton("Speichern",(d,b)->{try{if(!projectId.equals(activeProject)||!utilitySheets().toString().equals(original)){notice("Planblätter geändert. Neu öffnen.");return;}for(int k=0;k<keys.length;k++)row.put(keys[k],(double)values[k]);row.put("alpha",Math.round(values[4])).put("visible",visible.isChecked());if(saveUtilitySheets(rows))showUtilitySheets();}catch(Exception e){notice("Speichern fehlgeschlagen.");}}).show();
+  }catch(Exception e){notice("Planblatt konnte nicht geöffnet werden.");}
+ }
+ void importUtilitySheet(android.net.Uri uri){
+  String name="Schachtschein";try(android.database.Cursor c=getContentResolver().query(uri,new String[]{android.provider.OpenableColumns.DISPLAY_NAME},null,null,null)){if(c!=null&&c.moveToFirst()&&c.getString(0)!=null)name=c.getString(0);}catch(Exception ignored){}
+  final String label=name;
+  if("application/pdf".equals(getContentResolver().getType(uri))||name.toLowerCase(java.util.Locale.ROOT).endsWith(".pdf")){
+   try(android.os.ParcelFileDescriptor fd=getContentResolver().openFileDescriptor(uri,"r");android.graphics.pdf.PdfRenderer pdf=new android.graphics.pdf.PdfRenderer(fd)){
+    int count=pdf.getPageCount();if(count<=0){notice("PDF enthält keine Seiten.");return;}if(count==1){importUtilitySheetPage(uri,label,0);return;}
+    String[] choices=new String[count];for(int j=0;j<count;j++)choices[j]="Blatt "+(j+1);
+    new android.app.AlertDialog.Builder(this).setTitle("Schachtschein – Blatt auswählen").setItems(choices,(d,j)->importUtilitySheetPage(uri,label,j)).setNegativeButton("Abbrechen",null).show();
+   }catch(Exception e){notice("PDF konnte nicht gelesen werden.");}
+  }else importUtilitySheetPage(uri,label,-1);
+ }
+ void importUtilitySheetPage(android.net.Uri uri,String name,int pageIndex){
+  final String projectId=activeProject;
+  new Thread(()->{
+   java.io.File file=null;android.graphics.Bitmap bitmap=null;
+   try{
+    if(pageIndex<0)bitmap=imageForOcr(uri);else try(android.os.ParcelFileDescriptor fd=getContentResolver().openFileDescriptor(uri,"r");android.graphics.pdf.PdfRenderer pdf=new android.graphics.pdf.PdfRenderer(fd);android.graphics.pdf.PdfRenderer.Page page=pdf.openPage(pageIndex)){
+     double factor=1800.0/Math.max(page.getWidth(),page.getHeight());bitmap=android.graphics.Bitmap.createBitmap(Math.max(1,(int)(page.getWidth()*factor)),Math.max(1,(int)(page.getHeight()*factor)),android.graphics.Bitmap.Config.ARGB_8888);bitmap.eraseColor(Color.WHITE);page.render(bitmap,null,null,android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+    }
+    if(bitmap==null)throw new java.io.IOException();
+    if(Math.max(bitmap.getWidth(),bitmap.getHeight())>1800){double factor=1800.0/Math.max(bitmap.getWidth(),bitmap.getHeight());android.graphics.Bitmap resized=android.graphics.Bitmap.createScaledBitmap(bitmap,Math.max(1,(int)(bitmap.getWidth()*factor)),Math.max(1,(int)(bitmap.getHeight()*factor)),true);if(resized!=bitmap)bitmap.recycle();bitmap=resized;}
+    java.io.File dir=new java.io.File(getFilesDir(),"photos");if(!dir.isDirectory()&&!dir.mkdirs())throw new java.io.IOException();
+    file=java.io.File.createTempFile("schachtschein_",".png",dir);
+    try(java.io.OutputStream out=new java.io.FileOutputStream(file)){if(!bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out))throw new java.io.IOException();}
+    final java.io.File saved=file;
+    runOnUiThread(()->{
+     if(isDestroyed()||isFinishing()||!projectId.equals(activeProject)){saved.delete();return;}
+     try{org.json.JSONArray rows=utilitySheets();if(rows.length()>=MAX_UTILITY_SHEETS){saved.delete();notice("Maximal 12 Planblätter je Projekt.");return;}
+      rows.put(new org.json.JSONObject().put("file",saved.getName()).put("name",name+(pageIndex>=0?" · Blatt "+(pageIndex+1):"")).put("visible",true).put("x",0).put("y",0).put("scale",1).put("rotation",0).put("alpha",140));
+      if(!saveUtilitySheets(rows)){saved.delete();return;}applyDrawingLayers(drawingLayers()|RouteSketch.LAYER_SCHACHTSCHEINE);editUtilitySheet(rows.length()-1);
+     }catch(Exception e){saved.delete();notice("Schachtschein konnte nicht gespeichert werden.");}
+    });
+   }catch(Exception e){if(file!=null)file.delete();runOnUiThread(()->{if(!isDestroyed())notice("Schachtschein konnte nicht geladen werden.");});}
+   finally{if(bitmap!=null)bitmap.recycle();}
+  },"utility-plan-import").start();
  }
  void chooseRouteUnderlay(){
   new android.app.AlertDialog.Builder(this).setTitle("Zeichnungsunterlage – PDF / Foto")
@@ -1012,6 +1108,7 @@ public class MainActivity extends Activity {
   LinearLayout controls=new LinearLayout(this);controls.setPadding(dp(8),dp(4),dp(8),dp(4));controls.setBackground(editorShape(0xff202b2a,12));root.addView(controls);
   controls.addView(mode,new LinearLayout.LayoutParams(0,-2,1));controls.addView(angles,new LinearLayout.LayoutParams(0,-2,1));Spinner smartMode=new Spinner(this);smartMode.setAdapter(new android.widget.ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Freihand","Smart","Winkelraster 15°"}));smartMode.setSelection(route.smartDrawingMode);smartMode.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onItemSelected(android.widget.AdapterView<?> p,View v,int pos,long id){route.smartDrawingMode=pos;}public void onNothingSelected(android.widget.AdapterView<?> p){}});controls.addView(smartMode,new LinearLayout.LayoutParams(0,-2,1));
   Button layersButton=new Button(this);styleEditorButton(layersButton,false);compactToolIcon(layersButton,"","layers");layersButton.setContentDescription("Zeichnungsebenen");layersButton.setMinHeight(0);controls.addView(layersButton,new LinearLayout.LayoutParams(dp(48),dp(48)));layersButton.setOnClickListener(v->showDrawingLayers(route));
+   layersButton.setOnLongClickListener(v->{showUtilitySheets();return true;});
   Button gpsButton=new Button(this);styleEditorButton(gpsButton,false);compactToolIcon(gpsButton,"","center");gpsButton.setContentDescription("GPS-Aufzeichnung");gpsButton.setMinHeight(0);controls.addView(gpsButton,new LinearLayout.LayoutParams(dp(48),dp(48)));gpsButton.setOnClickListener(v->showGpsTrackControls());
   route.darkEditor=true;route.invalidate();root.addView(route,new LinearLayout.LayoutParams(-1,0,1));
   LinearLayout sectionStrip=new LinearLayout(this);sectionStrip.setOrientation(1);sectionStrip.setPadding(dp(6),dp(2),dp(6),dp(2));
@@ -1201,7 +1298,7 @@ public class MainActivity extends Activity {
  void editRoute(boolean measure,boolean startFullscreen){
   LinearLayout form=page();
   ScrollView scroll=new ScrollView(this);scroll.addView(form);
-  RouteSketch route=new RouteSketch(this,routeData());route.editable=true;route.darkPreview=true;route.bindDimensionProject(activeProject);route.setIndependentGpsTrack(gpsTrack());route.setImportedGpsReference(importedGpsReference());route.setVisibleLayers(drawingLayers());
+  RouteSketch route=new RouteSketch(this,routeData());route.editable=true;route.darkPreview=true;route.bindDimensionProject(activeProject);route.setIndependentGpsTrack(gpsTrack());route.setImportedGpsReference(importedGpsReference());route.setVisibleLayers(drawingLayers());loadUtilitySheets(route);
   TextView hint=sheetText("Trasse mit dem Finger zeichnen. Loslassen zum Bearbeiten.",15,false);
   form.addView(hint);
   Button fullscreen=new Button(this);fullscreen.setAllCaps(false);fullscreen.setText("⛶ Vollbild");form.addView(fullscreen);
@@ -4033,6 +4130,7 @@ public class MainActivity extends Activity {
  overviewAction(planPage,"GPS-Aufzeichnung","center",()->showGpsTrackControls());
  overviewAction(planPage,"Trassenvergleich","sections",()->showGpsTrackComparison());
  overviewAction(planPage,"Zeichnungsunterlage – PDF / Foto","image",()->chooseRouteUnderlay());
+ overviewAction(planPage,"Schachtscheine","layers",()->showUtilitySheets());
  routePreviewBox=page();planPage.addView(routePreviewBox);
  routeSummary=sheetText("",15,false);planPage.addView(routeSummary);
  LinearLayout actions=new LinearLayout(this);planPage.addView(actions);
@@ -6183,6 +6281,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  try{startActivityForResult(i,410);}catch(android.content.ActivityNotFoundException e){Toast.makeText(this,"Keine Spracherkennung verfügbar.",Toast.LENGTH_LONG).show();}
  }
  @Override protected void onActivityResult(int request,int result,android.content.Intent data){super.onActivityResult(request,result,data);
+ if(request==454){if(result==RESULT_OK&&data!=null&&data.getData()!=null)importUtilitySheet(data.getData());return;}
  if(request==453){if(result==RESULT_OK&&data!=null&&data.getData()!=null)readGpsImport(data.getData());return;}
  if(request==451||request==452){String snapshot=pendingGpsExport;pendingGpsExport=null;if(result==RESULT_OK&&data!=null&&data.getData()!=null&&snapshot!=null)writeGpsExport(data.getData(),request==451,snapshot);return;}
  if(request==432){
