@@ -12,6 +12,28 @@ import static org.junit.Assert.*;
 
 @RunWith(AndroidJUnit4.class)
 public class ProjectStateTest {
+ @Test public void singleTapStoresHausanschlussWithoutCreatingARoute(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->{
+    RouteSketch sketch=new RouteSketch(activity,"[]");sketch.editable=true;
+    android.widget.FrameLayout parent=new android.widget.FrameLayout(activity);
+    parent.addView(sketch);sketch.layout(0,0,400,400);
+    sketch.singleObjectSelected=(point,existing)->sketch.singleObjects.add(new RouteSketch.SingleObject(point,"Hausanschluss"));
+    for(int action:new int[]{android.view.MotionEvent.ACTION_DOWN,android.view.MotionEvent.ACTION_UP}){
+     android.view.MotionEvent event=android.view.MotionEvent.obtain(10,20,action,200,200,0);
+     try{sketch.onTouchEvent(event);}finally{event.recycle();}
+    }
+    RouteSketch restored=new RouteSketch(activity,sketch.encode());
+    assertEquals(1,restored.singleObjects.size());assertEquals("Hausanschluss",restored.singleObjects.get(0).type);
+    assertEquals(sketch.singleObjects.get(0).point,restored.singleObjects.get(0).point);
+    assertTrue(restored.vertices.isEmpty());assertFalse(Double.isFinite(restored.measuredLength()));
+    restored.vertices.add(new RouteSketch.Vertex(new android.graphics.PointF(0,0),Double.NaN));
+    restored.vertices.add(new RouteSketch.Vertex(new android.graphics.PointF(1,1),5));
+    RouteSketch mixed=new RouteSketch(activity,restored.encode());
+    assertEquals(1,mixed.singleObjects.size());assertEquals(2,mixed.vertices.size());assertEquals(5,mixed.measuredLength(),0);
+   });
+  }
+ }
  @Test public void fittingTextSuggestsOnlyExplicitValues(){
   java.util.List<FittingTextParser.Candidate> found=FittingTextParser.parse(
     "Bogen 22,5° DN 80, Station 12,5 m\nBogen 32°\nMuffe und Flansch\nT Stück DN 80 DN 100\nSchieber");

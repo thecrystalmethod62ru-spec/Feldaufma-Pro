@@ -157,6 +157,7 @@ public class MainActivity extends Activity {
     }else if(key.equals("routeSketch")){
      org.json.JSONArray rows=new org.json.JSONArray(v);
      for(int j=0;j<rows.length();j++){
+      if(rows.optJSONObject(j)!=null){RouteSketch.SingleObject.decode(rows.getJSONObject(j));continue;}
       org.json.JSONArray row=rows.getJSONArray(j);double x=row.getDouble(0),y=row.getDouble(1);
       if(!Double.isFinite(x)||!Double.isFinite(y)||x<0||x>1||y<0||y>1)throw new java.io.IOException("Ungültiger Trassenpunkt");
       org.json.JSONArray items=row.optJSONArray(4);if(items==null)continue;
@@ -227,6 +228,7 @@ public class MainActivity extends Activity {
   Object data=snapshot.get("routeSketch");
   org.json.JSONArray rows=new org.json.JSONArray(data==null?"[]":(String)data);
   for(int j=0;j<rows.length();j++){
+   if(rows.optJSONObject(j)!=null){RouteSketch.SingleObject.decode(rows.getJSONObject(j));continue;}
    org.json.JSONArray items=rows.getJSONArray(j).optJSONArray(4);if(items==null)continue;
    for(int k=0;k<items.length();k++){
     String name=items.getString(k);if(!name.matches("[A-Za-z0-9._-]+")||name.equals(".")||name.equals(".."))throw new java.io.IOException("Ungültiger Fotodateiname");
@@ -615,7 +617,7 @@ public class MainActivity extends Activity {
   routePreviewBox.addView(preview,new LinearLayout.LayoutParams(-1,dp(300)));
   refreshMainQuantities();
   double total=preview.measuredLength();
-  if(preview.vertices.size()<2){routeSummary.setText("Trasse mit dem Finger zeichnen");refreshStationLayers();return;}
+  if(preview.vertices.size()<2){routeSummary.setText(preview.singleObjects.isEmpty()?"Trasse mit dem Finger zeichnen":preview.singleObjects.size()==1?"Einzelobjekt · "+preview.singleObjects.get(0).type:"Einzelobjekte: "+preview.singleObjects.size());refreshStationLayers();return;}
   routeSummary.setText((preview.vertices.size()-1)+" Abschnitte · "+
     (Double.isFinite(total)?"Bemaßte Länge: "+reportMeasure(total):"Bemaßung unvollständig"));
   refreshStationLayers();
@@ -930,6 +932,9 @@ public class MainActivity extends Activity {
  void applyEditorSpeech(String speech,RouteSketch route,Spinner mode,LinearLayout historyBar,android.app.Dialog full){
   if(!full.isShowing())return;
   String command=speech.trim().toLowerCase(java.util.Locale.ROOT).replaceAll("[.!?]+$","");
+  if(command.matches("(?:один объект|отдельный объект|объект без трассы|только домовое подключение|только хаусанслюс|только hausanschluss|einzelobjekt|objekt ohne trasse|nur hausanschluss)")){
+   mode.setSelection(5);notice("Position des Einzelobjekts antippen.");return;
+  }
   if(command.matches("(?:рисовать|режим рисования|zeichnen|zeichenmodus)")){mode.setSelection(0);return;}
   if(command.matches("(?:размеры|режим размеров|bemaßen|maß eintragen)")){mode.setSelection(1);return;}
   if(command.matches("(?:перемещение точек|переместить точки|punkte verschieben)")){mode.setSelection(2);return;}
@@ -1374,20 +1379,46 @@ public class MainActivity extends Activity {
    }else form.addView(sheetText("Zeichenvorlage fehlt oder ist nicht lesbar.",13,false));
   }
 
-  Spinner mode=choices(form,new String[]{"Zeichnen","Maß eintragen","Bearbeiten","Objekt platzieren","Objekt bearbeiten"});
+  Spinner mode=choices(form,new String[]{"Zeichnen","Maß eintragen","Bearbeiten","Objekt platzieren","Objekt bearbeiten","Einzelobjekt ohne Trasse"});
   Spinner angles=choices(form,new String[]{"Freier Winkel","0°","15°","30°","45°","60°","75°","90°"});
   angles.setVisibility(View.GONE);
   onChoice(angles,index->route.angle=index==0?-1:(index-1)*15);
   onChoice(mode,index->{
-   route.dimensioning=index==1;route.moving=index==2;route.placingObject=index==3;route.editingObjects=index==4;
+   route.dimensioning=index==1;route.moving=index==2;route.placingObject=index==3;route.editingObjects=index==4;route.placingSingle=index==5;
    angles.setVisibility(route.moving?View.VISIBLE:View.GONE);
-   hint.setText(new String[]{"Mit einem Finger zeichnen, mit zwei Fingern zoomen oder verschieben.","Abschnitt lange drücken. Freie Fläche ziehen zum Verschieben.","Punkte, Objekte und Maße ziehen. Freie Fläche verschiebt den Plan.","Trasse antippen, um ein Objekt an einer Station zu platzieren.","Objekt ziehen oder lange drücken für Einstellungen."}[index]);
+   hint.setText(new String[]{"Für ein Einzelobjekt einmal tippen. Für eine Trasse mit dem Finger zeichnen.","Abschnitt lange drücken. Freie Fläche ziehen zum Verschieben.","Punkte, Objekte und Maße ziehen. Freie Fläche verschiebt den Plan.","Trasse antippen, um ein Objekt an einer Station zu platzieren.","Objekt ziehen oder lange drücken für Einstellungen.","Position antippen und Objekttyp wählen."}[index]);
   });
-  mode.setSelection(measure?1:route.vertices.isEmpty()?0:2);
+  mode.setSelection(measure?1:route.vertices.isEmpty()&&route.singleObjects.isEmpty()?0:2);
   final String initialSaved=routeData();
   final String initialObjects=objects.toString();final org.json.JSONArray draftObjects=copyEditorObjects(initialObjects);
   Runnable refreshObjects=()->{route.setTrenchWidth(w);route.setStationLayers(draftObjects,segments);route.invalidate();};
   Runnable openObjects=()->showEditorObjects(route,draftObjects,refreshObjects);
+  route.singleObjectSelected=(position,existing)->{
+   String[] types={"Hausanschluss","Suchschachtung","Hindernis","Startgrube","Zielgrube","KVS","Kernbohrung","Knickpunkt"};
+   java.util.function.Consumer<String> applyType=type->{
+    if(existing==null)route.singleObjects.add(new RouteSketch.SingleObject(position,type));else existing.type=type;
+    if(!route.layerVisible(RouteSketch.LAYER_OBJECTS))applyDrawingLayers(drawingLayers()|RouteSketch.LAYER_OBJECTS);
+    route.changed.run();route.invalidate();mode.setSelection(2);
+   };
+   android.app.AlertDialog.Builder chooser=new android.app.AlertDialog.Builder(this)
+    .setTitle(existing==null?"Einzelobjekt ohne Trasse":existing.type)
+    .setItems(types,(dialog,index)->applyType.accept(types[index])).setNegativeButton("Abbrechen",null);
+   if(existing!=null)chooser.setNeutralButton("Entfernen",(dialog,which)->{
+    route.singleObjects.remove(existing);route.changed.run();route.invalidate();
+   });
+   else chooser.setNeutralButton("Typ sprechen",null);
+   android.app.AlertDialog picker=chooser.show();
+   if(existing==null)picker.getButton(-3).setOnClickListener(v->startEditorDictation(speech->{
+    if(activeRouteEditor!=route||!picker.isShowing())return;
+    String spoken=speech.trim().toLowerCase(java.util.Locale.ROOT).replaceAll("[.!?]+$","")
+      .replaceFirst("^(?:(?:это|das ist) +)?(?:(?:просто|только|nur|ein) +)*","");
+    String[] russian={"домовое подключение","поисковый шурф","препятствие","стартовый котлован","приёмный котлован","квс","керновое бурение","точка поворота"};
+    for(int j=0;j<types.length;j++)if(types[j].equalsIgnoreCase(spoken)||russian[j].replace('ё','е').equals(spoken.replace('ё','е'))){
+     applyType.accept(types[j]);picker.dismiss();return;
+    }
+    notice("Objekttyp erneut sprechen oder auswählen.");
+   }));
+  };
   route.stationSelected=hits->pickEditorObjectStation(route,draftObjects,refreshObjects,hits);
   route.objectSelected=hits->pickEditorObject(route,draftObjects,refreshObjects,hits);
   Button objectTools=new Button(this);objectTools.setAllCaps(false);objectTools.setText("Objekte hinzufügen");form.addView(objectTools);objectTools.setOnClickListener(v->openObjects.run());refreshObjects.run();
@@ -1447,7 +1478,7 @@ public class MainActivity extends Activity {
   route.changed=()->{history.record(route.encode());refreshEditor.run();};
   java.util.function.Consumer<Boolean> restore=forward->{
    String snapshot=history.step(forward);RouteSketch parsed=new RouteSketch(this,snapshot);
-   route.vertices.clear();route.vertices.addAll(parsed.vertices);route.highlight=-1;route.dragged=-1;route.invalidate();refreshEditor.run();
+   route.vertices.clear();route.vertices.addAll(parsed.vertices);route.singleObjects.clear();route.singleObjects.addAll(parsed.singleObjects);route.highlight=-1;route.dragged=-1;route.invalidate();refreshEditor.run();
   };
   undo.setOnClickListener(v->restore.accept(false));redo.setOnClickListener(v->restore.accept(true));
   remove.setOnClickListener(v->{
@@ -1466,7 +1497,7 @@ public class MainActivity extends Activity {
    if(!initialObjects.equals(draftObjects.toString())){double total=route.measuredLength();if(!initialObjects.equals(objects.toString())){notice("Objekte zwischenzeitlich geändert. Editor neu öffnen.");return;}for(int j=0;j<draftObjects.length();j++){org.json.JSONObject entry=draftObjects.optJSONObject(j);if(unchangedEditorObject(initialObjects,entry))continue;double st=entry.optDouble("station");if(!Double.isFinite(total)||!Double.isFinite(st)||st<0||st>total){notice("Objektstation außerhalb der bemaßten Trasse. Bitte korrigieren.");return;}}}
    org.json.JSONArray objectsToSave=initialObjects.equals(draftObjects.toString())?objects:draftObjects;
    if(persistEditorRoute(history,objectsToSave,getPreferences(0).edit().putString("sketchCalibration",calibration[0].toString()))){
-    refreshRoute();editor.dismiss();notice("Trasse gespeichert.");
+    refreshRoute();editor.dismiss();notice(route.vertices.isEmpty()&&!route.singleObjects.isEmpty()?"Einzelobjekte gespeichert.":"Trasse gespeichert.");
    }
   });
   fullscreen.setOnClickListener(v->showFullscreenRoute(editor,form,route,mode,angles,historyBar,openObjects,underlayControls[0]));

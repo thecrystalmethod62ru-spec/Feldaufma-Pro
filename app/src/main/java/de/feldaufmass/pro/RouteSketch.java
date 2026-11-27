@@ -36,6 +36,33 @@ final class RouteSketch extends View {
   double metres; // Length of the incoming segment, NaN if unmeasured.
   Vertex(PointF point,double metres){this.point=point;this.metres=metres;}
  }
+ static final class SingleObject {
+  final PointF point;
+  String type;
+  SingleObject(PointF point,String type){this.point=point;this.type=type;}
+  static SingleObject decode(org.json.JSONObject row)throws JSONException{
+   double x=row.getDouble("x"),y=row.getDouble("y");String type=row.getString("singleObject").trim();
+   if(!Double.isFinite(x)||!Double.isFinite(y)||x<0||x>1||y<0||y>1||type.isEmpty())throw new JSONException("Ungültiges Einzelobjekt");
+   return new SingleObject(new PointF((float)x,(float)y),type);
+  }
+ }
+ final ArrayList<SingleObject> singleObjects=new ArrayList<>();
+ java.util.function.BiConsumer<PointF,SingleObject> singleObjectSelected;
+ boolean placingSingle;
+ SingleObject heldSingle;
+ PointF originalSingle;
+ int singleAt(float x,float y){
+  if(!layerVisible(LAYER_OBJECTS))return -1;
+  double best=20*getResources().getDisplayMetrics().density;int hit=-1;
+  for(int i=0;i<singleObjects.size();i++){
+   PointF p=singleObjects.get(i).point;double d=Math.hypot(left()+scale()*p.x-x,top()+scale()*p.y-y);
+   if(d<=best){best=d;hit=i;}
+  }
+  return hit;
+ }
+ void cancelSingleDrag(){
+  if(heldSingle!=null){heldSingle.point.set(originalSingle);heldSingle=null;invalidate();}
+ }
  final ArrayList<Vertex> vertices=new ArrayList<>();
  private final ArrayList<PointF> stroke=new ArrayList<>();
  private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -50,6 +77,7 @@ final class RouteSketch extends View {
   try{
    JSONArray rows=new JSONArray(data);
    for(int i=0;i<rows.length();i++){
+    if(rows.optJSONObject(i)!=null){singleObjects.add(SingleObject.decode(rows.getJSONObject(i)));continue;}
     JSONArray row=rows.getJSONArray(i);
     Vertex v=new Vertex(new PointF((float)row.getDouble(0),(float)row.getDouble(1)),row.optDouble(2,Double.NaN));
     v.hasStoredId=row.opt(3) instanceof String && !row.optString(3).trim().isEmpty();
@@ -59,7 +87,7 @@ final class RouteSketch extends View {
     v.name=row.optString(8,"");v.gpsUndo=row.optJSONArray(9);if(row.optJSONObject(10)!=null)v.photoMetadata=row.optJSONObject(10);
     vertices.add(v);
    }
-  }catch(JSONException e){vertices.clear();}
+  }catch(JSONException e){vertices.clear();singleObjects.clear();}
   setContentDescription("Trassenskizze");
  }
  String encode(){
@@ -73,6 +101,7 @@ final class RouteSketch extends View {
     row.put(v.name);row.put(v.gpsUndo==null?org.json.JSONObject.NULL:v.gpsUndo);if(v.photoMetadata.length()>0)row.put(v.photoMetadata);
     rows.put(row);
    }
+   for(SingleObject o:singleObjects)rows.put(new org.json.JSONObject().put("singleObject",o.type).put("x",(double)o.point.x).put("y",(double)o.point.y));
   }catch(JSONException e){throw new IllegalStateException(e);}
   return rows.toString();
  }
@@ -894,6 +923,11 @@ final class RouteSketch extends View {
   }
   drawSurfaceDimensions(c,density);
   drawStationObjects(c,density);
+  if(layerVisible(LAYER_OBJECTS))for(SingleObject o:singleObjects){
+   float x=left()+scale()*o.point.x,y=top()+scale()*o.point.y;
+   paint.setColor(darkPalette()?0xffffb267:0xff884208);paint.setTextSize(13*density);
+   c.drawCircle(x,y,5*density,paint);c.drawText(o.type,x+8*density,y-7*density,paint);
+  }
   drawIndependentGpsTrack(c,density);
   drawImportedGpsReference(c,density);
   drawGpsDeviations(c,density);
@@ -993,7 +1027,7 @@ final class RouteSketch extends View {
    return true;
   }
   if(event.getPointerCount()>=2){
-   cancelObjectDrag();
+   cancelSingleDrag();cancelObjectDrag();
    float x=(event.getX(0)+event.getX(1))/2,y=(event.getY(0)+event.getY(1))/2;
    float next=(float)Math.hypot(event.getX(0)-event.getX(1),event.getY(0)-event.getY(1));
    if(gesture && action==MotionEvent.ACTION_MOVE && span>0)zoomAt(next/span,focusX,focusY,x,y);
@@ -1009,6 +1043,11 @@ final class RouteSketch extends View {
    case MotionEvent.ACTION_DOWN:
     getParent().requestDisallowInterceptTouchEvent(true);
     stroke.clear();
+    if(placingSingle)return true;
+    if(editable&&(editingObjects||moving)){
+     int hit=singleAt(event.getX(),event.getY());
+     if(hit>=0){heldSingle=singleObjects.get(hit);originalSingle=new PointF(heldSingle.point.x,heldSingle.point.y);return true;}
+    }
     if(moving&&!placingObject&&!editingObjects&&tappedPoint>=0){dragged=tappedPoint;highlight=dragged;invalidate();return true;}
     resizeAxis=0;if((editingObjects||moving)&&selectedResizeObject>=0&&layerVisible(LAYER_OBJECTS)){org.json.JSONObject o=stationObjects.optJSONObject(selectedResizeObject);if(o!=null){resizeAxis=resizeHandle(objectFootprint(o),(event.getX()-left())/scale(),(event.getY()-top())/scale());if(resizeAxis!=0){draggedObject=selectedResizeObject;objectBefore=o.toString();dragged=-1;return true;}}}
     if(editingObjects||moving){java.util.ArrayList<Integer> hits=objectCandidates((event.getX()-left())/scale(),(event.getY()-top())/scale(),12*getResources().getDisplayMetrics().density/scale());if(hits.size()==1){draggedObject=hits.get(0);org.json.JSONObject o=stationObjects.optJSONObject(draggedObject);ObjectFootprint f=objectFootprint(o);objectBefore=o.toString();objectGrabX=(event.getX()-left())/scale()-f.center.x;objectGrabY=(event.getY()-top())/scale()-f.center.y;dragged=-1;return true;}}
@@ -1018,8 +1057,9 @@ final class RouteSketch extends View {
     return true;
    case MotionEvent.ACTION_MOVE:
     if(Math.hypot(event.getX()-touchStartX,event.getY()-touchStartY)>android.view.ViewConfiguration.get(getContext()).getScaledTouchSlop())touchMoved=true;
+    if(heldSingle!=null){if(touchMoved){heldSingle.point.set(clamp(originalSingle.x+(event.getX()-touchStartX)/scale()),clamp(originalSingle.y+(event.getY()-touchStartY)/scale()));invalidate();}return true;}
     if(draggedObject>=0&&touchMoved){if(resizeAxis!=0){resizeStationObject((event.getX()-left())/scale(),(event.getY()-top())/scale());return true;}moveStationObject((event.getX()-left())/scale()-objectGrabX,(event.getY()-top())/scale()-objectGrabY);return true;}
-    if(touchMoved&&(placingObject||editingObjects||(moving&&dragged<0)||dimensioning||!editable)){centerX=clamp(centerX-(event.getX()-lastTouchX)/scale());centerY=clamp(centerY-(event.getY()-lastTouchY)/scale());invalidate();}
+    if(touchMoved&&(placingSingle||placingObject||editingObjects||(moving&&dragged<0)||dimensioning||!editable)){centerX=clamp(centerX-(event.getX()-lastTouchX)/scale());centerY=clamp(centerY-(event.getY()-lastTouchY)/scale());invalidate();}
     lastTouchX=event.getX();lastTouchY=event.getY();
     if(placingObject||editingObjects)return true;
     if(moving && dragged>=0&&touchMoved)movePoint(dragged,p);
@@ -1027,6 +1067,16 @@ final class RouteSketch extends View {
     return true;
    case MotionEvent.ACTION_UP:
     getParent().requestDisallowInterceptTouchEvent(false);
+    if(heldSingle!=null){
+     SingleObject object=heldSingle;heldSingle=null;
+     if(touchMoved){if(changed!=null)changed.run();}
+     else if(event.getEventTime()-touchStartTime>=POINT_CONTEXT_HOLD_MS&&singleObjectSelected!=null)singleObjectSelected.accept(object.point,object);
+     invalidate();return true;
+    }
+    if(placingSingle||(!touchMoved&&!stroke.isEmpty()&&vertices.isEmpty()&&singleObjectSelected!=null)){
+     stroke.clear();if(!touchMoved&&singleObjectSelected!=null)singleObjectSelected.accept(p,null);
+     performClick();invalidate();return true;
+    }
     if(draggedObject>=0){int index=draggedObject;selectedResizeObject=index;resizeAxis=0;draggedObject=-1;objectBefore=null;if(!touchMoved&&objectSelected!=null&&event.getEventTime()-touchStartTime>=android.view.ViewConfiguration.getLongPressTimeout()){java.util.ArrayList<Integer> hits=new java.util.ArrayList<>();hits.add(index);objectSelected.accept(hits);}invalidate();return true;}
     if(editingObjects){if(!touchMoved&&objectSelected!=null&&event.getEventTime()-touchStartTime>=android.view.ViewConfiguration.getLongPressTimeout()){double tolerance=20*getResources().getDisplayMetrics().density/scale();objectSelected.accept(objectCandidates((event.getX()-left())/scale(),(event.getY()-top())/scale(),tolerance));}performClick();invalidate();return true;}
     if(placingObject){if(!touchMoved&&stationSelected!=null){double tolerance=24*getResources().getDisplayMetrics().density/scale();stationSelected.accept(stationCandidates((event.getX()-left())/scale(),(event.getY()-top())/scale(),tolerance));}performClick();invalidate();return true;}
@@ -1046,7 +1096,7 @@ final class RouteSketch extends View {
     }
     performClick();invalidate();return true;
    case MotionEvent.ACTION_CANCEL:
-    cancelObjectDrag();getParent().requestDisallowInterceptTouchEvent(false);stroke.clear();invalidate();return true;
+    cancelSingleDrag();cancelObjectDrag();getParent().requestDisallowInterceptTouchEvent(false);stroke.clear();invalidate();return true;
    default:return true;
   }
  }
