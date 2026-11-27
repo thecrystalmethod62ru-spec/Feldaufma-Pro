@@ -642,16 +642,18 @@ final class RouteSketch extends View {
   GpsLayer layer=new GpsLayer(((android.app.Activity)getContext()).getPreferences(0).getString("gpsRouteLayer","[]"));
   if(layer.observations.size()<2)return;
   boolean approximate=((android.app.Activity)getContext()).getPreferences(0).getBoolean("gpsEndpointAlignment",false);
+  android.content.SharedPreferences prefs=((android.app.Activity)getContext()).getPreferences(0);
+  if(approximate&&prefs.getBoolean("gpsLayerReverse",false))java.util.Collections.reverse(layer.observations);
   ArrayList<PointF> pts=approximate?layer.endpointAlignedPoints(this):layer.alignedPoints(this);
   if(approximate&&pts.size()>1){paint.setColor(0xff399cff);paint.setTextSize(12*getResources().getDisplayMetrics().density);c.drawText("GPS: schematisch ausgerichtet",12,24*getResources().getDisplayMetrics().density,paint);}
   if(pts.size()<2){
    paint.setColor(darkEditor?0xff62b3ff:0xff1565c0);paint.setTextSize(12*getResources().getDisplayMetrics().density);
    c.drawText("GPS-Ebene: Referenzpunkte fehlen",12,24*getResources().getDisplayMetrics().density,paint);return;
   }
-  paint.setColor(0xff399cff);paint.setStrokeWidth(3*getResources().getDisplayMetrics().density);
+  paint.setColor(0xff399cff);paint.setAlpha(Math.max(25,Math.min(255,prefs.getInt("gpsLayerAlpha",255))));paint.setStrokeWidth(3*getResources().getDisplayMetrics().density);
   paint.setPathEffect(new android.graphics.DashPathEffect(new float[]{12,8},0));
   for(int i=1;i<pts.size();i++)line(c,pts.get(i-1),pts.get(i));
-  paint.setPathEffect(null);
+  paint.setPathEffect(null);paint.setAlpha(255);
  }
  void drawUnderlay(Canvas c){
   if(underlay==null||underlay.isRecycled()||!underlayVisible)return;
