@@ -480,7 +480,11 @@ final class RouteSketch extends View {
       for(int pass=0;pass<2;pass++){
        if(pass==1&&(!Double.isFinite(extra)||extra<=0))continue;
        double offset=(side==0?1:-1)*(width/2+(pass==1?extra:0))*unit;
-       cut.setColor(pass==1?0xffe49a42:darkPalette()?0xffd5d9dc:0xff465968);
+       String key=pass==1?"Rückschnitt (zusätzlicher Asphaltschnitt)":"Asphaltschnitt";
+       int color=pass==1?0xffe49a42:darkPalette()?0xffd5d9dc:0xff465968;
+       JSONObject item=legendSettings().optJSONObject(key);
+       if(item!=null)try{color=Color.parseColor(item.optString("color"));}catch(Exception ignored){}
+       cut.setColor(color);
        cut.setPathEffect(pass==1?new android.graphics.DashPathEffect(new float[]{5*density,3*density},0):null);
        c.drawLine(left()+scale()*(float)(a.point.x+dx*t1+nx*offset),top()+scale()*(float)(a.point.y+dy*t1+ny*offset),left()+scale()*(float)(a.point.x+dx*t2+nx*offset),top()+scale()*(float)(a.point.y+dy*t2+ny*offset),cut);
       }
@@ -828,6 +832,10 @@ final class RouteSketch extends View {
   if(layerVisible(LAYER_SURFACES))for(int j=0;j<surfaceSections.length();j++){
    org.json.JSONObject o=surfaceSections.optJSONObject(j);if(o==null)continue;
    String name=o.optString("surface").trim();if(!name.isEmpty())entries.put(name,surfaceColor(name));
+   if("Asphalt".equals(name)&&o.optDouble("width")>0&&stationPoint(o.optDouble("from"))!=null&&stationPoint(o.optDouble("to"))!=null&&o.optDouble("to")>o.optDouble("from")){
+    entries.put("Asphaltschnitt",darkPalette()?0xffd5d9dc:0xff465968);
+    if(o.optDouble("left")>0||o.optDouble("right")>0)entries.put("Rückschnitt (zusätzlicher Asphaltschnitt)",0xffe49a42);
+   }
   }
   if(layerVisible(LAYER_OBJECTS))for(int j=0;j<stationObjects.length();j++){
    org.json.JSONObject o=stationObjects.optJSONObject(j);if(o!=null)entries.put(o.optString("type","Objekt"),0xffa65e19);
