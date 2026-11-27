@@ -61,9 +61,12 @@ public class UiScreenshotTest {
   return null;
  }
  @androidx.test.filters.SdkSuppress(minSdkVersion=29)
- @Test public void regelprofil() throws Exception {
+ @Test public void regelprofil() throws Exception { profile(false,"06-regelprofil"); }
+ @androidx.test.filters.SdkSuppress(minSdkVersion=29)
+ @Test public void regelprofilLandscape() throws Exception { profile(true,"07-regelprofil-landscape"); }
+ private void profile(boolean landscape,String name) throws Exception {
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
-   scenario.onActivity(a->{a.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);a.enterProject();});
+   scenario.onActivity(a->{a.setRequestedOrientation(landscape?ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE:ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);a.enterProject();});
    android.os.SystemClock.sleep(1000);
    scenario.onActivity(a->a.editRoute(false,true));
    boolean[] opened={false};
@@ -78,7 +81,7 @@ public class UiScreenshotTest {
     if(!opened[0])android.os.SystemClock.sleep(250);
    }
    // Preserve the actual screen even when navigation or visibility fails.
-   capture("06-regelprofil");
+   capture(name);
    assertTrue("Regelprofil tab not visible",opened[0]);
    boolean[] visible={false};
    for(int attempt=0;attempt<20&&!visible[0];attempt++){
@@ -90,7 +93,7 @@ public class UiScreenshotTest {
     });
     if(!visible[0])android.os.SystemClock.sleep(250);
    }
-   capture("06-regelprofil");
+   capture(name);
    assertTrue("Regelprofil content not visible after switching tabs",visible[0]);
   }
  }
