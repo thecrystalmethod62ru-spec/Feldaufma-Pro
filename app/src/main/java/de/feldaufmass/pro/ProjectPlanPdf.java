@@ -52,7 +52,7 @@ final class ProjectPlanPdf {
             try{
                 Canvas c=page.getCanvas();
                 label(c,activity.projectHeader.getText().toString(),26,39,25,600,true);
-                label(c,sections>0?"Abschnittsplan · Lage und Aufmaß":"Lageplan · Einzelobjekte",26,61,13,550,false);
+                label(c,sections>0?"Abschnittsplan · Lage und Aufmaß":route.singleObjects.isEmpty()?"Lageplan":"Lageplan · Einzelobjekte",26,61,13,550,false);
                 label(c,"Feldaufmaß Pro",667,43,16,155,true);
                 pen.setColor(INK);c.drawLine(26,76,816,76,pen);
                 pen.setColor(0xffedf2f5);c.drawRect(26,91,214,535,pen);
@@ -68,8 +68,9 @@ final class ProjectPlanPdf {
                     double length=route.vertices.get(i+1).metres;
                     int y=155+(i-first)*59;
                     label(c,String.format(Locale.GERMANY,"A%02d",i+1),39,y,15,162,true);
-                    label(c,metres(station)+" – "+metres(station+length),39,y+17,11,164,false);
-                    String detail=metres(length);
+                    boolean known=Double.isFinite(station)&&Double.isFinite(length)&&length>0;
+                    label(c,known?metres(station)+" – "+metres(station+length):"Station nicht vollständig erfasst",39,y+17,11,164,false);
+                    String detail=Double.isFinite(length)&&length>0?metres(length):"Länge offen";
                     if(stationVolumes){
                         double area=activity.w*activity.d,volume=length*area;
                         for(int j=0;j<profiles.length();j++){
@@ -80,7 +81,7 @@ final class ProjectPlanPdf {
                         detail+=String.format(Locale.GERMANY,"  /  %.2f m³",volume);
                     }
                     label(c,detail,39,y+33,11,164,false);
-                    station+=length;
+                    station=known?station+length:Double.NaN;
                 }
                 if(profileAvailable()&&activity.l>0&&Double.isFinite(totalVolume))label(c,String.format(Locale.GERMANY,"Aushub   %.2f m³",totalVolume),39,521,13,164,true);
                 label(c,sections>0?"Gesamttrasse":"Lageplan",228,116,16,580,true);
