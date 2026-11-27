@@ -800,6 +800,27 @@ public class MainActivity extends Activity {
   }
   return stations;
  }
+ JSONArray mergeEqualRouteRanges(JSONArray rows,java.util.List<Double> retained)throws org.json.JSONException{
+  JSONArray result=new JSONArray();
+  org.json.JSONObject previous=null;
+  for(int i=0;i<rows.length();i++){
+   org.json.JSONObject next=new org.json.JSONObject(rows.getJSONObject(i).toString());
+   boolean merge=false;
+   if(previous!=null){
+    double boundary=next.getDouble("from");
+    boolean keep=false;
+    for(double station:retained)if(Math.abs(station-boundary)<1e-8){keep=true;break;}
+    if(!keep&&Math.abs(previous.getDouble("to")-boundary)<1e-8){
+     org.json.JSONObject a=new org.json.JSONObject(previous.toString()),b=new org.json.JSONObject(next.toString());
+     a.remove("from");a.remove("to");b.remove("from");b.remove("to");
+     merge=a.toString().equals(b.toString());
+    }
+   }
+   if(merge)previous.put("to",next.getDouble("to"));
+   else{result.put(next);previous=next;}
+  }
+  return result;
+ }
  JSONArray stageRouteProfileRemap(String before,String after,SharedPreferences.Editor ed)throws org.json.JSONException{
   if(before.equals(after))return null;
   double[][] stations=matchingRouteStations(before,after);
@@ -822,7 +843,8 @@ public class MainActivity extends Activity {
   if(stations==null)return null;
   RouteSketch oldRoute=new RouteSketch(this,before),newRoute=new RouteSketch(this,after);
   boolean inserted=newRoute.vertices.size()>oldRoute.vertices.size();
-  if(!inserted&&java.util.Arrays.equals(stations[0],stations[1]))return null;
+  boolean deleted=newRoute.vertices.size()<oldRoute.vertices.size();
+  if(!inserted&&!deleted&&java.util.Arrays.equals(stations[0],stations[1]))return null;
   JSONArray surfaces=PipeLayoutStore.remapSections(segments,stations[0],stations[1]);
   JSONArray profiles=PipeLayoutStore.remapSections(new PipeLayoutStore(getPreferences(0)).sections(),stations[0],stations[1]);
   if(inserted){
@@ -840,6 +862,13 @@ public class MainActivity extends Activity {
    double[] boundaries=new double[cuts.size()];for(int i=0;i<boundaries.length;i++)boundaries[i]=cuts.get(i);
    surfaces=PipeLayoutStore.splitAtStations(surfaces,boundaries);
    profiles=PipeLayoutStore.splitAtStations(profiles,boundaries);
+  }
+  if(deleted){
+   java.util.ArrayList<Double> retained=new java.util.ArrayList<>();
+   double station=0;
+   for(int i=1;i<newRoute.vertices.size();i++){station+=newRoute.vertices.get(i).metres;retained.add(station);}
+   surfaces=mergeEqualRouteRanges(surfaces,retained);
+   profiles=mergeEqualRouteRanges(profiles,retained);
   }
   ed.putString("segments",surfaces.toString()).putString(PipeLayoutStore.SECTION_KEY,profiles.toString());
   return surfaces;
