@@ -1229,6 +1229,7 @@ public class MainActivity extends Activity {
     floatingCross.setLayoutData(PipeLayoutStore.decode(match.getJSONArray("pipes").toString()),ww,dd);
     org.json.JSONObject seg=findSurfaceSection(match);
     String type=seg==null?covering:seg.optString("surface",covering);
+    floatingCross.setAsphaltProfile("Asphalt".equals(type));
     floatingCross.setCivilProfile(seg==null?0:seg.optDouble("left",0),seg==null?0:seg.optDouble("right",0),seg==null?0:seg.optDouble("topThickness",0),seg==null?0:seg.optDouble("baseThickness",0),route.configuredSurfaceColor(type,route.legendSettings()));
 
     profilePlaceholder.setVisibility(View.GONE);floatingCross.setVisibility(View.VISIBLE);
@@ -4635,6 +4636,7 @@ public class MainActivity extends Activity {
    Runnable preview=()->{if(loading[0])return;try{org.json.JSONObject p=rows.get(picker.getSelectedItemPosition()-1);double ww=number(bw),dd=number(bd);if(!Double.isFinite(ww)||!Double.isFinite(dd)||ww<=0||dd<=0)return;view.setLayoutData(PipeLayoutStore.decode(p.getJSONArray("pipes").toString()),ww,dd);
     org.json.JSONObject seg=findSurfaceSection(p);String type=seg==null?covering:seg.optString("surface",covering);
     RouteSketch style=new RouteSketch(MainActivity.this,"[]");style.bindDimensionProject(activeProject);
+    view.setAsphaltProfile("Asphalt".equals(type));
     view.setCivilProfile(optional(cutL),optional(cutR),optional(topLayer),optional(baseLayer),style.configuredSurfaceColor(type,style.legendSettings()));
     quantity.setText(String.format(java.util.Locale.GERMANY,"Aushub (brutto): %.3f m³",(p.getDouble("to")-p.getDouble("from"))*ww*dd));}catch(Exception ignored){}};
    android.text.TextWatcher watcher=new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){preview.run();}public void afterTextChanged(android.text.Editable e){}};
