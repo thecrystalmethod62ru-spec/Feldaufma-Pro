@@ -7132,11 +7132,16 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   labels.add("+ Leitung / Kabel hinzufügen");
   new android.app.AlertDialog.Builder(this).setTitle("Mehrfachbelegung der Trasse").setItems(labels.toArray(new String[0]),(dialog,index)->{
    if(index<rows.length()){utilityMenu(index);return;}
-   LinearLayout form=new LinearLayout(this);form.setOrientation(1);
-   Spinner type=new Spinner(this);type.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Trinkwasser","Gas","Abwasser","Fernwärme","Stromkabel","Glasfaser","Kabelschutzrohr","Sonstige Leitung"}));form.addView(type);
-   EditText diameter=new EditText(this);diameter.setHint("Außendurchmesser (mm)");diameter.setInputType(8194);form.addView(diameter);utilitySlider(form,diameter,"Außendurchmesser (mm)",1,2000,1,true);
-   android.app.AlertDialog add=new android.app.AlertDialog.Builder(this).setTitle("Leitung hinzufügen").setView(form).setNegativeButton("Abbrechen",null).setPositiveButton("Hinzufügen",null).create();
-   add.setOnShowListener(x->add.getButton(-1).setOnClickListener(y->{try{double mm=Double.parseDouble(diameter.getText().toString().replace(',','.'));if(!Double.isFinite(mm)||mm<=0)throw new Exception();org.json.JSONObject o=new org.json.JSONObject();o.put("id",java.util.UUID.randomUUID().toString()).put("type",type.getSelectedItem().toString());o.put("diameter",mm);rows.put(o);if(saveUtilities(rows))add.dismiss();}catch(Exception e){diameter.setError("Positiven Durchmesser eingeben");}}));add.show();
+   final String sourceProject=activeProject;
+   new UtilityCatalogDialog(this,(type,name,material,mm)->{
+    if(!sourceProject.equals(activeProject)){notice("Projekt wurde gewechselt.");return;}
+    try{
+     org.json.JSONArray updated=extraUtilities();
+     org.json.JSONObject o=new org.json.JSONObject();
+     o.put("id",java.util.UUID.randomUUID().toString()).put("type",type).put("name",name).put("material",material).put("diameter",mm);
+     updated.put(o);if(saveUtilities(updated))editUtilities();
+    }catch(Exception e){notice("Leitung konnte nicht gespeichert werden.");}
+   }).open();
   }).setNegativeButton("Schließen",null).show();
  }
  void editUtilityPosition(int index,double station,Runnable refresh){
