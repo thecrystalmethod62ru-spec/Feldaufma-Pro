@@ -323,6 +323,42 @@ public class ProjectStateTest {
    });
   }
  }
+ @Test public void inactiveMaterialFieldsDoNotBlockValidProfile(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->{
+    activity.length.setText("20");activity.width.setText("1");activity.depth.setText("1.2");
+    activity.baseInput.setText("");activity.pipeInput.setText("");activity.leftInput.setText("");activity.rightInput.setText("");
+    activity.stoneLength.setText("ungültig");activity.stoneDepth.setText("ungültig");
+    activity.asphaltInput.setText("0.12");activity.surface.setSelection(1);
+    assertTrue(activity.validProfileForAutosave());
+    activity.asphaltInput.setText("2");
+    assertFalse(activity.validProfileForAutosave());
+    activity.surface.setSelection(4);
+    assertTrue(activity.validProfileForAutosave());
+    activity.surface.setSelection(2);
+    assertFalse(activity.validProfileForAutosave());
+   });
+  }
+ }
+ @Test public void routeLengthDifferenceIsReportedWithoutOverwritingConfirmedLength(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->{
+    android.content.SharedPreferences prefs=activity.getPreferences(0);
+    String original=prefs.getString("length",null);
+    try{
+     assertTrue(prefs.edit().putString("length","20").commit());
+     assertTrue(activity.routeLengthWarning(25).contains("Abweichung"));
+     assertEquals("",activity.routeLengthWarning(20));
+     assertEquals("",activity.routeLengthWarning(Double.NaN));
+     assertEquals("20",prefs.getString("length",""));
+    }finally{
+     android.content.SharedPreferences.Editor restore=prefs.edit();
+     if(original==null)restore.remove("length");else restore.putString("length",original);
+     assertTrue(restore.commit());
+    }
+   });
+  }
+ }
  @Test public void surfaceOptionsFollowMaterialAndOptionalCatalog(){
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    scenario.onActivity(activity->{
