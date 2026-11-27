@@ -414,7 +414,7 @@ public class MainActivity extends Activity {
     }
     if(rows.length()<2)throw new java.io.IOException("Mindestens zwei Punkte erforderlich");
     runOnUiThread(()->{if(isFinishing()||isDestroyed()||!project.equals(activeProject))return;
-     new android.app.AlertDialog.Builder(this,android.R.style.Theme_Material_Dialog_Alert).setTitle("GPX-Vorschau").setMessage(rows.length()+" Punkte. Genauigkeit unbekannt. Import als separate Referenzdatei?").setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",(d,w)->{
+     new android.app.AlertDialog.Builder(this,android.R.style.Theme_Material_Dialog_Alert).setTitle("GPX-Vorschau").setMessage(rows.length()+" Punkte. Genauigkeit unbekannt. "+(importedGpsReference().length()>0?"Vorhandene GPX-Referenz ersetzen?":"Import als separate Referenz?")).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",(d,w)->{
       if(!project.equals(activeProject))return;
       if(getPreferences(0).edit().putString("importedGpsReference",rows.toString()).commit()){if(livePreview!=null)livePreview.setImportedGpsReference(rows);applyDrawingLayers(drawingLayers()|RouteSketch.LAYER_GPS_REFERENCE);notice("GPX-Referenz gespeichert.");}else notice("GPX konnte nicht gespeichert werden.");
      }).show();
@@ -422,8 +422,18 @@ public class MainActivity extends Activity {
    }catch(Exception e){runOnUiThread(()->notice("GPX-Import fehlgeschlagen: "+e.getMessage()));}
   },"gps-import").start();
  }
+ void deleteGpsReference(){
+  final String project=activeProject;
+  final String original=getPreferences(0).getString("importedGpsReference","");
+  if(original.isEmpty()){notice("Keine GPX-Referenz vorhanden.");return;}
+  new android.app.AlertDialog.Builder(this,android.R.style.Theme_Material_Dialog_Alert).setTitle("GPX-Referenz löschen").setMessage("Nur die importierte Referenz wird gelöscht. Manuelle Trasse und GPS-Aufzeichnung bleiben erhalten.").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(d,w)->{
+   if(!project.equals(activeProject)||!original.equals(getPreferences(0).getString("importedGpsReference",""))){notice("Referenz geändert. Bitte erneut öffnen.");return;}
+   if(getPreferences(0).edit().remove("importedGpsReference").commit()){if(livePreview!=null)livePreview.setImportedGpsReference(new org.json.JSONArray());notice("GPX-Referenz gelöscht.");}else notice("GPX-Referenz konnte nicht gelöscht werden.");
+  }).show();
+ }
  void requestGpsExport(){
-  new android.app.AlertDialog.Builder(this,android.R.style.Theme_Material_Dialog_Alert).setTitle("GPS-Spur exportieren").setItems(new String[]{"GPX – GIS / Karte","CSV – Koordinatenliste","GPX importieren"},(d,w)->{
+  new android.app.AlertDialog.Builder(this,android.R.style.Theme_Material_Dialog_Alert).setTitle("GPS-Dateien").setItems(new String[]{"GPX exportieren – GIS / Karte","CSV exportieren – Koordinatenliste","GPX importieren / ersetzen","GPX-Referenz löschen"},(d,w)->{
+   if(w==3){deleteGpsReference();return;}
    if(w==2){requestGpsImport();return;}
    if(!gpsTrackStorageValid()||gpsTrack().length()==0){notice("Keine gültige GPS-Spur vorhanden.");return;}
    pendingGpsExport=gpsTrack().toString();
@@ -458,7 +468,7 @@ public class MainActivity extends Activity {
     if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=android.content.pm.PackageManager.PERMISSION_GRANTED){notice("Bitte zuerst GPS-Berechtigung erteilen.");return;}
     if(!gpsTrackStorageValid()){notice("GPS-Spur beschädigt. Bitte Sicherung prüfen.");return;}
     startLiveGps();if(liveManager==null){notice("GPS nicht verfügbar.");return;}gpsRecordingProject=activeProject;recordingGpsTrack=true;notice("GPS-Aufzeichnung gestartet.");
-   }).setNeutralButton("Spur löschen",(d,w)->new android.app.AlertDialog.Builder(this).setMessage("Gespeicherte GPS-Spur wirklich löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(dd,ww)->{recordingGpsTrack=false;if(!getPreferences(0).edit().remove("independentGpsTrack").commit())notice("GPS-Spur konnte nicht gelöscht werden.");else if(livePreview!=null)livePreview.setIndependentGpsTrack(gpsTrack());}).show()).setNegativeButton("Exportieren",(d,w)->requestGpsExport()).show();
+   }).setNeutralButton("Spur löschen",(d,w)->new android.app.AlertDialog.Builder(this).setMessage("Gespeicherte GPS-Spur wirklich löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(dd,ww)->{recordingGpsTrack=false;if(!getPreferences(0).edit().remove("independentGpsTrack").commit())notice("GPS-Spur konnte nicht gelöscht werden.");else if(livePreview!=null)livePreview.setIndependentGpsTrack(gpsTrack());}).show()).setNegativeButton("Dateien",(d,w)->requestGpsExport()).show();
  }
 
  android.location.LocationManager liveManager;
