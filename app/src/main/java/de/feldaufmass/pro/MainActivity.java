@@ -817,15 +817,16 @@ public class MainActivity extends Activity {
   LinearLayout sectionCards=new LinearLayout(this);sectionScroll.addView(sectionCards);
   root.addView(sectionStrip,new LinearLayout.LayoutParams(-1,-2));
   final int[] selectedSection={-1};
+  final TextView sectionPosition=sheetText("Abschnitt auswählen",12,false);sectionPosition.setTextColor(0xff69d6b7);sectionStrip.addView(sectionPosition,1);
   Runnable refreshSections=()->{
    sectionCards.removeAllViews();int count=Math.max(0,route.vertices.size()-1);
-   sectionTitle.setText("Abschnitte ("+count+")");double station=0;
+   sectionTitle.setText("Abschnitte ("+count+")");sectionPosition.setText(selectedSection[0]>=0?"Abschnitt "+(selectedSection[0]+1)+" / "+count:"Abschnitt auswählen");double station=0;
    for(int j=0;j<count;j++){
     final int index=j;double length=route.vertices.get(j+1).metres;double end=station+length;
     Button card=new Button(this);styleEditorButton(card,selectedSection[0]==j);
     card.setText(String.format(java.util.Locale.GERMANY,"A%02d",j+1)+"\n"+(Double.isFinite(end)?String.format(java.util.Locale.GERMANY,"%.2f – %.2f m",station,end):"Maß fehlt"));
     LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(dp(112),dp(54));cp.setMargins(dp(2),0,dp(2),0);sectionCards.addView(card,cp);
-    card.setOnClickListener(v->{selectedSection[0]=index;for(int k=0;k<sectionCards.getChildCount();k++)styleEditorButton((Button)sectionCards.getChildAt(k),k==index);});
+    card.setOnClickListener(v->{selectedSection[0]=index;sectionPosition.setText("Abschnitt "+(index+1)+" / "+count);for(int k=0;k<sectionCards.getChildCount();k++)styleEditorButton((Button)sectionCards.getChildAt(k),k==index);});
     station=end;
    }
   };
