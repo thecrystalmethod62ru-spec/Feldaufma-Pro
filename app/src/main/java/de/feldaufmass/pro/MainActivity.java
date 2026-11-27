@@ -4170,7 +4170,7 @@ public class MainActivity extends Activity {
  }
 
  public void onCreate(Bundle savedInstanceState){super.onCreate(savedInstanceState);activeProject=projectRegistry().getString("active",LEGACY_PROJECT);
- if(savedInstanceState!=null){pendingPdfProject=savedInstanceState.getString("pdfProject");String pdfScope=savedInstanceState.getString("pdfScope");if(pdfScope!=null)pendingPdfScope=PdfScope.valueOf(pdfScope);projectChosen=savedInstanceState.getBoolean("projectChosen",false);selectedPoint=savedInstanceState.getString("selectedPoint");pendingPoint=savedInstanceState.getString("pendingPoint");pendingPhoto=savedInstanceState.getString("pendingPhoto");pendingMaterialProject=savedInstanceState.getString("pendingMaterialProject");pendingConnectionsProject=savedInstanceState.getString("pendingConnectionsProject");pendingPlanProject=savedInstanceState.getString("pendingPlanProject");pendingProtocolsProject=savedInstanceState.getString("pendingProtocolsProject");}
+ if(savedInstanceState!=null){pendingPdfProject=savedInstanceState.getString("pdfProject");pendingPdfLayers=savedInstanceState.getInt("pdfLayers",-1);String pdfScope=savedInstanceState.getString("pdfScope");if(pdfScope!=null)pendingPdfScope=PdfScope.valueOf(pdfScope);projectChosen=savedInstanceState.getBoolean("projectChosen",false);selectedPoint=savedInstanceState.getString("selectedPoint");pendingPoint=savedInstanceState.getString("pendingPoint");pendingPhoto=savedInstanceState.getString("pendingPhoto");pendingMaterialProject=savedInstanceState.getString("pendingMaterialProject");pendingConnectionsProject=savedInstanceState.getString("pendingConnectionsProject");pendingPlanProject=savedInstanceState.getString("pendingPlanProject");pendingProtocolsProject=savedInstanceState.getString("pendingProtocolsProject");}
  shell=page();shell.setPadding(0,0,0,0);shell.setBackgroundColor(Color.BLACK);setContentView(shell);fitSystemPanels(shell);
  planPage=page();measurePage=page();voicePage=page();profilePage=page();segmentPage=page();objectPage=page();quantityPage=page();
  LinearLayout header=new LinearLayout(this);
@@ -5062,17 +5062,38 @@ public class MainActivity extends Activity {
  }
  PdfScope pendingPdfScope;
  String pendingPdfProject;
+ int pendingPdfLayers=-1;
  void exportPdf(){
   String[] choices={PdfScope.DATA.label,PdfScope.DRAWINGS.label,PdfScope.BOTH.label};
   new android.app.AlertDialog.Builder(this).setTitle("PDF-Inhalt auswählen").setItems(choices,(dialog,index)->{
    PdfScope scope=PdfScope.values()[index];
    // A sketch or a single object can be printed before trench measurements exist.
    if(scope!=PdfScope.DRAWINGS&&length.length()>0&&width.length()>0&&depth.length()>0&&!calculate()){showPage(measurePage);return;}
-   android.content.Intent intent=new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);
-   intent.addCategory(android.content.Intent.CATEGORY_OPENABLE);intent.setType("application/pdf");
-   intent.putExtra(android.content.Intent.EXTRA_TITLE,"Feldaufmass_"+scope.filename+".pdf");
-   pendingPdfScope=scope;pendingPdfProject=activeProject;startActivityForResult(intent,412);
+   if(scope==PdfScope.DATA)choosePdfDestination(scope,-1);else choosePdfDrawingLayers(scope);
   }).setNegativeButton("Abbrechen",null).show();
+ }
+ void choosePdfDrawingLayers(PdfScope scope){
+  final String project=activeProject;
+  String[] labels={"Leitungsverlauf / Punkte","Bemaßung","Punktnamen","GPS / Standort","Fotomarker","Objekte","Oberflächen","Oberflächenbemaßung","GPS-Aufzeichnung","GPS-Abweichungen","GPX-Referenz","Schachtscheine / Fremdmedien"};
+  int[] masks={RouteSketch.LAYER_ROUTE,RouteSketch.LAYER_DIMENSIONS,RouteSketch.LAYER_NAMES,RouteSketch.LAYER_GPS,RouteSketch.LAYER_PHOTOS,RouteSketch.LAYER_OBJECTS,RouteSketch.LAYER_SURFACES,RouteSketch.LAYER_SURFACE_DIMENSIONS,RouteSketch.LAYER_GPS_TRACK,RouteSketch.LAYER_GPS_DEVIATIONS,RouteSketch.LAYER_GPS_REFERENCE,RouteSketch.LAYER_SCHACHTSCHEINE};
+  boolean[] checked=new boolean[labels.length];int current=drawingLayers();
+  for(int j=0;j<labels.length;j++)checked[j]=(current&masks[j])!=0;
+  new android.app.AlertDialog.Builder(this).setTitle("PDF-Lageplan: Ebenen")
+   .setMultiChoiceItems(labels,checked,(dialog,index,on)->checked[index]=on)
+   .setNegativeButton("Abbrechen",null)
+   .setNeutralButton("Alle Ebenen",(dialog,which)->{if(project.equals(activeProject))choosePdfDestination(scope,RouteSketch.ALL_LAYERS);else notice("Projekt gewechselt.");})
+   .setPositiveButton("Weiter",(dialog,which)->{
+    if(!project.equals(activeProject)){notice("Projekt gewechselt.");return;}
+    int mask=0;for(int j=0;j<checked.length;j++)if(checked[j])mask|=masks[j];
+    if(mask==0){notice("Bitte mindestens eine Lageplanebene auswählen.");choosePdfDrawingLayers(scope);return;}
+    choosePdfDestination(scope,mask);
+   }).show();
+ }
+ void choosePdfDestination(PdfScope scope,int layers){
+  android.content.Intent intent=new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);
+  intent.addCategory(android.content.Intent.CATEGORY_OPENABLE);intent.setType("application/pdf");
+  intent.putExtra(android.content.Intent.EXTRA_TITLE,"Feldaufmass_"+scope.filename+".pdf");
+  pendingPdfScope=scope;pendingPdfProject=activeProject;pendingPdfLayers=layers;startActivityForResult(intent,412);
  }
  void drawReportView(Canvas canvas, View view, int top, int width, int height) {
   canvas.save();
@@ -5635,13 +5656,14 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   return report.toString();
  }
  void writePdf(android.net.Uri uri){writePdf(uri,PdfScope.BOTH);}
- void writePdf(android.net.Uri uri,PdfScope scope){
+ void writePdf(android.net.Uri uri,PdfScope scope){writePdf(uri,scope,-1);}
+ void writePdf(android.net.Uri uri,PdfScope scope,int layers){
   android.graphics.pdf.PdfDocument pdf=new android.graphics.pdf.PdfDocument();
   try{
    RouteSketch route=new RouteSketch(this,routeData());route.setStationLayers(objects,segments);route.setTrenchWidth(w);
    int next=1;
    if(scope!=PdfScope.DATA){
-    route.printPlan=true;route.bindDimensionProject(activeProject);route.setVisibleLayers(drawingLayers());loadUtilitySheets(route);
+    route.printPlan=true;route.bindDimensionProject(activeProject);route.setVisibleLayers(layers<0?drawingLayers():layers);loadUtilitySheets(route);
     route.setIndependentGpsTrack(gpsTrack());route.setImportedGpsReference(importedGpsReference());
     SharedPreferences prefs=getPreferences(0);
     if(prefs.getInt("routeUnderlayHidden",0)==0){
@@ -6198,7 +6220,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   pendingPoint=null;pendingPhoto=null;
  }
  @Override protected void onSaveInstanceState(Bundle out){
-  super.onSaveInstanceState(out);out.putString("pdfProject",pendingPdfProject);if(pendingPdfScope!=null)out.putString("pdfScope",pendingPdfScope.name());out.putBoolean("projectChosen",projectChosen);out.putString("selectedPoint",selectedPoint);
+  super.onSaveInstanceState(out);out.putString("pdfProject",pendingPdfProject);out.putInt("pdfLayers",pendingPdfLayers);if(pendingPdfScope!=null)out.putString("pdfScope",pendingPdfScope.name());out.putBoolean("projectChosen",projectChosen);out.putString("selectedPoint",selectedPoint);
   out.putString("pendingPoint",pendingPoint);out.putString("pendingPhoto",pendingPhoto);out.putString("pendingMaterialProject",pendingMaterialProject);out.putString("pendingConnectionsProject",pendingConnectionsProject);out.putString("pendingPlanProject",pendingPlanProject);out.putString("pendingProtocolsProject",pendingProtocolsProject);
  }
  com.google.mlkit.nl.translate.Translator translator;
@@ -6448,9 +6470,9 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  if(request==414&&result==RESULT_OK&&data!=null&&data.getData()!=null){exportProjectBackup(data.getData());return;}
  if(request==413){finishPhoto(result==RESULT_OK);return;}
  if(request==412){
-  PdfScope scope=pendingPdfScope;String owner=pendingPdfProject;pendingPdfScope=null;pendingPdfProject=null;
+  PdfScope scope=pendingPdfScope;String owner=pendingPdfProject;int layers=pendingPdfLayers;pendingPdfScope=null;pendingPdfProject=null;pendingPdfLayers=-1;
   if(result==RESULT_OK&&data!=null&&data.getData()!=null){
-   if(scope!=null&&activeProject.equals(owner))writePdf(data.getData(),scope);else notice("Projekt gewechselt. Export erneut starten.");
+   if(scope!=null&&activeProject.equals(owner))writePdf(data.getData(),scope,layers);else notice("Projekt gewechselt. Export erneut starten.");
   }
   return;
  }
