@@ -8,6 +8,7 @@ import org.json.JSONException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import static androidx.test.espresso.Espresso.onView;
+import static androidx.test.espresso.matcher.RootMatchers.isDialog;
 import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
@@ -72,14 +73,15 @@ public class FittingReviewTest {
                         assertTrue(activity.projectStorage(id).edit().putString("length","20")
                             .putString("routeSketch","[[0,0],[1,0,7.5,\"p2\",[],null,null,null,\"Schacht\"]]")
                             .putString("montageFittings",new JSONArray().put(fitting).toString()).commit());
-                        activity.showMontageFitting(MontageCatalog.Fitting.COUPLING,fitting);
+                        activity.showMontageInventory();
                     } catch (JSONException e) {throw new AssertionError(e);}
                 });
-                onView(withText("Punkt 2 · Schacht · Jetzt bei 7,500 m. Zum Übernehmen Punkt erneut wählen."))
+                onView(withText("Muffe · DN unbekannt · Werkstoff offen · Station 6.25 m · Einbau offen")).inRoot(isDialog()).perform(click());
+                onView(withText("Punkt 2 · Schacht · Jetzt bei 7,500 m. Zum Übernehmen Punkt erneut wählen.")).inRoot(isDialog())
                     .check(androidx.test.espresso.assertion.ViewAssertions.matches(androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom(android.widget.TextView.class)));
-                onView(withText("Station aus Projekt wählen")).perform(androidx.test.espresso.action.ViewActions.scrollTo(),click());
-                onView(withText("Station 7,500 m · Punkt 2 · Schacht")).perform(click());
-                onView(withText("Änderungen speichern")).perform(click());
+                onView(withText("Station aus Projekt wählen")).inRoot(isDialog()).perform(androidx.test.espresso.action.ViewActions.scrollTo(),click());
+                onView(withText("Station 7,500 m · Punkt 2 · Schacht")).inRoot(isDialog()).perform(click());
+                onView(withText("Änderungen speichern")).inRoot(isDialog()).perform(click());
                 scenario.onActivity(activity->{
                     try {
                         JSONArray items=new JSONArray(activity.projectStorage(id).getString("montageFittings","[]"));
