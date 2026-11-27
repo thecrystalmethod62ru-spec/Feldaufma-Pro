@@ -746,11 +746,7 @@ public class MainActivity extends Activity {
    org.json.JSONArray rows=utilitySheets();
    LinearLayout form=page();
    form.addView(sheetText("Bestandspläne / Fremdmedien: manuell ausrichten. Lage und Aktualität beim Netzbetreiber prüfen. Keine Freigabe zum Schachten.",14,false));
-   actionButtonSingle(form,"PDF / Foto hinzufügen",()->{
-    if(!projectId.equals(activeProject))return;
-    if(rows.length()>=MAX_UTILITY_SHEETS){notice("Maximal 12 Planblätter je Projekt.");return;}
-    android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.setType("*/*");i.putExtra(android.content.Intent.EXTRA_MIME_TYPES,new String[]{"image/*","application/pdf"});startActivityForResult(i,454);
-   });
+   Button add=actionButtonSingle(form,"PDF / Foto hinzufügen",()->{});
    final android.app.AlertDialog[] dialog={null};
    for(int j=0;j<rows.length();j++){
     org.json.JSONObject row=rows.getJSONObject(j);final int index=j;
@@ -758,7 +754,7 @@ public class MainActivity extends Activity {
    }
    ScrollView scroll=new ScrollView(this);scroll.addView(form);
    dialog[0]=new android.app.AlertDialog.Builder(this).setTitle("Schachtscheine ("+rows.length()+")").setView(scroll).setPositiveButton("Schließen",null).create();dialog[0].show();
-   Button add=(Button)form.getChildAt(1);add.setOnClickListener(v->{if(!projectId.equals(activeProject))return;if(rows.length()>=MAX_UTILITY_SHEETS){notice("Maximal 12 Planblätter je Projekt.");return;}dialog[0].dismiss();android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.setType("*/*");i.putExtra(android.content.Intent.EXTRA_MIME_TYPES,new String[]{"image/*","application/pdf"});startActivityForResult(i,454);});
+   add.setOnClickListener(v->{if(!projectId.equals(activeProject))return;if(rows.length()>=MAX_UTILITY_SHEETS){notice("Maximal 12 Planblätter je Projekt.");return;}dialog[0].dismiss();android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.setType("*/*");i.putExtra(android.content.Intent.EXTRA_MIME_TYPES,new String[]{"image/*","application/pdf"});startActivityForResult(i,454);});
   }catch(Exception e){notice("Schachtscheine konnten nicht gelesen werden.");}
  }
  void editUtilitySheet(int index){
@@ -794,10 +790,10 @@ public class MainActivity extends Activity {
    java.io.File file=null;android.graphics.Bitmap bitmap=null;
    try{
     if(pageIndex<0)bitmap=imageForOcr(uri);else try(android.os.ParcelFileDescriptor fd=getContentResolver().openFileDescriptor(uri,"r");android.graphics.pdf.PdfRenderer pdf=new android.graphics.pdf.PdfRenderer(fd);android.graphics.pdf.PdfRenderer.Page page=pdf.openPage(pageIndex)){
-     double factor=1800.0/Math.max(page.getWidth(),page.getHeight());bitmap=android.graphics.Bitmap.createBitmap(Math.max(1,(int)(page.getWidth()*factor)),Math.max(1,(int)(page.getHeight()*factor)),android.graphics.Bitmap.Config.ARGB_8888);bitmap.eraseColor(Color.WHITE);page.render(bitmap,null,null,android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+     double factor=1600.0/Math.max(page.getWidth(),page.getHeight());bitmap=android.graphics.Bitmap.createBitmap(Math.max(1,(int)(page.getWidth()*factor)),Math.max(1,(int)(page.getHeight()*factor)),android.graphics.Bitmap.Config.ARGB_8888);bitmap.eraseColor(Color.WHITE);page.render(bitmap,null,null,android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
     }
     if(bitmap==null)throw new java.io.IOException();
-    if(Math.max(bitmap.getWidth(),bitmap.getHeight())>1800){double factor=1800.0/Math.max(bitmap.getWidth(),bitmap.getHeight());android.graphics.Bitmap resized=android.graphics.Bitmap.createScaledBitmap(bitmap,Math.max(1,(int)(bitmap.getWidth()*factor)),Math.max(1,(int)(bitmap.getHeight()*factor)),true);if(resized!=bitmap)bitmap.recycle();bitmap=resized;}
+    if(Math.max(bitmap.getWidth(),bitmap.getHeight())>1600){double factor=1600.0/Math.max(bitmap.getWidth(),bitmap.getHeight());android.graphics.Bitmap resized=android.graphics.Bitmap.createScaledBitmap(bitmap,Math.max(1,(int)(bitmap.getWidth()*factor)),Math.max(1,(int)(bitmap.getHeight()*factor)),true);if(resized!=bitmap)bitmap.recycle();bitmap=resized;}
     java.io.File dir=new java.io.File(getFilesDir(),"photos");if(!dir.isDirectory()&&!dir.mkdirs())throw new java.io.IOException();
     file=java.io.File.createTempFile("schachtschein_",".png",dir);
     try(java.io.OutputStream out=new java.io.FileOutputStream(file)){if(!bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out))throw new java.io.IOException();}
@@ -1107,7 +1103,7 @@ public class MainActivity extends Activity {
   for(View view:views)form.removeView(view);
   LinearLayout controls=new LinearLayout(this);controls.setPadding(dp(8),dp(4),dp(8),dp(4));controls.setBackground(editorShape(0xff202b2a,12));root.addView(controls);
   controls.addView(mode,new LinearLayout.LayoutParams(0,-2,1));controls.addView(angles,new LinearLayout.LayoutParams(0,-2,1));Spinner smartMode=new Spinner(this);smartMode.setAdapter(new android.widget.ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Freihand","Smart","Winkelraster 15°"}));smartMode.setSelection(route.smartDrawingMode);smartMode.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onItemSelected(android.widget.AdapterView<?> p,View v,int pos,long id){route.smartDrawingMode=pos;}public void onNothingSelected(android.widget.AdapterView<?> p){}});controls.addView(smartMode,new LinearLayout.LayoutParams(0,-2,1));
-  Button layersButton=new Button(this);styleEditorButton(layersButton,false);compactToolIcon(layersButton,"","layers");layersButton.setContentDescription("Zeichnungsebenen");layersButton.setMinHeight(0);controls.addView(layersButton,new LinearLayout.LayoutParams(dp(48),dp(48)));layersButton.setOnClickListener(v->showDrawingLayers(route));
+  Button layersButton=new Button(this);styleEditorButton(layersButton,false);compactToolIcon(layersButton,"","layers");layersButton.setContentDescription("Zeichnungsebenen; lange drücken für Schachtscheine");layersButton.setMinHeight(0);controls.addView(layersButton,new LinearLayout.LayoutParams(dp(48),dp(48)));layersButton.setOnClickListener(v->showDrawingLayers(route));
    layersButton.setOnLongClickListener(v->{showUtilitySheets();return true;});
   Button gpsButton=new Button(this);styleEditorButton(gpsButton,false);compactToolIcon(gpsButton,"","center");gpsButton.setContentDescription("GPS-Aufzeichnung");gpsButton.setMinHeight(0);controls.addView(gpsButton,new LinearLayout.LayoutParams(dp(48),dp(48)));gpsButton.setOnClickListener(v->showGpsTrackControls());
   route.darkEditor=true;route.invalidate();root.addView(route,new LinearLayout.LayoutParams(-1,0,1));
@@ -4053,7 +4049,8 @@ public class MainActivity extends Activity {
   menu.getMenu().add(0,117,Menu.NONE,"Bluetooth-Messgerät (Test)");
   menu.getMenu().add(0,118,Menu.NONE,"Rohrleitungsbau – Montage");
   menu.getMenu().add(0,119,Menu.NONE,"Tiefbau – Maßstäbliche Vorschau");
-  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==119)showMetricRoute();else if(item.getItemId()==118)showMontage();else if(item.getItemId()==117)testBleMeasure();else if(item.getItemId()==116)chooseRouteUnderlay();else if(item.getItemId()==115)chooseImageAnalysis();else if(item.getItemId()==114)choosePdfAnalysis();else if(item.getItemId()==113)showNachtraege();else if(item.getItemId()==112)showDailyReports();else if(item.getItemId()==111)exportPhotoReport();else if(item.getItemId()==110)exportX31();else if(item.getItemId()==109)exportReb();else if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
+  menu.getMenu().add(0,120,Menu.NONE,"Schachtscheine");
+  menu.setOnMenuItemClickListener(item->{if(item.getItemId()==120)showUtilitySheets();else if(item.getItemId()==119)showMetricRoute();else if(item.getItemId()==118)showMontage();else if(item.getItemId()==117)testBleMeasure();else if(item.getItemId()==116)chooseRouteUnderlay();else if(item.getItemId()==115)chooseImageAnalysis();else if(item.getItemId()==114)choosePdfAnalysis();else if(item.getItemId()==113)showNachtraege();else if(item.getItemId()==112)showDailyReports();else if(item.getItemId()==111)exportPhotoReport();else if(item.getItemId()==110)exportX31();else if(item.getItemId()==109)exportReb();else if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
   menu.show();
  }
  LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setBackgroundColor(Color.BLACK);p.setPadding(dp(12),dp(8),dp(12),dp(8));return p;}
