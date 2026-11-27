@@ -385,7 +385,7 @@ public class MainActivity extends Activity {
    runOnUiThread(()->{
     if(isDestroyed()||isFinishing())return;
     progress.dismiss();if(!project.equals(activeProject))return;
-    new android.app.AlertDialog.Builder(this,android.R.style.Theme_Material_Dialog_Alert).setTitle("Trassenvergleich").setMessage(message).setNeutralButton("Abweichungen anzeigen",(d,w)->applyDrawingLayers(drawingLayers()|RouteSketch.LAYER_GPS_TRACK|RouteSketch.LAYER_ROUTE|RouteSketch.LAYER_GPS_DEVIATIONS)).setPositiveButton("Schließen",null).show();
+    new android.app.AlertDialog.Builder(this).setTitle("Trassenvergleich").setMessage(message).setNeutralButton("Abweichungen anzeigen",(d,w)->applyDrawingLayers(drawingLayers()|RouteSketch.LAYER_GPS_TRACK|RouteSketch.LAYER_ROUTE|RouteSketch.LAYER_GPS_DEVIATIONS)).setPositiveButton("Schließen",null).show();
    });
   }).start();
  }
@@ -416,7 +416,7 @@ public class MainActivity extends Activity {
     if(rows.length()<2)throw new java.io.IOException("Mindestens zwei Punkte erforderlich");
     runOnUiThread(()->{if(isFinishing()||isDestroyed()||!project.equals(activeProject))return;
      if(!original.equals(getPreferences(0).getString("importedGpsReference",""))){notice("Referenz geändert. Bitte erneut importieren.");return;}
-     new android.app.AlertDialog.Builder(this,android.R.style.Theme_Material_Dialog_Alert).setTitle("GPX-Vorschau").setMessage(rows.length()+" Punkte. Genauigkeit unbekannt. "+(importedGpsReference().length()>0?"Vorhandene GPX-Referenz ersetzen?":"Import als separate Referenz?")).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",(d,w)->{
+     new android.app.AlertDialog.Builder(this).setTitle("GPX-Vorschau").setMessage(rows.length()+" Punkte. Genauigkeit unbekannt. "+(importedGpsReference().length()>0?"Vorhandene GPX-Referenz ersetzen?":"Import als separate Referenz?")).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",(d,w)->{
       if(!project.equals(activeProject)||!original.equals(getPreferences(0).getString("importedGpsReference",""))){notice("Referenz oder Projekt geändert. Bitte erneut importieren.");return;}
       if(getPreferences(0).edit().putString("importedGpsReference",rows.toString()).commit()){if(livePreview!=null)livePreview.setImportedGpsReference(rows);applyDrawingLayers(drawingLayers()|RouteSketch.LAYER_GPS_REFERENCE);notice("GPX-Referenz gespeichert.");}else notice("GPX konnte nicht gespeichert werden.");
      }).show();
@@ -428,13 +428,13 @@ public class MainActivity extends Activity {
   final String project=activeProject;
   final String original=getPreferences(0).getString("importedGpsReference","");
   if(original.isEmpty()){notice("Keine GPX-Referenz vorhanden.");return;}
-  new android.app.AlertDialog.Builder(this,android.R.style.Theme_Material_Dialog_Alert).setTitle("GPX-Referenz löschen").setMessage("Nur die importierte Referenz wird gelöscht. Manuelle Trasse und GPS-Aufzeichnung bleiben erhalten.").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(d,w)->{
+  new android.app.AlertDialog.Builder(this).setTitle("GPX-Referenz löschen").setMessage("Nur die importierte Referenz wird gelöscht. Manuelle Trasse und GPS-Aufzeichnung bleiben erhalten.").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(d,w)->{
    if(!project.equals(activeProject)||!original.equals(getPreferences(0).getString("importedGpsReference",""))){notice("Referenz geändert. Bitte erneut öffnen.");return;}
    if(getPreferences(0).edit().remove("importedGpsReference").commit()){if(livePreview!=null)livePreview.setImportedGpsReference(new org.json.JSONArray());notice("GPX-Referenz gelöscht.");}else notice("GPX-Referenz konnte nicht gelöscht werden.");
   }).show();
  }
  void requestGpsExport(){
-  new android.app.AlertDialog.Builder(this,android.R.style.Theme_Material_Dialog_Alert).setTitle("GPS-Dateien").setItems(new String[]{"GPX exportieren – GIS / Karte","CSV exportieren – Koordinatenliste","GPX importieren / ersetzen","GPX-Referenz löschen"},(d,w)->{
+  new android.app.AlertDialog.Builder(this).setTitle("GPS-Dateien").setItems(new String[]{"GPX exportieren – GIS / Karte","CSV exportieren – Koordinatenliste","GPX importieren / ersetzen","GPX-Referenz löschen"},(d,w)->{
    if(w==3){deleteGpsReference();return;}
    if(w==2){requestGpsImport();return;}
    if(!gpsTrackStorageValid()||gpsTrack().length()==0){notice("Keine gültige GPS-Spur vorhanden.");return;}
@@ -464,7 +464,7 @@ public class MainActivity extends Activity {
  }
  void showGpsTrackControls(){
   org.json.JSONArray rows=gpsTrack();
-  new android.app.AlertDialog.Builder(this,android.R.style.Theme_Material_Dialog_Alert).setTitle("GPS-Aufzeichnung").setMessage((recordingGpsTrack?"Aufzeichnung aktiv":"Aufzeichnung gestoppt")+" · "+rows.length()+" Punkte\nUnabhängig von der manuellen Trasse.")
+  new android.app.AlertDialog.Builder(this).setTitle("GPS-Aufzeichnung").setMessage((recordingGpsTrack?"Aufzeichnung aktiv":"Aufzeichnung gestoppt")+" · "+rows.length()+" Punkte\nUnabhängig von der manuellen Trasse.")
    .setPositiveButton(recordingGpsTrack?"Stoppen":"Fortsetzen",(d,w)->{
     if(recordingGpsTrack){recordingGpsTrack=false;return;}
     if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=android.content.pm.PackageManager.PERMISSION_GRANTED){notice("Bitte zuerst GPS-Berechtigung erteilen.");return;}
@@ -3888,7 +3888,7 @@ public class MainActivity extends Activity {
   menu.setOnMenuItemClickListener(item->{if(item.getItemId()==119)showMetricRoute();else if(item.getItemId()==118)showMontage();else if(item.getItemId()==117)testBleMeasure();else if(item.getItemId()==116)chooseRouteUnderlay();else if(item.getItemId()==115)chooseImageAnalysis();else if(item.getItemId()==114)choosePdfAnalysis();else if(item.getItemId()==113)showNachtraege();else if(item.getItemId()==112)showDailyReports();else if(item.getItemId()==111)exportPhotoReport();else if(item.getItemId()==110)exportX31();else if(item.getItemId()==109)exportReb();else if(item.getItemId()==108)showLv();else if(item.getItemId()==107)exportCsv();else if(item.getItemId()==106)exportDxf();else if(item.getItemId()==105)showLongitudinalProfile();else if(item.getItemId()==104)showAutomaticBackups();else if(item.getItemId()==103)showProjectHistory();else if(item.getItemId()==102)requestProjectRestore();else if(item.getItemId()==101)requestProjectBackup();else if(item.getItemId()==100)showProjects();else showPage(pages[item.getItemId()]);return true;});
   menu.show();
  }
- LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setPadding(dp(12),dp(8),dp(12),dp(8));return p;}
+ LinearLayout page(){LinearLayout p=new LinearLayout(this);p.setOrientation(1);p.setBackgroundColor(Color.BLACK);p.setPadding(dp(12),dp(8),dp(12),dp(8));return p;}
  int dp(int n){return (int)(n*getResources().getDisplayMetrics().density+.5f);}
  void showPage(LinearLayout p){
   for(java.util.Map.Entry<LinearLayout,Button> entry:sheetTabs.entrySet()){
