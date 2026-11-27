@@ -4821,6 +4821,7 @@ public class MainActivity extends Activity {
   double[] trench=currentTrenchQuantities();
   boolean sectional=true;try{sectional=new PipeLayoutStore(getPreferences(0)).sections().length()>0;}catch(Exception ignored){}
   String basis=Double.isFinite(trench[0])?(sectional?"Abschnittsprofile berücksichtigt; keine Abzüge":"Standardprofil; keine Abzüge"):"Abschnittsprofile prüfen – Menge offen";
+  String overlap=mainOverlapNotice(new RouteSketch(this,routeData()));if(!overlap.isEmpty())basis+="; "+overlap;
   csvRow(out,name,"Haupttrasse","Aushub – geometrisch",0,l,l,sectional?n:w,sectional?n:d,trench[1],"m³",basis);
   csvRow(out,name,"Haupttrasse","Grundfläche",0,l,l,sectional?n:w,n,trench[0],"m²",basis+"; Bezugsfläche, nicht addieren");
   double cutArea=currentCutArea();
@@ -5109,6 +5110,34 @@ public class MainActivity extends Activity {
   try{return mainTrenchQuantities(l,w,d,new PipeLayoutStore(getPreferences(0)).sections());}
   catch(Exception e){return new double[]{Double.NaN,Double.NaN};}
  }
+ static StripOverlap.Result mainRouteOverlap(RouteSketch route,double l,double w,double d,org.json.JSONArray profiles)throws Exception{
+  if(!DxfExport.metricAvailable(route)||Math.abs(route.measuredLength()-l)>0.001)throw new IllegalArgumentException("Trassenlänge oder Bemaßung prüfen");
+  mainTrenchQuantities(l,w,d,profiles);
+  DxfExport metric=new DxfExport(new java.io.StringWriter(),route,true);
+  java.util.TreeSet<Double> cuts=new java.util.TreeSet<>();cuts.add(0.0);cuts.add(l);
+  double station=0;
+  for(int i=1;i<route.vertices.size();i++){station+=route.vertices.get(i).metres;if(station>0&&station<l)cuts.add(station);}
+  for(int i=0;i<profiles.length();i++){org.json.JSONObject p=profiles.getJSONObject(i);cuts.add(p.getDouble("from"));cuts.add(p.getDouble("to"));}
+  if(cuts.size()>301)throw new IllegalArgumentException("Detaillierte Flächenprüfung erforderlich");
+  java.util.List<double[]> strips=new java.util.ArrayList<>();Double previous=null;
+  for(double end:cuts){
+   if(previous==null){previous=end;continue;}
+   double start=previous,mid=start+(end-start)/2;previous=end;
+   double bw=w;for(int j=0;j<profiles.length();j++){org.json.JSONObject p=profiles.getJSONObject(j);if(mid>=p.getDouble("from")&&mid<p.getDouble("to")){bw=p.getDouble("width");break;}}
+   double[] a=metric.station(start),b=metric.station(end);
+   if(a==null||b==null)throw new IllegalArgumentException("Station außerhalb der Skizze");
+   if(end-start>1e-8)strips.add(new double[]{a[0],a[1],b[0],b[1],bw/2,bw/2});
+  }
+  return StripOverlap.calculate(strips);
+ }
+ String mainOverlapNotice(RouteSketch route){
+  if(route.vertices.size()<2)return "";
+  try{
+   StripOverlap.Result r=mainRouteOverlap(route,l,w,d,new PipeLayoutStore(getPreferences(0)).sections());
+   if(r.overlap<=0.01)return "";
+   return String.format(java.util.Locale.GERMANY,"Überlappungskontrolle: %.2f m² im Streifenmodell der Haupttrasse (auch an Knicken). Bruttomengen unverändert; Netto / Eckergänzungen / Abzweige in Maßstäbliche Vorschau prüfen.",r.overlap);
+  }catch(Exception e){return "Überlappungskontrolle Haupttrasse offen – Geometrie / Maße prüfen.";}
+ }
  void refreshMainQuantities(){
   if(result==null)return;
   String basic="Trassenmaße fehlen";
@@ -5117,8 +5146,9 @@ public class MainActivity extends Activity {
    basic=Double.isFinite(q[0])?String.format(java.util.Locale.GERMANY,"Aushub: %.2f m³\nGrundfläche: %.2f m²",q[1],q[0]):"Abschnittsprofile prüfen – Mengen nicht eindeutig";
   }
   double cutArea=currentCutArea();if(Double.isFinite(cutArea))basic+=String.format(java.util.Locale.GERMANY,"\nFläche mit Nachschnitt: %.2f m² (alternativ)",cutArea);
-  double measured=new RouteSketch(this,routeData()).measuredLength();
-  result.setText(basic+routeLengthWarning(measured));
+  RouteSketch route=new RouteSketch(this,routeData());double measured=route.measuredLength();
+  String overlap=mainOverlapNotice(route);
+  result.setText(basic+routeLengthWarning(measured)+(overlap.isEmpty()?"":"\n"+overlap));
   if(shoringQuantities!=null)shoringQuantities.setText(shoringReport());
  }
  RouteSketch measuredExportRoute(RouteSketch original){
