@@ -1095,7 +1095,7 @@ public class MainActivity extends Activity {
   layers.append("\nTragschicht · ").append(baseValue.isEmpty()?"Stärke nicht erfasst":baseValue+" m");
   surfaceLayers.setText(layers.toString());
  }
- static final int INK=0xfff2f2f2, TEAL=0xff14766b;
+ static final int INK=0xff193747, UI_TEXT=0xfff2f2f2, TEAL=0xff14766b;
  TextView[] overviewValues=new TextView[4];
  LinearLayout stationRows;
  final java.util.LinkedHashMap<LinearLayout,Button> sheetTabs=new java.util.LinkedHashMap<>();
@@ -1105,7 +1105,7 @@ public class MainActivity extends Activity {
   TextView label=new TextView(this);
   label.setText(text);
   label.setTextSize(size);
-  label.setTextColor(INK);
+  label.setTextColor(UI_TEXT);
   if(bold)label.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
   return label;
  }
@@ -1151,7 +1151,7 @@ public class MainActivity extends Activity {
    Button entry=new Button(this);
    entry.setAllCaps(false);
    entry.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);
-   entry.setTextColor(objectWarning(index)?0xff982f20:INK);
+   entry.setTextColor(objectWarning(index)?0xffff927d:UI_TEXT);
    entry.setText(String.format(java.util.Locale.GERMANY,"%.2f m   ·   %s",object.optDouble("station"),object.optString("type")));
    entry.setOnClickListener(v->detailObject(index));
    if(!overlapSignature(index).isEmpty()){
@@ -3651,8 +3651,8 @@ public class MainActivity extends Activity {
   window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
   androidx.core.view.WindowInsetsControllerCompat controller=
     androidx.core.view.WindowCompat.getInsetsController(window,root);
-  controller.setAppearanceLightStatusBars(true);
-  controller.setAppearanceLightNavigationBars(true);
+  controller.setAppearanceLightStatusBars(false);
+  controller.setAppearanceLightNavigationBars(false);
   androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root,(view,insets)->{
    int types=androidx.core.view.WindowInsetsCompat.Type.systemBars()
       |androidx.core.view.WindowInsetsCompat.Type.displayCutout()
@@ -3674,7 +3674,7 @@ public class MainActivity extends Activity {
  header.setBackgroundColor(0xff1b1b1b);
  shell.addView(header);
  projectHeader=sheetText(getPreferences(0).getString("project","Feldaufmaß Pro"),22,true);
- projectHeader.setTextColor(INK);
+ projectHeader.setTextColor(UI_TEXT);
  projectHeader.setMaxLines(2);
  projectHeader.setEllipsize(android.text.TextUtils.TruncateAt.END);
  header.addView(projectHeader,new LinearLayout.LayoutParams(0,-2,1));
@@ -4196,21 +4196,22 @@ public class MainActivity extends Activity {
  }
  void utilitySlider(LinearLayout form,EditText field,String label,double min,double max,double step,boolean enabled){
   TextView title=new TextView(this);title.setText(label);form.addView(title);
-  SeekBar bar=new SeekBar(this);bar.setMax((int)Math.ceil((max-min)/step));bar.setEnabled(enabled);form.addView(bar);
+  SeekBar bar=new SeekBar(this);styleProfileSlider(bar);bar.setMax((int)Math.ceil((max-min)/step));bar.setEnabled(enabled);form.addView(bar);
   field.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL|(min<0?android.text.InputType.TYPE_NUMBER_FLAG_SIGNED:0));
   Runnable sync=()->{try{double value=Double.parseDouble(field.getText().toString().replace(',','.'));if(Double.isFinite(value))bar.setProgress((int)Math.round((value-min)/step));}catch(Exception ignored){}};
   field.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){sync.run();}public void afterTextChanged(android.text.Editable e){}});
   bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onStartTrackingTouch(SeekBar b){}public void onStopTrackingTouch(SeekBar b){}public void onProgressChanged(SeekBar b,int p,boolean user){if(user)field.setText(String.format(java.util.Locale.GERMANY,step>=1?"%.0f":step>=0.01?"%.2f":"%.3f",Math.min(max,min+p*step)));}});
   sync.run();
  }
+ void styleProfileSlider(SeekBar bar){bar.setProgressTintList(android.content.res.ColorStateList.valueOf(0xffeeeeee));bar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff484848));bar.setThumbTintList(android.content.res.ColorStateList.valueOf(0xff111111));bar.setMinHeight(dp(44));}
  void profileSlider(LinearLayout page,String name,EditText target,int min,int max){
- TextView label=new TextView(this);page.addView(label);SeekBar bar=new SeekBar(this);bar.setMax(max-min);page.addView(bar);
+ LinearLayout heading=new LinearLayout(this);heading.setGravity(Gravity.CENTER_VERTICAL);page.addView(heading);TextView title=sheetText(name,16,false);heading.addView(title,new LinearLayout.LayoutParams(0,-2,1));TextView label=sheetText("",16,true);label.setTextColor(0xff58c99a);heading.addView(label);SeekBar bar=new SeekBar(this);styleProfileSlider(bar);bar.setMax(max-min);page.addView(bar);
  EditText exact=new EditText(this);exact.setSingleLine(true);exact.setInputType(8194);exact.setText(target.getText());page.addView(exact);
  final boolean[] busy={false};
- Runnable sync=()->{if(busy[0])return;busy[0]=true;try{double val=number(target);label.setText(name+" · "+String.format(java.util.Locale.GERMANY,"%.2f m",val));bar.setProgress((int)Math.round(val*100)-min);exact.setText(target.getText());}catch(Exception e){label.setText(name+" (m)");}busy[0]=false;};
+ Runnable sync=()->{if(busy[0])return;busy[0]=true;try{double val=number(target);label.setText(String.format(java.util.Locale.GERMANY,"%.2f m",val));bar.setProgress((int)Math.round(val*100)-min);exact.setText(target.getText());}catch(Exception e){label.setText("— m");}busy[0]=false;};
  target.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){sync.run();}public void afterTextChanged(android.text.Editable e){}});
  bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onStartTrackingTouch(SeekBar b){}public void onStopTrackingTouch(SeekBar b){}public void onProgressChanged(SeekBar b,int progress,boolean user){if(!user)return;target.setText(String.format(java.util.Locale.GERMANY,"%.2f",(progress+min)/100.0));refreshProfileDraft();}});
- exact.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){if(busy[0])return;try{double v=number(exact);if(!Double.isFinite(v)||v<min/100.0||v>max/100.0)return;busy[0]=true;target.setText(s);label.setText(name+" · "+s+" m");bar.setProgress((int)Math.round(v*100)-min);busy[0]=false;refreshProfileDraft();}catch(Exception e){busy[0]=false;}}public void afterTextChanged(android.text.Editable e){}});
+ exact.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){if(busy[0])return;try{double v=number(exact);if(!Double.isFinite(v)||v<min/100.0||v>max/100.0)return;busy[0]=true;target.setText(s);label.setText(s+" m");bar.setProgress((int)Math.round(v*100)-min);busy[0]=false;refreshProfileDraft();}catch(Exception e){busy[0]=false;}}public void afterTextChanged(android.text.Editable e){}});
  sync.run();
  }
  void refreshProfileDraft(){
