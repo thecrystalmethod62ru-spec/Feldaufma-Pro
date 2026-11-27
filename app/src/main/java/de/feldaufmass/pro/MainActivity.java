@@ -1286,7 +1286,7 @@ public class MainActivity extends Activity {
     Button card=new Button(this);styleEditorButton(card,selectedSection[0]==j);
     card.setText(String.format(java.util.Locale.GERMANY,"A%d",j+1)+"  "+(Double.isFinite(length)&&length>0?(Double.isFinite(end)?String.format(java.util.Locale.GERMANY,"%.2f – %.2f m",station,end):"Station offen"):"Maß fehlt")+(Double.isFinite(length)&&length>0?String.format(java.util.Locale.GERMANY,"\n%.2f m",length):""));
     LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(sectionCards.getOrientation()==LinearLayout.VERTICAL?-1:dp(104),dp(48));cp.setMargins(dp(2),0,dp(2),0);sectionCards.addView(card,cp);
-    card.setOnClickListener(v->{if(!Double.isFinite(route.vertices.get(index+1).metres)||route.vertices.get(index+1).metres<=0){measureSegment(route,index+1);return;}selectedSection[0]=index;sectionPosition.setText("Abschnitt "+(index+1)+" / "+count);for(int k=0;k<sectionCards.getChildCount();k++)styleEditorButton((Button)sectionCards.getChildAt(k),k==index);});
+    card.setOnClickListener(v->{if(index+1>=route.vertices.size())return;selectedSection[0]=index;sectionPosition.setText("Abschnitt "+(index+1)+" / "+count);for(int k=0;k<sectionCards.getChildCount();k++)styleEditorButton((Button)sectionCards.getChildAt(k),k==index);if(!Double.isFinite(route.vertices.get(index+1).metres)||route.vertices.get(index+1).metres<=0)measureSegment(route,index+1);});
     station=Double.isFinite(length)&&length>0?end:Double.NaN;
    }
   };
