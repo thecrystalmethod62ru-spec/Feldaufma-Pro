@@ -15,7 +15,7 @@ import java.util.Locale;
 
 /** Coordinates describe a schematic only. Metres are entered in the field. */
 final class RouteSketch extends View {
- static final int LAYER_ROUTE=1,LAYER_DIMENSIONS=2,LAYER_NAMES=4,LAYER_GPS=8,LAYER_PHOTOS=16,LAYER_OBJECTS=32,LAYER_SURFACES=64,LAYER_SURFACE_DIMENSIONS=128,LAYER_GPS_TRACK=256,LAYER_GPS_DEVIATIONS=512,LAYER_GPS_REFERENCE=1024,ALL_LAYERS=2047;
+ static final int LAYER_ROUTE=1,LAYER_DIMENSIONS=2,LAYER_NAMES=4,LAYER_GPS=8,LAYER_PHOTOS=16,LAYER_OBJECTS=32,LAYER_SURFACES=64,LAYER_SURFACE_DIMENSIONS=128,LAYER_GPS_TRACK=256,LAYER_GPS_DEVIATIONS=512,LAYER_GPS_REFERENCE=1024,LAYER_SCHACHTSCHEINE=2048,ALL_LAYERS=4095;
  int visibleLayers=ALL_LAYERS;
  boolean layerVisible(int layer){return (visibleLayers&layer)!=0;}
  void setVisibleLayers(int layers){visibleLayers=layers&ALL_LAYERS;invalidate();}
@@ -714,6 +714,23 @@ final class RouteSketch extends View {
   double v=Math.hypot(a.point.x-b.point.x,a.point.y-b.point.y)*factor;
   return Double.isFinite(v)&&v>0?v:Double.NaN;
  }
+ static final class UtilitySheet {
+  final android.graphics.Bitmap bitmap;final float x,y,scale,rotation;final int alpha;
+  UtilitySheet(android.graphics.Bitmap bitmap,float x,float y,float scale,float rotation,int alpha){this.bitmap=bitmap;this.x=x;this.y=y;this.scale=scale;this.rotation=rotation;this.alpha=alpha;}
+ }
+ private java.util.List<UtilitySheet> utilitySheets=java.util.Collections.emptyList();
+ void setUtilitySheets(java.util.List<UtilitySheet> sheets){utilitySheets=new java.util.ArrayList<>(sheets);invalidate();}
+ void drawUtilitySheets(Canvas c){
+  if(!layerVisible(LAYER_SCHACHTSCHEINE))return;
+  float side=scale();
+  for(UtilitySheet sheet:utilitySheets){
+   android.graphics.Bitmap bitmap=sheet.bitmap;if(bitmap==null||bitmap.isRecycled())continue;
+   float factor=side/Math.max(bitmap.getWidth(),bitmap.getHeight()),w=bitmap.getWidth()*factor,h=bitmap.getHeight()*factor;
+   float x=left()+(side-w)/2,y=top()+(side-h)/2;
+   underlayPaint.setAlpha(sheet.alpha);c.save();c.translate(sheet.x*side,sheet.y*side);c.rotate(sheet.rotation,x+w/2,y+h/2);c.scale(sheet.scale,sheet.scale,x+w/2,y+h/2);
+   c.drawBitmap(bitmap,null,new android.graphics.RectF(x,y,x+w,y+h),underlayPaint);c.restore();
+  }
+ }
  private android.graphics.Bitmap underlay;
  private int underlayAlpha=150;
  private float underlayX=0,underlayY=0,underlayScale=1,underlayRotation=0;
@@ -836,6 +853,7 @@ final class RouteSketch extends View {
  @Override protected void onDraw(Canvas c){
   c.drawColor(darkPalette()?Color.BLACK:Color.WHITE);
   drawUnderlay(c);
+  drawUtilitySheets(c);
   float density=getResources().getDisplayMetrics().density;
   paint.setTextSize(13*density);
   dimensionHits.clear();
