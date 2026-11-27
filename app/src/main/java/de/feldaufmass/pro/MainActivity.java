@@ -5126,7 +5126,11 @@ public class MainActivity extends Activity {
   }catch(Exception ex){notice("Abschnittsprofile: "+ex.getMessage());}
  }
  org.json.JSONObject findSurfaceSection(org.json.JSONObject p){
-  for(int j=0;j<segments.length();j++){org.json.JSONObject seg=segments.optJSONObject(j);if(seg!=null&&seg.optDouble("from")==p.optDouble("from")&&seg.optDouble("to")==p.optDouble("to"))return seg;}return null;
+  if(p==null)return null;
+  double from=p.optDouble("from"),to=p.optDouble("to");
+  if(!Double.isFinite(from)||!Double.isFinite(to)||to<=from)return null;
+  for(int j=0;j<segments.length();j++){org.json.JSONObject seg=segments.optJSONObject(j);if(seg!=null&&seg.optDouble("from")==from&&seg.optDouble("to")==to)return seg;}
+  for(int j=0;j<segments.length();j++){org.json.JSONObject seg=segments.optJSONObject(j);if(seg!=null&&Math.abs(seg.optDouble("from")-from)<1e-6&&Math.abs(seg.optDouble("to")-to)<1e-6)return seg;}return null;
  }
  void actionButton(LinearLayout bar,String label,Runnable action){
   Button button=actionButtonSingle(bar,label,action);button.setLayoutParams(new LinearLayout.LayoutParams(0,-2,1));
