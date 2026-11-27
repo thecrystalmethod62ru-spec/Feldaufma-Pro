@@ -327,6 +327,16 @@ public class ProjectStateTest {
   return new org.json.JSONObject().put("kind","segment").put("mode",mode).put("unit","m²").put("quantity",quantity)
    .put("snapshot",new org.json.JSONObject().put("from",from).put("to",to).toString());
  }
+ @Test public void reinstatementIntervalsRespectProfileWidthsAndExplicitCut() throws Exception {
+  org.json.JSONArray profiles=new org.json.JSONArray().put(new org.json.JSONObject().put("from",5).put("to",10).put("width",2).put("depth",1));
+  org.json.JSONArray surfaces=new org.json.JSONArray().put(new org.json.JSONObject().put("from",8).put("to",12).put("cutWidth",3));
+  java.util.List<double[]> parts=MainActivity.cutIntervals(20,1,1,.2,.3,profiles,surfaces);
+  double area=0,length=0;for(double[] part:parts){length+=part[0];area+=part[0]*part[1];}
+  assertEquals(20,length,1e-9);assertEquals(39,area,1e-9);
+  surfaces.put(new org.json.JSONObject().put("from",9).put("to",15).put("cutWidth",2));
+  try{MainActivity.cutIntervals(20,1,1,.2,.3,profiles,surfaces);fail("Overlapping surface sections must be rejected");}
+  catch(IllegalArgumentException expected){}
+ }
  @Test public void changingTrenchProfilesUseSameAreaVolumeAndRebDimensions() throws Exception {
   org.json.JSONArray profiles=new org.json.JSONArray()
    .put(new org.json.JSONObject().put("from",15).put("to",20).put("width",2).put("depth",1))
