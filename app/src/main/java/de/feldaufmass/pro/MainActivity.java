@@ -1961,6 +1961,15 @@ public class MainActivity extends Activity {
   if(Double.isFinite(width)&&Double.isFinite(cutWidth)&&Math.abs(width-cutWidth)<1e-9&&!(left>0)&&!(right>0))return 0;
   return Double.NaN;
  }
+ String asphaltLvBreakdown(org.json.JSONObject row){
+  String source=row.optString("source");
+  if(!"asphaltLong".equals(source)&&!"asphaltRecut".equals(source))return "";
+  double longitudinal=asphaltLongitudinalQuantity("asphaltRecut".equals(source)),cross=row.optDouble("transverseCuts",0);
+  StringBuilder text=new StringBuilder("\nLängsschnitt (rechnerisch): ").append(Double.isFinite(longitudinal)?csvNumber(longitudinal)+" m":"offen");
+  if(Double.isFinite(cross)&&cross>0)text.append("\nQuer- und Endschnitte (manuell): ").append(csvNumber(cross)).append(" m");
+  else if(!Double.isFinite(cross)||cross<0)text.append("\nQuer- und Endschnitte: Eingabe prüfen");
+  return text.toString();
+ }
  double lvQuantity(org.json.JSONObject o){
   String source=o.optString("source","manual");
   double value=Double.NaN;
@@ -2020,7 +2029,7 @@ public class MainActivity extends Activity {
   form.addView(sheetText("Manuelles LV · Zuordnung durch Anwender. Geometrische Mengen vor Abrechnung prüfen.",14,false));
   for(int j=0;j<rows.length();j++){
    final int index=j;org.json.JSONObject o=rows.optJSONObject(j);if(o==null)continue;double qty=lvQuantity(o),target=o.optDouble("target");
-   Button button=new Button(this);button.setAllCaps(false);button.setText(lvLabel(o)+"\nIst: "+(Double.isFinite(qty)?csvNumber(qty):"offen")+(Double.isFinite(target)?" · Soll: "+csvNumber(target):""));
+   Button button=new Button(this);button.setAllCaps(false);button.setText(lvLabel(o)+"\nIst: "+(Double.isFinite(qty)?csvNumber(qty):"offen")+(Double.isFinite(target)?" · Soll: "+csvNumber(target):"")+asphaltLvBreakdown(o));
    button.setOnClickListener(v->editLv(index));form.addView(button);Button amounts=new Button(this);amounts.setAllCaps(false);amounts.setText("Mengenansätze · "+o.optString("oz"));amounts.setOnClickListener(v->showLvAnsatz(index));form.addView(amounts);
   }
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Leistungsverzeichnis").setView(scroll).setNegativeButton("Schließen",null).setNeutralButton("GAEB importieren",(a,b)->requestGaebImport()).setPositiveButton("Neue Position",(a,b)->editLv(-1)).create();dialog.show();
@@ -5766,7 +5775,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   for(int i=0;i<fittings.length();i++)body.append("\nFormstück · ").append(planFittingLabel(fittings.getJSONObject(i),i,null));
   String materials=projectMaterialText(getPreferences(0));if(!materials.isEmpty())body.append("\n\nMaterialliste\n").append(materials);
   org.json.JSONArray lv=lvPositions();for(int i=0;i<lv.length();i++){
-   org.json.JSONObject row=lv.getJSONObject(i);body.append("\nLV · ").append(lvLabel(row)).append(" · Ist: ").append(csvNumber(lvQuantity(row))).append(" · Soll: ").append(csvNumber(row.optDouble("target")));
+   org.json.JSONObject row=lv.getJSONObject(i);body.append("\nLV · ").append(lvLabel(row)).append(" · Ist: ").append(csvNumber(lvQuantity(row))).append(" · Soll: ").append(csvNumber(row.optDouble("target"))).append(asphaltLvBreakdown(row));
   }
   org.json.JSONArray sheets=utilitySheets();for(int i=0;i<sheets.length();i++)body.append("\nSchachtschein · ").append(sheets.getJSONObject(i).optString("name"));
   for(int i=0;i<documents.length();i++)body.append("\nUnterlage · ").append(documents.getJSONObject(i).optString("name"));
