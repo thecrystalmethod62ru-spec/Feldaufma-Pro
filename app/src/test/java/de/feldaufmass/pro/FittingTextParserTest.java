@@ -20,6 +20,8 @@ public class FittingTextParserTest {
         assertEquals("", station("Station 1+0000"));
         assertEquals("", station("Station 1+020 und Stat. 30 m"));
         assertEquals("", station("Station unleserlich, Stat. 30 m"));
+        assertEquals("", station("Station 1+020 bis 1+040"));
+        assertEquals("", station("Station 1+020–1+040"));
         assertEquals("", station("1+020"));
     }
 }

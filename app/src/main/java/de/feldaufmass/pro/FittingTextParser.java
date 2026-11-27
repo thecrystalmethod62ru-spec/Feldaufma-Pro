@@ -14,6 +14,8 @@ final class FittingTextParser {
     private static final Pattern STATION_VALUE=Pattern.compile(
             "\\s*[:=]?\\s*(?:(\\d+)\\s*\\+\\s*(\\d{3}(?:[.,]\\d+)?)(?:\\s*m\\b)?|(\\d+(?:[.,]\\d+)?)\\s*m\\b)(?![\\w+]|[.,]\\d)",FLAGS);
 
+    private static final Pattern RANGE_END=Pattern.compile("\\s*(?:[-–—/]|bis\\b|und\\b|oder\\b)\\s*\\d",FLAGS);
+
     static final class Candidate {
         final MontageCatalog.Fitting type;
         final String dn,station,evidence;
@@ -56,7 +58,7 @@ final class FittingTextParser {
         int start=label.end();
         if(label.find())return "";
         Matcher value=STATION_VALUE.matcher(line).region(start,line.length());
-        if(!value.lookingAt())return "";
+        if(!value.lookingAt() || RANGE_END.matcher(line).region(value.end(),line.length()).lookingAt())return "";
         if(value.group(3)!=null)return value.group(3);
         // Three metre digits follow the kilometre prefix, including leading zeros.
         String metres=value.group(1)+value.group(2);

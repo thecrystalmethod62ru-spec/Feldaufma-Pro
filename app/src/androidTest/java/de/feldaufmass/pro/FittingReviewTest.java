@@ -19,7 +19,7 @@ public class FittingReviewTest {
         try (ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
             String id=UUID.randomUUID().toString();
             String[] original=new String[1];
-            String tee="T-Stück DN 80 Station 12,5 m";
+            String tee="T-Stück DN 80 Station 0+012,5";
             try {
                 scenario.onActivity(activity->{
                     original[0]=activity.activeProject;
