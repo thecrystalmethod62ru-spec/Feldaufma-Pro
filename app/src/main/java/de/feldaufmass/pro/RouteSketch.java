@@ -577,19 +577,36 @@ final class RouteSketch extends View {
   }
   if(span<=0||metres<=0)return;
   double factor=metres/span;
-  int stride=Math.max(1,(points.size()+99)/100);
+  java.util.ArrayList<PointF> manual=new java.util.ArrayList<>();
+  for(Vertex v:vertices)manual.add(v.point);
+  drawDeviationDirection(c,density,points,manual,factor,false);
+  drawDeviationDirection(c,density,manual,points,factor,true);
+ }
+ private void drawDeviationDirection(Canvas c,float density,java.util.List<PointF> from,java.util.List<PointF> to,double factor,boolean reverse){
+  double length=0;for(int i=1;i<from.size();i++)length+=distance(from.get(i-1),from.get(i));
+  if(length<=0)return;
+  double step=Math.max(1/factor,length/99),next=0,offset=0;int count=0;
   paint.setStrokeWidth(1.5f*density);
-  for(int i=0;i<points.size();i+=stride){
-   PointF p=points.get(i),nearest=null;double best=Double.POSITIVE_INFINITY;
-   for(int j=1;j<vertices.size();j++){
-    PointF a=vertices.get(j-1).point,b=vertices.get(j).point;
-    double dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;
-    double t=den==0?0:Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/den));
-    PointF q=new PointF((float)(a.x+t*dx),(float)(a.y+t*dy));double d=distance(p,q);
-    if(d<best){best=d;nearest=q;}
+  try{
+   if(reverse)paint.setPathEffect(new android.graphics.DashPathEffect(new float[]{4*density,3*density},0));
+   for(int i=1;i<from.size();i++){
+    PointF start=from.get(i-1),end=from.get(i);double len=distance(start,end);if(len<=0)continue;
+    while(next<=offset+len&&count<100){
+     double f=Math.max(0,Math.min(1,(next-offset)/len));
+     PointF p=new PointF((float)(start.x+f*(end.x-start.x)),(float)(start.y+f*(end.y-start.y)));
+     PointF nearest=null;double best=Double.POSITIVE_INFINITY;
+     for(int j=1;j<to.size();j++){
+      PointF a=to.get(j-1),b=to.get(j);double dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;
+      double t=den==0?0:Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/den));
+      PointF q=new PointF((float)(a.x+t*dx),(float)(a.y+t*dy));double d=distance(p,q);
+      if(d<best){best=d;nearest=q;}
+     }
+     if(nearest!=null){double m=best*factor;paint.setColor(m<=1?0xff69cdbb:m<=3?0xffe9b63c:0xffef5350);line(c,p,nearest);}
+     next+=step;count++;
+    }
+    offset+=len;
    }
-   if(nearest!=null){double m=best*factor;paint.setColor(m<=1?0xff69cdbb:m<=3?0xffe9b63c:0xffef5350);line(c,p,nearest);}
-  }
+  }finally{paint.setPathEffect(null);}
  }
  void drawIndependentGpsTrack(Canvas c,float density){
   if(!layerVisible(LAYER_GPS_TRACK)||independentGpsTrack.length()==0)return;
