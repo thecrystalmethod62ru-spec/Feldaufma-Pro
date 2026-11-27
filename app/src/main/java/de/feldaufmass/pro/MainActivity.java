@@ -464,19 +464,21 @@ public class MainActivity extends Activity {
  }
  void showGpsTrackControls(){
   org.json.JSONArray rows=gpsTrack();
-  new android.app.AlertDialog.Builder(this).setTitle("GPS-Aufzeichnung").setMessage((recordingGpsTrack?"Aufzeichnung aktiv":"Aufzeichnung gestoppt")+" · "+rows.length()+" Punkte\nUnabhängig von der manuellen Trasse.")
-   .setPositiveButton(recordingGpsTrack?"Stoppen":"Fortsetzen",(d,w)->{
-    if(recordingGpsTrack){recordingGpsTrack=false;return;}
-    if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=android.content.pm.PackageManager.PERMISSION_GRANTED){notice("Bitte zuerst GPS-Berechtigung erteilen.");return;}
+  new android.app.AlertDialog.Builder(this).setTitle("GPS-Aufzeichnung").setMessage((recordingGpsTrack?"Aufzeichnung aktiv":"Aufzeichnung gestoppt")+" · "+rows.length()+" Punkte\nUnabhängig von der manuellen Trasse.\nBeim Verlassen der App wird die Aufzeichnung gestoppt.")
+   .setPositiveButton(recordingGpsTrack?"Stoppen":rows.length()==0?"Starten":"Fortsetzen",(d,w)->{
+    if(recordingGpsTrack){recordingGpsTrack=false;gpsRecordingProject=null;notice("GPS-Aufzeichnung gestoppt.");return;}
+    if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=android.content.pm.PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION,android.Manifest.permission.ACCESS_COARSE_LOCATION},704);return;}
     if(!gpsTrackStorageValid()){notice("GPS-Spur beschädigt. Bitte Sicherung prüfen.");return;}
-    startLiveGps();if(liveManager==null){notice("GPS nicht verfügbar.");return;}gpsRecordingProject=activeProject;recordingGpsTrack=true;notice("GPS-Aufzeichnung gestartet.");
+    android.location.LocationManager manager=(android.location.LocationManager)getSystemService(LOCATION_SERVICE);
+    if(manager==null||!manager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)){notice("Bitte GPS in den Android-Einstellungen aktivieren.");return;}
+    startLiveGps();if(liveManager==null){notice("GPS nicht verfügbar.");return;}gpsRecordingProject=activeProject;recordingGpsTrack=true;applyDrawingLayers(drawingLayers()|RouteSketch.LAYER_GPS_TRACK);notice("GPS-Aufzeichnung gestartet.");
    }).setNeutralButton("Spur löschen",(d,w)->new android.app.AlertDialog.Builder(this).setMessage("Gespeicherte GPS-Spur wirklich löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(dd,ww)->{recordingGpsTrack=false;if(!getPreferences(0).edit().remove("independentGpsTrack").commit())notice("GPS-Spur konnte nicht gelöscht werden.");else if(livePreview!=null)livePreview.setIndependentGpsTrack(gpsTrack());}).show()).setNegativeButton("Dateien",(d,w)->requestGpsExport()).show();
  }
 
  android.location.LocationManager liveManager;
  final android.location.LocationListener liveListener=new android.location.LocationListener(){
   public void onLocationChanged(android.location.Location fix){liveFix=fix;appendGpsTrack(fix);if(livePreview!=null)livePreview.setLiveFix(fix);}
-  public void onProviderDisabled(String provider){liveFix=null;if(livePreview!=null)livePreview.setLiveFix(null);}
+  public void onProviderDisabled(String provider){liveFix=null;if(livePreview!=null)livePreview.setLiveFix(null);if(recordingGpsTrack){recordingGpsTrack=false;gpsRecordingProject=null;notice("GPS deaktiviert. Aufzeichnung gestoppt; gespeicherte Punkte bleiben erhalten.");}}
   public void onProviderEnabled(String provider){}
   public void onStatusChanged(String provider,int status,android.os.Bundle extras){}
  };
@@ -5613,6 +5615,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] results){
   super.onRequestPermissionsResult(requestCode,permissions,results);
   if(requestCode==703){java.util.function.DoubleConsumer next=pendingBleConsumer;pendingBleConsumer=null;boolean granted=results.length>0;for(int result:results)granted&=result==android.content.pm.PackageManager.PERMISSION_GRANTED;if(granted&&next!=null)openBleMeasure(next);else notice("Bluetooth-Berechtigung fehlt.");return;}
+  if(requestCode==704){if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==android.content.pm.PackageManager.PERMISSION_GRANTED){if(projectChosen&&!isFinishing()&&!isDestroyed())showGpsTrackControls();}else notice("Für die GPS-Aufzeichnung ist der genaue Standort erforderlich.");return;}
   if(requestCode==702){if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==android.content.pm.PackageManager.PERMISSION_GRANTED){startLiveGps();assignGps(selectedPoint);}else notice("Für GPS-Punkte ist der genaue Standort erforderlich.");}
  }
  void renamePoint(String id,String proposed){
