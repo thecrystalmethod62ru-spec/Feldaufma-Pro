@@ -1199,6 +1199,7 @@ public class MainActivity extends Activity {
   orientation.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
    public void onItemSelected(android.widget.AdapterView<?> parent,View view,int position,long id){
     if(!full.isShowing())return;
+    if(position==0&&getRequestedOrientation()==previousOrientation)return;
     setRequestedOrientation(position==1?android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE:position==2?android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT:android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
    }
    public void onNothingSelected(android.widget.AdapterView<?> parent){}
@@ -1259,7 +1260,7 @@ public class MainActivity extends Activity {
   compactToolIcon(mic,"","mic");mic.setContentDescription("Sprachassistent");mic.setMinHeight(0);
   compactToolIcon(measureList,"Maße","ruler");compactToolIcon(resetZoom,"Zentrieren","center");compactToolIcon(legendEdit,"Legende","legend");compactToolIcon(objectTools,"Objekte","objects");
   styleEditorButton(save,true);compactToolIcon(save,"Speichern","save");LinearLayout.LayoutParams saveParams=new LinearLayout.LayoutParams(dp(88),dp(54));saveParams.setMargins(dp(6),0,dp(4),0);tools.addView(save,saveParams);compactToolIcon(back,"","back");back.setContentDescription("Vollbild beenden");
-  Button drawingTab=new Button(this),profileTab=new Button(this);styleEditorButton(drawingTab,true);styleEditorButton(profileTab,false);compactToolIcon(drawingTab,"Zeichnungsebene","view");compactToolIcon(profileTab,"Regelprofil","layers");LinearLayout viewTabs=new LinearLayout(this);viewTabs.setPadding(dp(8),0,dp(8),dp(4));root.addView(viewTabs,1);for(Button tab:new Button[]{drawingTab,profileTab}){android.graphics.drawable.Drawable icon=tab.getCompoundDrawables()[1];tab.setCompoundDrawables(icon,null,null,null);tab.setMinHeight(0);tab.setMinimumHeight(0);tab.setTextSize(12);tab.setPadding(dp(8),0,dp(8),0);}viewTabs.addView(drawingTab,new LinearLayout.LayoutParams(0,dp(40),1));viewTabs.addView(profileTab,new LinearLayout.LayoutParams(0,dp(40),1));
+  Button drawingTab=new Button(this),profileTab=new Button(this);styleEditorButton(drawingTab,true);styleEditorButton(profileTab,false);compactToolIcon(drawingTab,"Zeichnungsebene","view");compactToolIcon(profileTab,"Regelprofil","layers");LinearLayout viewTabs=new LinearLayout(this);viewTabs.setPadding(dp(8),0,dp(8),dp(4));root.addView(viewTabs,1,new LinearLayout.LayoutParams(-1,dp(48)));for(Button tab:new Button[]{drawingTab,profileTab}){android.graphics.drawable.Drawable icon=tab.getCompoundDrawables()[1];tab.setCompoundDrawables(icon,null,null,null);tab.setMinHeight(0);tab.setMinimumHeight(0);tab.setTextSize(12);tab.setPadding(dp(8),0,dp(8),0);}viewTabs.addView(drawingTab,new LinearLayout.LayoutParams(0,dp(40),1));viewTabs.addView(profileTab,new LinearLayout.LayoutParams(0,dp(40),1));
   Button canvasToggle=new Button(this);canvasToggle.setText("⛶");canvasToggle.setContentDescription("Zeichenfläche maximieren");styleEditorButton(canvasToggle,false);
   compactToolIcon(canvasToggle,"","view");canvasToggle.setContentDescription("Zeichenfläche maximieren");header.addView(canvasToggle,new LinearLayout.LayoutParams(dp(44),dp(48)));
   android.widget.FrameLayout canvasFrame=new android.widget.FrameLayout(this);
@@ -1437,7 +1438,7 @@ public class MainActivity extends Activity {
    });
   }
   full.show();
-  setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
+  // Preserve the current orientation on entry; the orientation selector controls subsequent changes.
   if(window!=null){window.setLayout(-1,-1);androidx.core.view.WindowInsetsControllerCompat c=androidx.core.view.WindowCompat.getInsetsController(window,root);c.setSystemBarsBehavior(androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);if(immersive[0])c.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars());else c.show(androidx.core.view.WindowInsetsCompat.Type.systemBars());androidx.core.view.ViewCompat.requestApplyInsets(root);}
  }
  void deleteRoutePoint(RouteSketch route){
