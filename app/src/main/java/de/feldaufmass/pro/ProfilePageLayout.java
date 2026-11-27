@@ -21,7 +21,7 @@ final class ProfilePageLayout {
  ProfilePageLayout(Context context){
  this.context=context;
  profilePage=new LinearLayout(context);profilePage.setOrientation(1);profilePage.setBackgroundColor(Color.BLACK);profilePage.setVisibility(View.GONE);
-  profilePageTitle=sheetText("Regelprofil",16,true);profilePageTitle.setTextColor(Color.WHITE);profilePageTitle.setPadding(dp(8),dp(6),dp(56),dp(6));profilePage.addView(profilePageTitle);
+  profilePageTitle=sheetText("Regelprofil",16,true);profilePageTitle.setTextColor(Color.WHITE);profilePageTitle.setPadding(dp(8),dp(6),dp(56),dp(6));LinearLayout titleRow=new LinearLayout(context);titleRow.setGravity(android.view.Gravity.CENTER_VERTICAL);titleRow.addView(profilePageTitle,new LinearLayout.LayoutParams(0,-2,1));Button catalogShortcut=new Button(context);catalogShortcut.setText("Katalog");configureAction(catalogShortcut);catalogShortcut.setTextColor(0xff28d5c7);catalogShortcut.setBackground(panelFrame());titleRow.addView(catalogShortcut,new LinearLayout.LayoutParams(dp(72),dp(32)));profilePage.addView(titleRow);catalogShortcut.setOnClickListener(v->{if(baseSettings!=null)baseSettings.performClick();});
   profileWork=new LinearLayout(context);profileWork.setOrientation(0);profilePage.addView(profileWork,new LinearLayout.LayoutParams(-1,0,1));profileWork.setPadding(dp(6),dp(4),dp(6),dp(4));
   profileCatalog=new LinearLayout(context);profileCatalog.setOrientation(LinearLayout.VERTICAL);profileCatalog.setPadding(dp(6),dp(6),dp(6),dp(6));profileCatalog.setBackground(panelFrame());profileCatalog.setVisibility(View.GONE);profileWork.addView(profileCatalog,new LinearLayout.LayoutParams(dp(140),-1));
   profileCenter=new LinearLayout(context);profileCenter.setOrientation(LinearLayout.VERTICAL);profileWork.addView(profileCenter,new LinearLayout.LayoutParams(-1,0,3));
@@ -40,7 +40,7 @@ final class ProfilePageLayout {
    int height=b-t-profileWork.getPaddingTop()-profileWork.getPaddingBottom();
    if(width<=0||height<=0)return;
    boolean wide=getResourcesLandscape();
-   int panelHeight=Math.min(dp(200),Math.max(dp(105),Math.round(height*.34f)));
+   int panelHeight=Math.min(dp(190),Math.max(dp(105),Math.round(height*.29f)));
    if(initialized[0]&&lastWide[0]==wide){
     if(!wide&&portraitPanels.getLayoutParams().height!=panelHeight)portraitPanels.setLayoutParams(new LinearLayout.LayoutParams(-1,panelHeight));
     return;
@@ -70,7 +70,7 @@ final class ProfilePageLayout {
   editSectionProfile=new Button(context);style.accept(editSectionProfile,false);settingsIcon.accept(editSectionProfile,"Abschnitt bearbeiten");
   baseSettings=new Button(context);style.accept(baseSettings,false);settingsIcon.accept(baseSettings,"Standard-Profil verwalten");
   applyProfile=new Button(context);style.accept(applyProfile,true);applyProfile.setText("Übernehmen");configureAction(applyProfile);
-  LinearLayout fullTabs=new LinearLayout(context);fullTabs.setPadding(dp(4),0,dp(4),dp(4));profileCenter.addView(fullTabs,0,new LinearLayout.LayoutParams(-1,dp(44)));
+  LinearLayout fullTabs=new LinearLayout(context);fullTabs.setPadding(dp(4),0,dp(4),dp(4));profileCenter.addView(fullTabs,0,new LinearLayout.LayoutParams(-1,dp(44)));profilePage.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,orr,ob)->{boolean wide=getResourcesLandscape();int next=wide?dp(44):dp(30);if(fullTabs.getLayoutParams().height!=next){fullTabs.getLayoutParams().height=next;fullTabs.requestLayout();}});
   String[] names={"Aufbau","Leitungen","Material","Berechnung"};fullButtons=new Button[names.length];
   for(int i=0;i<names.length;i++){Button b=new Button(context);fullButtons[i]=b;style.accept(b,i==0);b.setText(names[i]);b.setAllCaps(false);b.setTextSize(11);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(0,0,0,0);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-1,1);lp.setMargins(dp(2),0,dp(2),0);fullTabs.addView(b,lp);}
   LinearLayout profileActions=new LinearLayout(context);profilePage.addView(profileActions,new LinearLayout.LayoutParams(-1,dp(40)));
