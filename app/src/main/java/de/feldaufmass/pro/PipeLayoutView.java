@@ -180,6 +180,19 @@ public final class PipeLayoutView extends View {
         p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(d);p.setColor(color);c.drawRoundRect(x-3*d,y-p.getTextSize(),x+p.measureText(label)+3*d,y+3*d,3*d,3*d,p);p.setStyle(Paint.Style.FILL);c.drawText(label,x,y,p);
     }
     private void drawLabel(Canvas c,String label,float x,float y,int color){
+        float d=getResources().getDisplayMetrics().density,w=p.measureText(label),h=p.getTextSize();
+        x=Math.max(4*d,Math.min(x,getWidth()-w-4*d));
+        float originalY=y;
+        android.graphics.RectF bounds=new android.graphics.RectF();
+        for(int i=0;i<25;i++){
+            int ring=(i+1)/2;
+            y=Math.max(h+4*d,Math.min(originalY+(i%2==1?-1:1)*ring*(h+8*d),getHeight()-4*d));
+            bounds.set(x-3*d,y-h,x+w+3*d,y+3*d);
+            boolean overlap=false;
+            for(android.graphics.RectF other:dimensionLabels){if(android.graphics.RectF.intersects(bounds,other)){overlap=true;break;}}
+            if(!overlap)break;
+        }
+        dimensionLabels.add(new android.graphics.RectF(bounds));
         Paint.Style previous=p.getStyle();float stroke=p.getStrokeWidth();
         p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);p.setColor(0xff141414);c.drawText(label,x,y,p);
         p.setStyle(Paint.Style.FILL);p.setColor(color);c.drawText(label,x,y,p);
