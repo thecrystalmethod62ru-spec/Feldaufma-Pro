@@ -1856,7 +1856,7 @@ public class MainActivity extends Activity {
   route.changed=()->{history.record(route.encode());refreshEditor.run();};
   java.util.function.Consumer<Boolean> restore=forward->{
    String snapshot=history.step(forward);RouteSketch parsed=new RouteSketch(this,snapshot);
-   route.vertices.clear();route.vertices.addAll(parsed.vertices);route.singleObjects.clear();route.singleObjects.addAll(parsed.singleObjects);route.highlight=-1;route.dragged=-1;route.setStationLayers(route.stationObjects,segments);route.invalidate();if(route.changed!=null)route.changed.run();else refreshEditor.run();
+   route.vertices.clear();route.vertices.addAll(parsed.vertices);route.singleObjects.clear();route.singleObjects.addAll(parsed.singleObjects);route.highlight=-1;route.dragged=-1;refreshObjects.run();refreshEditor.run();
   };
   undo.setOnClickListener(v->restore.accept(false));redo.setOnClickListener(v->restore.accept(true));
   remove.setOnClickListener(v->{
