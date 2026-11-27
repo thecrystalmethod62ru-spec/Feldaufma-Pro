@@ -374,7 +374,7 @@ public class MainActivity extends Activity {
    runOnUiThread(()->{
     if(isDestroyed()||isFinishing())return;
     progress.dismiss();if(!project.equals(activeProject))return;
-    new android.app.AlertDialog.Builder(this).setTitle("Trassenvergleich").setMessage(message).setPositiveButton("Schließen",null).show();
+    new android.app.AlertDialog.Builder(this).setTitle("Trassenvergleich").setMessage(message).setNeutralButton("Abweichungen anzeigen",(d,w)->applyDrawingLayers(drawingLayers()|RouteSketch.LAYER_GPS_TRACK|RouteSketch.LAYER_ROUTE|RouteSketch.LAYER_GPS_DEVIATIONS)).setPositiveButton("Schließen",null).show();
    });
   }).start();
  }
@@ -419,11 +419,15 @@ public class MainActivity extends Activity {
    mask|=RouteSketch.LAYER_GPS_TRACK;
    prefs.edit().putInt(activeProject,mask).putBoolean("gpsTrackLayerMigrated:"+activeProject,true).apply();
   }
+  if(!prefs.getBoolean("gpsDeviationLayerMigrated:"+activeProject,false)){
+   mask&=~RouteSketch.LAYER_GPS_DEVIATIONS;
+   prefs.edit().putInt(activeProject,mask).putBoolean("gpsDeviationLayerMigrated:"+activeProject,true).apply();
+  }
   return mask;
  }
  void showDrawingLayers(){
-  String[] labels={"Leitungsverlauf / Punkte","Bemaßung","Punktnamen","GPS / Standort","Fotodokumentation","Objekte","Oberflächen","Oberflächenbemaßung","GPS-Aufzeichnung"};
-  int[] masks={RouteSketch.LAYER_ROUTE,RouteSketch.LAYER_DIMENSIONS,RouteSketch.LAYER_NAMES,RouteSketch.LAYER_GPS,RouteSketch.LAYER_PHOTOS,RouteSketch.LAYER_OBJECTS,RouteSketch.LAYER_SURFACES,RouteSketch.LAYER_SURFACE_DIMENSIONS,RouteSketch.LAYER_GPS_TRACK};
+  String[] labels={"Leitungsverlauf / Punkte","Bemaßung","Punktnamen","GPS / Standort","Fotodokumentation","Objekte","Oberflächen","Oberflächenbemaßung","GPS-Aufzeichnung","GPS-Abweichungen"};
+  int[] masks={RouteSketch.LAYER_ROUTE,RouteSketch.LAYER_DIMENSIONS,RouteSketch.LAYER_NAMES,RouteSketch.LAYER_GPS,RouteSketch.LAYER_PHOTOS,RouteSketch.LAYER_OBJECTS,RouteSketch.LAYER_SURFACES,RouteSketch.LAYER_SURFACE_DIMENSIONS,RouteSketch.LAYER_GPS_TRACK,RouteSketch.LAYER_GPS_DEVIATIONS};
   boolean[] checked=new boolean[labels.length];int current=drawingLayers();
   for(int j=0;j<labels.length;j++)checked[j]=(current&masks[j])!=0;
   new android.app.AlertDialog.Builder(this).setTitle("Zeichnungsebenen")
