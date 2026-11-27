@@ -259,9 +259,26 @@ public class ProjectStateTest {
    });
   }
  }
+ @Test public void startupRequiresProjectOnlyOnce(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->{
+    assertFalse(activity.projectChosen);
+    assertFalse(activity.shell.isShown());
+    assertFalse(activity.saveDraft());
+    activity.enterProject();
+    assertTrue(activity.projectChosen);
+    assertNull(activity.project.getParent());
+    activity.showPage(activity.profilePage);
+    assertTrue(activity.profilePage.isShown());
+   });
+   scenario.recreate();
+   scenario.onActivity(activity->{assertTrue(activity.projectChosen);assertTrue(activity.shell.isShown());});
+  }
+ }
  @Test public void contentClearsVisibleSystemBars(){
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    scenario.onActivity(activity->{
+    activity.enterProject();
     androidx.core.view.WindowInsetsCompat windowInsets=
       androidx.core.view.ViewCompat.getRootWindowInsets(activity.shell);
     assertNotNull(windowInsets);
@@ -293,6 +310,7 @@ public class ProjectStateTest {
   }
   try (ActivityScenario<MainActivity> reopened = ActivityScenario.launch(MainActivity.class)) {
    reopened.onActivity(activity -> {
+    activity.enterProject();
     assertTrue(activity.redoObjectsButton.isEnabled());
     activity.redoObjectsButton.performClick();
     assertEquals(2, activity.objects.length());
@@ -439,6 +457,7 @@ public class ProjectStateTest {
   try{route.onTouchEvent(e);}finally{e.recycle();}
  }
  private void verifyProjectState(MainActivity activity) throws Exception {
+  activity.enterProject();
   activity.showPage(activity.measurePage);
   assertFalse(activity.stoneLength.isShown());
   assertTrue(activity.surface.isShown());
