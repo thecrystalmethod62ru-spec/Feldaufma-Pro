@@ -811,6 +811,26 @@ public class MainActivity extends Activity {
   LinearLayout controls=new LinearLayout(this);controls.setPadding(dp(8),dp(4),dp(8),dp(4));controls.setBackground(editorShape(0xff202b2a,12));root.addView(controls);
   controls.addView(mode,new LinearLayout.LayoutParams(0,-2,1));controls.addView(angles,new LinearLayout.LayoutParams(0,-2,1));
   route.darkEditor=true;route.invalidate();root.addView(route,new LinearLayout.LayoutParams(-1,0,1));
+  LinearLayout sectionStrip=new LinearLayout(this);sectionStrip.setOrientation(1);sectionStrip.setPadding(dp(6),dp(2),dp(6),dp(2));
+  TextView sectionTitle=sheetText("Abschnitte",13,true);sectionStrip.addView(sectionTitle);
+  android.widget.HorizontalScrollView sectionScroll=new android.widget.HorizontalScrollView(this);sectionScroll.setHorizontalScrollBarEnabled(false);sectionStrip.addView(sectionScroll);
+  LinearLayout sectionCards=new LinearLayout(this);sectionScroll.addView(sectionCards);
+  root.addView(sectionStrip,new LinearLayout.LayoutParams(-1,-2));
+  final int[] selectedSection={-1};
+  Runnable refreshSections=()->{
+   sectionCards.removeAllViews();int count=Math.max(0,route.vertices.size()-1);
+   sectionTitle.setText("Abschnitte ("+count+")");double station=0;
+   for(int j=0;j<count;j++){
+    final int index=j;double length=route.vertices.get(j+1).metres;double end=station+length;
+    Button card=new Button(this);styleEditorButton(card,selectedSection[0]==j);
+    card.setText(String.format(java.util.Locale.GERMANY,"A%02d",j+1)+"\n"+(Double.isFinite(end)?String.format(java.util.Locale.GERMANY,"%.2f – %.2f m",station,end):"Maß fehlt"));
+    LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(dp(112),dp(54));cp.setMargins(dp(2),0,dp(2),0);sectionCards.addView(card,cp);
+    card.setOnClickListener(v->{selectedSection[0]=index;for(int k=0;k<sectionCards.getChildCount();k++)styleEditorButton((Button)sectionCards.getChildAt(k),k==index);});
+    station=end;
+   }
+  };
+  refreshSections.run();
+  sectionStrip.addOnLayoutChangeListener((v,ll,tt,rr,bb,ol,ot,orr,ob)->{if(sectionCards.getChildCount()!=Math.max(0,route.vertices.size()-1))refreshSections.run();});
   root.addView(historyBar,new LinearLayout.LayoutParams(-1,-2));
   for(int k=0;k<historyBar.getChildCount();k++)if(historyBar.getChildAt(k) instanceof Button)styleEditorButton((Button)historyBar.getChildAt(k),false);
   LinearLayout tools=new LinearLayout(this);root.addView(tools);
@@ -846,7 +866,7 @@ public class MainActivity extends Activity {
   Button floatingSave=new Button(this);floatingSave.setAllCaps(false);floatingSave.setText("Speichern");styleEditorButton(floatingSave,true);
   android.widget.FrameLayout.LayoutParams floatingSaveParams=new android.widget.FrameLayout.LayoutParams(dp(112),dp(44),Gravity.BOTTOM|Gravity.RIGHT);floatingSaveParams.setMargins(dp(8),dp(8),dp(8),dp(8));canvasFrame.addView(floatingSave,floatingSaveParams);floatingSave.setVisibility(View.GONE);
   floatingSave.setOnClickListener(v->save.performClick());
-  canvasToggle.setOnClickListener(v->{for(View bar:new View[]{header,controls,historyBar,tools,save})bar.setVisibility(View.GONE);restoreTools.setVisibility(View.VISIBLE);floatingSave.setVisibility(View.VISIBLE);});
+  canvasToggle.setOnClickListener(v->{for(View bar:new View[]{header,controls,historyBar,tools,save,sectionStrip})bar.setVisibility(View.GONE);restoreTools.setVisibility(View.VISIBLE);floatingSave.setVisibility(View.VISIBLE);});
   restoreTools.setOnTouchListener(new View.OnTouchListener(){
    float startX,startY,baseX,baseY;boolean moved;
    public boolean onTouch(View v,android.view.MotionEvent e){
@@ -862,7 +882,7 @@ public class MainActivity extends Activity {
    }
   });
   canvasFrame.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(restoreTools.getVisibility()==View.VISIBLE){restoreTools.setX(Math.max(0,Math.min(canvasFrame.getWidth()-restoreTools.getWidth(),restoreTools.getX())));restoreTools.setY(Math.max(0,Math.min(canvasFrame.getHeight()-restoreTools.getHeight(),restoreTools.getY())));}});
-  restoreTools.setOnClickListener(v->{for(View bar:new View[]{header,controls,historyBar,tools,save})bar.setVisibility(View.VISIBLE);restoreTools.setVisibility(View.GONE);floatingSave.setVisibility(View.GONE);});
+  restoreTools.setOnClickListener(v->{for(View bar:new View[]{header,controls,historyBar,tools,save,sectionStrip})bar.setVisibility(View.VISIBLE);restoreTools.setVisibility(View.GONE);floatingSave.setVisibility(View.GONE);});
   full.setContentView(root);
   full.setOnDismissListener(d->{
    pendingEditorSpeech=null;route.darkEditor=false;
