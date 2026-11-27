@@ -544,7 +544,7 @@ public class MainActivity extends Activity {
     final java.io.File saved=file;
     runOnUiThread(()->{
      if(isDestroyed()||isFinishing()||!projectId.equals(activeProject)||!original.equals(getPreferences(0).getString("routeUnderlay",""))){saved.delete();return;}
-     if(!getPreferences(0).edit().putString("routeUnderlay",saved.getName()).commit()){saved.delete();notice("Vorlage konnte nicht gespeichert werden.");return;}
+     if(!getPreferences(0).edit().putString("routeUnderlay",saved.getName()).remove("routeUnderlayTransform").remove("sketchCalibration").commit()){saved.delete();notice("Vorlage konnte nicht gespeichert werden.");return;}
      recordProjectEvent("Zeichenvorlage geändert");editRoute(false,true);
     });
    }catch(Exception e){if(file!=null)file.delete();runOnUiThread(()->{if(!isDestroyed())notice("Vorlage konnte nicht geladen werden.");});}
@@ -874,6 +874,20 @@ public class MainActivity extends Activity {
    android.graphics.Bitmap image=reportPhoto(template);
    if(image!=null){
     route.setUnderlay(image);
+    LinearLayout transform=fold(form,"Unterlage ausrichten",false);
+    CheckBox lock=new CheckBox(this);lock.setText("Unterlage sperren");lock.setChecked(true);transform.addView(lock);
+    String transformKey="routeUnderlayTransform";
+    float[] vals={0,0,1,0};
+    try{org.json.JSONArray saved=new org.json.JSONArray(getPreferences(0).getString(transformKey,"[]"));for(int k=0;k<4;k++)vals[k]=(float)saved.optDouble(k,vals[k]);}catch(Exception ignored){}
+    route.setUnderlayTransform(vals[0],vals[1],vals[2],vals[3]);
+    String[] names={"Horizontal verschieben","Vertikal verschieben","Maßstab der Unterlage","Drehung"};
+    float[] mins={-2,-2,.1f,-180},maxs={2,2,5,180};
+    java.util.ArrayList<SeekBar> bars=new java.util.ArrayList<>();
+    for(int k=0;k<4;k++){final int index=k;TextView label=sheetText(names[k],14,false);transform.addView(label);SeekBar bar=new SeekBar(this);bar.setMax(1000);bar.setProgress(Math.round(1000*(vals[k]-mins[k])/(maxs[k]-mins[k])));bar.setEnabled(false);transform.addView(bar);bars.add(bar);
+     bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onStartTrackingTouch(SeekBar b){}public void onStopTrackingTouch(SeekBar b){try{org.json.JSONArray data=new org.json.JSONArray();for(float value:vals)data.put((double)value);getPreferences(0).edit().putString(transformKey,data.toString()).remove("sketchCalibration").apply();}catch(Exception ignored){}}public void onProgressChanged(SeekBar b,int progress,boolean user){if(user&&!lock.isChecked()){vals[index]=mins[index]+(maxs[index]-mins[index])*progress/1000f;route.setUnderlayTransform(vals[0],vals[1],vals[2],vals[3]);}}});
+    }
+    lock.setOnCheckedChangeListener((b,checked)->{for(SeekBar bar:bars)bar.setEnabled(!checked);});
+
     android.widget.CheckBox showTemplate=new android.widget.CheckBox(this);showTemplate.setText("Zeichenvorlage anzeigen");showTemplate.setChecked(true);form.addView(showTemplate);
     showTemplate.setOnCheckedChangeListener((b,checked)->route.setUnderlayVisible(checked));
     form.addView(sheetText("Deckkraft der Vorlage",13,false));
@@ -881,7 +895,7 @@ public class MainActivity extends Activity {
     opacity.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(android.widget.SeekBar bar,int progress,boolean user){route.setUnderlayAlpha(progress);}public void onStartTrackingTouch(android.widget.SeekBar bar){}public void onStopTrackingTouch(android.widget.SeekBar bar){}});
     Button removeTemplate=new Button(this);removeTemplate.setAllCaps(false);removeTemplate.setText("Vorlage aus Projekt entfernen");form.addView(removeTemplate);
     removeTemplate.setOnClickListener(v->new android.app.AlertDialog.Builder(this).setTitle("Zeichenvorlage entfernen?").setMessage("Die gezeichnete Trasse und Maße bleiben erhalten.").setNegativeButton("Abbrechen",null).setPositiveButton("Entfernen",(d,w)->{
-     if(template.equals(getPreferences(0).getString("routeUnderlay",""))&&getPreferences(0).edit().remove("routeUnderlay").commit()){route.setUnderlay(null);showTemplate.setEnabled(false);opacity.setEnabled(false);removeTemplate.setEnabled(false);recordProjectEvent("Zeichenvorlage entfernt");}else notice("Vorlage konnte nicht entfernt werden.");
+     if(template.equals(getPreferences(0).getString("routeUnderlay",""))&&getPreferences(0).edit().remove("routeUnderlay").remove("routeUnderlayTransform").remove("sketchCalibration").commit()){route.setUnderlay(null);showTemplate.setEnabled(false);opacity.setEnabled(false);removeTemplate.setEnabled(false);recordProjectEvent("Zeichenvorlage entfernt");}else notice("Vorlage konnte nicht entfernt werden.");
     }).show());
    }else form.addView(sheetText("Zeichenvorlage fehlt oder ist nicht lesbar.",13,false));
   }
