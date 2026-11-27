@@ -344,7 +344,8 @@ public class MainActivity extends Activity {
  };
  void showGpsLayerOptions(RouteSketch route){
   boolean approximate=getPreferences(0).getBoolean("gpsEndpointAlignment",false);
-  new android.app.AlertDialog.Builder(this).setTitle("GPS-Ebene").setItems(new String[]{"GPS als Vorlage übernehmen","Start- und Endpunkt ausrichten"+(approximate?" (aktiv)":""),"GPS-Referenzpunkte verwenden"+(!approximate?" (aktiv)":""),"Aufnahmerichtung umkehren","Transparenz einstellen"},(d,w)->{
+  new android.app.AlertDialog.Builder(this).setTitle("GPS-Ebene").setItems(new String[]{"GPS als Vorlage übernehmen","Start- und Endpunkt ausrichten"+(approximate?" (aktiv)":""),"GPS-Referenzpunkte verwenden"+(!approximate?" (aktiv)":""),"Aufnahmerichtung umkehren","Transparenz einstellen",getPreferences(0).getBoolean("gpsShowDeviations",false)?"Abweichungen ausblenden":"Abweichungen anzeigen"},(d,w)->{
+   if(w==5){getPreferences(0).edit().putBoolean("gpsShowDeviations",!getPreferences(0).getBoolean("gpsShowDeviations",false)).apply();route.invalidate();return;}
    if(w==3){if(!approximate){notice("Nur für schematische Ausrichtung erforderlich.");return;}getPreferences(0).edit().putBoolean("gpsLayerReverse",!getPreferences(0).getBoolean("gpsLayerReverse",false)).apply();route.invalidate();return;}
    if(w==4){android.widget.SeekBar slider=new android.widget.SeekBar(this);slider.setMax(230);slider.setProgress(Math.max(0,Math.min(230,getPreferences(0).getInt("gpsLayerAlpha",255)-25)));new android.app.AlertDialog.Builder(this).setTitle("GPS-Deckkraft").setView(slider).setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",(dd,ww)->{getPreferences(0).edit().putInt("gpsLayerAlpha",slider.getProgress()+25).apply();route.invalidate();}).show();return;}
    if(w==0){openSavedGpsTemplate(route);return;}
