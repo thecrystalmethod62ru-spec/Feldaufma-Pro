@@ -803,9 +803,28 @@ public class MainActivity extends Activity {
  JSONArray stageRouteProfileRemap(String before,String after,SharedPreferences.Editor ed)throws org.json.JSONException{
   if(before.equals(after))return null;
   double[][] stations=matchingRouteStations(before,after);
-  if(stations==null||java.util.Arrays.equals(stations[0],stations[1]))return null;
+  if(stations==null)return null;
+  RouteSketch oldRoute=new RouteSketch(this,before),newRoute=new RouteSketch(this,after);
+  boolean inserted=newRoute.vertices.size()>oldRoute.vertices.size();
+  if(!inserted&&java.util.Arrays.equals(stations[0],stations[1]))return null;
   JSONArray surfaces=PipeLayoutStore.remapSections(segments,stations[0],stations[1]);
   JSONArray profiles=PipeLayoutStore.remapSections(new PipeLayoutStore(getPreferences(0)).sections(),stations[0],stations[1]);
+  if(inserted){
+   java.util.HashSet<String> oldIds=new java.util.HashSet<>();
+   for(RouteSketch.Vertex vertex:oldRoute.vertices)oldIds.add(vertex.id);
+   java.util.ArrayList<Double> cuts=new java.util.ArrayList<>();
+   double station=0;
+   for(int i=1;i<newRoute.vertices.size();i++){
+    RouteSketch.Vertex vertex=newRoute.vertices.get(i);
+    if(!Double.isFinite(vertex.metres)||vertex.metres<=0)break;
+    station+=vertex.metres;
+    if(station>=stations[1][stations[1].length-1])break;
+    if(!oldIds.contains(vertex.id))cuts.add(station);
+   }
+   double[] boundaries=new double[cuts.size()];for(int i=0;i<boundaries.length;i++)boundaries[i]=cuts.get(i);
+   surfaces=PipeLayoutStore.splitAtStations(surfaces,boundaries);
+   profiles=PipeLayoutStore.splitAtStations(profiles,boundaries);
+  }
   ed.putString("segments",surfaces.toString()).putString(PipeLayoutStore.SECTION_KEY,profiles.toString());
   return surfaces;
  }
