@@ -782,7 +782,7 @@ final class RouteSketch extends View {
   ArrayList<PointF> original=new ArrayList<>();
   for(PointF p:stroke)original.add(new PointF(p.x,p.y));
   if(original.size()==2&&distance(original.get(0),original.get(1))<.02){stroke.clear();return;}
-  ArrayList<PointF> straight=simplifiedStroke(original,.023);
+  ArrayList<PointF> straight=simplifiedStroke(original,editable?Math.max(.023,Math.min(.08,18*getResources().getDisplayMetrics().density/scale())):.023);
   if(straight.size()==original.size()){appendStroke(original);return;}
   if(editable){appendStroke(straight);return;}
   new android.app.AlertDialog.Builder(getContext())
@@ -868,7 +868,7 @@ final class RouteSketch extends View {
      if(dragged>=0){
       if(moving&&touchMoved){movePoint(dragged,p);if(changed!=null)changed.run();}
       if(!editable&&pointSelected!=null)pointSelected.select(dragged);
-     }else if(!editable && !touchMoved&&selected!=null&&layerVisible(LAYER_ROUTE))selectSegment(p);
+     }else if(!touchMoved&&selected!=null&&layerVisible(LAYER_ROUTE)&&(!editable||event.getEventTime()-touchStartTime>=android.view.ViewConfiguration.getLongPressTimeout()))selectSegment(p);
      dragged=-1;
     }else if(dimensioning){
      if(!touchMoved&&event.getEventTime()-touchStartTime>=android.view.ViewConfiguration.getLongPressTimeout())selectSegment(p);
