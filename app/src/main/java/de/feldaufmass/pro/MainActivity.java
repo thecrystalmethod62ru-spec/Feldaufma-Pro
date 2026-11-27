@@ -514,19 +514,23 @@ public class MainActivity extends Activity {
   if(!prefs.getBoolean("gpsReferenceLayerMigrated:"+activeProject,false)){mask|=RouteSketch.LAYER_GPS_REFERENCE;prefs.edit().putInt(activeProject,mask).putBoolean("gpsReferenceLayerMigrated:"+activeProject,true).apply();}
   return mask;
  }
- void showDrawingLayers(){
+ void showDrawingLayers(){showDrawingLayers(null);}
+ void showDrawingLayers(RouteSketch editorRoute){
+  final String project=activeProject;
   String[] labels={"Leitungsverlauf / Punkte","Bemaßung","Punktnamen","GPS / Standort","Fotodokumentation","Objekte","Oberflächen","Oberflächenbemaßung","GPS-Aufzeichnung","GPS-Abweichungen","GPX-Referenz"};
   int[] masks={RouteSketch.LAYER_ROUTE,RouteSketch.LAYER_DIMENSIONS,RouteSketch.LAYER_NAMES,RouteSketch.LAYER_GPS,RouteSketch.LAYER_PHOTOS,RouteSketch.LAYER_OBJECTS,RouteSketch.LAYER_SURFACES,RouteSketch.LAYER_SURFACE_DIMENSIONS,RouteSketch.LAYER_GPS_TRACK,RouteSketch.LAYER_GPS_DEVIATIONS,RouteSketch.LAYER_GPS_REFERENCE};
   boolean[] checked=new boolean[labels.length];int current=drawingLayers();
+  java.util.function.IntConsumer apply=mask->{if(!project.equals(activeProject)){notice("Projekt geändert. Ebenen erneut öffnen.");return;}if(applyDrawingLayers(mask)&&editorRoute!=null)editorRoute.setVisibleLayers(mask);};
   for(int j=0;j<labels.length;j++)checked[j]=(current&masks[j])!=0;
   new android.app.AlertDialog.Builder(this).setTitle("Zeichnungsebenen")
    .setMultiChoiceItems(labels,checked,(d,j,on)->checked[j]=on)
-   .setNegativeButton("Abbrechen",null).setNeutralButton("Alle anzeigen",(d,w)->applyDrawingLayers(RouteSketch.ALL_LAYERS))
-   .setPositiveButton("Übernehmen",(d,w)->{int mask=0;for(int j=0;j<checked.length;j++)if(checked[j])mask|=masks[j];applyDrawingLayers(mask);}).show();
+   .setNegativeButton("Abbrechen",null).setNeutralButton("Alle anzeigen",(d,w)->apply.accept(RouteSketch.ALL_LAYERS))
+   .setPositiveButton("Übernehmen",(d,w)->{int mask=0;for(int j=0;j<checked.length;j++)if(checked[j])mask|=masks[j];apply.accept(mask);}).show();
  }
- void applyDrawingLayers(int mask){
-  if(!getSharedPreferences("drawing_view",MODE_PRIVATE).edit().putInt(activeProject,mask).commit()){notice("Ebenen konnten nicht gespeichert werden.");return;}
+ boolean applyDrawingLayers(int mask){
+  if(!getSharedPreferences("drawing_view",MODE_PRIVATE).edit().putInt(activeProject,mask).commit()){notice("Ebenen konnten nicht gespeichert werden.");return false;}
   if(livePreview!=null)livePreview.setVisibleLayers(mask);
+  return true;
  }
  void refreshStationLayers(){
   if(livePreview==null)return;
@@ -968,6 +972,7 @@ public class MainActivity extends Activity {
   for(View view:views)form.removeView(view);
   LinearLayout controls=new LinearLayout(this);controls.setPadding(dp(8),dp(4),dp(8),dp(4));controls.setBackground(editorShape(0xff202b2a,12));root.addView(controls);
   controls.addView(mode,new LinearLayout.LayoutParams(0,-2,1));controls.addView(angles,new LinearLayout.LayoutParams(0,-2,1));Spinner smartMode=new Spinner(this);smartMode.setAdapter(new android.widget.ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Freihand","Smart","Winkelraster 15°"}));smartMode.setSelection(route.smartDrawingMode);smartMode.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onItemSelected(android.widget.AdapterView<?> p,View v,int pos,long id){route.smartDrawingMode=pos;}public void onNothingSelected(android.widget.AdapterView<?> p){}});controls.addView(smartMode,new LinearLayout.LayoutParams(0,-2,1));
+  Button layersButton=new Button(this);styleEditorButton(layersButton,false);compactToolIcon(layersButton,"","layers");layersButton.setContentDescription("Zeichnungsebenen");layersButton.setMinHeight(0);controls.addView(layersButton,new LinearLayout.LayoutParams(dp(48),dp(48)));layersButton.setOnClickListener(v->showDrawingLayers(route));
   route.darkEditor=true;route.invalidate();root.addView(route,new LinearLayout.LayoutParams(-1,0,1));
   LinearLayout sectionStrip=new LinearLayout(this);sectionStrip.setOrientation(1);sectionStrip.setPadding(dp(6),dp(2),dp(6),dp(2));
   TextView sectionTitle=sheetText("Abschnitte",13,true);sectionStrip.addView(sectionTitle);
@@ -1077,7 +1082,7 @@ public class MainActivity extends Activity {
   LinearLayout profilePage=new LinearLayout(this);profilePage.setOrientation(1);profilePage.setBackgroundColor(Color.BLACK);profilePage.setVisibility(View.GONE);
   TextView profilePageTitle=sheetText("Regelprofil",16,true);profilePageTitle.setTextColor(Color.WHITE);profilePage.addView(profilePageTitle);
   PipeLayoutView fullCross=new PipeLayoutView(this);profilePage.addView(fullCross,new LinearLayout.LayoutParams(-1,0,1));
-  Button editSectionProfile=new Button(this);styleEditorButton(editSectionProfile,false);compactToolIcon(editSectionProfile,"Abschnitt bearbeiten","settings");profilePage.addView(editSectionProfile,new LinearLayout.LayoutParams(-1,dp(54)));editSectionProfile.setOnClickListener(v->openSectionProfilePicker());
+  Button editSectionProfile=new Button(this);styleEditorButton(editSectionProfile,false);compactToolIcon(editSectionProfile,"Abschnitt bearbeiten","settings");profilePage.addView(editSectionProfile,new LinearLayout.LayoutParams(-1,dp(54)));editSectionProfile.setOnClickListener(v->{if(sectionProfilePanel.getParent()!=null)return;openSectionProfilePicker();showProfilePanel("Abschnitte",sectionProfilePanel);});
   canvasFrame.addView(profilePage,new android.widget.FrameLayout.LayoutParams(-1,-1));
   Runnable refreshFullProfile=()->{profilePageTitle.setText("Regelprofil · "+sectionPosition.getText());fullCross.setVisibility(View.GONE);if(selectedSection[0]<0||selectedSection[0]+1>=route.vertices.size())return;double start=0;for(int j=0;j<selectedSection[0];j++)start+=route.vertices.get(j+1).metres;double end=start+route.vertices.get(selectedSection[0]+1).metres;try{org.json.JSONArray rows=new PipeLayoutStore(getPreferences(0)).sections();for(int j=0;j<rows.length();j++){org.json.JSONObject p=rows.getJSONObject(j);if(Math.abs(p.optDouble("from")-start)>0.001||Math.abs(p.optDouble("to")-end)>0.001)continue;double w=p.optDouble("width"),d=p.optDouble("depth");if(w>0&&d>0){fullCross.setLayoutData(PipeLayoutStore.decode(p.getJSONArray("pipes").toString()),w,d);fullCross.setVisibility(View.VISIBLE);}break;}}catch(Exception ignored){}};
   drawingTab.setOnClickListener(v->{profilePage.setVisibility(View.GONE);route.setVisibility(View.VISIBLE);floatingProfile.setVisibility(View.VISIBLE);styleEditorButton(drawingTab,true);styleEditorButton(profileTab,false);});
