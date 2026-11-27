@@ -800,6 +800,15 @@ public class MainActivity extends Activity {
   }
   return stations;
  }
+ JSONArray clipRouteRanges(JSONArray rows,double limit)throws org.json.JSONException{
+  JSONArray result=new JSONArray();
+  for(int i=0;i<rows.length();i++){
+   org.json.JSONObject row=new org.json.JSONObject(rows.getJSONObject(i).toString());
+   double from=row.getDouble("from"),to=Math.min(limit,row.getDouble("to"));
+   if(to>from)result.put(row.put("to",to));
+  }
+  return result;
+ }
  JSONArray mergeEqualRouteRanges(JSONArray rows,java.util.List<Double> retained)throws org.json.JSONException{
   JSONArray result=new JSONArray();
   org.json.JSONObject previous=null;
@@ -840,7 +849,18 @@ public class MainActivity extends Activity {
      stations=new double[][]{reverse[1],reverse[0]};
    }
   }
-  if(stations==null)return null;
+  if(stations==null){
+   // Terminal truncation: retain only ranges inside the surviving measured prefix.
+   double[][] reverse=matchingRouteStations(after,before);
+   if(reverse!=null){
+    double limit=reverse[1][reverse[1].length-1];
+    JSONArray surfaces=PipeLayoutStore.remapSections(clipRouteRanges(segments,limit),reverse[1],reverse[0]);
+    JSONArray profiles=PipeLayoutStore.remapSections(clipRouteRanges(new PipeLayoutStore(getPreferences(0)).sections(),limit),reverse[1],reverse[0]);
+    ed.putString("segments",surfaces.toString()).putString(PipeLayoutStore.SECTION_KEY,profiles.toString());
+    return surfaces;
+   }
+   return null;
+  }
   RouteSketch oldRoute=new RouteSketch(this,before),newRoute=new RouteSketch(this,after);
   boolean inserted=newRoute.vertices.size()>oldRoute.vertices.size();
   boolean deleted=newRoute.vertices.size()<oldRoute.vertices.size();
