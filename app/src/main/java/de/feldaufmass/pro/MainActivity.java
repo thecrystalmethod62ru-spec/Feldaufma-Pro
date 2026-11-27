@@ -850,7 +850,7 @@ public class MainActivity extends Activity {
   LinearLayout form=page();
   ScrollView scroll=new ScrollView(this);scroll.addView(form);
   RouteSketch route=new RouteSketch(this,routeData());route.editable=true;route.bindDimensionProject(activeProject);
-  TextView hint=sheetText("Trasse mit dem Finger zeichnen. Weitere Striche verlängern das Ende.",15,false);
+  TextView hint=sheetText("Trasse mit dem Finger zeichnen. Loslassen zum Bearbeiten.",15,false);
   form.addView(hint);
   Button fullscreen=new Button(this);fullscreen.setAllCaps(false);fullscreen.setText("⛶ Vollbild");form.addView(fullscreen);
   form.addView(route,new LinearLayout.LayoutParams(-1,dp(260)));
@@ -909,10 +909,10 @@ public class MainActivity extends Activity {
   LinearLayout list=page();form.addView(list);
   route.selected=i->measureSegment(route,i);
   route.strokeAdded=first->{
-   if(route.darkEditor){
-    route.highlight=first;route.invalidate();
-    android.widget.Toast.makeText(this,"Maße offen – über Maße eintragen.",android.widget.Toast.LENGTH_SHORT).show();
-   }else offerNewRouteMeasurements(route,first);
+   route.moving=true;route.dimensioning=false;route.placingObject=false;route.editingObjects=false;
+   mode.setSelection(2);
+   route.highlight=first;route.invalidate();
+   android.widget.Toast.makeText(this,"Trasse fertig – Punkte ziehen, Maße später eintragen.",android.widget.Toast.LENGTH_SHORT).show();
   };
   route.pointSelected=i->{
    if(i<0||i>=route.vertices.size())return;
