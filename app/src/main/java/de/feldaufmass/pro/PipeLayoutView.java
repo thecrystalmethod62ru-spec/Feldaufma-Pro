@@ -47,19 +47,28 @@ public final class PipeLayoutView extends View {
     private void texture(Canvas c,float l,float t,float r,float b,int fill,int grain,boolean gravel){
         l=Math.max(0,l);t=Math.max(0,t);r=Math.min(getWidth(),r);b=Math.min(getHeight(),b);
         if(r<=l||b<=t)return;
-        p.setStyle(Paint.Style.FILL);p.setColor(fill);c.drawRect(l,t,r,b,p);
-        c.save();c.clipRect(l,t,r,b);p.setColor(grain);p.setStrokeWidth(1);
-        float density=getResources().getDisplayMetrics().density;
-        float step=(gravel?8:5)*density;
-        java.util.Random random=new java.util.Random(731);
-        for(float yy=t;yy<b;yy+=step)for(float xx=l;xx<r;xx+=step){
-            float x=xx+random.nextFloat()*step,y=yy+random.nextFloat()*step;
-            float w=step*(.18f+random.nextFloat()*.48f),h=w*(.35f+random.nextFloat()*.45f);
-            p.setColor(grain);p.setAlpha(65+random.nextInt(105));
-            if(gravel){p.setStyle(Paint.Style.STROKE);c.drawOval(x,y,x+w,y+h,p);}
-            else{p.setStyle(Paint.Style.FILL);c.drawOval(x,y,x+w,y+h,p);}
+        p.setStyle(Paint.Style.FILL);p.setColor(0xff080c0d);c.drawRect(l,t,r,b,p);
+        c.save();c.clipRect(l,t,r,b);
+        float d=getResources().getDisplayMetrics().density;
+        p.setColor(0xffb7c1c1);p.setStrokeWidth(Math.max(0.7f,d*.65f));
+        boolean asphalt=fill==0xff383c3f;
+        boolean nativeSoil=fill==0xff292520||fill==0xff302922;
+        if(asphalt||nativeSoil){
+            float step=(nativeSoil?14:6)*d;
+            if(nativeSoil){
+                for(float y=t+step/2;y<b;y+=step)for(float x=l+step/2;x<r;x+=step){
+                    for(int k=0;k<3;k++)c.drawLine(x+k*2*d,y,x+(k*2+4)*d,y-4*d,p);
+                }
+            }else for(float x=l-(b-t);x<r;x+=step)c.drawLine(x,b,x+b-t,t,p);
+        }else{
+            float step=(gravel?7:3.5f)*d;
+            for(int row=0; t+row*step<b;row++)for(int col=0;l+col*step<r;col++){
+                float x=l+(col+.25f+((row*7+col*3)%5)*.1f)*step;
+                float y=t+(row+.25f+((row*3+col*7)%5)*.1f)*step;
+                if(gravel){p.setStyle(Paint.Style.STROKE);c.drawOval(x,y,x+step*.48f,y+step*.36f,p);}
+                else{p.setStyle(Paint.Style.FILL);c.drawCircle(x,y,Math.max(.5f,d*.42f),p);}
+            }
         }
-        p.setAlpha(255);
         p.setStyle(Paint.Style.FILL);c.restore();
     }
     @Override protected void onDraw(Canvas c){
@@ -76,15 +85,16 @@ public final class PipeLayoutView extends View {
         if(!Float.isFinite(scale)||scale<=0)return;
         float left=cx-(float)(width*scale/2),right=cx+(float)(width*scale/2),top=bottom-(float)(depth*scale);
         texture(c,left,top,right,bottom,0xff503a29,0xffb18a62,false);
-        p.setColor(0xff00e5ee);p.setStrokeWidth(1.5f);c.drawLine(left,top,right,top,p);
-        p.setColor(0xff00e5ee);c.drawLine(left,top,left,bottom,p);c.drawLine(right,top,right,bottom,p);c.drawLine(left,bottom,right,bottom,p);
+        if(civilProfile){float dt=top+(float)(Math.min(depth,deck)*scale),bt=top+(float)(Math.min(depth,deck+base)*scale);texture(c,left,top,right,dt,asphaltProfile?0xff383c3f:surfaceColor,0xffaaaaaa,!asphaltProfile);texture(c,left,dt,right,bt,0xff666052,0xffaaaaaa,true);p.setColor(0xffeeeeee);c.drawLine(left,dt,right,dt,p);c.drawLine(left,bt,right,bt,p);}
+        p.setColor(0xffeeeeee);p.setStrokeWidth(1.5f);c.drawLine(left,top,right,top,p);
+        p.setColor(0xffeeeeee);c.drawLine(left,top,left,bottom,p);c.drawLine(right,top,right,bottom,p);c.drawLine(left,bottom,right,bottom,p);
         if(civilProfile){
             float a=left-(float)(cutLeft*scale),b=right+(float)(cutRight*scale);
             texture(c,0,top,left,bottom,0xff292520,0xff82705c,false);texture(c,right,top,getWidth(),bottom,0xff302922,0xff78634d,false);
             float deckBottom=top+(float)(Math.min(depth,deck)*scale),baseBottom=top+(float)(Math.min(depth,deck+base)*scale);
             texture(c,0,top,a,deckBottom,asphaltProfile?0xff383c3f:surfaceColor,asphaltProfile?0xff777b7e:0xff96938a, !asphaltProfile);texture(c,b,top,getWidth(),deckBottom,asphaltProfile?0xff383c3f:surfaceColor,asphaltProfile?0xff777b7e:0xff96938a,!asphaltProfile);
             texture(c,0,deckBottom,left,baseBottom,0xff666052,0xffa39a83,true);texture(c,right,deckBottom,getWidth(),baseBottom,0xff666052,0xffa39a83,true);
-            p.setColor(0xff00e5ee);p.setStrokeWidth(1.5f);c.drawLine(left,top,left,bottom,p);c.drawLine(right,top,right,bottom,p);c.drawLine(left,bottom,right,bottom,p);
+            p.setColor(0xffeeeeee);p.setStrokeWidth(1.5f);c.drawLine(left,top,left,bottom,p);c.drawLine(right,top,right,bottom,p);c.drawLine(left,bottom,right,bottom,p);
             p.setTextSize(11*getResources().getDisplayMetrics().scaledDensity);
 
             if(cutLeft+cutRight>0)dimension(c,a,top-pad/2,b,top-pad/2,width+cutLeft+cutRight);
@@ -101,8 +111,8 @@ public final class PipeLayoutView extends View {
             }
         }
         p.setTextSize(11*getResources().getDisplayMetrics().scaledDensity);
-        dimension(c,left,bottom+pad/2,right,bottom+pad/2,width);
-        dimension(c,right+pad/3,top,right+pad/3,bottom,depth);
+        dimension(c,left,top-pad/2,right,top-pad/2,width);
+        dimension(c,left-pad/3,top,left-pad/3,bottom,depth);
         int[] colors={0xff397db5,0xffd4ab35,0xff398b75,0xff9567b8};
         p.setTextSize(12*getResources().getDisplayMetrics().scaledDensity);
         for(int i=0;i<pipes.size();i++){
@@ -140,7 +150,7 @@ public final class PipeLayoutView extends View {
         }
     }
     private void dimension(Canvas c,float x1,float y1,float x2,float y2,double metres){
-        int color=metres<0?0xffff8a80:0xff00e5ee;
+        int color=metres<0?0xffff8a80:0xffeeeeee;
         float d=getResources().getDisplayMetrics().density;
         p.setColor(color);
         p.setStrokeWidth(1.5f*d);
