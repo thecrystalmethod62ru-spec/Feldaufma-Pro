@@ -1154,6 +1154,7 @@ public class MainActivity extends Activity {
     c.save();c.translate(getBounds().left,getBounds().top);c.scale(getBounds().width()/24f,getBounds().height()/24f);
     p.setColor(Color.WHITE);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(1.7f);p.setStrokeCap(Paint.Cap.ROUND);p.setStrokeJoin(Paint.Join.ROUND);
     switch(kind){
+     case "undo":case "redo":{boolean reverse=kind.equals("redo");c.save();if(reverse)c.scale(-1,1,12,12);c.drawLine(4,9,10,3,p);c.drawLine(4,9,10,15,p);c.drawLine(4,9,15,9,p);c.drawArc(9,9,21,21,-90,180,false,p);c.restore();break;}
      case "cursor":{android.graphics.Path cursor=new android.graphics.Path();cursor.moveTo(5,3);cursor.lineTo(20,14);cursor.lineTo(13,15);cursor.lineTo(10,21);cursor.close();c.drawPath(cursor,p);break;}
      case "pencil":c.drawLine(4,20,7,13,p);c.drawLine(7,13,17,3,p);c.drawLine(17,3,21,7,p);c.drawLine(21,7,11,17,p);c.drawLine(11,17,4,20,p);c.drawLine(14,6,18,10,p);break;
      case "nodes":c.drawLine(4,19,20,5,p);for(int k=0;k<3;k++)c.drawCircle(4+8*k,19-7*k,2.5f,p);break;
@@ -1214,10 +1215,11 @@ public class MainActivity extends Activity {
   LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);header.setPadding(dp(8),dp(4),dp(8),dp(4));root.addView(header);
   Button back=new Button(this),save=new Button(this);back.setAllCaps(false);save.setAllCaps(false);back.setText("‹");back.setContentDescription("Vollbild beenden");save.setText("Speichern");
   header.addView(back,new LinearLayout.LayoutParams(dp(44),dp(44)));
-  LinearLayout heading=new LinearLayout(this);heading.setOrientation(1);heading.addView(sheetText("Feldaufmaß Pro",16,true));heading.addView(sheetText("Tiefbau · Zeichnungseditor",10,false));for(int k=0;k<heading.getChildCount();k++)if(heading.getChildAt(k) instanceof TextView)((TextView)heading.getChildAt(k)).setTextColor(0xffe9f2f1);header.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
+  LinearLayout heading=new LinearLayout(this);heading.setOrientation(1);heading.addView(sheetText("Feldaufmaß Pro",16,true));heading.addView(sheetText("Tiefbau",10,false));for(int k=0;k<heading.getChildCount();k++)if(heading.getChildAt(k) instanceof TextView)((TextView)heading.getChildAt(k)).setTextColor(0xffe9f2f1);header.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
+  Button currentProject=new Button(this);styleEditorButton(currentProject,false);currentProject.setText("Projekt: "+getPreferences(0).getString("project","Feldaufmaß Pro"));currentProject.setTextSize(12);currentProject.setSingleLine(true);currentProject.setEllipsize(android.text.TextUtils.TruncateAt.END);header.addView(currentProject,new LinearLayout.LayoutParams(0,dp(40),1.3f));currentProject.setOnClickListener(v->new android.app.AlertDialog.Builder(this).setTitle("Aktuelles Projekt").setMessage(getPreferences(0).getString("project","Feldaufmaß Pro")+"\nZum Projektwechsel zuerst die Zeichnung speichern und den Editor schließen.").setPositiveButton("OK",null).show());
   Spinner orientation=new Spinner(this);
   orientation.setAdapter(new android.widget.ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Auto","Quer","Hoch"}));
-  header.addView(orientation,new LinearLayout.LayoutParams(dp(76),dp(48)));
+  header.addView(orientation,new LinearLayout.LayoutParams(dp(76),dp(40)));orientation.setVisibility(View.GONE);
   orientation.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
    public void onItemSelected(android.widget.AdapterView<?> parent,View view,int position,long id){
     if(!full.isShowing())return;
@@ -1232,6 +1234,9 @@ public class MainActivity extends Activity {
   Button layersButton=new Button(this);styleEditorButton(layersButton,false);compactToolIcon(layersButton,"","layers");layersButton.setContentDescription("Zeichnungsebenen; lange drücken für Schachtscheine");layersButton.setMinHeight(0);controls.addView(layersButton,new LinearLayout.LayoutParams(dp(44),dp(44)));layersButton.setOnClickListener(v->showDrawingLayers(route));
    layersButton.setOnLongClickListener(v->{showUtilitySheets();return true;});
   Button gpsButton=new Button(this);styleEditorButton(gpsButton,false);compactToolIcon(gpsButton,"","center");gpsButton.setContentDescription("GPS-Aufzeichnung");gpsButton.setMinHeight(0);controls.addView(gpsButton,new LinearLayout.LayoutParams(dp(44),dp(44)));gpsButton.setOnClickListener(v->showGpsTrackControls());
+  controls.removeView(layersButton);controls.removeView(gpsButton);header.addView(layersButton,new LinearLayout.LayoutParams(dp(40),dp(40)));header.addView(gpsButton,new LinearLayout.LayoutParams(dp(40),dp(40)));
+  Button settingsTool=new Button(this);styleEditorButton(settingsTool,false);compactToolIcon(settingsTool,"","settings");settingsTool.setContentDescription("Zeichenoptionen");settingsTool.setMinHeight(0);header.addView(settingsTool,new LinearLayout.LayoutParams(dp(40),dp(40)));controls.setVisibility(View.GONE);
+  settingsTool.setOnClickListener(v->new android.app.AlertDialog.Builder(this).setTitle("Zeichenoptionen").setItems(new String[]{"Zeichenmodus / Winkel / Smart","Auto / Quer / Hoch","Legende"},(dialog,which)->{if(which==0){controls.setVisibility(controls.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE);}else if(which==1){new android.app.AlertDialog.Builder(this).setTitle("Ausrichtung").setItems(new String[]{"Auto","Quer","Hoch"},(d,k)->orientation.setSelection(k)).show();}else route.editLegend();}).show());
   route.darkEditor=true;route.invalidate();root.addView(route,new LinearLayout.LayoutParams(-1,0,1));
   LinearLayout sectionStrip=new LinearLayout(this);sectionStrip.setOrientation(1);sectionStrip.setPadding(dp(6),dp(2),dp(6),dp(2));android.graphics.drawable.GradientDrawable sectionFrame=editorShape(0xff041012,8);sectionFrame.setStroke(dp(1),0xff008b93);sectionStrip.setBackground(sectionFrame);
   TextView sectionTitle=sheetText("Abschnitte",13,true);sectionStrip.addView(sectionTitle);
@@ -1287,12 +1292,14 @@ public class MainActivity extends Activity {
   route.inspectorSelection=index->{selectedSection[0]=index;refreshSections.run();};
   final Runnable originalRouteChanged=route.changed;
   route.changed=()->{if(originalRouteChanged!=null)originalRouteChanged.run();if(selectedSection[0]>=route.vertices.size()-1)selectedSection[0]=-1;refreshSections.run();};
-  root.addView(historyBar,new LinearLayout.LayoutParams(-1,-2));
+  root.addView(historyBar,new LinearLayout.LayoutParams(-1,-2));historyBar.setVisibility(View.GONE);
+  for(int j=0;j<Math.min(2,historyBar.getChildCount());j++){final View action=historyBar.getChildAt(j);Button shortcut=new Button(this);styleEditorButton(shortcut,false);compactToolIcon(shortcut,"",j==0?"undo":"redo");shortcut.setContentDescription(j==0?"Rückgängig":"Wiederholen");shortcut.setMinHeight(0);header.addView(shortcut,new LinearLayout.LayoutParams(dp(40),dp(40)));shortcut.setOnClickListener(v->action.performClick());}
+  settingsTool.setOnLongClickListener(v->{historyBar.setVisibility(historyBar.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE);return true;});
   for(int k=0;k<historyBar.getChildCount();k++)if(historyBar.getChildAt(k) instanceof Button)styleEditorButton((Button)historyBar.getChildAt(k),false);
   LinearLayout tools=new LinearLayout(this);tools.setPadding(dp(6),dp(3),dp(6),dp(3));root.addView(tools);
   Button mic=new Button(this),measureList=new Button(this),resetZoom=new Button(this);
   mic.setAllCaps(false);mic.setText("🎙");mic.setContentDescription("Sprachassistent");measureList.setAllCaps(false);measureList.setText("↔\nMaße");resetZoom.setAllCaps(false);resetZoom.setText("⌖\nAnsicht");
-  header.addView(mic,new LinearLayout.LayoutParams(dp(44),dp(44)));tools.addView(measureList,new LinearLayout.LayoutParams(0,-2,1));tools.addView(resetZoom,new LinearLayout.LayoutParams(0,-2,1));
+  header.addView(mic,new LinearLayout.LayoutParams(dp(44),dp(44)));mic.setVisibility(View.GONE);tools.addView(measureList,new LinearLayout.LayoutParams(0,-2,1));tools.addView(resetZoom,new LinearLayout.LayoutParams(0,-2,1));
   mic.setOnClickListener(v->startEditorDictation(speech->{route.selectionOnly=false;applyEditorSpeech(speech,route,mode,historyBar,full);}));
   measureList.setOnClickListener(v->showFullscreenMeasures(route));
   Button legendEdit=new Button(this);legendEdit.setAllCaps(false);legendEdit.setText("☷\nLegende");tools.addView(legendEdit,new LinearLayout.LayoutParams(0,-2,1));legendEdit.setOnClickListener(v->route.editLegend());
@@ -1473,7 +1480,7 @@ public class MainActivity extends Activity {
    }catch(Exception ex){bw.setError("Positive Maße eingeben");bd.setError("Positive Maße eingeben");}});
   });
   profileEdit.setOnClickListener(v->{if(selectedSection[0]>=0)editSectionProfile.performClick();else baseSettings.performClick();});
-  drawingTab.setOnClickListener(v->{profilePage.setVisibility(View.GONE);route.setVisibility(View.VISIBLE);floatingProfile.setVisibility(View.VISIBLE);controls.setVisibility(View.VISIBLE);historyBar.setVisibility(View.VISIBLE);tools.setVisibility(View.VISIBLE);styleEditorButton(drawingTab,true);styleEditorButton(profileTab,false);});
+  drawingTab.setOnClickListener(v->{profilePage.setVisibility(View.GONE);route.setVisibility(View.VISIBLE);floatingProfile.setVisibility(View.VISIBLE);controls.setVisibility(View.GONE);historyBar.setVisibility(View.GONE);tools.setVisibility(View.VISIBLE);styleEditorButton(drawingTab,true);styleEditorButton(profileTab,false);});
   profileTab.setOnClickListener(v->{route.setVisibility(View.GONE);floatingProfile.setVisibility(View.GONE);controls.setVisibility(View.GONE);historyBar.setVisibility(View.GONE);tools.setVisibility(View.GONE);profilePage.setVisibility(View.VISIBLE);styleEditorButton(drawingTab,false);styleEditorButton(profileTab,true);refreshFullProfile.run();});
   sectionPosition.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){if(profilePage.getVisibility()==View.VISIBLE)refreshFullProfile.run();}public void afterTextChanged(android.text.Editable e){}});
   Button restoreTools=new Button(this);restoreTools.setText("☰");restoreTools.setContentDescription("Werkzeuge anzeigen");styleEditorButton(restoreTools,false);
@@ -1497,7 +1504,7 @@ public class MainActivity extends Activity {
    }
   });
   canvasFrame.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(restoreTools.getVisibility()==View.VISIBLE){restoreTools.setX(Math.max(0,Math.min(canvasFrame.getWidth()-restoreTools.getWidth(),restoreTools.getX())));restoreTools.setY(Math.max(0,Math.min(canvasFrame.getHeight()-restoreTools.getHeight(),restoreTools.getY())));}});
-  restoreTools.setOnClickListener(v->{immersive[0]=immersiveInitially;if(!immersive[0]&&full.getWindow()!=null)androidx.core.view.WindowCompat.getInsetsController(full.getWindow(),root).show(androidx.core.view.WindowInsetsCompat.Type.systemBars());for(View bar:new View[]{header,viewTabs,controls,historyBar,tools,save,sectionStrip})bar.setVisibility(View.VISIBLE);if(landscapeSections[0])layerPanel.setVisibility(View.VISIBLE);restoreTools.setVisibility(View.GONE);floatingSave.setVisibility(View.GONE);});
+  restoreTools.setOnClickListener(v->{immersive[0]=immersiveInitially;if(!immersive[0]&&full.getWindow()!=null)androidx.core.view.WindowCompat.getInsetsController(full.getWindow(),root).show(androidx.core.view.WindowInsetsCompat.Type.systemBars());for(View bar:new View[]{header,viewTabs,tools,save,sectionStrip})bar.setVisibility(View.VISIBLE);if(landscapeSections[0])layerPanel.setVisibility(View.VISIBLE);restoreTools.setVisibility(View.GONE);floatingSave.setVisibility(View.GONE);});
   full.setContentView(root);
   full.setOnDismissListener(d->{
    int maxX=Math.max(0,canvasFrame.getWidth()-floatingProfile.getWidth()),maxY=Math.max(0,canvasFrame.getHeight()-floatingProfile.getHeight());
