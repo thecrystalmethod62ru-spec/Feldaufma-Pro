@@ -780,13 +780,23 @@ public class MainActivity extends Activity {
   int count=oldRoute.vertices.size();
   if(count<2||count>newRoute.vertices.size())return null;
   double[][] stations=new double[2][count];
+  int cursor=0;double newStation=0;
   for(int i=0;i<count;i++){
-   RouteSketch.Vertex a=oldRoute.vertices.get(i),b=newRoute.vertices.get(i);
-   if(!a.hasStoredId||!b.hasStoredId||!java.util.Objects.equals(a.id,b.id))return null;
+   RouteSketch.Vertex a=oldRoute.vertices.get(i);
+   if(!a.hasStoredId)return null;
    if(i>0){
-    if(!Double.isFinite(a.metres)||!Double.isFinite(b.metres)||a.metres<=0||b.metres<=0)return null;
-    stations[0][i]=stations[0][i-1]+a.metres;stations[1][i]=stations[1][i-1]+b.metres;
+    if(!Double.isFinite(a.metres)||a.metres<=0)return null;
+    stations[0][i]=stations[0][i-1]+a.metres;
    }
+   while(cursor<newRoute.vertices.size()){
+    RouteSketch.Vertex b=newRoute.vertices.get(cursor);
+    if(cursor>0){if(!Double.isFinite(b.metres)||b.metres<=0)return null;newStation+=b.metres;}
+    if(b.hasStoredId&&java.util.Objects.equals(a.id,b.id))break;
+    if(i==0)return null;
+    cursor++;
+   }
+   if(cursor>=newRoute.vertices.size())return null;
+   stations[1][i]=newStation;cursor++;
   }
   return stations;
  }
