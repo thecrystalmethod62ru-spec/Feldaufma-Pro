@@ -1335,10 +1335,10 @@ public class MainActivity extends Activity {
  void saveReferenceSection(RouteSketch route,double from,double to,double ww,double dd,String type,boolean recut,double total,double leftCut,double rightCut)throws Exception{
    if(!Double.isFinite(from)||!Double.isFinite(to)||from<0||to<=from||!Double.isFinite(ww)||!Double.isFinite(dd)||!Double.isFinite(total)||ww<=0||dd<=0||total<ww)throw new IllegalArgumentException("Ungültige Maße");
    if(recut&&(!Double.isFinite(leftCut)||!Double.isFinite(rightCut)||leftCut<0||rightCut<0))throw new IllegalArgumentException("Ungültiger Rückschnitt");
-   JSONArray next=new JSONArray(segments.toString());JSONObject row=null;for(int j=0;j<next.length();j++){JSONObject p=next.getJSONObject(j);double a=p.getDouble("from"),b=p.getDouble("to");if(a==from&&b==to)row=p;else if(from<b&&to>a)throw new IllegalArgumentException("Oberflächenabschnitte überlappen");}
+   JSONArray next=new JSONArray(segments.toString());JSONObject row=null;for(int j=0;j<next.length();j++){JSONObject p=next.getJSONObject(j);double a=p.getDouble("from"),b=p.getDouble("to");if(Math.abs(a-from)<1e-6&&Math.abs(b-to)<1e-6)row=p;else if(from<b&&to>a)throw new IllegalArgumentException("Oberflächenabschnitte überlappen");}
    if(row==null){row=new JSONObject().put("from",from).put("to",to);next.put(row);}
    if(type.isEmpty())throw new IllegalArgumentException("Oberfläche eingeben");
-   row.put("width",ww).put("surface",type);
+   row.put("from",from).put("to",to).put("width",ww).put("surface",type);
    if(recut){double extra=total-ww,ratio=leftCut+rightCut>0?leftCut/(leftCut+rightCut):0.5;row.put("left",extra*ratio).put("right",extra*(1-ratio)).put("cutWidth",total);}else{row.remove("left");row.remove("right");row.remove("cutWidth");}
    PipeLayoutStore store=new PipeLayoutStore(getPreferences(0));java.util.List<PipeLayout.Pipe> pipes=store.load();JSONArray profiles=store.sections();for(int j=0;j<profiles.length();j++){JSONObject p=profiles.getJSONObject(j);if(p.optDouble("from")==from&&p.optDouble("to")==to){pipes=PipeLayoutStore.decode(p.getJSONArray("pipes").toString());break;}}
    store.saveSectionWithSurfaces(from,to,ww,dd,pipes,next);segments=next;showSegments();refreshStationLayers();route.setStationLayers(route.stationObjects,segments);if(route.changed!=null)route.changed.run();refreshMainQuantities();refreshDetailQuantities();
