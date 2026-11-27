@@ -532,6 +532,38 @@ final class RouteSketch extends View {
  }
  private android.location.Location liveFix;
  JSONArray independentGpsTrack=new JSONArray();
+ String gpsTrackComparison(){
+  if(vertices.size()<2||independentGpsTrack.length()<2)return "Mindestens zwei Punkte je Trasse erforderlich.";
+  java.util.ArrayList<PointF> gps=new java.util.ArrayList<>();
+  double gpsLength=0,planLength=0;
+  org.json.JSONObject last=null;
+  for(int i=0;i<independentGpsTrack.length();i++){
+   org.json.JSONObject row=independentGpsTrack.optJSONObject(i);
+   if(row==null)return "Ungültige GPS-Spur.";
+   PointF p=gpsPosition(row.optDouble("lat"),row.optDouble("lon"),-1);
+   if(p==null)return "GPS-Spur nicht vollständig kalibriert oder außerhalb des Plans.";
+   if(last!=null){float[] d=new float[1];android.location.Location.distanceBetween(last.optDouble("lat"),last.optDouble("lon"),row.optDouble("lat"),row.optDouble("lon"),d);gpsLength+=d[0];planLength+=distance(gps.get(gps.size()-1),p);}
+   gps.add(p);last=row;
+  }
+  if(planLength<=0||gpsLength<=0)return "GPS-Spur zu kurz.";
+  double factor=gpsLength/planLength;
+  java.util.ArrayList<PointF> manual=new java.util.ArrayList<>();for(Vertex v:vertices)manual.add(v.point);
+  double[] forward=sampleDeviation(gps,manual,factor),reverse=sampleDeviation(manual,gps,factor);
+  return String.format(Locale.GERMANY,"GPS → manuell: Ø %.2f m · Max. %.2f m\nManuell → GPS: Ø %.2f m · Max. %.2f m\nGPS-Länge: %.2f m\nStichproben alle ca. 1 m (max. 10000 je Richtung). Näherungswerte, kein Vermessungsnachweis.",forward[0],forward[1],reverse[0],reverse[1],gpsLength);
+ }
+ private double[] sampleDeviation(java.util.List<PointF> from,java.util.List<PointF> to,double factor){
+  double length=0;for(int i=1;i<from.size();i++)length+=distance(from.get(i-1),from.get(i));
+  double step=Math.max(1/factor,length/9999);double sum=0,max=0;int count=0;double next=0,offset=0;
+  for(int i=1;i<from.size();i++){
+   PointF a=from.get(i-1),b=from.get(i);double len=distance(a,b);if(len<=0)continue;
+   while(next<=offset+len&&count<10000){
+    double f=Math.max(0,Math.min(1,(next-offset)/len));PointF p=new PointF((float)(a.x+f*(b.x-a.x)),(float)(a.y+f*(b.y-a.y)));
+    double best=Double.POSITIVE_INFINITY;for(int j=1;j<to.size();j++)best=Math.min(best,distanceToLine(p,to.get(j-1),to.get(j)));
+    best*=factor;sum+=best;max=Math.max(max,best);count++;next+=step;
+   }offset+=len;
+  }
+  return new double[]{count==0?0:sum/count,max};
+ }
  void setIndependentGpsTrack(JSONArray rows){independentGpsTrack=rows==null?new JSONArray():rows;invalidate();}
  void drawIndependentGpsTrack(Canvas c,float density){
   if(!layerVisible(LAYER_GPS_TRACK)||independentGpsTrack.length()==0)return;
