@@ -1593,13 +1593,11 @@ public class MainActivity extends Activity {
   collapseProfile.setOnClickListener(v->{boolean hide=resizeProfile.getVisibility()==View.VISIBLE;if(hide){profilePlaceholder.setVisibility(View.GONE);floatingCross.setVisibility(View.GONE);}else updateFloatingCross.run();resizeProfile.setVisibility(hide?View.GONE:View.VISIBLE);collapseProfile.setText(hide?"+":"−");});
   sectionPosition.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){floatingTitle.setText(selectedSection[0]<0?"Regelprofil":String.format(java.util.Locale.GERMANY,"Regelprofil · A%02d",selectedSection[0]+1));if(resizeProfile.getVisibility()==View.VISIBLE)updateFloatingCross.run();}public void afterTextChanged(android.text.Editable e){}});
 
-  LinearLayout profilePage=new LinearLayout(this);profilePage.setOrientation(1);profilePage.setBackgroundColor(Color.BLACK);profilePage.setVisibility(View.GONE);
-  TextView profilePageTitle=sheetText("Regelprofil",16,true);profilePageTitle.setTextColor(Color.WHITE);profilePageTitle.setPadding(dp(8),dp(6),dp(8),dp(6));profilePage.addView(profilePageTitle);
-  LinearLayout profileWork=new LinearLayout(this);profileWork.setOrientation(0);profilePage.addView(profileWork,new LinearLayout.LayoutParams(-1,0,1));profileWork.setPadding(dp(6),dp(4),dp(6),dp(4));
-  PipeLayoutView fullCross=new PipeLayoutView(this);profileWork.addView(fullCross,new LinearLayout.LayoutParams(-1,0,3));profileWork.setOrientation(LinearLayout.VERTICAL);
-  LinearLayout profileInfo=new LinearLayout(this);profileInfo.setOrientation(1);profileInfo.setPadding(dp(8),dp(8),dp(8),dp(8));android.graphics.drawable.GradientDrawable parameterFrame=editorShape(0xff041012,8);parameterFrame.setStroke(dp(1),0xff008b93);profileInfo.setBackground(parameterFrame);
-  ScrollView profileInfoScroll=new ScrollView(this);profileInfoScroll.addView(profileInfo);profileInfoScroll.setFillViewport(true);profileWork.addView(profileInfoScroll,new LinearLayout.LayoutParams(-1,0,2));
-  ProfileResponsiveLayout.bind(profileWork,fullCross,profileInfoScroll);
+  ProfilePageLayout profileLayout=new ProfilePageLayout(this);
+  LinearLayout profilePage=profileLayout.profilePage,profileWork=profileLayout.profileWork,profileInfo=profileLayout.profileInfo;
+  TextView profilePageTitle=profileLayout.profilePageTitle;
+  PipeLayoutView fullCross=profileLayout.fullCross;
+  ScrollView profileInfoScroll=profileLayout.profileInfoScroll;
   TextView profileDimensions=sheetText("",14,true);profileDimensions.setTextColor(0xff28d5c7);TextView parameterTitle=sheetText("PARAMETER",12,true);parameterTitle.setTextColor(0xff28d5c7);profileInfo.addView(parameterTitle);profileInfo.addView(profileDimensions);profileDimensions.setPadding(dp(8),dp(10),dp(8),dp(10));android.graphics.drawable.GradientDrawable dimensionFrame=editorShape(Color.BLACK,4);dimensionFrame.setStroke(dp(1),0xff008b93);profileDimensions.setBackground(dimensionFrame);
   TextView profileMaterial=sheetText("",12,false);profileMaterial.setTextColor(0xffcbd6d5);profileInfo.addView(profileMaterial);profileMaterial.setPadding(dp(8),dp(10),dp(8),dp(10));
   LinearLayout profileLegend=ProfileLegend.create(this);profileInfo.addView(profileLegend);
