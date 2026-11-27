@@ -1130,7 +1130,7 @@ final class RouteSketch extends View {
    if(!Double.isFinite(w)||w<=0)w=getContext().getSharedPreferences("base_profile_defaults",0).getFloat("width",0.4f);
    if(!Double.isFinite(w)||w<=0)w=0.4;
    float sw=(float)Math.max(2*density,Math.min(24*density*w/0.4,Math.max(getWidth(),getHeight())*2.0));
-   Path draft=new Path();PointF first=stroke.get(0);draft.moveTo(left()+scale()*first.x,top()+scale()*first.y);
+   android.graphics.Path draft=new android.graphics.Path();PointF first=stroke.get(0);draft.moveTo(left()+scale()*first.x,top()+scale()*first.y);
    for(int i=1;i<stroke.size();i++){PointF pt=stroke.get(i);draft.lineTo(left()+scale()*pt.x,top()+scale()*pt.y);}
    Paint previewPaint=new Paint(Paint.ANTI_ALIAS_FLAG);previewPaint.setStyle(Paint.Style.STROKE);previewPaint.setStrokeJoin(Paint.Join.ROUND);previewPaint.setStrokeCap(Paint.Cap.ROUND);
    previewPaint.setColor(0xff00e5ee);previewPaint.setStrokeWidth(sw+3*density);c.drawPath(draft,previewPaint);
