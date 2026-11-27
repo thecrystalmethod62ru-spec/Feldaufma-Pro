@@ -38,6 +38,9 @@ public final class PipeLayoutStore {
             throw new IllegalStateException("Rohrprofil konnte nicht gespeichert werden");
     }
     public void saveSection(double from,double to,double width,double depth,List<PipeLayout.Pipe> pipes) throws JSONException {
+        saveSectionWithSurfaces(from,to,width,depth,pipes,null);
+    }
+    void saveSectionWithSurfaces(double from,double to,double width,double depth,List<PipeLayout.Pipe> pipes,JSONArray surfaces) throws JSONException {
         if(!Double.isFinite(from)||!Double.isFinite(to)||from<0||to<=from||!Double.isFinite(width)||width<=0||!Double.isFinite(depth)||depth<=0)
             throw new IllegalArgumentException("Ungültige Abschnittsmaße");
         JSONArray old=new JSONArray(prefs.getString(SECTION_KEY,"[]")), next=new JSONArray();
@@ -49,7 +52,9 @@ public final class PipeLayoutStore {
             next.put(row);
         }
         JSONObject row=new JSONObject();row.put("from",from);row.put("to",to);row.put("width",width);row.put("depth",depth);row.put("pipes",encode(pipes));next.put(row);
-        if(!prefs.edit().putString(SECTION_KEY,next.toString()).commit())throw new IllegalStateException("Abschnitt konnte nicht gespeichert werden");
+        SharedPreferences.Editor editor=prefs.edit().putString(SECTION_KEY,next.toString());
+        if(surfaces!=null)editor.putString("segments",surfaces.toString());
+        if(!editor.commit())throw new IllegalStateException("Abschnitt konnte nicht gespeichert werden");
     }
     public void deleteSection(double from,double to) throws JSONException {
         JSONArray rows=sections(),next=new JSONArray();boolean found=false;
