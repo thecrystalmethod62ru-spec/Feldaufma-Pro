@@ -56,6 +56,15 @@ jobs:
           script: |
             adb shell cmd overlay enable-exclusive --user current --category com.android.internal.systemui.navbar.threebutton
             gradle :app:connectedDebugAndroidTest --rerun-tasks --stacktrace
+            mkdir -p ui-screenshots
+            adb shell run-as de.feldaufmass.pro ls files/ui-screenshots
+            for name in 01-start-menu 02-normal-portrait 03-normal-landscape 04-full-portrait 05-full-landscape; do adb exec-out run-as de.feldaufmass.pro cat files/ui-screenshots/$name.png > ui-screenshots/$name.png; done
+      - name: Upload real UI screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-16-UI-screenshots
+          path: ui-screenshots/*.png
+          if-no-files-found: error
       - name: Report Android test failures
         if: failure()
         shell: python
