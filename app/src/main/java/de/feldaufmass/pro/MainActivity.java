@@ -374,13 +374,13 @@ public class MainActivity extends Activity {
    runOnUiThread(()->{
     if(isDestroyed()||isFinishing())return;
     progress.dismiss();if(!project.equals(activeProject))return;
-    new android.app.AlertDialog.Builder(this).setTitle("Trassenvergleich").setMessage(message).setNeutralButton("Abweichungen anzeigen",(d,w)->applyDrawingLayers(drawingLayers()|RouteSketch.LAYER_GPS_TRACK|RouteSketch.LAYER_ROUTE|RouteSketch.LAYER_GPS_DEVIATIONS)).setPositiveButton("Schließen",null).show();
+    new android.app.AlertDialog.Builder(this,android.R.style.Theme_Material_Dialog_Alert).setTitle("Trassenvergleich").setMessage(message).setNeutralButton("Abweichungen anzeigen",(d,w)->applyDrawingLayers(drawingLayers()|RouteSketch.LAYER_GPS_TRACK|RouteSketch.LAYER_ROUTE|RouteSketch.LAYER_GPS_DEVIATIONS)).setPositiveButton("Schließen",null).show();
    });
   }).start();
  }
  void showGpsTrackControls(){
   org.json.JSONArray rows=gpsTrack();
-  new android.app.AlertDialog.Builder(this).setTitle("GPS-Aufzeichnung").setMessage((recordingGpsTrack?"Aufzeichnung aktiv":"Aufzeichnung gestoppt")+" · "+rows.length()+" Punkte\nUnabhängig von der manuellen Trasse.")
+  new android.app.AlertDialog.Builder(this,android.R.style.Theme_Material_Dialog_Alert).setTitle("GPS-Aufzeichnung").setMessage((recordingGpsTrack?"Aufzeichnung aktiv":"Aufzeichnung gestoppt")+" · "+rows.length()+" Punkte\nUnabhängig von der manuellen Trasse.")
    .setPositiveButton(recordingGpsTrack?"Stoppen":"Fortsetzen",(d,w)->{
     if(recordingGpsTrack){recordingGpsTrack=false;return;}
     if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=android.content.pm.PackageManager.PERMISSION_GRANTED){notice("Bitte zuerst GPS-Berechtigung erteilen.");return;}
@@ -5608,13 +5608,14 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   if(index<0||livePreview==null)return;
   RouteSketch.Vertex point=route.vertices.get(index);
   final String id=point.id;
-  android.widget.PopupMenu menu=new android.widget.PopupMenu(this,livePreview);
+  android.widget.PopupMenu menu=new android.widget.PopupMenu(new android.view.ContextThemeWrapper(this,android.R.style.Theme_Material),livePreview);
   menu.getMenu().add(0,0,0,point.name.isEmpty()?"Trassenpunkt "+(index+1):point.name).setEnabled(false);
   if(Double.isFinite(point.latitude)&&Double.isFinite(point.longitude)){
    menu.getMenu().add(0,10,1,String.format(java.util.Locale.GERMANY,"%.7f° / %.7f°",point.latitude,point.longitude)).setEnabled(false);
    menu.getMenu().add(0,11,2,Double.isFinite(point.accuracy)?String.format(java.util.Locale.GERMANY,"GPS ± %.2f m",point.accuracy):"GPS: Genauigkeit unbekannt").setEnabled(false);
   }else menu.getMenu().add(0,10,1,"Keine GPS-Koordinaten").setEnabled(false);
   menu.getMenu().add(0,12,3,"GPS-Aufzeichnung");
+  menu.getMenu().add(0,13,4,"Trassenvergleich");
   menu.getMenu().add(0,1,4,"GPS-Punkt zuordnen");
   menu.getMenu().add(0,2,4,"Foto aufnehmen");
   menu.getMenu().add(0,3,5,"Punkt umbenennen");
@@ -5623,6 +5624,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   for(int i=0;i<point.photos.length();i++)menu.getMenu().add(0,100+i,8+i,"Foto "+(i+1)+" · Details");
   menu.setOnMenuItemClickListener(item->{switch(item.getItemId()){
    case 12:showGpsTrackControls();return true;
+   case 13:showGpsTrackComparison();return true;
    case 1:assignGps(id);return true;
    case 2:selectedPoint=id;capturePhoto();return true;
    case 3:renamePoint(id,null);return true;
