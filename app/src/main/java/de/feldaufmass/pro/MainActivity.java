@@ -511,18 +511,33 @@ public class MainActivity extends Activity {
   notice("Trasse konnte nicht gespeichert werden. Bitte erneut versuchen.");return false;
  }
  void chooseRouteUnderlay(){
-  new android.app.AlertDialog.Builder(this).setTitle("Handskizze als Zeichenvorlage")
-   .setMessage("Bild wird als Hintergrund im Trasseneditor gespeichert. Vorhandene Punkte und Maße bleiben unverändert. Keine automatische Maßstabsberechnung.")
-   .setNegativeButton("Abbrechen",null).setPositiveButton("Bild auswählen",(d,w)->{
-    android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.setType("image/*");startActivityForResult(i,427);
+  new android.app.AlertDialog.Builder(this).setTitle("Zeichnungsunterlage – PDF / Foto")
+   .setMessage("PDF-Seite oder Foto als Hintergrund verwenden. Trasse und Maße bleiben unverändert. Maßstab bei Bedarf kalibrieren.")
+   .setNegativeButton("Abbrechen",null).setPositiveButton("Datei auswählen",(d,w)->{
+    android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.setType("*/*");i.putExtra(android.content.Intent.EXTRA_MIME_TYPES,new String[]{"image/*","application/pdf"});startActivityForResult(i,427);
    }).show();
  }
  void importRouteUnderlay(android.net.Uri uri){
+  String mime=getContentResolver().getType(uri);
+  if("application/pdf".equals(mime)||(uri.getLastPathSegment()!=null&&uri.getLastPathSegment().toLowerCase(java.util.Locale.ROOT).endsWith(".pdf"))){
+   try(android.os.ParcelFileDescriptor fd=getContentResolver().openFileDescriptor(uri,"r");android.graphics.pdf.PdfRenderer pdf=new android.graphics.pdf.PdfRenderer(fd)){
+    int count=pdf.getPageCount();if(count==0){notice("PDF enthält keine Seiten.");return;}
+    if(count==1){importRouteUnderlay(uri,0);return;}
+    String[] labels=new String[count];for(int k=0;k<count;k++)labels[k]="Blatt "+(k+1);
+    new android.app.AlertDialog.Builder(this).setTitle("PDF-Blatt auswählen").setItems(labels,(d,k)->importRouteUnderlay(uri,k)).setNegativeButton("Abbrechen",null).show();
+   }catch(Exception e){notice("PDF konnte nicht geöffnet werden.");}
+  }else importRouteUnderlay(uri,-1);
+ }
+ void importRouteUnderlay(android.net.Uri uri,int pdfPage){
   String projectId=activeProject;String original=getPreferences(0).getString("routeUnderlay","");
   new Thread(()->{
    java.io.File file=null;android.graphics.Bitmap bitmap=null;
    try{
-    bitmap=imageForOcr(uri);if(bitmap==null)throw new java.io.IOException("Bild nicht lesbar");
+    if(pdfPage<0)bitmap=imageForOcr(uri);else{
+     try(android.os.ParcelFileDescriptor fd=getContentResolver().openFileDescriptor(uri,"r");android.graphics.pdf.PdfRenderer pdf=new android.graphics.pdf.PdfRenderer(fd);android.graphics.pdf.PdfRenderer.Page page=pdf.openPage(pdfPage)){
+      double scale=3000.0/Math.max(page.getWidth(),page.getHeight());bitmap=android.graphics.Bitmap.createBitmap(Math.max(1,(int)(page.getWidth()*scale)),Math.max(1,(int)(page.getHeight()*scale)),android.graphics.Bitmap.Config.ARGB_8888);bitmap.eraseColor(Color.WHITE);page.render(bitmap,null,null,android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+     }
+    }if(bitmap==null)throw new java.io.IOException("Bild nicht lesbar");
     java.io.File dir=new java.io.File(getFilesDir(),"photos");if(!dir.isDirectory()&&!dir.mkdirs())throw new java.io.IOException("Bildordner fehlt");
     file=java.io.File.createTempFile("vorlage_",".png",dir);
     try(java.io.OutputStream out=new java.io.FileOutputStream(file)){if(!bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out))throw new java.io.IOException("Bild konnte nicht gespeichert werden");}
@@ -530,7 +545,7 @@ public class MainActivity extends Activity {
     runOnUiThread(()->{
      if(isDestroyed()||isFinishing()||!projectId.equals(activeProject)||!original.equals(getPreferences(0).getString("routeUnderlay",""))){saved.delete();return;}
      if(!getPreferences(0).edit().putString("routeUnderlay",saved.getName()).commit()){saved.delete();notice("Vorlage konnte nicht gespeichert werden.");return;}
-     recordProjectEvent("Zeichenvorlage geändert");editRoute(false);
+     recordProjectEvent("Zeichenvorlage geändert");editRoute(false,true);
     });
    }catch(Exception e){if(file!=null)file.delete();runOnUiThread(()->{if(!isDestroyed())notice("Vorlage konnte nicht geladen werden.");});}
    finally{if(bitmap!=null)bitmap.recycle();}
@@ -3557,7 +3572,7 @@ public class MainActivity extends Activity {
   menu.getMenu().add(0,113,Menu.NONE,"Nachtragsmanagement");
   menu.getMenu().add(0,114,Menu.NONE,"PDF-Unterlagen analysieren");
   menu.getMenu().add(0,115,Menu.NONE,"Foto / Handskizze analysieren");
-  menu.getMenu().add(0,116,Menu.NONE,"Handskizze als Zeichenvorlage");
+  menu.getMenu().add(0,116,Menu.NONE,"Zeichnungsunterlage – PDF / Foto");
   menu.getMenu().add(0,117,Menu.NONE,"Bluetooth-Messgerät (Test)");
   menu.getMenu().add(0,118,Menu.NONE,"Rohrleitungsbau – Montage");
   menu.getMenu().add(0,119,Menu.NONE,"Tiefbau – Maßstäbliche Vorschau");
@@ -3631,6 +3646,7 @@ public class MainActivity extends Activity {
  Button persistentSave=actionButtonSingle(dock,"Speichern",()->{if(calculate())Toast.makeText(this,"Gespeichert",Toast.LENGTH_SHORT).show();});
  persistentSave.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(52)));
  actionButtonSingle(planPage,"Zeichnungsebenen",()->showDrawingLayers());
+ actionButtonSingle(planPage,"Zeichnungsunterlage – PDF / Foto",()->chooseRouteUnderlay());
  routePreviewBox=page();planPage.addView(routePreviewBox);
  routeSummary=sheetText("",15,false);planPage.addView(routeSummary);
  LinearLayout actions=new LinearLayout(this);planPage.addView(actions);
