@@ -396,6 +396,7 @@ public class MainActivity extends Activity {
  }
  void readGpsImport(android.net.Uri uri){
   final String project=activeProject;
+  final String original=getPreferences(0).getString("importedGpsReference","");
   new Thread(()->{
    try(java.io.InputStream in=getContentResolver().openInputStream(uri)){
     if(in==null)throw new java.io.IOException("Datei fehlt");
@@ -414,8 +415,9 @@ public class MainActivity extends Activity {
     }
     if(rows.length()<2)throw new java.io.IOException("Mindestens zwei Punkte erforderlich");
     runOnUiThread(()->{if(isFinishing()||isDestroyed()||!project.equals(activeProject))return;
+     if(!original.equals(getPreferences(0).getString("importedGpsReference",""))){notice("Referenz geändert. Bitte erneut importieren.");return;}
      new android.app.AlertDialog.Builder(this,android.R.style.Theme_Material_Dialog_Alert).setTitle("GPX-Vorschau").setMessage(rows.length()+" Punkte. Genauigkeit unbekannt. "+(importedGpsReference().length()>0?"Vorhandene GPX-Referenz ersetzen?":"Import als separate Referenz?")).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",(d,w)->{
-      if(!project.equals(activeProject))return;
+      if(!project.equals(activeProject)||!original.equals(getPreferences(0).getString("importedGpsReference",""))){notice("Referenz oder Projekt geändert. Bitte erneut importieren.");return;}
       if(getPreferences(0).edit().putString("importedGpsReference",rows.toString()).commit()){if(livePreview!=null)livePreview.setImportedGpsReference(rows);applyDrawingLayers(drawingLayers()|RouteSketch.LAYER_GPS_REFERENCE);notice("GPX-Referenz gespeichert.");}else notice("GPX konnte nicht gespeichert werden.");
      }).show();
     });
