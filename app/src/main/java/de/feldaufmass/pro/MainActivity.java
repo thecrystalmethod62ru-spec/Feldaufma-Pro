@@ -297,12 +297,20 @@ public class MainActivity extends Activity {
   LinearLayout content=page();content.setPadding(0,0,0,0);content.setBackgroundColor(Color.BLACK);scroll.addView(content);
   TextView brand=sheetText("Feldaufmaß Pro",26,true);android.text.SpannableString brandText=new android.text.SpannableString("Feldaufmaß Pro");brandText.setSpan(new android.text.style.ForegroundColorSpan(0xff26d9d0),11,14,0);brand.setText(brandText);content.addView(brand);
   TextView subtitle=sheetText("Tiefbau · Leitungsbau",14,false);subtitle.setTextColor(0xff9aabaa);content.addView(subtitle);
-  TextView heading=sheetText("Projekte",20,true);heading.setPadding(0,dp(18),0,dp(8));content.addView(heading);
+  View space=new View(this);content.addView(space,new LinearLayout.LayoutParams(-1,dp(12)));
   overviewAction(content,"Neues Projekt erstellen","objects",()->newProjectDialog());
   Button create=(Button)content.getChildAt(content.getChildCount()-1);
   create.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x33ffffff),proButtonShape(true),null));
-  overviewAction(content,"Bestehendes Projekt öffnen","layers",()->showProjects());
-  TextView recent=sheetText("Vorhandene Projekte",18,true);recent.setPadding(0,dp(16),0,dp(6));content.addView(recent);
+  LinearLayout shortcuts=new LinearLayout(this);shortcuts.setGravity(Gravity.CENTER);content.addView(shortcuts,new LinearLayout.LayoutParams(-1,-2));
+  String[] shortcutNames={"Zeichnung","Regelprofil","Mengen","PDF"},shortcutIcons={"ruler","layers","sections","document"};
+  for(int j=0;j<shortcutNames.length;j++){
+   Button shortcut=new Button(this);styleEditorButton(shortcut,false);compactToolIcon(shortcut,shortcutNames[j],shortcutIcons[j]);
+   LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(0,dp(64),1);sp.setMargins(dp(2),dp(4),dp(2),dp(4));shortcuts.addView(shortcut,sp);
+   shortcut.setOnClickListener(v->showProjects());
+  }
+  LinearLayout recentHeader=new LinearLayout(this);recentHeader.setGravity(Gravity.CENTER_VERTICAL);recentHeader.setPadding(0,dp(12),0,dp(4));content.addView(recentHeader);
+  recentHeader.addView(sheetText("Projekte",17,true),new LinearLayout.LayoutParams(0,-2,1));
+  Button all=new Button(this);styleEditorButton(all,false);all.setText("Alle anzeigen ›");all.setTextColor(0xff26d9d0);all.setOnClickListener(v->showProjects());recentHeader.addView(all,new LinearLayout.LayoutParams(-2,dp(44)));
   java.util.ArrayList<String> ids=new java.util.ArrayList<>(projectRegistry().getStringSet("ids",java.util.Collections.emptySet()));
   ids.remove(LEGACY_PROJECT);
   java.util.Collections.sort(ids,(a,b)->projectStorage(a).getString("project","").compareToIgnoreCase(projectStorage(b).getString("project","")));
@@ -1143,6 +1151,7 @@ public class MainActivity extends Activity {
     c.save();c.translate(getBounds().left,getBounds().top);c.scale(getBounds().width()/24f,getBounds().height()/24f);
     p.setColor(Color.WHITE);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(1.7f);p.setStrokeCap(Paint.Cap.ROUND);p.setStrokeJoin(Paint.Join.ROUND);
     switch(kind){
+     case "document":c.drawRoundRect(5,3,19,21,2,2,p);for(int yy=8;yy<=16;yy+=4)c.drawLine(8,yy,16,yy,p);break;
      case "save":c.drawRoundRect(4,3,20,21,2,2,p);c.drawRect(8,3,16,9,p);c.drawRect(8,13,16,21,p);break;
      case "back":c.drawLine(15,5,8,12,p);c.drawLine(8,12,15,19,p);break;
      case "map":{android.graphics.Path map=new android.graphics.Path();map.moveTo(3,5);map.lineTo(9,3);map.lineTo(15,6);map.lineTo(21,3);map.lineTo(21,19);map.lineTo(15,22);map.lineTo(9,19);map.lineTo(3,21);map.close();c.drawPath(map,p);c.drawLine(9,3,9,19,p);c.drawLine(15,6,15,22,p);break;}
