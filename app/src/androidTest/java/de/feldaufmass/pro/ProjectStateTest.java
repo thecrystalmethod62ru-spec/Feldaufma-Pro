@@ -100,6 +100,33 @@ public class ProjectStateTest {
    });
   }
  }
+ @Test public void utilityPlanLayerAndBackupPreserveSeparatePlanSheets(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->{
+    String source=java.util.UUID.randomUUID().toString(),target=java.util.UUID.randomUUID().toString();
+    java.util.List<File> created=new java.util.ArrayList<>();File zip=null,first=null,second=null;
+    try{
+     File folder=new File(activity.getFilesDir(),"photos");assertTrue(folder.isDirectory()||folder.mkdirs());
+     first=File.createTempFile("schachtschein_test_",".png",folder);second=File.createTempFile("schachtschein_test_",".png",folder);
+     android.graphics.Bitmap image=android.graphics.Bitmap.createBitmap(32,32,android.graphics.Bitmap.Config.ARGB_8888);
+     try{for(File file:new File[]{first,second})try(java.io.OutputStream out=new java.io.FileOutputStream(file)){assertTrue(image.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out));}}finally{image.recycle();}
+     org.json.JSONArray rows=new org.json.JSONArray();
+     for(File file:new File[]{first,second})rows.put(new org.json.JSONObject().put("file",file.getName()).put("name","Gas").put("x",.2).put("y",0).put("scale",1.5).put("rotation",15).put("alpha",120).put("visible",file==first));
+     android.content.SharedPreferences prefs=activity.projectStorage(source);assertTrue(prefs.edit().putString("project","Schachtscheine").putString(MainActivity.UTILITY_SHEETS_KEY,rows.toString()).commit());
+     zip=File.createTempFile("utility",".zip",activity.getCacheDir());activity.writeProjectBackup(zip,prefs.getAll());
+     try(java.io.InputStream in=new java.io.FileInputStream(zip)){activity.readProjectBackup(in,target,created);}
+     org.json.JSONArray copy=new org.json.JSONArray(activity.projectStorage(target).getString(MainActivity.UTILITY_SHEETS_KEY,"[]"));
+     assertEquals(2,copy.length());assertEquals(1.5,copy.getJSONObject(0).getDouble("scale"),0);
+     assertTrue(copy.getJSONObject(0).getBoolean("visible"));assertFalse(copy.getJSONObject(1).getBoolean("visible"));
+     assertNotEquals(first.getName(),copy.getJSONObject(0).getString("file"));
+     assertTrue(new File(folder,copy.getJSONObject(0).getString("file")).isFile());
+     RouteSketch sketch=new RouteSketch(activity,"[[0.1,0.2,null],[0.5,0.2,10]]");String before=sketch.encode();
+     sketch.setVisibleLayers(RouteSketch.LAYER_SCHACHTSCHEINE);assertTrue(sketch.layerVisible(RouteSketch.LAYER_SCHACHTSCHEINE));assertFalse(sketch.layerVisible(RouteSketch.LAYER_ROUTE));assertEquals(before,sketch.encode());
+    }catch(Exception e){throw new AssertionError(e);}
+    finally{if(zip!=null)zip.delete();if(first!=null)first.delete();if(second!=null)second.delete();for(File file:created)file.delete();activity.deleteSharedPreferences("project_"+source);activity.deleteSharedPreferences("project_"+target);}
+   });
+  }
+ }
  @Test public void restoreMetricProjectWithPipesAndBranches(){
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    scenario.onActivity(activity->{
