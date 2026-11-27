@@ -697,7 +697,7 @@ final class RouteSketch extends View {
    org.json.JSONObject o=stationObjects.optJSONObject(j);if(o!=null)entries.put(o.optString("type","Objekt"),0xffa65e19);
   }
   for(Vertex v:vertices){
-   if(layerVisible(LAYER_GPS)&&Double.isFinite(v.latitude)&&Double.isFinite(v.longitude)){entries.put("GPS-Punkt ≤ 0,5 m",0xff43ce80);entries.put("GPS-Punkt > 0,5 bis 3 m",0xffffb74d);entries.put("GPS-Punkt > 3 m",0xffff6666);entries.put("GPS-Punkt unbekannt",0xff9299a3);}
+   if(layerVisible(LAYER_GPS)&&Double.isFinite(v.latitude)&&Double.isFinite(v.longitude)){entries.put("Hohe Genauigkeit (≤ 0,5 m)",0xff43ce80);entries.put("Mittlere Genauigkeit (> 0,5–3 m)",0xffffb74d);entries.put("Geringe Genauigkeit (> 3 m)",0xffff6666);entries.put("Unbekannt",0xff9299a3);}
    if(layerVisible(LAYER_PHOTOS)&&v.photos.length()>0)entries.put("Foto",0xff536c80);
   }
   return entries;
@@ -809,19 +809,14 @@ final class RouteSketch extends View {
    Vertex vertex=vertices.get(i);float px=left()+scale()*p.x,py=top()+scale()*p.y;
    if(layerVisible(LAYER_GPS)&&Double.isFinite(vertex.latitude)&&Double.isFinite(vertex.longitude)){
     int quality=gpsQualityColor(vertex.accuracy);
-    double metresPerUnit=uniformMetresPerUnit();
-    if(Double.isFinite(metresPerUnit)&&metresPerUnit>0&&Double.isFinite(vertex.accuracy)&&vertex.accuracy>0){
-     double radius=scale()*vertex.accuracy/metresPerUnit;
-     if(Double.isFinite(radius)&&radius>0&&radius<1000000){
-      paint.setStyle(Paint.Style.FILL);paint.setColor((quality&0x00ffffff)|0x18000000);c.drawCircle(px,py,(float)radius,paint);
-      paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(density);paint.setColor((quality&0x00ffffff)|0x88000000);c.drawCircle(px,py,(float)radius,paint);paint.setStyle(Paint.Style.FILL);
-     }
-    }
+    paint.setStyle(Paint.Style.FILL);paint.setColor(darkEditor?0xff080808:Color.WHITE);c.drawCircle(px,py,8*density,paint);
     paint.setColor(quality);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(2*density);c.drawCircle(px,py,8*density,paint);
-    paint.setStyle(Paint.Style.FILL);
-    paint.setTextSize(10*density);
+    paint.setStyle(Paint.Style.FILL);c.drawCircle(px,py,3*density,paint);
+    paint.setTextSize(11*density);paint.setTextAlign(Paint.Align.CENTER);
     String accuracy=Double.isFinite(vertex.accuracy)&&vertex.accuracy>0?String.format(Locale.GERMANY,"± %.1f m",vertex.accuracy):"GPS ?";
-    c.drawText(accuracy,px+10*density,py-10*density,paint);paint.setTextSize(13*density);
+    c.drawText(accuracy,px,py-15*density,paint);
+    paint.setColor(darkEditor?0xffdddddd:0xff173c42);c.drawText(String.format(Locale.ROOT,"P%02d",i+1),px,py+23*density,paint);
+    paint.setTextAlign(Paint.Align.LEFT);paint.setTextSize(13*density);
    }
    if(layerVisible(LAYER_PHOTOS)&&vertex.photos.length()>0){
     float x=px+8*density,y=py-15*density;paint.setColor(0xff536c80);c.drawRoundRect(x,y,x+22*density,y+12*density,3*density,3*density,paint);paint.setColor(Color.WHITE);paint.setTextSize(10*density);c.drawText("F"+vertex.photos.length(),x+3*density,y+10*density,paint);paint.setTextSize(13*density);
