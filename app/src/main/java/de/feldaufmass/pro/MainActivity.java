@@ -373,6 +373,7 @@ public class MainActivity extends Activity {
    if(!getPreferences(0).edit().putString("gpsRouteLayer",recording.snapshot().encode()).commit()){notice("GPS-Ebene konnte nicht gespeichert werden.");return;}
    if(route.vertices.isEmpty())new android.app.AlertDialog.Builder(this).setTitle("GPS-Ebene gespeichert").setMessage("GPS als Vorlage für eine neue manuelle Trasse übernehmen?").setNegativeButton("Nur GPS-Ebene",null).setPositiveButton("Übernehmen",(dd,ww)->{if(!recording.apply(route))notice("GPS-Trasse konnte nicht übernommen werden.");}).show();
    else notice("GPS-Ebene gespeichert. Manuelle Trasse unverändert.");
+   route.setVisibleLayers(route.visibleLayers|RouteSketch.LAYER_GPS_ROUTE);route.invalidate();
   }).create();
   Runnable tick=new Runnable(){public void run(){
    if(!dialog.isShowing()||!editor.isShowing()||isFinishing()||isDestroyed()){dialog.dismiss();return;}
@@ -406,8 +407,8 @@ public class MainActivity extends Activity {
   return mask;
  }
  void showDrawingLayers(){
-  String[] labels={"Leitungsverlauf / Punkte","Bemaßung","Punktnamen","GPS / Standort","Fotodokumentation","Objekte","Oberflächen","Oberflächenbemaßung"};
-  int[] masks={RouteSketch.LAYER_ROUTE,RouteSketch.LAYER_DIMENSIONS,RouteSketch.LAYER_NAMES,RouteSketch.LAYER_GPS,RouteSketch.LAYER_PHOTOS,RouteSketch.LAYER_OBJECTS,RouteSketch.LAYER_SURFACES,RouteSketch.LAYER_SURFACE_DIMENSIONS};
+  String[] labels={"Leitungsverlauf / Punkte","Bemaßung","Punktnamen","GPS / Standort","Fotodokumentation","Objekte","Oberflächen","Oberflächenbemaßung","GPS-Trasse"};
+  int[] masks={RouteSketch.LAYER_ROUTE,RouteSketch.LAYER_DIMENSIONS,RouteSketch.LAYER_NAMES,RouteSketch.LAYER_GPS,RouteSketch.LAYER_PHOTOS,RouteSketch.LAYER_OBJECTS,RouteSketch.LAYER_SURFACES,RouteSketch.LAYER_SURFACE_DIMENSIONS,RouteSketch.LAYER_GPS_ROUTE};
   boolean[] checked=new boolean[labels.length];int current=drawingLayers();
   for(int j=0;j<labels.length;j++)checked[j]=(current&masks[j])!=0;
   new android.app.AlertDialog.Builder(this).setTitle("Zeichnungsebenen")
