@@ -940,6 +940,32 @@ final class RouteSketch extends View {
  boolean darkEditor=false;
  boolean darkPreview=false;
  private boolean darkPalette(){return darkEditor||darkPreview;}
+ private void drawTrenchPlan(Canvas c,float density){
+  double base=trenchWidth;
+  if(!Double.isFinite(base)||base<=0)base=getContext().getSharedPreferences("base_profile_defaults",0).getFloat("width",0.4f);
+  if(!Double.isFinite(base)||base<=0)base=0.4;
+  JSONArray profiles=new JSONArray();
+  if(getContext() instanceof android.app.Activity)try{profiles=new PipeLayoutStore(((android.app.Activity)getContext()).getPreferences(0)).sections();}catch(Exception ignored){}
+  Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);p.setStrokeCap(Paint.Cap.ROUND);
+  double station=0;
+  for(int i=1;i<vertices.size();i++){
+   Vertex a=vertices.get(i-1),b=vertices.get(i);double len=b.metres,end=station+len,w=base;
+   if(Double.isFinite(end)&&len>0)for(int j=0;j<profiles.length();j++){
+    JSONObject row=profiles.optJSONObject(j);if(row==null)continue;
+    double candidate=row.optDouble("width");
+    if(Math.abs(row.optDouble("from")-station)<0.001&&Math.abs(row.optDouble("to")-end)<0.001&&Double.isFinite(candidate)&&candidate>0){w=candidate;break;}
+   }
+   double pixels=Math.hypot(b.point.x-a.point.x,b.point.y-a.point.y)*scale();
+   boolean measured=Double.isFinite(len)&&len>0;
+   float sw=(float)(measured?pixels*w/len:24*density*w/0.4);
+   if(!Float.isFinite(sw)||sw<=0)sw=24*density;
+   sw=Math.max(2*density,Math.min(sw,Math.max(getWidth(),getHeight())*2f));
+   float x1=left()+a.point.x*scale(),y1=top()+a.point.y*scale(),x2=left()+b.point.x*scale(),y2=top()+b.point.y*scale();
+   p.setColor(0xff78918a);p.setStrokeWidth(sw+2*density);c.drawLine(x1,y1,x2,y2,p);
+   p.setColor(0xff443b30);p.setStrokeWidth(sw);c.drawLine(x1,y1,x2,y2,p);
+   station=measured?end:Double.NaN;
+  }
+ }
  @Override protected void onDraw(Canvas c){
   c.drawColor(darkPalette()?Color.BLACK:Color.WHITE);
   drawUnderlay(c);
@@ -947,6 +973,7 @@ final class RouteSketch extends View {
   float density=getResources().getDisplayMetrics().density;
   paint.setTextSize(13*density);
   dimensionHits.clear();
+  if(darkEditor&&!printPlan&&layerVisible(LAYER_ROUTE))drawTrenchPlan(c,density);
   drawSurfaceSections(c,density);
   drawAsphaltCuts(c,density);
   drawShoring(c,density);
