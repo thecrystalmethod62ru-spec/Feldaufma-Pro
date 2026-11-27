@@ -6068,6 +6068,8 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
 
   android.widget.FrameLayout.LayoutParams barParams=new android.widget.FrameLayout.LayoutParams(Math.min(dp(280),Math.max(dp(160),getResources().getDisplayMetrics().widthPixels-dp(96))),-2,android.view.Gravity.TOP|android.view.Gravity.LEFT);
   workspace.addView(toolbar,barParams);android.widget.FrameLayout.LayoutParams zoomParams=new android.widget.FrameLayout.LayoutParams(dp(72),-2,android.view.Gravity.BOTTOM|android.view.Gravity.RIGHT);workspace.addView(resetProfileZoom,zoomParams);Button saveProfile=new Button(this);saveProfile.setText("Speichern");android.widget.FrameLayout.LayoutParams saveParams=new android.widget.FrameLayout.LayoutParams(-2,-2,android.view.Gravity.BOTTOM|android.view.Gravity.LEFT);workspace.addView(saveProfile,saveParams);resetProfileZoom.setTextSize(11);resetProfileZoom.setMinWidth(0);resetProfileZoom.setMinimumWidth(0);toolbar.addView(groupButton,new LinearLayout.LayoutParams(0,-2,1));groupButton.setMinWidth(0);groupButton.setMinimumWidth(0);groupButton.setPadding(0,0,0,0);groupButton.setTextSize(10);toolbar.setBackgroundColor(0xff303030);
+  for(Button tool:new Button[]{undoPosition,redoPosition,fullscreen,toggleControls,groupButton,resetProfileZoom,saveProfile}){styleEditorButton(tool,tool==saveProfile);tool.setMinHeight(dp(44));tool.setMinimumHeight(dp(44));}
+  toolbar.setBackground(editorShape(0xff202827,12));
   fullscreen.setTextSize(10);toggleControls.setTextSize(10);
   fullscreen.setPadding(dp(2),0,dp(2),0);toggleControls.setPadding(dp(2),0,dp(2),0);
   undoPosition.setPadding(0,0,0,0);redoPosition.setPadding(0,0,0,0);
