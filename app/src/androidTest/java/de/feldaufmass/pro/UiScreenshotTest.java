@@ -46,4 +46,15 @@ public class UiScreenshotTest {
  @Test public void normalLandscape() throws Exception {editor(false,true,"03-normal-landscape");}
  @Test public void fullPortrait() throws Exception {editor(true,false,"04-full-portrait");}
  @Test public void fullLandscape() throws Exception {editor(true,true,"05-full-landscape");}
+ @Test public void regelprofil() throws Exception {
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(a->{a.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);a.enterProject();});
+   android.os.SystemClock.sleep(1000);
+   scenario.onActivity(a->a.editRoute(false,false));
+   androidx.test.espresso.Espresso.onView(androidx.test.espresso.matcher.ViewMatchers.allOf(
+    androidx.test.espresso.matcher.ViewMatchers.withContentDescription("Regelprofil"),
+    androidx.test.espresso.matcher.ViewMatchers.isDisplayed())).perform(androidx.test.espresso.action.ViewActions.click());
+   capture("06-regelprofil");
+  }
+ }
 }
