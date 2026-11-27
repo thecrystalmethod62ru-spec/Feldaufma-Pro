@@ -77,6 +77,22 @@ public final class PipeLayoutStore {
         }
         return result;
     }
+    /** Split ranges at measured route vertices, preserving all profile attributes. */
+    static JSONArray splitAtStations(JSONArray rows,double[] stations) throws JSONException {
+        JSONArray result=new JSONArray();
+        for(int i=0;i<rows.length();i++){
+            JSONObject row=rows.getJSONObject(i);
+            double from=row.getDouble("from"),to=row.getDouble("to"),cursor=from;
+            if(!Double.isFinite(from)||!Double.isFinite(to)||to<=from)throw new IllegalArgumentException("Ungültiger Abschnitt");
+            for(double station:stations){
+                if(station<=cursor+1e-9||station>=to-1e-9)continue;
+                result.put(new JSONObject(row.toString()).put("from",cursor).put("to",station));
+                cursor=station;
+            }
+            result.put(new JSONObject(row.toString()).put("from",cursor).put("to",to));
+        }
+        return result;
+    }
     private static double remapStation(double value,double[] oldStations,double[] newStations){
         if(!Double.isFinite(value)||value<oldStations[0]||value>oldStations[oldStations.length-1])throw new IllegalArgumentException("Station außerhalb der Trasse");
         for(int i=1;i<oldStations.length;i++)if(value<=oldStations[i]){
