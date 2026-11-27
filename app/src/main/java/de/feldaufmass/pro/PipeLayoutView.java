@@ -59,13 +59,15 @@ public final class PipeLayoutView extends View {
     @Override protected void onDraw(Canvas c){
         super.onDraw(c);
         dimensionLabels.clear();
-        float pad=42*getResources().getDisplayMetrics().density;
+        float density=getResources().getDisplayMetrics().density;
+        float pad=Math.min(42*density,Math.min(getWidth(),getHeight())*.20f);
+        if(getWidth()<=0||getHeight()<=0)return;
         double extent=width/2+Math.max(cutLeft,cutRight),above=depth;
         for(PipeLayout.Pipe pipe:pipes){extent=Math.max(extent,Math.abs(pipe.offset)+pipe.diameter/2);above=Math.max(above,pipe.bedding+pipe.diameter);}
         scale=(float)Math.min((getWidth()-2*pad)/(2*extent),(getHeight()-2*pad)/above);
         if(dragged>=0&&dragScale>0){scale=dragScale;cx=dragCx;bottom=dragBottom;}
         else{cx=getWidth()/2f;bottom=getHeight()-pad;}
-        if(scale<=0)return;
+        if(!Float.isFinite(scale)||scale<=0)return;
         float left=cx-(float)(width*scale/2),right=cx+(float)(width*scale/2),top=bottom-(float)(depth*scale);
         texture(c,left,top,right,bottom,0xff674323,0xffa87949,false);
         p.setColor(0xff00e5ee);p.setStrokeWidth(1.5f);c.drawLine(left,top,right,top,p);
