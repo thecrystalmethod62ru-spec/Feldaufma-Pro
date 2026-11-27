@@ -327,6 +327,27 @@ public class ProjectStateTest {
   return new org.json.JSONObject().put("kind","segment").put("mode",mode).put("unit","m²").put("quantity",quantity)
    .put("snapshot",new org.json.JSONObject().put("from",from).put("to",to).toString());
  }
+ @Test public void surfaceReportsUseSameValuesInPdfAndDialogs(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->{
+    org.json.JSONArray original=activity.segments;double oldLength=activity.l,oldTop=activity.topThickness,oldBase=activity.base;String oldCover=activity.covering;
+    try{
+     activity.l=20;activity.covering="Asphalt";activity.topThickness=.12;activity.base=.2;
+     activity.segments=new org.json.JSONArray()
+      .put(new org.json.JSONObject().put("from",0).put("to",10).put("width",1).put("cutWidth",1.5).put("surface","Asphalt"))
+      .put(new org.json.JSONObject().put("from",10).put("to",20).put("width",1).put("surface","Pflaster"));
+     String area=activity.surfaceAreaReport(),volume=activity.surfaceVolumeReport(),pdf=activity.surfaceReportForExport();
+     assertTrue(area.contains("Nachschnitt zusätzlich: 5,000 m²"));
+     assertTrue(volume.contains("Deckschicht: 1,800 m³"));
+     assertTrue(volume.contains("Deckschichtstärke fehlt"));
+     assertTrue(pdf.contains(area));assertTrue(pdf.contains(volume));
+     activity.segments.put(new org.json.JSONObject().put("from",5).put("to",7).put("width",1));
+     assertTrue(activity.surfaceReportForExport().contains("Mengen offen"));
+    }catch(Exception e){throw new AssertionError(e);}
+    finally{activity.segments=original;activity.l=oldLength;activity.covering=oldCover;activity.topThickness=oldTop;activity.base=oldBase;}
+   });
+  }
+ }
  @Test public void shoringTotalsRemainOpenWhenSavedSectionsConflict(){
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    scenario.onActivity(activity->{
