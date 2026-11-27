@@ -5,6 +5,8 @@ import android.widget.*;
 import android.view.*;
 import android.graphics.*;
 import android.content.SharedPreferences;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 public class MainActivity extends Activity {
  static final String LEGACY_PROJECT="legacy";
@@ -1182,25 +1184,19 @@ public class MainActivity extends Activity {
   };
   icon.setBounds(0,0,dp(20),dp(20));button.setText(label);button.setContentDescription(label);button.setCompoundDrawables(null,icon,null,null);button.setCompoundDrawablePadding(dp(3));button.setGravity(Gravity.CENTER);button.setMinHeight(dp(52));button.setTextSize(12);
  }
- void editReferenceSection(RouteSketch route,int index,double from,double to,double initialWidth,double initialDepth,String material,double leftCut,double rightCut,int field){
-  LinearLayout form=page();EditText bw=new EditText(this),bd=new EditText(this),cut=new EditText(this);
-  for(EditText e:new EditText[]{bw,bd,cut})e.setInputType(8194);
-  bw.setText(String.valueOf(initialWidth));bd.setText(String.valueOf(initialDepth));cut.setText(String.valueOf(initialWidth+leftCut+rightCut));
-  form.addView(sheetText("Breite (B) · m",13,true));form.addView(bw);form.addView(sheetText("Tiefe (T) · m",13,true));form.addView(bd);
-  EditText surfaceType=new EditText(this);surfaceType.setSingleLine(true);surfaceType.setText(material);form.addView(sheetText("Oberfläche",13,true));form.addView(surfaceType);
-  CheckBox recut=new CheckBox(this);recut.setText("Rückschnitt");recut.setChecked(leftCut+rightCut>0);form.addView(recut);form.addView(sheetText("Gesamtbreite Rückschnitt (m)",13,true));form.addView(cut);cut.setEnabled(recut.isChecked());recut.setOnCheckedChangeListener((b,on)->cut.setEnabled(on));
-  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("A"+(index+1)+" · Abschnitt bearbeiten").setView(form).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
-  dialog.show();if(field==1)bw.requestFocus();else if(field==2)bd.requestFocus();else if(field==3)surfaceType.requestFocus();else if(field==5)cut.requestFocus();
-  dialog.getButton(-1).setOnClickListener(v->{try{
-   double ww=number(bw),dd=number(bd),total=recut.isChecked()?number(cut):ww;if(!Double.isFinite(ww)||!Double.isFinite(dd)||!Double.isFinite(total)||ww<=0||dd<=0||total<ww)throw new IllegalArgumentException("Ungültige Maße");
+ void saveReferenceSection(RouteSketch route,double from,double to,double ww,double dd,String type,boolean recut,double total,double leftCut,double rightCut)throws Exception{
+   if(!Double.isFinite(ww)||!Double.isFinite(dd)||!Double.isFinite(total)||ww<=0||dd<=0||total<ww)throw new IllegalArgumentException("Ungültige Maße");
    JSONArray next=new JSONArray(segments.toString());JSONObject row=null;for(int j=0;j<next.length();j++){JSONObject p=next.getJSONObject(j);double a=p.getDouble("from"),b=p.getDouble("to");if(a==from&&b==to)row=p;else if(from<b&&to>a)throw new IllegalArgumentException("Oberflächenabschnitte überlappen");}
    if(row==null){row=new JSONObject().put("from",from).put("to",to);next.put(row);}
-   String type=surfaceType.getText().toString().trim();if(type.isEmpty())throw new IllegalArgumentException("Oberfläche eingeben");
+   if(type.isEmpty())throw new IllegalArgumentException("Oberfläche eingeben");
    row.put("width",ww).put("surface",type);
-   if(recut.isChecked()){double extra=total-ww,ratio=leftCut+rightCut>0?leftCut/(leftCut+rightCut):0.5;row.put("left",extra*ratio).put("right",extra*(1-ratio)).put("cutWidth",total);}else{row.remove("left");row.remove("right");row.remove("cutWidth");}
+   if(recut){double extra=total-ww,ratio=leftCut+rightCut>0?leftCut/(leftCut+rightCut):0.5;row.put("left",extra*ratio).put("right",extra*(1-ratio)).put("cutWidth",total);}else{row.remove("left");row.remove("right");row.remove("cutWidth");}
    PipeLayoutStore store=new PipeLayoutStore(getPreferences(0));java.util.List<PipeLayout.Pipe> pipes=store.load();JSONArray profiles=store.sections();for(int j=0;j<profiles.length();j++){JSONObject p=profiles.getJSONObject(j);if(p.optDouble("from")==from&&p.optDouble("to")==to){pipes=PipeLayoutStore.decode(p.getJSONArray("pipes").toString());break;}}
-   store.saveSectionWithSurfaces(from,to,ww,dd,pipes,next);segments=next;showSegments();refreshStationLayers();route.invalidate();if(route.changed!=null)route.changed.run();refreshMainQuantities();refreshDetailQuantities();dialog.dismiss();
-  }catch(Exception ex){notice("Abschnitt: "+ex.getMessage());}});
+   store.saveSectionWithSurfaces(from,to,ww,dd,pipes,next);segments=next;showSegments();refreshStationLayers();route.invalidate();if(route.changed!=null)route.changed.run();refreshMainQuantities();refreshDetailQuantities();
+ }
+ EditText referenceField(LinearLayout panel,String label,String value,boolean numeric){
+  LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.addView(sheetText(label,11,false),new LinearLayout.LayoutParams(0,-2,1));
+  EditText field=new EditText(this);field.setSingleLine(true);field.setTextSize(11);field.setTextColor(Color.WHITE);field.setPadding(dp(4),0,dp(4),0);field.setBackground(proButtonShape(false));if(numeric)field.setInputType(8194);field.setText(value);row.addView(field,new LinearLayout.LayoutParams(dp(82),dp(32)));panel.addView(row);return field;
  }
  void showFullscreenRoute(android.app.AlertDialog editor,LinearLayout form,RouteSketch route,Spinner mode,Spinner angles,LinearLayout historyBar,Runnable openObjects,LinearLayout underlayControls,boolean immersiveInitially){
   final boolean[] immersive={immersiveInitially};
@@ -1257,9 +1253,16 @@ public class MainActivity extends Activity {
    final double initialWidth=bw,initialDepth=bd;
    final String material=surfaceRow==null?covering:surfaceRow.optString("surface",covering);
    final double leftCut=surfaceRow==null?0:surfaceRow.optDouble("left",0),rightCut=surfaceRow==null?0:surfaceRow.optDouble("right",0);
-   String[] names={"Länge","Breite (B)","Tiefe (T)","Oberfläche","Rückschnitt","Breite Rückschnitt"};
-   String[] values={Double.isFinite(to-from)?String.format(java.util.Locale.GERMANY,"%.2f m",to-from):"Maß fehlt",String.format(java.util.Locale.GERMANY,"%.2f m",bw),String.format(java.util.Locale.GERMANY,"%.2f m",bd),material,leftCut+rightCut>0?"An":"Aus",leftCut+rightCut>0?String.format(java.util.Locale.GERMANY,"%.2f m",bw+leftCut+rightCut):"–"};
-   for(int j=0;j<names.length;j++){final int field=j;LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.addView(sheetText(names[j],11,false),new LinearLayout.LayoutParams(0,-2,1));Button value=new Button(this);styleEditorButton(value,false);value.setText(values[j]);value.setTextSize(11);value.setMinHeight(0);value.setMinimumHeight(0);row.addView(value,new LinearLayout.LayoutParams(dp(82),dp(32)));sectionEditor.addView(row);value.setOnClickListener(v->{if(field==0){measureSegment(route,index+1);return;}if(!Double.isFinite(from)||!Double.isFinite(to)||to<=from){notice("Zuerst Abschnitt bemaßen.");return;}editReferenceSection(route,index,from,to,initialWidth,initialDepth,material,leftCut,rightCut,field);});}
+   Button lengthValue=new Button(this);styleEditorButton(lengthValue,false);lengthValue.setText(Double.isFinite(to-from)?String.format(java.util.Locale.GERMANY,"Länge  %.2f m",to-from):"Länge · Maß fehlt");lengthValue.setTextSize(11);lengthValue.setMinHeight(0);sectionEditor.addView(lengthValue,new LinearLayout.LayoutParams(-1,dp(32)));lengthValue.setOnClickListener(v->measureSegment(route,index+1));
+   EditText widthField=referenceField(sectionEditor,"Breite (B)",String.format(java.util.Locale.GERMANY,"%.2f",bw),true);
+   EditText depthField=referenceField(sectionEditor,"Tiefe (T)",String.format(java.util.Locale.GERMANY,"%.2f",bd),true);
+   EditText materialField=referenceField(sectionEditor,"Oberfläche",material,false);
+   Switch recut=new Switch(this);recut.setText("Rückschnitt");recut.setTextSize(11);recut.setTextColor(Color.WHITE);recut.setChecked(leftCut+rightCut>0);sectionEditor.addView(recut,new LinearLayout.LayoutParams(-1,dp(32)));
+   EditText cutField=referenceField(sectionEditor,"Breite Rückschnitt",String.format(java.util.Locale.GERMANY,"%.2f",bw+leftCut+rightCut),true);
+   View cutRow=(View)cutField.getParent();cutRow.setVisibility(recut.isChecked()?View.VISIBLE:View.GONE);recut.setOnCheckedChangeListener((button,on)->cutRow.setVisibility(on?View.VISIBLE:View.GONE));
+   Button apply=new Button(this);styleEditorButton(apply,true);apply.setText("Übernehmen");apply.setTextSize(11);apply.setMinHeight(0);sectionEditor.addView(apply,new LinearLayout.LayoutParams(-1,dp(34)));
+   apply.setOnClickListener(v->{try{if(!Double.isFinite(from)||!Double.isFinite(to)||to<=from)throw new IllegalArgumentException("Zuerst Abschnitt bemaßen.");double ww=number(widthField),dd=number(depthField),total=recut.isChecked()?number(cutField):ww;saveReferenceSection(route,from,to,ww,dd,materialField.getText().toString().trim(),recut.isChecked(),total,leftCut,rightCut);notice("Abschnitt gespeichert.");}catch(Exception ex){notice("Abschnitt: "+ex.getMessage());}});
+
   };
   sectionPosition.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){refreshSectionEditor.run();}public void afterTextChanged(android.text.Editable e){}});
   Runnable refreshSections=()->{
