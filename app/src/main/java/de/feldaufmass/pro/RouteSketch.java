@@ -697,7 +697,7 @@ final class RouteSketch extends View {
    org.json.JSONObject o=stationObjects.optJSONObject(j);if(o!=null)entries.put(o.optString("type","Objekt"),0xffa65e19);
   }
   for(Vertex v:vertices){
-   if(layerVisible(LAYER_GPS)&&Double.isFinite(v.latitude)&&Double.isFinite(v.longitude))entries.put("GPS-Punkt (Genauigkeit)",gpsQualityColor(v.accuracy));
+   if(layerVisible(LAYER_GPS)&&Double.isFinite(v.latitude)&&Double.isFinite(v.longitude)){entries.put("GPS-Punkt ≤ 0,5 m",0xff43ce80);entries.put("GPS-Punkt > 0,5 bis 3 m",0xffffb74d);entries.put("GPS-Punkt > 3 m",0xffff6666);entries.put("GPS-Punkt unbekannt",0xff9299a3);}
    if(layerVisible(LAYER_PHOTOS)&&v.photos.length()>0)entries.put("Foto",0xff536c80);
   }
   return entries;
@@ -809,6 +809,14 @@ final class RouteSketch extends View {
    Vertex vertex=vertices.get(i);float px=left()+scale()*p.x,py=top()+scale()*p.y;
    if(layerVisible(LAYER_GPS)&&Double.isFinite(vertex.latitude)&&Double.isFinite(vertex.longitude)){
     int quality=gpsQualityColor(vertex.accuracy);
+    double metresPerUnit=uniformMetresPerUnit();
+    if(Double.isFinite(metresPerUnit)&&metresPerUnit>0&&Double.isFinite(vertex.accuracy)&&vertex.accuracy>0){
+     double radius=scale()*vertex.accuracy/metresPerUnit;
+     if(Double.isFinite(radius)&&radius>0&&radius<1000000){
+      paint.setStyle(Paint.Style.FILL);paint.setColor((quality&0x00ffffff)|0x18000000);c.drawCircle(px,py,(float)radius,paint);
+      paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(density);paint.setColor((quality&0x00ffffff)|0x88000000);c.drawCircle(px,py,(float)radius,paint);paint.setStyle(Paint.Style.FILL);
+     }
+    }
     paint.setColor(quality);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(2*density);c.drawCircle(px,py,8*density,paint);
     paint.setStyle(Paint.Style.FILL);
     paint.setTextSize(10*density);
