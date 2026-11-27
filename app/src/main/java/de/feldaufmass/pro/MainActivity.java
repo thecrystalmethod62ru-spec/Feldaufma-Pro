@@ -4011,11 +4011,24 @@ public class MainActivity extends Activity {
   dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(btn->{try{double value=number(station);if(!Double.isFinite(value)||value<0||l<=0||value>l){station.setError("Station innerhalb der Trasse eingeben");return;}profileShoringStation=value;profile.invalidate();dialog.dismiss();}catch(Exception ex){station.setError("Ungültige Station");}}));dialog.show();
  });
 
- LinearLayout sizes=fold(profilePage,"Grabenmaße",false);
+ LinearLayout sizes=page();profilePage.addView(sizes,2);
+ sizes.addView(sheetText("Grabenmaße – direkt bearbeiten",16,true));
  profileSlider(sizes,"Grabenbreite",width,10,600);
  profileSlider(sizes,"Grabentiefe",depth,10,800);
  profileSlider(sizes,"Nachschnitt links",leftInput,0,200);
  profileSlider(sizes,"Nachschnitt rechts",rightInput,0,200);
+ LinearLayout asphaltControls=page(),stoneControls=page();
+ sizes.addView(asphaltControls);sizes.addView(stoneControls);
+ profileSlider(asphaltControls,"Asphaltstärke",asphaltInput,0,100);
+ utilitySlider(stoneControls,stoneDepth,"Belagsstärke (cm)",0,100,1,true);
+ EditText stoneExact=new EditText(this);stoneExact.setSingleLine(true);stoneExact.setInputType(8194);stoneExact.setText(stoneDepth.getText());stoneControls.addView(stoneExact);
+ final boolean[] syncingStone={false};
+ stoneDepth.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){if(syncingStone[0])return;syncingStone[0]=true;stoneExact.setText(s);syncingStone[0]=false;refreshProfileDraft();}public void afterTextChanged(android.text.Editable e){}});
+ stoneExact.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){if(syncingStone[0])return;syncingStone[0]=true;stoneDepth.setText(s);syncingStone[0]=false;refreshProfileDraft();}public void afterTextChanged(android.text.Editable e){}});
+ profileSlider(sizes,"Tragschicht",baseInput,0,200);
+ Runnable updateSurfaceControls=()->{boolean asphaltSelected="Asphalt".equals(surface.getSelectedItem().toString());asphaltControls.setVisibility(asphaltSelected?View.VISIBLE:View.GONE);stoneControls.setVisibility(asphaltSelected?View.GONE:View.VISIBLE);};
+ sizes.getViewTreeObserver().addOnGlobalLayoutListener(()->updateSurfaceControls.run());
+ updateSurfaceControls.run();
  LinearLayout pipeDetails=fold(profilePage,"Rohr und Bettung",false);
  utilitySlider(pipeDetails,pipeInput,"Rohr-Außendurchmesser (mm)",1,2000,1,true);
  pipeInput.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){if(profile!=null)profile.invalidate();}public void afterTextChanged(android.text.Editable e){}});
@@ -4055,9 +4068,22 @@ public class MainActivity extends Activity {
  final boolean[] busy={false};
  Runnable sync=()->{if(busy[0])return;busy[0]=true;try{double val=number(target);label.setText(name+" · "+String.format(java.util.Locale.GERMANY,"%.2f m",val));bar.setProgress((int)Math.round(val*100)-min);exact.setText(target.getText());}catch(Exception e){label.setText(name+" (m)");}busy[0]=false;};
  target.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){sync.run();}public void afterTextChanged(android.text.Editable e){}});
- bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onStartTrackingTouch(SeekBar b){}public void onStopTrackingTouch(SeekBar b){}public void onProgressChanged(SeekBar b,int progress,boolean user){if(!user)return;target.setText(String.format(java.util.Locale.GERMANY,"%.2f",(progress+min)/100.0));calculate();}});
- exact.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){if(busy[0])return;try{double v=number(exact);if(!Double.isFinite(v)||v<min/100.0||v>max/100.0)return;busy[0]=true;target.setText(s);label.setText(name+" · "+s+" m");bar.setProgress((int)Math.round(v*100)-min);busy[0]=false;calculate();}catch(Exception e){busy[0]=false;}}public void afterTextChanged(android.text.Editable e){}});
+ bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onStartTrackingTouch(SeekBar b){}public void onStopTrackingTouch(SeekBar b){}public void onProgressChanged(SeekBar b,int progress,boolean user){if(!user)return;target.setText(String.format(java.util.Locale.GERMANY,"%.2f",(progress+min)/100.0));refreshProfileDraft();}});
+ exact.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){if(busy[0])return;try{double v=number(exact);if(!Double.isFinite(v)||v<min/100.0||v>max/100.0)return;busy[0]=true;target.setText(s);label.setText(name+" · "+s+" m");bar.setProgress((int)Math.round(v*100)-min);busy[0]=false;refreshProfileDraft();}catch(Exception e){busy[0]=false;}}public void afterTextChanged(android.text.Editable e){}});
  sync.run();
+ }
+ void refreshProfileDraft(){
+  try{
+   double bw=number(width),bd=number(depth);
+   if(!Double.isFinite(bw)||!Double.isFinite(bd)||bw<=0||bd<=0)return;
+   double nl=optional(leftInput),nr=optional(rightInput),nb=optional(baseInput);
+   String cover=surface.getSelectedItem().toString();
+   double na=optional(asphaltInput),nt="Asphalt".equals(cover)?na:optional(stoneDepth)/100;
+   if((Double.isFinite(nt)&&nt>bd)||(Double.isFinite(nb)&&nb+(Double.isFinite(nt)?nt:0)>bd))return;
+   w=bw;d=bd;left=nl;right=nr;base=nb;asphalt=na;topThickness=nt;covering=cover;
+   if(profile!=null)profile.invalidate();
+   if(length.length()>0)calculate();
+  }catch(Exception ignored){}
  }
  boolean calculate(){try{double l=number(length),w=number(width),d=number(depth);if(!Double.isFinite(l*w*d)||l<=0||w<=0||d<=0)throw new Exception();
  optional(stoneLength);optional(stoneWidth);double stoneMetres=optional(stoneDepth)/100;
