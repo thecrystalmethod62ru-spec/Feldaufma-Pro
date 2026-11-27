@@ -432,6 +432,38 @@ public class MainActivity extends Activity {
   }};
   dialog.setOnDismissListener(d->handler.removeCallbacks(tick));dialog.show();handler.post(tick);
  }
+ void measureStationaryGps(int seconds,android.app.Dialog editor){
+  startLiveGps();
+  if(liveManager==null){notice("GPS nicht verfügbar.");return;}
+  final java.util.ArrayList<android.location.Location> fixes=new java.util.ArrayList<>();
+  final android.os.Handler handler=new android.os.Handler(android.os.Looper.getMainLooper());
+  final long start=android.os.SystemClock.elapsedRealtime();
+  TextView info=new TextView(this);info.setPadding(dp(20),dp(16),dp(20),dp(16));
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Präzisionsmessung").setView(info).setNegativeButton("Abbrechen",null).create();
+  Runnable tick=new Runnable(){long last=0;public void run(){
+   if(!dialog.isShowing()||!editor.isShowing()||isFinishing()||isDestroyed()||liveManager==null){dialog.dismiss();return;}
+   android.location.Location fix=liveFix;
+   long now=android.os.SystemClock.elapsedRealtime();
+   if(fix!=null&&fix.hasAccuracy()&&fix.getAccuracy()>0&&fix.getAccuracy()<=10&&fix.getElapsedRealtimeNanos()>last&&fix.getElapsedRealtimeNanos()/1000000>=start&&now-fix.getElapsedRealtimeNanos()/1000000<=3000){fixes.add(new android.location.Location(fix));last=fix.getElapsedRealtimeNanos();}
+   long elapsed=(now-start)/1000;
+   info.setText("Bitte ruhig stehen bleiben.\nMessdauer: "+Math.min(elapsed,seconds)+" / "+seconds+" s\nGültige Messungen: "+fixes.size());
+   if(elapsed>=seconds){dialog.dismiss();showStationaryGpsResult(fixes);return;}handler.postDelayed(this,500);
+  }};
+  dialog.setOnDismissListener(d->handler.removeCallbacks(tick));dialog.show();handler.post(tick);
+ }
+ void showStationaryGpsResult(java.util.ArrayList<android.location.Location> fixes){
+  if(fixes.size()<5){notice("Zu wenige gültige GPS-Messungen.");return;}
+  android.location.Location origin=fixes.get(0);
+  java.util.ArrayList<Double> xs=new java.util.ArrayList<>(),ys=new java.util.ArrayList<>();
+  for(android.location.Location f:fixes){xs.add((f.getLongitude()-origin.getLongitude()+540)%360-180);ys.add(f.getLatitude());}
+  java.util.Collections.sort(xs);java.util.Collections.sort(ys);
+  android.location.Location median=new android.location.Location("gps");median.setLatitude(ys.get(ys.size()/2));median.setLongitude((origin.getLongitude()+xs.get(xs.size()/2)+540)%360-180);
+  double lat=0,lon=0,weight=0,accuracy=0;int accepted=0;
+  for(android.location.Location f:fixes){if(f.distanceTo(median)>Math.max(3,2*f.getAccuracy()))continue;double w=1.0/Math.pow(Math.max(1,f.getAccuracy()),2);lat+=w*f.getLatitude();lon+=w*((f.getLongitude()-origin.getLongitude()+540)%360-180);weight+=w;accuracy+=f.getAccuracy();accepted++;}
+  if(accepted<5||weight<=0){notice("Messung nicht stabil genug.");return;}
+  double resultLat=lat/weight,resultLon=(origin.getLongitude()+lon/weight+540)%360-180;
+  new android.app.AlertDialog.Builder(this).setTitle("Gemittelte GPS-Position").setMessage(String.format(java.util.Locale.GERMANY,"Breite: %.7f\nLänge: %.7f\nVerwendet: %d / %d\nGemeldete Einzelgenauigkeit (Mittel): ± %.1f m\n\nKeine garantierte Genauigkeitsverbesserung. Noch keinem Trassenpunkt zugeordnet.",resultLat,resultLon,accepted,fixes.size(),accuracy/accepted)).setPositiveButton("Schließen",null).show();
+ }
  void showGnssDiagnosis(){
   if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=android.content.pm.PackageManager.PERMISSION_GRANTED){notice("Genauer Standort erforderlich.");return;}
   android.location.LocationManager manager=(android.location.LocationManager)getSystemService(LOCATION_SERVICE);
@@ -925,6 +957,8 @@ public class MainActivity extends Activity {
    LinearLayout diagnosisBox=new LinearLayout(this);diagnosisBox.setOrientation(1);
    Button diagnosis=new Button(this);diagnosis.setText("GNSS-Diagnose");diagnosisBox.addView(diagnosis);
    diagnosis.setOnClickListener(vv->{gpsDialog.dismiss();showGnssDiagnosis();});
+   Button precision=new Button(this);precision.setText("Präzisionsmessung");diagnosisBox.addView(precision);
+   precision.setOnClickListener(vv->{gpsDialog.dismiss();new android.app.AlertDialog.Builder(this).setTitle("Messdauer").setItems(new String[]{"15 Sekunden","30 Sekunden","60 Sekunden"},(dd,ww)->measureStationaryGps(new int[]{15,30,60}[ww],full)).show();});
    gpsDialog.setView(diagnosisBox);gpsDialog.show();
   });
   styleEditorButton(save,true);LinearLayout.LayoutParams saveParams=new LinearLayout.LayoutParams(-1,dp(48));saveParams.setMargins(dp(10),dp(4),dp(10),dp(8));root.addView(save,saveParams);
