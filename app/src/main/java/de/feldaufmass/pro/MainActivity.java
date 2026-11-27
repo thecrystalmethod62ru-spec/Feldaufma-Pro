@@ -770,7 +770,7 @@ public class MainActivity extends Activity {
      case "legend":for(int y=6;y<=18;y+=6){c.drawCircle(5,y,1,p);c.drawLine(9,y,20,y,p);}break;
      case "objects":c.drawRoundRect(5,5,19,19,2,2,p);c.drawLine(9,12,15,12,p);c.drawLine(12,9,12,15,p);break;
      case "sections":c.drawLine(3,12,21,12,p);for(int x:new int[]{3,9,15,21}){c.drawLine(x,7,x,17,p);}break;
-     case "pipe":c.drawCircle(12,12,8,p);c.drawCircle(12,12,5,p);break;
+     case "pipe":c.drawCircle(7.5f,12,6,p);c.drawCircle(7.5f,12,3.8f,p);c.drawCircle(19,14,4,p);c.drawCircle(19,14,2.1f,p);break;
      case "settings":c.drawCircle(12,12,7,p);c.drawCircle(12,12,3,p);for(int k=0;k<8;k++){c.save();c.rotate(k*45,12,12);c.drawLine(12,2,12,5,p);c.restore();}break;
      case "layers":c.drawLine(4,8,12,3,p);c.drawLine(12,3,20,8,p);c.drawLine(20,8,12,13,p);c.drawLine(12,13,4,8,p);c.drawLine(4,13,12,18,p);c.drawLine(12,18,20,13,p);c.drawLine(4,18,12,22,p);c.drawLine(12,22,20,18,p);break;
      default:for(int y=6;y<=18;y+=6)c.drawLine(4,y,20,y,p);
