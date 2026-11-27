@@ -1918,7 +1918,7 @@ public class MainActivity extends Activity {
    final Runnable[] refreshStationPlanHolder=new Runnable[1];
    Runnable refreshStationPlan=()->{if(refreshStationPlanHolder[0]!=null)refreshStationPlanHolder[0].run();};
    axis.setContentDescription("Station auf der linearen Trasse wählen");
-   axis.setOnTouchListener(new View.OnTouchListener(){float startX,startY;public boolean onTouch(View v,android.view.MotionEvent e){if(e.getActionMasked()==android.view.MotionEvent.ACTION_DOWN){startX=e.getX();startY=e.getY();return true;}if(e.getActionMasked()==android.view.MotionEvent.ACTION_UP){if(Math.hypot(e.getX()-startX,e.getY()-startY)>dp(12))return true;if(!stationProject.equals(activeProject)||v.getWidth()<=dp(36))return true;double st=Math.round(Math.max(0,Math.min(1,(e.getX()-dp(18))/(v.getWidth()-2.0*dp(18))))*total*1000)/1000.0;st=Math.min(total,st);final double chosen=st;String[] labels=new String[rows.length()];for(int j=0;j<labels.length;j++){try{labels[j]=montageDescription(rows.getJSONObject(j));}catch(Exception ex){labels[j]="Formstück "+(j+1);}}if(labels.length==0){notice("Zuerst Formstück hinzufügen.");return true;}new android.app.AlertDialog.Builder(MainActivity.this).setTitle(String.format(java.util.Locale.GERMANY,"Station %.3f m – Formstück wählen",chosen)).setItems(labels,(dd,j)->{try{if(!stationProject.equals(activeProject))throw new IllegalStateException();org.json.JSONArray latest=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));int idx=findMontageItem(latest,rows.getJSONObject(j));String before=latest.toString();latest.getJSONObject(idx).put("station",chosen).put("stationLinked",true);if(!getPreferences(0).edit().putString("montageFittings",latest.toString()).commit())throw new java.io.IOException();rememberMontageStation(stationProject,before,latest.toString());recordProjectEvent("Formstück stationiert");if(sketch!=null)sketch.invalidate();if(livePreview!=null)livePreview.invalidate();refreshStationPlan.run();}catch(Exception ex){notice("Projektdaten geändert oder Speichern fehlgeschlagen.");}}).setNegativeButton("Abbrechen",null).show();return true;}return true;}});
+   axis.setOnTouchListener(new View.OnTouchListener(){float startX,startY;public boolean onTouch(View v,android.view.MotionEvent e){if(e.getActionMasked()==android.view.MotionEvent.ACTION_DOWN){startX=e.getX();startY=e.getY();return true;}if(e.getActionMasked()==android.view.MotionEvent.ACTION_UP){if(Math.hypot(e.getX()-startX,e.getY()-startY)>dp(12))return true;if(!stationProject.equals(activeProject)||v.getWidth()<=dp(36))return true;double st=Math.round(Math.max(0,Math.min(1,(e.getX()-dp(18))/(v.getWidth()-2.0*dp(18))))*total*1000)/1000.0;st=Math.min(total,st);final double chosen=st;String[] labels=new String[rows.length()];for(int j=0;j<labels.length;j++){try{labels[j]=montageDescription(rows.getJSONObject(j));}catch(Exception ex){labels[j]="Formstück "+(j+1);}}if(labels.length==0){notice("Zuerst Formstück hinzufügen.");return true;}new android.app.AlertDialog.Builder(MainActivity.this).setTitle(String.format(java.util.Locale.GERMANY,"Station %.3f m – Formstück wählen",chosen)).setItems(labels,(dd,j)->{try{if(!stationProject.equals(activeProject))throw new IllegalStateException();org.json.JSONArray latest=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));int idx=findMontageItem(latest,rows.getJSONObject(j));String before=latest.toString();latest.getJSONObject(idx).remove("routePointId");latest.getJSONObject(idx).put("station",chosen).put("stationLinked",true);if(!getPreferences(0).edit().putString("montageFittings",latest.toString()).commit())throw new java.io.IOException();rememberMontageStation(stationProject,before,latest.toString());recordProjectEvent("Formstück stationiert");if(sketch!=null)sketch.invalidate();if(livePreview!=null)livePreview.invalidate();refreshStationPlan.run();}catch(Exception ex){notice("Projektdaten geändert oder Speichern fehlgeschlagen.");}}).setNegativeButton("Abbrechen",null).show();return true;}return true;}});
    TextView range=new TextView(this);range.setText("0,00 m  —  "+total+" m");panel.addView(range);
    RouteSketch geometry=new RouteSketch(this,routeData());
    double measured=geometry.measuredLength();
@@ -2041,6 +2041,7 @@ public class MainActivity extends Activity {
   try{max=Double.parseDouble(getPreferences(0).getString("length","").trim().replace(',','.'));}
   catch(NumberFormatException ex){max=Double.NaN;}
   if(!Double.isFinite(max)||max<=0){notice("Zuerst gültige Trassenlänge erfassen.");return;}
+  java.util.Map<Double,String> pointIds=new java.util.HashMap<>();
   java.util.TreeMap<Double,String> stations=new java.util.TreeMap<>();
   stations.put(0.0,"");stations.put(max,"");
   org.json.JSONArray utilities=extraUtilities();
@@ -2063,6 +2064,7 @@ public class MainActivity extends Activity {
    double value=distance.doubleValue();
    if(value>max)break;
    String name=point.name.trim();
+   if(point.hasStoredId)pointIds.put(value,point.id);
    stations.put(value," · Punkt "+(j+1)+(name.isEmpty()?"":" · "+name));
   }
   java.util.List<Double> values=new java.util.ArrayList<>(stations.keySet());
@@ -2072,7 +2074,11 @@ public class MainActivity extends Activity {
    labels[j]=String.format(java.util.Locale.GERMANY,"Station %.3f m",value)+stations.get(value);
   }
   new android.app.AlertDialog.Builder(this).setTitle("Trassen- und Leitungsstationen")
-   .setItems(labels,(d,j)->field.setText(java.math.BigDecimal.valueOf(values.get(j)).stripTrailingZeros().toPlainString()))
+   .setItems(labels,(d,j)->{
+    double value=values.get(j);
+    field.setText(java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString());
+    field.setTag(pointIds.get(value));
+   })
    .setNegativeButton("Abbrechen",null).show();
  }
  void showMontageFitting(MontageCatalog.Fitting fitting, org.json.JSONObject original){
@@ -2122,6 +2128,32 @@ public class MainActivity extends Activity {
   }else if(original!=null&&original.has("sourceLine")){
    panel.addView(sheetText("Quelle: "+original.optString("sourceName")+" · Zeile "+original.optInt("sourceLineNumber")+"\n"+original.optString("sourceLine"),14,false));
   }
+  TextView pointStatus=new TextView(this);
+  panel.addView(pointStatus,panel.indexOfChild(pickStation)+1);
+  pointStatus.setVisibility(View.GONE);
+  station.addTextChangedListener(new android.text.TextWatcher(){
+   public void beforeTextChanged(CharSequence s,int start,int count,int after){}
+   public void onTextChanged(CharSequence s,int start,int before,int count){station.setTag(null);pointStatus.setVisibility(View.GONE);}
+   public void afterTextChanged(android.text.Editable s){}
+  });
+  if(original!=null&&!original.optString("routePointId").isEmpty()){
+   String id=original.optString("routePointId");
+   station.setTag(id);
+   RouteSketch route=new RouteSketch(this,routeData());
+   int index=findPoint(route,id);
+   String message="Zugeordneter Trassenpunkt fehlt. Station prüfen.";
+   if(index>=0){
+    RouteSketch.Vertex point=route.vertices.get(index);
+    String label="Punkt "+(index+1)+(point.name.isEmpty()?"":" · "+point.name);
+    double current=photoStation(route,index);
+    if(!Double.isFinite(current))message=label+" · Abschnittslänge fehlt. Station prüfen.";
+    else if(Math.abs(current-original.optDouble("station"))>1e-9)
+     message=String.format(java.util.Locale.GERMANY,"%s · Jetzt bei %.3f m. Zum Übernehmen Punkt erneut wählen.",label,current);
+    else message=label;
+   }
+   pointStatus.setText(message);
+   pointStatus.setVisibility(View.VISIBLE);
+  }
   Runnable updatePreview=()->{
    try{double degrees=MontageCatalog.normalizeRotation(Double.parseDouble(rotation.getText().toString().trim().replace(',','.')));preview.setRotation((float)degrees);if(!rotationSlider.isPressed())rotationSlider.setProgress((int)Math.round(degrees));}
    catch(IllegalArgumentException invalid){preview.setRotation(0);}
@@ -2169,6 +2201,8 @@ public class MainActivity extends Activity {
      if(i==0){String routeLength=getPreferences(0).getString("length","").trim();try{double max=Double.parseDouble(routeLength.replace(',','.'));if(!Double.isFinite(max)||max<=0||value>max)throw new IllegalArgumentException();}catch(Exception e){station.setError("Station innerhalb einer gültigen Tiefbau-Trassenlänge erforderlich");return;}}
      item.put(keys[i],value);
     }
+    if(station.length()>0&&station.getTag() instanceof String)item.put("routePointId",station.getTag());
+    else item.remove("routePointId");
     if(suggestion!=null)item.put("sourceName",source).put("sourceLine",suggestion.evidence).put("sourceLineNumber",suggestion.line);
     String rawElevation=elevation.getText().toString().trim();if(rawElevation.isEmpty())item.remove("topElevation");else{try{double value=Double.parseDouble(rawElevation.replace(',','.'));if(!Double.isFinite(value))throw new IllegalArgumentException();item.put("topElevation",value);}catch(Exception ex){elevation.setError("Gültige Höhenkote erforderlich");return;}}
     String rawVertical=vertical.getText().toString().trim();if(rawVertical.isEmpty())item.remove("verticalEnvelope");else{try{double value=Double.parseDouble(rawVertical.replace(',','.'));if(!Double.isFinite(value)||value<=0)throw new IllegalArgumentException();item.put("verticalEnvelope",value);}catch(Exception ex){vertical.setError("Positive Bauhöhe erforderlich");return;}}

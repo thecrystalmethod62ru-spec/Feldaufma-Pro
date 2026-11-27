@@ -46,9 +46,32 @@ public class FittingReviewTest {
                         assertFalse(items.getJSONObject(0).getBoolean("installed"));
                         assertEquals(12.5,items.getJSONObject(0).getDouble("station"),0);
                         assertEquals("Blatt A",items.getJSONObject(0).getString("sourceName"));
+                        assertEquals("p2",items.getJSONObject(1).getString("routePointId"));
+                        assertFalse(items.getJSONObject(0).has("routePointId"));
                         assertEquals(6.25,items.getJSONObject(1).getDouble("station"),0);
                         assertEquals(2,items.getJSONObject(1).getInt("sourceLineNumber"));
                         assertFalse(items.getJSONObject(1).getBoolean("installed"));
+                    } catch (JSONException e) {throw new AssertionError(e);}
+                });
+                scenario.onActivity(activity->{
+                    try {
+                        JSONArray route=new JSONArray(activity.routeData());
+                        route.getJSONArray(1).put(2,7.5);
+                        assertTrue(activity.projectStorage(id).edit().putString("routeSketch",route.toString()).commit());
+                        JSONArray items=new JSONArray(activity.projectStorage(id).getString("montageFittings","[]"));
+                        activity.showMontageFitting(MontageCatalog.Fitting.COUPLING,items.getJSONObject(1));
+                    } catch (JSONException e) {throw new AssertionError(e);}
+                });
+                onView(withText("Punkt 2 · Schacht · Jetzt bei 7,500 m. Zum Übernehmen Punkt erneut wählen."))
+                    .check(androidx.test.espresso.assertion.ViewAssertions.matches(androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom(android.widget.TextView.class)));
+                onView(withText("Station aus Projekt wählen")).perform(androidx.test.espresso.action.ViewActions.scrollTo(),click());
+                onView(withText("Station 7,500 m · Punkt 2 · Schacht")).perform(click());
+                onView(withText("Änderungen speichern")).perform(click());
+                scenario.onActivity(activity->{
+                    try {
+                        JSONArray items=new JSONArray(activity.projectStorage(id).getString("montageFittings","[]"));
+                        assertEquals(7.5,items.getJSONObject(1).getDouble("station"),0);
+                        assertEquals("p2",items.getJSONObject(1).getString("routePointId"));
                     } catch (JSONException e) {throw new AssertionError(e);}
                 });
             } finally {

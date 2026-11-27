@@ -23,6 +23,7 @@ final class RouteSketch extends View {
  static boolean preciseGps(double accuracy){return Double.isFinite(accuracy)&&accuracy>0&&accuracy<=GPS_MOVE_ACCURACY_METRES;}
  static final class Vertex {
   final PointF point;
+  boolean hasStoredId;
   String id=java.util.UUID.randomUUID().toString();
   String name="";
   JSONArray gpsUndo;
@@ -50,6 +51,7 @@ final class RouteSketch extends View {
    for(int i=0;i<rows.length();i++){
     JSONArray row=rows.getJSONArray(i);
     Vertex v=new Vertex(new PointF((float)row.getDouble(0),(float)row.getDouble(1)),row.optDouble(2,Double.NaN));
+    v.hasStoredId=row.opt(3) instanceof String && !row.optString(3).trim().isEmpty();
     v.id=row.optString(3,v.id);
     if(row.optJSONArray(4)!=null)v.photos=row.optJSONArray(4);
     v.latitude=row.optDouble(5,Double.NaN);v.longitude=row.optDouble(6,Double.NaN);v.accuracy=row.optDouble(7,Double.NaN);
