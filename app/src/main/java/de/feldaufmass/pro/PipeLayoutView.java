@@ -20,6 +20,8 @@ public final class PipeLayoutView extends View {
     private double cutLeft,cutRight,deck,base;
     private int surfaceColor=0xff777777;
     private boolean civilProfile;
+    private boolean asphaltProfile;
+    public void setAsphaltProfile(boolean asphalt){asphaltProfile=asphalt;invalidate();}
     public void setCivilProfile(double left,double right,double deck,double base,int color){
         civilProfile=true;cutLeft=Double.isFinite(left)?Math.max(0,left):0;cutRight=Double.isFinite(right)?Math.max(0,right):0;
         this.deck=Double.isFinite(deck)?Math.max(0,deck):0;this.base=Double.isFinite(base)?Math.max(0,base):0;surfaceColor=color;invalidate();
@@ -63,6 +65,17 @@ public final class PipeLayoutView extends View {
             dimension(c,left,bottom+pad/2,right,bottom+pad/2,width);
             dimension(c,right+pad/3,top,right+pad/3,bottom,depth);
             if(cutLeft+cutRight>0)dimension(c,a,top-pad/2,b,top-pad/2,width+cutLeft+cutRight);
+            if(asphaltProfile){
+                float cutBottom=Math.max(top+6,deckBottom);
+                p.setColor(0xffd5d9dc);p.setStrokeWidth(1.5f);
+                c.drawLine(left,top-4,left,cutBottom,p);c.drawLine(right,top-4,right,cutBottom,p);
+                android.graphics.PathEffect prior=p.getPathEffect();
+                p.setPathEffect(new android.graphics.DashPathEffect(new float[]{4,2},0));
+                p.setColor(0xffffb267);
+                if(cutLeft>0)c.drawLine(a,top-4,a,cutBottom,p);
+                if(cutRight>0)c.drawLine(b,top-4,b,cutBottom,p);
+                p.setPathEffect(prior);
+            }
         }
         int[] colors={0xff397db5,0xffd4ab35,0xff398b75,0xff9567b8};
         p.setTextSize(12*getResources().getDisplayMetrics().scaledDensity);
