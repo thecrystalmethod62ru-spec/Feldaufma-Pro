@@ -4772,8 +4772,11 @@ public class MainActivity extends Activity {
      if(!ansatzSourceCurrent(row))throw new java.io.IOException("Quelle geändert: "+oz);
      out.append(RebExport.record(oz,formula,address++)).append("\r\n");
     }
+   }else if("area".equals(source)||"volume".equals(source)){
+    for(String formula:trenchRebFormulas(l,w,d,new PipeLayoutStore(getPreferences(0)).sections(),"volume".equals(source)))
+     out.append(RebExport.record(oz,formula,address++)).append("\r\n");
    }else{
-    String formula="length".equals(source)?RebExport.product(l):"area".equals(source)?RebExport.product(qty):"volume".equals(source)?RebExport.product(qty):"cut".equals(source)?RebExport.product(l,w+left+right):RebExport.product(qty);
+    String formula="length".equals(source)?RebExport.product(l):"cut".equals(source)?RebExport.product(l,w+left+right):RebExport.product(qty);
     out.append(RebExport.record(oz,formula,address++)).append("\r\n");
    }
   }
@@ -5063,6 +5066,20 @@ public class MainActivity extends Activity {
   }
   if(!Double.isFinite(volume)||!Double.isFinite(area)||volume<=0||area<=0)throw new IllegalArgumentException("Ungültige Mengen");
   return new double[]{area,volume};
+ }
+ static java.util.List<String> trenchRebFormulas(double l,double w,double d,org.json.JSONArray profiles,boolean volume)throws Exception{
+  mainTrenchQuantities(l,w,d,profiles);
+  java.util.ArrayList<org.json.JSONObject> sorted=new java.util.ArrayList<>();
+  for(int j=0;j<profiles.length();j++)sorted.add(profiles.getJSONObject(j));
+  sorted.sort((a,b)->Double.compare(a.optDouble("from"),b.optDouble("from")));
+  java.util.List<String> formulas=new java.util.ArrayList<>();double cursor=0;
+  for(org.json.JSONObject p:sorted){
+   double from=p.getDouble("from"),to=p.getDouble("to"),bw=p.getDouble("width"),bd=p.getDouble("depth");
+   if(from>cursor)formulas.add(volume?RebExport.product(from-cursor,w,d):RebExport.product(from-cursor,w));
+   formulas.add(volume?RebExport.product(to-from,bw,bd):RebExport.product(to-from,bw));cursor=to;
+  }
+  if(cursor<l)formulas.add(volume?RebExport.product(l-cursor,w,d):RebExport.product(l-cursor,w));
+  return formulas;
  }
  double[] currentTrenchQuantities(){
   try{return mainTrenchQuantities(l,w,d,new PipeLayoutStore(getPreferences(0)).sections());}
