@@ -464,6 +464,21 @@ public class MainActivity extends Activity {
   }));
   dialog.show();
  }
+ void showRouteSegmentMenu(RouteSketch route,int i){
+  if(i<1||i>=route.vertices.size())return;
+  route.highlight=i;route.invalidate();
+  android.widget.PopupMenu menu=new android.widget.PopupMenu(this,route);
+  menu.getMenu().add(0,0,0,"Abschnitt "+i).setEnabled(false);
+  menu.getMenu().add(0,1,1,"Länge ändern");
+  menu.getMenu().add(0,2,2,"Winkel ändern");
+  menu.getMenu().add(0,3,3,"Knickpunkt entfernen").setEnabled(i<route.vertices.size()-1);
+  menu.setOnMenuItemClickListener(item->{switch(item.getItemId()){
+   case 1:measureSegment(route,i);return true;
+   case 2:new android.app.AlertDialog.Builder(this).setTitle("Winkel ändern").setItems(new String[]{"0°","15°","30°","45°","60°","75°","90°"},(d,w)->{if(i>=route.vertices.size())return;int previous=route.angle;route.angle=w*15;android.graphics.PointF p=route.vertices.get(i).point;route.movePoint(i,new android.graphics.PointF(p.x,p.y));route.angle=previous;if(route.changed!=null)route.changed.run();route.invalidate();}).show();return true;
+   case 3:confirmDeleteRoutePoint(route,i);return true;
+   default:return false;
+  }});menu.show();
+ }
  void measureSegment(RouteSketch route,int i){
   EditText metres=new EditText(this);
   metres.setSingleLine(true);metres.setKeyListener(android.text.method.DigitsKeyListener.getInstance("0123456789,."));
@@ -1078,7 +1093,7 @@ public class MainActivity extends Activity {
   Button calibrate=new Button(this);calibrate.setAllCaps(false);calibrate.setText("Maßstab kalibrieren");form.addView(calibrate);
   Button clearScale=new Button(this);clearScale.setAllCaps(false);clearScale.setText("Kalibrierung entfernen");form.addView(clearScale);
   LinearLayout list=page();form.addView(list);
-  route.selected=i->measureSegment(route,i);
+  route.selected=i->showRouteSegmentMenu(route,i);
   route.strokeAdded=first->{
    route.moving=true;route.dimensioning=false;route.placingObject=false;route.editingObjects=false;
    mode.setSelection(2);
