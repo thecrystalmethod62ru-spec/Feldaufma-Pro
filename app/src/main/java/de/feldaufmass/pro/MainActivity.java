@@ -322,6 +322,7 @@ public class MainActivity extends Activity {
  TextView t=new TextView(this);t.setText(label);root.addView(t);
  EditText e=new EditText(this);e.setSingleLine(true);
  if(numeric)e.setInputType(8194);
+ android.graphics.drawable.GradientDrawable fieldShape=editorShape(0xff1b1b1b,24);fieldShape.setStroke(dp(1),0xff626262);e.setBackground(fieldShape);e.setTextColor(Color.WHITE);e.setHintTextColor(0xff999999);e.setPadding(dp(16),dp(10),dp(16),dp(10));e.setMinHeight(dp(48));
  e.setText(getPreferences(0).getString(key,""));autosaveFields.put(key,e);root.addView(e);return e;
  }
  double number(EditText e){return Double.parseDouble(e.getText().toString().replace(',','.'));}
@@ -743,7 +744,7 @@ public class MainActivity extends Activity {
   android.graphics.drawable.GradientDrawable shape=new android.graphics.drawable.GradientDrawable();shape.setColor(color);shape.setCornerRadius(dp(radius));return shape;
  }
  void styleEditorButton(Button b,boolean primary){
-  b.setAllCaps(false);b.setTextSize(primary?15:12);b.setTextColor(primary?Color.WHITE:0xff9edbd2);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(dp(4),dp(4),dp(4),dp(4));b.setBackgroundTintList(null);
+  b.setAllCaps(false);b.setTextSize(primary?15:12);b.setTextColor(Color.WHITE);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(dp(4),dp(4),dp(4),dp(4));b.setBackgroundTintList(null);
   b.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x3312665f),editorShape(primary?TEAL:0xff202827,12),null));
  }
  void showFullscreenRoute(android.app.AlertDialog editor,LinearLayout form,RouteSketch route,Spinner mode,Spinner angles,LinearLayout historyBar,Runnable openObjects,LinearLayout underlayControls){
@@ -1072,7 +1073,7 @@ public class MainActivity extends Activity {
   layers.append("\nTragschicht · ").append(baseValue.isEmpty()?"Stärke nicht erfasst":baseValue+" m");
   surfaceLayers.setText(layers.toString());
  }
- static final int INK=0xff193747, TEAL=0xff12665f;
+ static final int INK=0xfff2f2f2, TEAL=0xff14766b;
  TextView[] overviewValues=new TextView[4];
  LinearLayout stationRows;
  final java.util.LinkedHashMap<LinearLayout,Button> sheetTabs=new java.util.LinkedHashMap<>();
@@ -3615,8 +3616,8 @@ public class MainActivity extends Activity {
    boolean selected=entry.getKey()==p;
    Button tab=entry.getValue();
    tab.setSelected(selected);
-   tab.setBackgroundTintList(android.content.res.ColorStateList.valueOf(selected?TEAL:Color.WHITE));
-   tab.setTextColor(selected?Color.WHITE:INK);
+   tab.setBackground(editorShape(selected?0xff28564c:0xff1b1b1b,10));
+   tab.setTextColor(selected?Color.WHITE:0xffb5b5b5);
   }
   if(p==profilePage&&sectionProfilePanel!=null)openSectionProfilePicker();if(p==documentsPage)compareSoll();if(p==quantityPage)refreshDetailQuantities();body.removeAllViews();ScrollView sc=new ScrollView(this);sc.setFillViewport(true);if(p.getParent()!=null)((android.view.ViewGroup)p.getParent()).removeView(p);sc.addView(p);body.addView(sc,new LinearLayout.LayoutParams(-1,-1));}
  private void fitSystemPanels(LinearLayout root){
@@ -3643,12 +3644,12 @@ public class MainActivity extends Activity {
 
  public void onCreate(Bundle savedInstanceState){super.onCreate(savedInstanceState);activeProject=projectRegistry().getString("active",LEGACY_PROJECT);
  if(savedInstanceState!=null){selectedPoint=savedInstanceState.getString("selectedPoint");pendingPoint=savedInstanceState.getString("pendingPoint");pendingPhoto=savedInstanceState.getString("pendingPhoto");pendingMaterialProject=savedInstanceState.getString("pendingMaterialProject");pendingConnectionsProject=savedInstanceState.getString("pendingConnectionsProject");pendingPlanProject=savedInstanceState.getString("pendingPlanProject");pendingProtocolsProject=savedInstanceState.getString("pendingProtocolsProject");}
- shell=page();shell.setPadding(0,0,0,0);shell.setBackgroundColor(0xfff4f6f8);setContentView(shell);fitSystemPanels(shell);
+ shell=page();shell.setPadding(0,0,0,0);shell.setBackgroundColor(0xff1b1b1b);setContentView(shell);fitSystemPanels(shell);
  planPage=page();measurePage=page();voicePage=page();profilePage=page();segmentPage=page();objectPage=page();quantityPage=page();
  LinearLayout header=new LinearLayout(this);
  header.setGravity(Gravity.CENTER_VERTICAL);
  header.setPadding(dp(16),dp(4),dp(8),dp(4));
- header.setBackgroundColor(Color.WHITE);
+ header.setBackgroundColor(0xff1b1b1b);
  shell.addView(header);
  projectHeader=sheetText(getPreferences(0).getString("project","Feldaufmaß Pro"),22,true);
  projectHeader.setTextColor(INK);
@@ -3657,7 +3658,7 @@ public class MainActivity extends Activity {
  header.addView(projectHeader,new LinearLayout.LayoutParams(0,-2,1));
  toolsMenu=new Button(this);
  toolsMenu.setAllCaps(false);
- toolsMenu.setText("Werkzeuge");
+ toolsMenu.setText("Werkzeuge");styleEditorButton(toolsMenu,false);
  header.addView(toolsMenu);
  toolsMenu.setOnClickListener(v->showTools());
  LinearLayout tabs=new LinearLayout(this);shell.addView(tabs);
@@ -3666,7 +3667,7 @@ public class MainActivity extends Activity {
  addSheetTab(tabs,"Mengen",quantityPage);
  body=new LinearLayout(this);shell.addView(body,new LinearLayout.LayoutParams(-1,0,1));
  LinearLayout dock=new LinearLayout(this);dock.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);
- dock.setBackgroundColor(Color.WHITE);dock.setPadding(dp(8),dp(4),dp(8),dp(4));shell.addView(dock);
+ dock.setBackgroundColor(0xff1b1b1b);dock.setPadding(dp(8),dp(4),dp(8),dp(4));shell.addView(dock);
  ImageButton assistant=new ImageButton(this);assistant.setImageResource(android.R.drawable.ic_btn_speak_now);
  assistant.setContentDescription("Sprachassistent starten; lange drücken für Assistent");
  header.addView(assistant,header.indexOfChild(toolsMenu),new LinearLayout.LayoutParams(dp(48),dp(48)));
@@ -4160,7 +4161,7 @@ public class MainActivity extends Activity {
  }
  Button actionButtonSingle(LinearLayout bar,String label,Runnable action){
   Button button=new Button(this);button.setAllCaps(false);button.setText(label);
-  button.setBackgroundTintList(android.content.res.ColorStateList.valueOf(TEAL));button.setTextColor(Color.WHITE);
+  styleEditorButton(button,label.equals("Speichern"));button.setTextSize(14);
   button.setOnClickListener(v->action.run());bar.addView(button);return button;
  }
  LinearLayout fold(LinearLayout parent,String title,boolean expanded){
