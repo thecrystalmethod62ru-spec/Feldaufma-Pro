@@ -1918,7 +1918,7 @@ public class MainActivity extends Activity {
    final Runnable[] refreshStationPlanHolder=new Runnable[1];
    Runnable refreshStationPlan=()->{if(refreshStationPlanHolder[0]!=null)refreshStationPlanHolder[0].run();};
    axis.setContentDescription("Station auf der linearen Trasse wählen");
-   axis.setOnTouchListener(new View.OnTouchListener(){float startX,startY;public boolean onTouch(View v,android.view.MotionEvent e){if(e.getActionMasked()==android.view.MotionEvent.ACTION_DOWN){startX=e.getX();startY=e.getY();return true;}if(e.getActionMasked()==android.view.MotionEvent.ACTION_UP){if(Math.hypot(e.getX()-startX,e.getY()-startY)>dp(12))return true;if(!stationProject.equals(activeProject)||v.getWidth()<=dp(36))return true;double st=Math.round(Math.max(0,Math.min(1,(e.getX()-dp(18))/(v.getWidth()-2.0*dp(18))))*total*1000)/1000.0;st=Math.min(total,st);final double chosen=st;String[] labels=new String[rows.length()];for(int j=0;j<labels.length;j++){try{labels[j]=montageDescription(rows.getJSONObject(j));}catch(Exception ex){labels[j]="Formstück "+(j+1);}}if(labels.length==0){notice("Zuerst Formstück hinzufügen.");return true;}new android.app.AlertDialog.Builder(MainActivity.this).setTitle(String.format(java.util.Locale.GERMANY,"Station %.3f m – Formstück wählen",chosen)).setItems(labels,(dd,j)->{try{if(!stationProject.equals(activeProject))throw new IllegalStateException();org.json.JSONArray latest=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));int idx=findMontageItem(latest,rows.getJSONObject(j));String before=latest.toString();latest.getJSONObject(idx).remove("routePointId");latest.getJSONObject(idx).put("station",chosen).put("stationLinked",true);if(!getPreferences(0).edit().putString("montageFittings",latest.toString()).commit())throw new java.io.IOException();rememberMontageStation(stationProject,before,latest.toString());recordProjectEvent("Formstück stationiert");if(sketch!=null)sketch.invalidate();if(livePreview!=null)livePreview.invalidate();refreshStationPlan.run();}catch(Exception ex){notice("Projektdaten geändert oder Speichern fehlgeschlagen.");}}).setNegativeButton("Abbrechen",null).show();return true;}return true;}});
+   axis.setOnTouchListener(new View.OnTouchListener(){float startX,startY;public boolean onTouch(View v,android.view.MotionEvent e){if(e.getActionMasked()==android.view.MotionEvent.ACTION_DOWN){startX=e.getX();startY=e.getY();return true;}if(e.getActionMasked()==android.view.MotionEvent.ACTION_UP){if(Math.hypot(e.getX()-startX,e.getY()-startY)>dp(12))return true;if(!stationProject.equals(activeProject)||v.getWidth()<=dp(36))return true;double st=Math.round(Math.max(0,Math.min(1,(e.getX()-dp(18))/(v.getWidth()-2.0*dp(18))))*total*1000)/1000.0;st=Math.min(total,st);final double chosen=st;String[] labels=new String[rows.length()];for(int j=0;j<labels.length;j++){try{labels[j]=montageDescription(rows.getJSONObject(j));}catch(Exception ex){labels[j]="Formstück "+(j+1);}}if(labels.length==0){notice("Zuerst Formstück hinzufügen.");return true;}new android.app.AlertDialog.Builder(MainActivity.this).setTitle(String.format(java.util.Locale.GERMANY,"Station %.3f m – Formstück wählen",chosen)).setItems(labels,(dd,j)->{try{if(!stationProject.equals(activeProject))throw new IllegalStateException();org.json.JSONArray latest=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));int idx=findMontageItem(latest,rows.getJSONObject(j));String before=latest.toString();setPlanStation(latest.getJSONObject(idx),chosen);if(!getPreferences(0).edit().putString("montageFittings",latest.toString()).commit())throw new java.io.IOException();rememberMontageStation(stationProject,before,latest.toString());recordProjectEvent("Formstück stationiert");if(sketch!=null)sketch.invalidate();if(livePreview!=null)livePreview.invalidate();refreshStationPlan.run();}catch(Exception ex){notice("Projektdaten geändert oder Speichern fehlgeschlagen.");}}).setNegativeButton("Abbrechen",null).show();return true;}return true;}});
    TextView range=new TextView(this);range.setText("0,00 m  —  "+total+" m");panel.addView(range);
    RouteSketch geometry=new RouteSketch(this,routeData());
    double measured=geometry.measuredLength();
@@ -1968,7 +1968,7 @@ public class MainActivity extends Activity {
         org.json.JSONArray latest=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));
         int idx=findMontageItem(latest,rows.getJSONObject(j));
         String before=latest.toString();
-        latest.getJSONObject(idx).put("station",chosen).put("stationLinked",true);
+        setPlanStation(latest.getJSONObject(idx),chosen);
         if(!getPreferences(0).edit().putString("montageFittings",latest.toString()).commit())throw new java.io.IOException();
         rememberMontageStation(stationProject,before,latest.toString());
         recordProjectEvent("Formstück im Montageplan stationiert");if(sketch!=null)sketch.invalidate();if(livePreview!=null)livePreview.invalidate();
@@ -2034,6 +2034,10 @@ public class MainActivity extends Activity {
    tile.setContentDescription(fitting.label);tile.setFocusable(true);tile.setOnClickListener(v->{dialog.dismiss();showMontageFitting(fitting,null);});
   }
   dialog.show();
+ }
+ static void setPlanStation(org.json.JSONObject fitting,double station) throws org.json.JSONException {
+  fitting.put("station",station).put("stationLinked",true);
+  fitting.remove("routePointId");
  }
  void chooseFittingStation(String projectId,EditText field){
   if(!projectId.equals(activeProject)){notice("Projekt wurde gewechselt.");return;}
