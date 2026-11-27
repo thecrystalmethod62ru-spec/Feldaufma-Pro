@@ -1051,8 +1051,21 @@ final class RouteSketch extends View {
    paint.setColor(darkPalette()?0xff101010:Color.WHITE);c.drawRect(0,0,getWidth(),25*density,paint);
    paint.setColor(darkPalette()?0xffe3f0ed:0xff173c42);c.drawText(status,8*density,18*density,paint);
   }
-  paint.setColor(0xff42799e);paint.setStrokeWidth(3);
-  for(int i=1;i<stroke.size();i++)line(c,stroke.get(i-1),stroke.get(i));
+  if(darkEditor&&!printPlan&&stroke.size()>1){
+   double w=trenchWidth;
+   if(!Double.isFinite(w)||w<=0)w=getContext().getSharedPreferences("base_profile_defaults",0).getFloat("width",0.4f);
+   if(!Double.isFinite(w)||w<=0)w=0.4;
+   float sw=(float)Math.max(2*density,Math.min(24*density*w/0.4,Math.max(getWidth(),getHeight())*2.0));
+   Path draft=new Path();PointF first=stroke.get(0);draft.moveTo(left()+scale()*first.x,top()+scale()*first.y);
+   for(int i=1;i<stroke.size();i++){PointF pt=stroke.get(i);draft.lineTo(left()+scale()*pt.x,top()+scale()*pt.y);}
+   Paint previewPaint=new Paint(Paint.ANTI_ALIAS_FLAG);previewPaint.setStyle(Paint.Style.STROKE);previewPaint.setStrokeJoin(Paint.Join.ROUND);previewPaint.setStrokeCap(Paint.Cap.ROUND);
+   previewPaint.setColor(0xff78918a);previewPaint.setStrokeWidth(sw+2*density);c.drawPath(draft,previewPaint);
+   previewPaint.setColor(0xff443b30);previewPaint.setStrokeWidth(sw);c.drawPath(draft,previewPaint);
+   previewPaint.setColor(0xff55c7b5);previewPaint.setStrokeWidth(2*density);c.drawPath(draft,previewPaint);
+  }else{
+   paint.setColor(0xff42799e);paint.setStrokeWidth(3);
+   for(int i=1;i<stroke.size();i++)line(c,stroke.get(i-1),stroke.get(i));
+  }
   drawAutomaticLegend(c,density);
  }
  private ArrayList<PointF> simplifiedStroke(ArrayList<PointF> points,double tolerance){
