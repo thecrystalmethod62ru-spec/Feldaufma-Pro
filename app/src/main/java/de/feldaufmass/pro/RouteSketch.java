@@ -15,7 +15,7 @@ import java.util.Locale;
 
 /** Coordinates describe a schematic only. Metres are entered in the field. */
 final class RouteSketch extends View {
- static final int LAYER_ROUTE=1,LAYER_DIMENSIONS=2,LAYER_NAMES=4,LAYER_GPS=8,LAYER_PHOTOS=16,LAYER_OBJECTS=32,LAYER_SURFACES=64,LAYER_SURFACE_DIMENSIONS=128,LAYER_GPS_TRACK=256,ALL_LAYERS=511;
+ static final int LAYER_ROUTE=1,LAYER_DIMENSIONS=2,LAYER_NAMES=4,LAYER_GPS=8,LAYER_PHOTOS=16,LAYER_OBJECTS=32,LAYER_SURFACES=64,LAYER_SURFACE_DIMENSIONS=128,LAYER_GPS_TRACK=256,LAYER_GPS_DEVIATIONS=512,ALL_LAYERS=1023;
  int visibleLayers=ALL_LAYERS;
  boolean layerVisible(int layer){return (visibleLayers&layer)!=0;}
  void setVisibleLayers(int layers){visibleLayers=layers&ALL_LAYERS;invalidate();}
@@ -565,6 +565,32 @@ final class RouteSketch extends View {
   return new double[]{count==0?0:sum/count,max};
  }
  void setIndependentGpsTrack(JSONArray rows){independentGpsTrack=rows==null?new JSONArray():rows;invalidate();}
+ void drawGpsDeviations(Canvas c,float density){
+  if(!layerVisible(LAYER_GPS_DEVIATIONS)||vertices.size()<2||independentGpsTrack.length()<2)return;
+  java.util.ArrayList<PointF> points=new java.util.ArrayList<>();
+  double metres=0,span=0;org.json.JSONObject last=null;
+  for(int i=0;i<independentGpsTrack.length();i++){
+   org.json.JSONObject row=independentGpsTrack.optJSONObject(i);if(row==null)return;
+   PointF p=gpsPosition(row.optDouble("lat"),row.optDouble("lon"),-1);if(p==null)return;
+   if(last!=null){float[] d=new float[1];android.location.Location.distanceBetween(last.optDouble("lat"),last.optDouble("lon"),row.optDouble("lat"),row.optDouble("lon"),d);metres+=d[0];span+=distance(points.get(points.size()-1),p);}
+   points.add(p);last=row;
+  }
+  if(span<=0||metres<=0)return;
+  double factor=metres/span;
+  int stride=Math.max(1,(points.size()+99)/100);
+  paint.setStrokeWidth(1.5f*density);
+  for(int i=0;i<points.size();i+=stride){
+   PointF p=points.get(i),nearest=null;double best=Double.POSITIVE_INFINITY;
+   for(int j=1;j<vertices.size();j++){
+    PointF a=vertices.get(j-1).point,b=vertices.get(j).point;
+    double dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;
+    double t=den==0?0:Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/den));
+    PointF q=new PointF((float)(a.x+t*dx),(float)(a.y+t*dy));double d=distance(p,q);
+    if(d<best){best=d;nearest=q;}
+   }
+   if(nearest!=null){double m=best*factor;paint.setColor(m<=1?0xff69cdbb:m<=3?0xffe9b63c:0xffef5350);line(c,p,nearest);}
+  }
+ }
  void drawIndependentGpsTrack(Canvas c,float density){
   if(!layerVisible(LAYER_GPS_TRACK)||independentGpsTrack.length()==0)return;
   PointF previous=null;paint.setColor(0xff35b9ff);paint.setStrokeWidth(3*density);
@@ -777,6 +803,7 @@ final class RouteSketch extends View {
   drawSurfaceDimensions(c,density);
   drawStationObjects(c,density);
   drawIndependentGpsTrack(c,density);
+  drawGpsDeviations(c,density);
   if(layerVisible(LAYER_GPS)&&liveFix!=null){
    PointF gps=gpsPosition(liveFix.getLatitude(),liveFix.getLongitude(),-1);
    if(gps!=null){
