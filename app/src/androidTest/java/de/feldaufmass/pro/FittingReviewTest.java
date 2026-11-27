@@ -12,6 +12,8 @@ import static androidx.test.espresso.matcher.RootMatchers.isDialog;
 import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
+import static androidx.test.espresso.assertion.ViewAssertions.matches;
+import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static org.junit.Assert.*;
 
 @RunWith(AndroidJUnit4.class)
@@ -33,10 +35,11 @@ public class FittingReviewTest {
                 onView(withText("Zurück")).inRoot(isDialog()).perform(click());
                 onView(withText("Zeile 1 · "+bend)).inRoot(isDialog()).perform(click());
                 onView(withText("Zum Projekt hinzufügen")).inRoot(isDialog()).perform(click());
-                onView(withText("Zeile 1 · "+bend)).check(doesNotExist());
+                onView(withText("Formstücke prüfen · 1 von 2 offen")).inRoot(isDialog()).check(matches(isDisplayed()));
+                onView(withText("Zeile 1 · "+bend)).inRoot(isDialog()).check(doesNotExist());
                 onView(withText("Zeile 2 · Muffe")).inRoot(isDialog()).perform(click());
                 onView(withText("Station aus Projekt wählen")).inRoot(isDialog()).perform(androidx.test.espresso.action.ViewActions.scrollTo(),click());
-                onView(withText("Station 8,250 m · Punkt 4")).check(doesNotExist());
+                onView(withText("Station 8,250 m · Punkt 4")).inRoot(isDialog()).check(doesNotExist());
                 onView(withText("Station 6,250 m · Punkt 2 · Schacht")).inRoot(isDialog()).perform(click());
                 onView(withText("Zum Projekt hinzufügen")).inRoot(isDialog()).perform(click());
                 scenario.onActivity(activity->{
