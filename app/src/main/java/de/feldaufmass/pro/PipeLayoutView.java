@@ -75,7 +75,7 @@ public final class PipeLayoutView extends View {
         super.onDraw(c);
         dimensionLabels.clear();
         float density=getResources().getDisplayMetrics().density;
-        float pad=Math.min(42*density,Math.min(getWidth(),getHeight())*.20f);
+        float pad=Math.min(64*density,Math.min(getWidth(),getHeight())*.25f);
         if(getWidth()<=0||getHeight()<=0)return;
         double leftExtent=width/2+cutLeft,rightExtent=width/2+cutRight,above=depth;
         for(PipeLayout.Pipe pipe:pipes){leftExtent=Math.max(leftExtent,-pipe.offset+pipe.diameter/2);rightExtent=Math.max(rightExtent,pipe.offset+pipe.diameter/2);above=Math.max(above,pipe.bedding+pipe.diameter);}
@@ -97,7 +97,7 @@ public final class PipeLayoutView extends View {
             p.setColor(0xffeeeeee);p.setStrokeWidth(1.5f);c.drawLine(left,top,left,bottom,p);c.drawLine(right,top,right,bottom,p);c.drawLine(left,bottom,right,bottom,p);
             p.setTextSize(11*getResources().getDisplayMetrics().scaledDensity);
 
-            if(cutLeft+cutRight>0)dimension(c,a,top-pad/2,b,top-pad/2,width+cutLeft+cutRight);
+            if(cutLeft+cutRight>0)dimension(c,a,top-pad*.80f,b,top-pad*.80f,width+cutLeft+cutRight);
             if(asphaltProfile&&deck>0){
                 float cutBottom=deckBottom;
                 p.setColor(0xffd5d9dc);p.setStrokeWidth(1.5f);
@@ -111,8 +111,8 @@ public final class PipeLayoutView extends View {
             }
         }
         p.setTextSize(11*getResources().getDisplayMetrics().scaledDensity);
-        dimension(c,left,top-pad/2,right,top-pad/2,width);
-        dimension(c,left-pad/3,top,left-pad/3,bottom,depth);
+        dimension(c,left,top-pad*.28f,right,top-pad*.28f,width);
+        dimension(c,left-pad*.55f,top,left-pad*.55f,bottom,depth);
         int[] colors={0xff397db5,0xffd4ab35,0xff398b75,0xff9567b8};
         p.setTextSize(12*getResources().getDisplayMetrics().scaledDensity);
         for(int i=0;i<pipes.size();i++){
@@ -191,7 +191,7 @@ public final class PipeLayoutView extends View {
             p.setColor(color);p.setStrokeWidth(d);
             c.drawLine((x1+x2)/2,(y1+y2)/2,x+textWidth/2,y-textHeight/2,p);
         }
-        p.setStyle(Paint.Style.FILL);p.setColor(0xff041012);c.drawRoundRect(x-3*d,y-p.getTextSize(),x+p.measureText(label)+3*d,y+3*d,3*d,3*d,p);
+        p.setStyle(Paint.Style.FILL);p.setColor(0xff000000);c.drawRoundRect(x-3*d,y-p.getTextSize(),x+p.measureText(label)+3*d,y+3*d,3*d,3*d,p);
         p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(d);p.setColor(color);c.drawRoundRect(x-3*d,y-p.getTextSize(),x+p.measureText(label)+3*d,y+3*d,3*d,3*d,p);p.setStyle(Paint.Style.FILL);c.drawText(label,x,y,p);
     }
     private void drawLabel(Canvas c,String label,float x,float y,int color){
