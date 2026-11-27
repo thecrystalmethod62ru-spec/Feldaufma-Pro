@@ -295,12 +295,12 @@ public class MainActivity extends Activity {
   LinearLayout start=page();start.setGravity(Gravity.TOP);start.setBackgroundColor(Color.BLACK);start.setPadding(dp(20),dp(16),dp(20),dp(12));setContentView(start);fitSystemPanels(start);
   ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);start.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
   LinearLayout content=page();content.setPadding(0,0,0,0);content.setBackgroundColor(Color.BLACK);scroll.addView(content);
-  TextView brand=sheetText("Feldaufmaß Pro",26,true);content.addView(brand);
+  TextView brand=sheetText("Feldaufmaß Pro",26,true);android.text.SpannableString brandText=new android.text.SpannableString("Feldaufmaß Pro");brandText.setSpan(new android.text.style.ForegroundColorSpan(0xff26d9d0),11,14,0);brand.setText(brandText);content.addView(brand);
   TextView subtitle=sheetText("Tiefbau · Leitungsbau",14,false);subtitle.setTextColor(0xff9aabaa);content.addView(subtitle);
   TextView heading=sheetText("Projekte",20,true);heading.setPadding(0,dp(18),0,dp(8));content.addView(heading);
   overviewAction(content,"Neues Projekt erstellen","objects",()->newProjectDialog());
   Button create=(Button)content.getChildAt(content.getChildCount()-1);
-  create.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x33ffffff),editorShape(TEAL,10),null));
+  create.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x33ffffff),proButtonShape(true),null));
   overviewAction(content,"Bestehendes Projekt öffnen","layers",()->showProjects());
   TextView recent=sheetText("Vorhandene Projekte",18,true);recent.setPadding(0,dp(16),0,dp(6));content.addView(recent);
   java.util.ArrayList<String> ids=new java.util.ArrayList<>(projectRegistry().getStringSet("ids",java.util.Collections.emptySet()));
@@ -1128,9 +1128,13 @@ public class MainActivity extends Activity {
  android.graphics.drawable.GradientDrawable editorShape(int color,int radius){
   android.graphics.drawable.GradientDrawable shape=new android.graphics.drawable.GradientDrawable();shape.setColor(color);shape.setCornerRadius(dp(radius));return shape;
  }
+ android.graphics.drawable.GradientDrawable proButtonShape(boolean primary){
+  android.graphics.drawable.GradientDrawable shape=primary?new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0xff009e96,0xff006b65}):editorShape(0xff101c1e,8);
+  shape.setCornerRadius(dp(8));shape.setStroke(dp(1),primary?0xff26d9d0:0xff405658);return shape;
+ }
  void styleEditorButton(Button b,boolean primary){
   b.setAllCaps(false);b.setTextSize(primary?15:12);b.setTextColor(Color.WHITE);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(dp(4),dp(4),dp(4),dp(4));b.setBackgroundTintList(null);
-  b.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x3312665f),editorShape(primary?TEAL:0xff202827,12),null));
+  b.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x3312665f),proButtonShape(primary),null));
  }
  void compactToolIcon(Button button,String label,String kind){
   android.graphics.drawable.Drawable icon=new android.graphics.drawable.Drawable(){
@@ -1675,7 +1679,7 @@ public class MainActivity extends Activity {
   layers.append("\nTragschicht · ").append(baseValue.isEmpty()?"Stärke nicht erfasst":baseValue+" m");
   surfaceLayers.setText(layers.toString());
  }
- static final int INK=0xff193747, UI_TEXT=0xfff2f2f2, TEAL=0xff14766b;
+ static final int INK=0xff193747, UI_TEXT=0xfff2f2f2, TEAL=0xff008f89;
  TextView[] overviewValues=new TextView[4];
  LinearLayout stationRows;
  final java.util.LinkedHashMap<LinearLayout,Button> sheetTabs=new java.util.LinkedHashMap<>();
