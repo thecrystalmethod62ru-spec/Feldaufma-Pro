@@ -556,7 +556,7 @@ public class MainActivity extends Activity {
  }
  void refreshRoute(){
   routePreviewBox.removeAllViews();
-  RouteSketch preview=new RouteSketch(this,routeData());preview.bindDimensionProject(activeProject);
+  RouteSketch preview=new RouteSketch(this,routeData());preview.darkPreview=true;preview.bindDimensionProject(activeProject);
   livePreview=preview;preview.setVisibleLayers(drawingLayers());preview.setLiveFix(liveFix);preview.setIndependentGpsTrack(gpsTrack());preview.setImportedGpsReference(importedGpsReference());
   preview.pointSelected=i->{selectedPoint=preview.vertices.get(i).id;refreshRoute();pointMenu();};
   preview.selected=i->measureSegment(preview,i);
@@ -1161,7 +1161,7 @@ public class MainActivity extends Activity {
  void editRoute(boolean measure,boolean startFullscreen){
   LinearLayout form=page();
   ScrollView scroll=new ScrollView(this);scroll.addView(form);
-  RouteSketch route=new RouteSketch(this,routeData());route.editable=true;route.bindDimensionProject(activeProject);route.setIndependentGpsTrack(gpsTrack());route.setImportedGpsReference(importedGpsReference());route.setVisibleLayers(drawingLayers());
+  RouteSketch route=new RouteSketch(this,routeData());route.editable=true;route.darkPreview=true;route.bindDimensionProject(activeProject);route.setIndependentGpsTrack(gpsTrack());route.setImportedGpsReference(importedGpsReference());route.setVisibleLayers(drawingLayers());
   TextView hint=sheetText("Trasse mit dem Finger zeichnen. Loslassen zum Bearbeiten.",15,false);
   form.addView(hint);
   Button fullscreen=new Button(this);fullscreen.setAllCaps(false);fullscreen.setText("⛶ Vollbild");form.addView(fullscreen);
