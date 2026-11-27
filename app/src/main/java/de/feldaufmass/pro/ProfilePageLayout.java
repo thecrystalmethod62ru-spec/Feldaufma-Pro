@@ -40,10 +40,10 @@ final class ProfilePageLayout {
   String[] names={"Aufbau","Leitungen","Material","Berechnung"};fullButtons=new Button[names.length];
   for(int i=0;i<names.length;i++){Button b=new Button(context);fullButtons[i]=b;style.accept(b,i==0);b.setText(names[i]);b.setAllCaps(false);b.setTextSize(11);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(0,0,0,0);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-1,1);lp.setMargins(dp(2),0,dp(2),0);fullTabs.addView(b,lp);}
   LinearLayout profileActions=new LinearLayout(context);profilePage.addView(profileActions,new LinearLayout.LayoutParams(-1,dp(40)));
-  for(Button b:new Button[]{editSectionProfile,baseSettings}){android.graphics.drawable.Drawable icon=b.getCompoundDrawables()[1];b.setCompoundDrawables(icon,null,null,null);b.setMinHeight(0);b.setMinimumHeight(0);b.setTextSize(12);b.setPadding(dp(6),0,dp(6),0);}
+  for(Button b:new Button[]{editSectionProfile,baseSettings}){android.graphics.drawable.Drawable icon=b.getCompoundDrawables()[1];b.setCompoundDrawables(icon,null,null,null);b.setMinHeight(0);b.setMinimumHeight(0);b.setTextSize(12);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(dp(6),0,dp(6),0);}
   for(Button b:new Button[]{baseSettings,profileEdit,applyProfile})profileActions.addView(b,new LinearLayout.LayoutParams(0,-1,1));
  }
- private void configureAction(Button b){b.setAllCaps(false);b.setMinHeight(0);b.setMinimumHeight(0);b.setTextSize(12);}
+ private void configureAction(Button b){b.setAllCaps(false);b.setMinHeight(0);b.setMinimumHeight(0);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(dp(4),0,dp(4),0);b.setTextSize(12);}
  private int dp(int value){return Math.round(value*context.getResources().getDisplayMetrics().density);}
  private TextView sheetText(String text,int size,boolean bold){TextView v=new TextView(context);v.setText(text);v.setTextSize(size);if(bold)v.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return v;}
  private GradientDrawable editorShape(int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));return d;}
