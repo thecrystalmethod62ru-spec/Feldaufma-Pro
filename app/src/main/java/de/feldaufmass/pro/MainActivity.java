@@ -998,10 +998,12 @@ public class MainActivity extends Activity {
    public void onNothingSelected(AdapterView<?> parent){}
   });
  }
- LinearLayout belagsFields;
+ LinearLayout belagsFields,asphaltFields;
  Button belagsToggle;
 
+ boolean isStoneSurface(String name){String n=name.toLowerCase(java.util.Locale.ROOT);return n.contains("pflaster")||n.contains("platten")||n.contains("rasengittersteine");}
  void setBelagsExpanded(boolean expanded){
+  if(surface!=null&&!isStoneSurface(String.valueOf(surface.getSelectedItem())))expanded=false;
   belagsFields.setVisibility(expanded?View.VISIBLE:View.GONE);
   belagsToggle.setText(expanded?"Belagsdetails ausblenden ▴":"Belagsdetails anzeigen ▾");
  }
@@ -1016,7 +1018,7 @@ public class MainActivity extends Activity {
  void showSurfaceLayers(){
   SharedPreferences data=getPreferences(0);
   String material=covering.equals("Unbekannt")?"Material nicht erfasst":covering;
-  String thickness=covering.equals("Asphalt")?data.getString("asphalt",""):data.getString("stoneDepth","");
+  String thickness=covering.equals("Asphalt")?data.getString("asphalt",""):isStoneSurface(covering)?data.getString("stoneDepth",""):"";
   String unit=covering.equals("Asphalt")?" m":" cm";
   StringBuilder layers=new StringBuilder("Deckschicht · ").append(material).append(" · ")
    .append(thickness.isEmpty()?"Stärke nicht erfasst":thickness+unit);
@@ -3684,7 +3686,7 @@ public class MainActivity extends Activity {
  width=field(root,"Grabenbreite (m)","width",true);
  depth=field(root,"Grabentiefe (m)","depth",true);
  TextView surfaceLabel=new TextView(this);surfaceLabel.setText("Oberfläche");root.addView(surfaceLabel);
- surface=new Spinner(this);String[] types={"Unbekannt","Asphalt","Pflaster","Gehwegplatten","Unbefestigt","Betonpflaster – Rechteck","Betonpflaster – Quadrat","Doppel-T-Pflaster","Wellenverbundpflaster","Sechseckpflaster","Achteckpflaster","Verbundpflaster – sonstige","Betonpflaster – Mehrformat","Ökopflaster / Sickerpflaster","Rasengittersteine","Rasenfugenpflaster","Natursteinpflaster – Großpflaster","Natursteinpflaster – Kleinpflaster","Natursteinpflaster – Mosaikpflaster","Natursteinpflaster – sonstige","Klinkerpflaster","Ziegelpflaster","Beton-Gehwegplatten","Natursteinplatten","Waschbetonplatten","Taktilplatten – Rippen","Taktilplatten – Noppen","Rinnenpflaster","Schlackenpflaster","Holzpflaster","Sonstiges","Beton","Betonpflaster","Großpflaster","Kleinpflaster","Gehwegplatten 1 × 1 m","Verbundpflaster","Schotter","Kies","Sand","Unbefestigte Fläche","Rasen","Grünfläche","Wassergebundene Decke","Sonstige Oberfläche"};
+ surface=new Spinner(this);String[] types={"Unbekannt","Asphalt","Pflaster","Gehwegplatten","Unbefestigt","Betonpflaster – Rechteck","Betonpflaster – Quadrat","Doppel-T-Pflaster","Wellenverbundpflaster","Sechseckpflaster","Achteckpflaster","Verbundpflaster – sonstige","Betonpflaster – Mehrformat","Ökopflaster / Sickerpflaster","Rasengittersteine","Rasenfugenpflaster","Natursteinpflaster – Großpflaster","Natursteinpflaster – Kleinpflaster","Natursteinpflaster – Mosaikpflaster","Natursteinpflaster – sonstige","Klinkerpflaster","Ziegelpflaster","Beton-Gehwegplatten","Natursteinplatten","Waschbetonplatten","Taktilplatten – Rippen","Taktilplatten – Noppen","Rinnenpflaster","Schlackenpflaster","Holzpflaster","Sonstiges","Beton","Betonpflaster","Großpflaster","Kleinpflaster","Gehwegplatten 1 × 1 m","Verbundpflaster","Schotter","Kies","Sand","Unbefestigte Fläche","Rasen","Grünfläche","Wassergebundene Decke","Sonstige Oberfläche","Pflastersteine","Großsteinpflaster","Kleinsteinpflaster"};
  java.util.ArrayList<String> surfaceTypes=new java.util.ArrayList<>(java.util.Arrays.asList(types));
  android.content.SharedPreferences catalog=getSharedPreferences("surface_catalog",MODE_PRIVATE);
  try{org.json.JSONArray custom=new org.json.JSONArray(catalog.getString("custom","[]"));for(int i=0;i<custom.length();i++){String name=custom.optString(i).trim();if(!name.isEmpty()&&!surfaceTypes.contains(name))surfaceTypes.add(name);}}catch(Exception ignored){}
@@ -3717,23 +3719,37 @@ public class MainActivity extends Activity {
  stoneColor=field(belagsFields,"Farbe (optional)","stoneColor",false);
  pattern=field(belagsFields,"Verlegemuster (optional)","pattern",false);
  bedding=field(belagsFields,"Bettung – Material / Stärke (optional)","bedding",false);
- underlying=field(belagsFields,"Unterliegender Altbelag (z. B. Großpflaster)","underlying",false);
- TextView handlingLabel=new TextView(this);handlingLabel.setText("Umgang mit Altbelag");root.addView(handlingLabel);
+ LinearLayout optionalCatalog=fold(root,"Zusätzliche Leistungen / Katalog",false);
+ LinearLayout oldBelag=fold(optionalCatalog,"Altbelag und Wiederherstellung",false);
+ underlying=field(oldBelag,"Unterliegender Altbelag (z. B. Großpflaster)","underlying",false);
+ TextView handlingLabel=new TextView(this);handlingLabel.setText("Umgang mit Altbelag");oldBelag.addView(handlingLabel);
  handling=new Spinner(this);String[] options={"Nicht erfasst","Aufnahme","Aufnahme und Entsorgung","Aufnahme und Wiederverwendung","Wiederherstellung"};
- handling.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,options));root.addView(handling);handling.setSelection(Math.min(4,Math.max(0,getPreferences(0).getInt("handling",0))));
- baseInput=field(root,"Tragschichtstärke (m, optional)","base",true);
- pipeInput=field(root,"Rohr-Außendurchmesser (mm, optional)","pipe",true);
- Button utilitiesButton=new Button(this);utilitiesButton.setText("Weitere Leitungen / Kabel");utilitiesButton.setAllCaps(false);root.addView(utilitiesButton);utilitiesButton.setOnClickListener(v->editUtilities());
- asphaltInput=field(root,"Asphaltstärke (m, optional)","asphalt",true);
- leftInput=field(root,"Nachschnitt links (m, optional)","left",true);
- rightInput=field(root,"Nachschnitt rechts (m, optional)","right",true);
- Button save=new Button(this);save.setText("Berechnen und speichern");root.addView(save);
+ handling.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,options));oldBelag.addView(handling);handling.setSelection(Math.min(4,Math.max(0,getPreferences(0).getInt("handling",0))));
+ baseInput=field(fold(optionalCatalog,"Tragschicht",false),"Tragschichtstärke (m, optional)","base",true);
+ LinearLayout utilitiesFields=fold(optionalCatalog,"Leitungen / Kabel",false);
+ pipeInput=field(utilitiesFields,"Rohr-Außendurchmesser (mm, optional)","pipe",true);
+ Button utilitiesButton=new Button(this);utilitiesButton.setText("Weitere Leitungen / Kabel");utilitiesButton.setAllCaps(false);utilitiesFields.addView(utilitiesButton);utilitiesButton.setOnClickListener(v->editUtilities());
+ asphaltFields=page();root.addView(asphaltFields,root.indexOfChild(belagsToggle));
+ asphaltInput=field(asphaltFields,"Asphaltstärke (m, optional)","asphalt",true);
+ LinearLayout cutFields=fold(optionalCatalog,"Nachschnitt",false);
+ leftInput=field(cutFields,"Nachschnitt links (m, optional)","left",true);
+ rightInput=field(cutFields,"Nachschnitt rechts (m, optional)","right",true);
+ Button save=new Button(this);save.setText("Berechnen und speichern");save.setVisibility(View.GONE);root.addView(save);
+ Runnable surfaceVisibility=()->{String name=String.valueOf(surface.getSelectedItem());boolean stone=isStoneSurface(name);belagsToggle.setVisibility(stone?View.VISIBLE:View.GONE);setBelagsExpanded(stone);asphaltFields.setVisibility("Asphalt".equals(name)?View.VISIBLE:View.GONE);};
+ onChoice(surface,i->surfaceVisibility.run());surfaceVisibility.run();
  root=quantityPage;
  result=new TextView(this);result.setTextSize(18);root.addView(result);shoringQuantities=new TextView(this);root.addView(shoringQuantities);detailQuantities=new TextView(this);root.addView(detailQuantities);
  root=planPage;
  sketch=new Sketch();sketch.setBackgroundColor(Color.WHITE);root.addView(sketch,new LinearLayout.LayoutParams(-1,dp(280))); LinearLayout historyBar=new LinearLayout(this);root.addView(historyBar);undoObjectsButton=new Button(this);undoObjectsButton.setText("Rückgängig");historyBar.addView(undoObjectsButton,new LinearLayout.LayoutParams(0,-2,1));redoObjectsButton=new Button(this);redoObjectsButton.setText("Wiederholen");historyBar.addView(redoObjectsButton,new LinearLayout.LayoutParams(0,-2,1));undoObjectsButton.setOnClickListener(v->restoreObjectHistory(false));redoObjectsButton.setOnClickListener(v->restoreObjectHistory(true));updateHistoryButtons();
  Button edit=new Button(this);edit.setText("Trassenmaße bearbeiten");root.addView(edit);edit.setOnClickListener(v->showPage(measurePage));
- actionButtonSingle(planPage,"Verbauflächen berechnen",()->{
+ LinearLayout serviceCatalog=fold(planPage,"Zusätzliche Leistungen / Katalog",false);
+ actionButtonSingle(serviceCatalog,"Trassenobjekte – Suchschachtung, Baugruben, Hindernisse",()->showPage(objectPage));
+ actionButtonSingle(serviceCatalog,"Oberflächenabschnitte",()->showPage(segmentPage));
+ actionButtonSingle(serviceCatalog,"Leitungen / Kabel",()->editUtilities());
+ LinearLayout earthCatalog=fold(serviceCatalog,"Erdarbeiten und Verbau",false);
+ LinearLayout surfaceWorkCatalog=fold(serviceCatalog,"Oberflächenarbeiten",false);
+ LinearLayout sectionCatalog=fold(serviceCatalog,"Abschnittsprofile und Mengen",false);
+ actionButtonSingle(earthCatalog,"Verbauflächen berechnen",()->{
   LinearLayout fields=new LinearLayout(this);fields.setOrientation(1);
   String[] hints={"Station von (m)","Station bis (m)","Verbauhöhe links (m; 0 = kein Verbau)","Verbauhöhe rechts (m; 0 = kein Verbau)"};
   EditText[] inputs=new EditText[4];for(int i=0;i<4;i++){inputs[i]=new EditText(this);inputs[i].setHint(hints[i]);inputs[i].setInputType(8194);fields.addView(inputs[i]);}
@@ -3775,7 +3791,7 @@ public class MainActivity extends Activity {
   ScrollView scroll=new ScrollView(this);scroll.addView(fields);
   new android.app.AlertDialog.Builder(this).setTitle("Verbau – Flächenvorberechnung").setView(scroll).setPositiveButton("Schließen",null).show();
  });
- actionButtonSingle(planPage,"Bodenaustausch und Entsorgung",()->{
+ actionButtonSingle(earthCatalog,"Bodenaustausch und Entsorgung",()->{
   LinearLayout fields=new LinearLayout(this);fields.setOrientation(1);
   String[] hints={"Bodenaushub fest (m³), ohne Oberbau","Wiederverwendbarer Boden fest (m³)","Benötigte Verfüllung verdichtet (m³)","Auflockerungsfaktor Entsorgung","Lieferfaktor Ersatzmaterial"};
   EditText[] inputs=new EditText[hints.length];
@@ -3793,7 +3809,7 @@ public class MainActivity extends Activity {
   ScrollView scroll=new ScrollView(this);scroll.addView(fields);
   new android.app.AlertDialog.Builder(this).setTitle("Bodenbilanz – Vorberechnung").setView(scroll).setPositiveButton("Schließen",null).show();
  });
- actionButtonSingle(planPage,"Leitungszone und Verfüllung",()->{
+ actionButtonSingle(earthCatalog,"Leitungszone und Verfüllung",()->{
   try{
    org.json.JSONArray rows=new PipeLayoutStore(getPreferences(0)).sections();
    if(rows.length()==0){notice("Keine Abschnittsprofile vorhanden.");return;}
@@ -3825,7 +3841,7 @@ public class MainActivity extends Activity {
    }));inputDialog.show();
   }catch(Exception ex){notice(ex.getMessage());}
  });
- actionButtonSingle(planPage,"Schichtvolumen berechnen",()->{
+ actionButtonSingle(surfaceWorkCatalog,"Schichtvolumen berechnen",()->{
   try{
    if(segments.length()==0){notice("Keine Oberflächenabschnitte vorhanden.");return;}
    StringBuilder report=new StringBuilder("Vorberechnung – abschnittsbezogene Schichtstärken\n\n");
@@ -3861,7 +3877,7 @@ public class MainActivity extends Activity {
    new android.app.AlertDialog.Builder(this).setTitle("Oberflächenaufbau – Schichtvolumen").setView(scroll).setPositiveButton("Schließen",null).show();
   }catch(Exception ex){notice("Schichtvolumen: "+ex.getMessage());}
  });
- actionButtonSingle(planPage,"Oberflächenmengen nach Abschnitt",()->{
+ actionButtonSingle(surfaceWorkCatalog,"Oberflächenmengen nach Abschnitt",()->{
   try{
    java.util.TreeMap<String,double[]> totals=new java.util.TreeMap<>();
    StringBuilder report=new StringBuilder();double covered=0;
@@ -3886,7 +3902,7 @@ public class MainActivity extends Activity {
    new android.app.AlertDialog.Builder(this).setTitle("Oberflächenmengen").setView(scroll).setPositiveButton("Schließen",null).show();
   }catch(Exception ex){notice("Oberflächenmengen: "+ex.getMessage());}
  });
- actionButtonSingle(planPage,"Erdmengen nach Abschnitt",()->{
+ actionButtonSingle(sectionCatalog,"Erdmengen nach Abschnitt",()->{
   try{
    org.json.JSONArray rows=new PipeLayoutStore(getPreferences(0)).sections();
    if(rows.length()==0){notice("Keine Abschnittsprofile vorhanden.");return;}
@@ -3923,7 +3939,7 @@ public class MainActivity extends Activity {
    new android.app.AlertDialog.Builder(this).setTitle("Mengenermittlung – Abschnittsprofile").setView(scroll).setPositiveButton("Schließen",null).show();
   }catch(Exception ex){notice("Mengenermittlung: "+ex.getMessage());}
  });
- actionButtonSingle(planPage,"Abschnittsprofile anzeigen",()->{
+ actionButtonSingle(sectionCatalog,"Abschnittsprofile anzeigen",()->{
   try{
    org.json.JSONArray profiles=new PipeLayoutStore(getPreferences(0)).sections();
    if(profiles.length()==0){notice("Keine Abschnittsprofile vorhanden.");return;}
@@ -4028,7 +4044,7 @@ public class MainActivity extends Activity {
  stoneDepth.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){if(syncingStone[0])return;syncingStone[0]=true;stoneExact.setText(s);syncingStone[0]=false;refreshProfileDraft();}public void afterTextChanged(android.text.Editable e){}});
  stoneExact.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){if(syncingStone[0])return;syncingStone[0]=true;stoneDepth.setText(s);syncingStone[0]=false;refreshProfileDraft();}public void afterTextChanged(android.text.Editable e){}});
  profileSlider(sizes,"Tragschicht",baseInput,0,200);
- Runnable updateSurfaceControls=()->{boolean asphaltSelected="Asphalt".equals(surface.getSelectedItem().toString());asphaltControls.setVisibility(asphaltSelected?View.VISIBLE:View.GONE);stoneControls.setVisibility(asphaltSelected?View.GONE:View.VISIBLE);};
+ Runnable updateSurfaceControls=()->{boolean asphaltSelected="Asphalt".equals(surface.getSelectedItem().toString());asphaltControls.setVisibility(asphaltSelected?View.VISIBLE:View.GONE);stoneControls.setVisibility(isStoneSurface(String.valueOf(surface.getSelectedItem()))?View.VISIBLE:View.GONE);};
  sizes.getViewTreeObserver().addOnGlobalLayoutListener(()->updateSurfaceControls.run());
  updateSurfaceControls.run();
  LinearLayout pipeDetails=fold(profilePage,"Rohr und Bettung",false);
@@ -4143,9 +4159,9 @@ public class MainActivity extends Activity {
   }catch(Exception ignored){}
  }
  boolean calculate(){try{double l=number(length),w=number(width),d=number(depth);if(!Double.isFinite(l*w*d)||l<=0||w<=0||d<=0)throw new Exception();
- optional(stoneLength);optional(stoneWidth);double stoneMetres=optional(stoneDepth)/100;
- String covering=surface.getSelectedItem().toString();double base=optional(baseInput),pipe=optional(pipeInput);if(Double.isFinite(pipe)&&(pipe<=0||pipe/1000>w||pipe/1000>d))throw new Exception();
- double asphalt=optional(asphaltInput),left=optional(leftInput),right=optional(rightInput);double topLayer=covering.equals("Asphalt")?asphalt:stoneMetres;
+ String covering=surface.getSelectedItem().toString();boolean stoneSelected=isStoneSurface(covering);if(stoneSelected){optional(stoneLength);optional(stoneWidth);}double stoneMetres=stoneSelected?optional(stoneDepth)/100:Double.NaN;
+ double base=optional(baseInput),pipe=optional(pipeInput);if(Double.isFinite(pipe)&&(pipe<=0||pipe/1000>w||pipe/1000>d))throw new Exception();
+ double asphalt="Asphalt".equals(covering)?optional(asphaltInput):Double.NaN,left=optional(leftInput),right=optional(rightInput);double topLayer=covering.equals("Asphalt")?asphalt:stoneMetres;
  if(Double.isFinite(topLayer)&&topLayer>d)throw new Exception();
  if(Double.isFinite(base)&&base+(Double.isFinite(topLayer)?topLayer:0)>d)throw new Exception();
  this.l=l; this.w=w; this.d=d; this.covering=covering;
@@ -4153,11 +4169,11 @@ public class MainActivity extends Activity {
  if(!getPreferences(0).edit().putString("stoneLength",stoneLength.getText().toString()).putString("stoneWidth",stoneWidth.getText().toString()).putString("stoneDepth",stoneDepth.getText().toString()).putString("stoneColor",stoneColor.getText().toString()).putString("pattern",pattern.getText().toString()).putString("bedding",bedding.getText().toString()).putString("underlying",underlying.getText().toString()).putInt("handling",handling.getSelectedItemPosition()).putInt("surface",surface.getSelectedItemPosition()).putString("base",baseInput.getText().toString()).putString("pipe",pipeInput.getText().toString()).putString("asphalt",asphaltInput.getText().toString()).putString("left",leftInput.getText().toString()).putString("right",rightInput.getText().toString()).putString("project",project.getText().toString()).putString("length",length.getText().toString()).putString("width",width.getText().toString()).putString("depth",depth.getText().toString()).commit())throw new Exception("Speichern fehlgeschlagen");
  projectHeader.setText(project.length()>0?project.getText().toString():"Feldaufmaß Pro");
  refreshMainQuantities();StringBuilder details=new StringBuilder("Legende\nOberfläche: "+covering);
- if(stoneLength.length()>0||stoneWidth.length()>0)details.append("\nSteinformat: "+(stoneLength.length()>0?stoneLength.getText():"?")+" × "+(stoneWidth.length()>0?stoneWidth.getText():"?")+" cm");
- if(stoneDepth.length()>0)details.append("\nBelagsstärke: "+stoneDepth.getText()+" cm");
- if(stoneColor.length()>0)details.append("\nFarbe: "+stoneColor.getText());
- if(pattern.length()>0)details.append("\nVerlegemuster: "+pattern.getText());
- if(bedding.length()>0)details.append("\nBettung: "+bedding.getText());
+ if(stoneSelected&&(stoneLength.length()>0||stoneWidth.length()>0))details.append("\nSteinformat: "+(stoneLength.length()>0?stoneLength.getText():"?")+" × "+(stoneWidth.length()>0?stoneWidth.getText():"?")+" cm");
+ if(stoneSelected&&(stoneDepth.length()>0))details.append("\nBelagsstärke: "+stoneDepth.getText()+" cm");
+ if(stoneSelected&&(stoneColor.length()>0))details.append("\nFarbe: "+stoneColor.getText());
+ if(stoneSelected&&(pattern.length()>0))details.append("\nVerlegemuster: "+pattern.getText());
+ if(stoneSelected&&(bedding.length()>0))details.append("\nBettung: "+bedding.getText());
  if(underlying.length()>0)details.append("\nAltbelag darunter: "+underlying.getText());
  if(handling.getSelectedItemPosition()>0)details.append("\n"+handling.getSelectedItem());
  compareSoll();showObjects();refreshStationLayers();refreshDetailQuantities();legend.setText(details.toString());showSurfaceLayers();sketch.invalidate();profile.invalidate();return true;
