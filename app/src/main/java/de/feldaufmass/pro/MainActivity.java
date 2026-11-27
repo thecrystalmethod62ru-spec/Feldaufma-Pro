@@ -1318,6 +1318,17 @@ public class MainActivity extends Activity {
    }
   });
   floatingCross.setEnabled(true);floatingCross.setOnTouchListener((v,e)->{floatingScale.onTouchEvent(e);return true;});
+  canvasFrame.addOnLayoutChangeListener((v,l,t,rr,bb,ol,ot,orr,ob)->{
+   int availableWidth=rr-l,availableHeight=bb-t;if(availableWidth<=0||availableHeight<=0)return;
+   android.view.ViewGroup.LayoutParams lp=floatingProfile.getLayoutParams();
+   int maxWidth=Math.max(1,Math.min(availableWidth,Math.max(dp(120),availableWidth/2)));
+   int width=Math.min(lp.width,maxWidth);if(lp.width!=width){lp.width=width;floatingProfile.setLayoutParams(lp);}
+   android.view.ViewGroup.LayoutParams cp=floatingCross.getLayoutParams();
+   int height=Math.max(1,Math.min(Math.max(dp(90),Math.min(dp(360),Math.round(width*.78f))),availableHeight-dp(48)));
+   if(cp.height!=height){cp.height=height;floatingCross.setLayoutParams(cp);}
+   floatingProfile.setX(Math.max(0,Math.min(availableWidth-width,floatingProfile.getX())));
+   floatingProfile.setY(Math.max(0,Math.min(availableHeight-floatingProfile.getHeight(),floatingProfile.getY())));
+  });
   floatingProfile.addOnLayoutChangeListener((v,ll,tt,rr,bb,ol,ot,orr,ob)->{floatingProfile.setX(Math.max(0,Math.min(canvasFrame.getWidth()-floatingProfile.getWidth(),floatingProfile.getX())));floatingProfile.setY(Math.max(0,Math.min(canvasFrame.getHeight()-floatingProfile.getHeight(),floatingProfile.getY())));});
   collapseProfile.setOnClickListener(v->{boolean hide=resizeProfile.getVisibility()==View.VISIBLE;if(hide){profilePlaceholder.setVisibility(View.GONE);floatingCross.setVisibility(View.GONE);}else updateFloatingCross.run();resizeProfile.setVisibility(hide?View.GONE:View.VISIBLE);collapseProfile.setText(hide?"+":"−");});
   sectionPosition.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){floatingTitle.setText(selectedSection[0]<0?"Regelprofil":String.format(java.util.Locale.GERMANY,"Regelprofil · A%02d",selectedSection[0]+1));if(resizeProfile.getVisibility()==View.VISIBLE)updateFloatingCross.run();}public void afterTextChanged(android.text.Editable e){}});
