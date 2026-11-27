@@ -343,7 +343,6 @@ public class MainActivity extends Activity {
   public void onStatusChanged(String provider,int status,android.os.Bundle extras){}
  };
  void recordGpsRoute(RouteSketch route,android.app.Dialog editor){
-  if(!route.vertices.isEmpty()){notice("GPS-Aufzeichnung benötigt eine leere Trasse.");return;}
   if(liveManager==null){notice("Bitte GPS aktivieren.");return;}
   RouteSketch.GpsRecording recording=new RouteSketch.GpsRecording();
   android.os.Handler handler=new android.os.Handler(android.os.Looper.getMainLooper());
@@ -370,7 +369,10 @@ public class MainActivity extends Activity {
   android.widget.LinearLayout previewBox=new android.widget.LinearLayout(this);previewBox.setPadding(dp(16),dp(8),dp(16),dp(8));previewBox.addView(preview,new android.widget.LinearLayout.LayoutParams(-1,dp(180)));
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("GPS-Aufzeichnung").setView(previewBox).setMessage("Bitte entlang der Trasse gehen.").setNegativeButton("Abbrechen",null).setPositiveButton("Stopp",(d,w)->{
    if(!editor.isShowing())return;
-   if(recording.apply(route))notice("GPS-Trasse übernommen. Maße bitte eintragen.");else notice("Zu wenige gültige GPS-Punkte oder Trasse nicht leer.");
+   if(recording.samples.size()<2){notice("Zu wenige gültige GPS-Punkte.");return;}
+   if(!getPreferences(0).edit().putString("gpsRouteLayer",recording.snapshot().encode()).commit()){notice("GPS-Ebene konnte nicht gespeichert werden.");return;}
+   if(route.vertices.isEmpty())new android.app.AlertDialog.Builder(this).setTitle("GPS-Ebene gespeichert").setMessage("GPS als Vorlage für eine neue manuelle Trasse übernehmen?").setNegativeButton("Nur GPS-Ebene",null).setPositiveButton("Übernehmen",(dd,ww)->{if(!recording.apply(route))notice("GPS-Trasse konnte nicht übernommen werden.");}).show();
+   else notice("GPS-Ebene gespeichert. Manuelle Trasse unverändert.");
   }).create();
   Runnable tick=new Runnable(){public void run(){
    if(!dialog.isShowing()||!editor.isShowing()||isFinishing()||isDestroyed()){dialog.dismiss();return;}
@@ -844,7 +846,7 @@ public class MainActivity extends Activity {
    android.location.Location fix=liveFix;
    String status=fix==null?"GPS-Signal wird gesucht …":fix.hasAccuracy()?String.format(java.util.Locale.GERMANY,"GPS-Genauigkeit: ± %.1f m",fix.getAccuracy()):"GPS-Genauigkeit unbekannt";
    android.app.AlertDialog.Builder menu=new android.app.AlertDialog.Builder(this).setTitle("GPS / Live-Position").setMessage(status+"\nGPS dient zur Orientierung. Aufmaßmaße bleiben unverändert.").setNegativeButton("Schließen",null);
-   if(route.vertices.isEmpty())menu.setPositiveButton("Aufzeichnung starten",(d,w)->recordGpsRoute(route,full));
+   menu.setPositiveButton("GPS-Ebene aufnehmen",(d,w)->{if(!getPreferences(0).getString("gpsRouteLayer","[]").equals("[]"))new android.app.AlertDialog.Builder(this).setTitle("GPS-Ebene ersetzen?").setMessage("Die manuelle Trasse bleibt unverändert.").setNegativeButton("Abbrechen",null).setPositiveButton("Neu aufnehmen",(dd,ww)->recordGpsRoute(route,full)).show();else recordGpsRoute(route,full);});
    menu.show();
   });
   styleEditorButton(save,true);LinearLayout.LayoutParams saveParams=new LinearLayout.LayoutParams(-1,dp(48));saveParams.setMargins(dp(10),dp(4),dp(10),dp(8));root.addView(save,saveParams);
