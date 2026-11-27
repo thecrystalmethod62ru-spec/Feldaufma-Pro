@@ -113,12 +113,8 @@ final class MontageProtocols {
         activity.notice("Protokoll konnte nicht gespeichert werden.");return false;
     }
 
-    void writePdf(Uri target) {
-        PdfDocument pdf=new PdfDocument();
-        try {
+    int appendPages(android.graphics.pdf.PdfDocument pdf,int page)throws org.json.JSONException{
             JSONArray rows=new JSONArray(prefs.getString(KEY,"[]"));
-            if(rows.length()==0){activity.notice("Noch keine Protokolle erfasst.");return;}
-            int page=1;
             for(int i=0;i<rows.length();i++){
                 JSONObject row=rows.getJSONObject(i);
                 StringBuilder body=new StringBuilder("Projekt: ").append(prefs.getString("project","Projekt"))
@@ -129,6 +125,12 @@ final class MontageProtocols {
                 }
                 page=activity.dailyTextPdf(pdf,page,row.getString("type")+" · Protokoll",body.toString(),null);
             }
+            return page;
+    }
+    void writePdf(Uri target) {
+        PdfDocument pdf=new PdfDocument();
+        try {
+            if(appendPages(pdf,1)==1){activity.notice("Keine Einträge vorhanden.");return;}
             try(OutputStream out=activity.getContentResolver().openOutputStream(target,"wt")){
                 if(out==null)throw new IOException();pdf.writeTo(out);
             }

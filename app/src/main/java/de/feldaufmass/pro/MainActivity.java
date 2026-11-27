@@ -2096,15 +2096,19 @@ public class MainActivity extends Activity {
   android.graphics.pdf.PdfDocument pdf=new android.graphics.pdf.PdfDocument();
   try(java.io.OutputStream out=getContentResolver().openOutputStream(uri,"wt")){
    if(out==null)throw new java.io.IOException();
+   appendDailyReport(pdf,1,report);
+   pdf.writeTo(out);notice("Bautagesbericht gespeichert.");
+  }catch(Exception e){notice("PDF konnte nicht gespeichert werden.");}finally{pdf.close();}
+ }
+ int appendDailyReport(android.graphics.pdf.PdfDocument pdf,int first,org.json.JSONObject report){
    String projectName=projectHeader.getText().toString();StringBuilder text=new StringBuilder("Projekt: "+projectName+"\nDatum: "+report.optString("date")+"\n");
    for(int j=1;j<DAILY_KEYS.length;j++){String value=report.optString(DAILY_KEYS[j]);text.append("\n").append(DAILY_LABELS[j]).append("\n").append(value.isEmpty()?"Nicht erfasst":value).append("\n");}
    org.json.JSONArray photos=dailyPhotos(report);text.append("\nZugeordnete Fotos: ").append(photos.length());
-   int page=dailyTextPdf(pdf,1,"Bautagesbericht",text.toString(),null);
+   int page=dailyTextPdf(pdf,first,"Bautagesbericht",text.toString(),null);
    for(int j=0;j<photos.length();j++){org.json.JSONObject o=photos.optJSONObject(j);if(o==null)continue;android.graphics.Bitmap bitmap=reportPhoto(o.optString("file"));String info=projectName+"\nBerichtsdatum: "+report.optString("date")+"\n"+o.optString("info");if(bitmap==null)info+="\nBilddatei fehlt oder ist nicht lesbar.";
     page=dailyTextPdf(pdf,page,"Foto "+(j+1)+" / "+photos.length(),info,bitmap);
    }
-   pdf.writeTo(out);notice("Bautagesbericht gespeichert.");
-  }catch(Exception e){notice("PDF konnte nicht gespeichert werden.");}finally{pdf.close();}
+   return page;
  }
  void showDailyReports(){
   org.json.JSONArray rows=dailyReports();LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
@@ -2184,19 +2188,23 @@ public class MainActivity extends Activity {
   android.graphics.pdf.PdfDocument pdf=new android.graphics.pdf.PdfDocument();
   try(java.io.OutputStream out=getContentResolver().openOutputStream(uri,"wt")){
    if(out==null)throw new java.io.IOException();
+   appendNachtrag(pdf,1,row);
+   pdf.writeTo(out);notice("Nachtragsdokumentation gespeichert.");
+  }catch(Exception e){notice("PDF konnte nicht gespeichert werden.");}finally{pdf.close();}
+ }
+ int appendNachtrag(android.graphics.pdf.PdfDocument pdf,int first,org.json.JSONObject row){
    String projectName=projectHeader.getText().toString();StringBuilder text=new StringBuilder("Projekt: "+projectName+"\nDatum: "+row.optString("date")+"\nBearbeitungsstatus: "+row.optString("status")+"\n");
    String[] keys={"title","reason","order","evidence"},labels={"Bezeichnung / LV-Bezug","Sachverhalt / Begründung","Anordnung / Auftraggeber","Nachweise / Bezug"};
    for(int j=0;j<keys.length;j++){String value=row.optString(keys[j]);text.append("\n").append(labels[j]).append("\n").append(value.isEmpty()?"Nicht erfasst":value).append("\n");}
    double q=row.optDouble("quantity");text.append("\nZusätzliche Menge\n").append(Double.isFinite(q)?csvNumber(q)+" "+row.optString("unit"):"Nicht erfasst");
    org.json.JSONArray photos=dailyPhotos(row);text.append("\n\nZugeordnete Fotos: ").append(photos.length());
    text.append("\n\nDokumentation – kein automatisch ermittelter Vergütungsanspruch. Vertragsgrundlage, Mengen und Freigabe gesondert prüfen.");
-   int page=dailyTextPdf(pdf,1,"Nachtragsdokumentation",text.toString(),null);
+   int page=dailyTextPdf(pdf,first,"Nachtragsdokumentation",text.toString(),null);
    for(int j=0;j<photos.length();j++){org.json.JSONObject o=photos.optJSONObject(j);if(o==null)continue;android.graphics.Bitmap bitmap=reportPhoto(o.optString("file"));
     String info=projectName+"\nNachtrag: "+row.optString("title")+"\n"+o.optString("info");if(bitmap==null)info+="\nBilddatei fehlt oder ist nicht lesbar.";
     page=dailyTextPdf(pdf,page,"Nachweisfoto "+(j+1)+" / "+photos.length(),info,bitmap);
    }
-   pdf.writeTo(out);notice("Nachtragsdokumentation gespeichert.");
-  }catch(Exception e){notice("PDF konnte nicht gespeichert werden.");}finally{pdf.close();}
+   return page;
  }
  void showNachtraege(){
   LinearLayout form=page();ScrollView scroll=new ScrollView(this);scroll.addView(form);
@@ -2560,6 +2568,19 @@ public class MainActivity extends Activity {
       +(row.has("offset")?" · Versatz "+row.optString("offset")+" m":"")
       +(map!=null&&!map.hasPosition(index)?" · Lage offen":"");
  }
+ MontagePlanView appendMontageDrawing(android.graphics.pdf.PdfDocument pdf,int pageNumber,RouteSketch route,org.json.JSONArray fittings,double total)throws Exception{
+   MontagePlanView map=new MontagePlanView(this,new DxfExport(new java.io.StringWriter(),route,true),fittings);
+   android.graphics.pdf.PdfDocument.Page page=pdf.startPage(new android.graphics.pdf.PdfDocument.PageInfo.Builder(842,595,pageNumber).create());
+   String name=getPreferences(0).getString("project","Projekt");
+   try{
+    Canvas canvas=page.getCanvas();Paint pen=new Paint(Paint.ANTI_ALIAS_FLAG);pen.setColor(INK);pen.setTextSize(19);
+    canvas.drawText("Montageplan",28,36,pen);pen.setTextSize(12);
+    canvas.drawText(name,28,58,pen);canvas.save();canvas.translate(28,76);map.render(canvas,786,445);canvas.restore();
+    canvas.drawText("0,00 – "+String.format(java.util.Locale.GERMANY,"%.2f m",total)+" · Abschnittslängen gemessen, Richtungen aus der Skizze",28,553,pen);
+    canvas.drawText("Seite "+pageNumber,765,566,pen);
+   }finally{pdf.finishPage(page);}
+   return map;
+ }
  void writeMontagePlan(android.net.Uri target){
   android.graphics.pdf.PdfDocument pdf=new android.graphics.pdf.PdfDocument();
   try{
@@ -2567,16 +2588,8 @@ public class MainActivity extends Activity {
    double total=Double.parseDouble(getPreferences(0).getString("length","").trim().replace(',','.'));
    if(!Double.isFinite(total)||!DxfExport.metricAvailable(route)||Math.abs(route.measuredLength()-total)>=0.001){notice("Trassenmaße prüfen und Export erneut starten.");return;}
    org.json.JSONArray fittings=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));
-   MontagePlanView map=new MontagePlanView(this,new DxfExport(new java.io.StringWriter(),route,true),fittings);
-   android.graphics.pdf.PdfDocument.Page page=pdf.startPage(new android.graphics.pdf.PdfDocument.PageInfo.Builder(842,595,1).create());
+   MontagePlanView map=appendMontageDrawing(pdf,1,route,fittings,total);
    String name=getPreferences(0).getString("project","Projekt");
-   try{
-    Canvas canvas=page.getCanvas();Paint pen=new Paint(Paint.ANTI_ALIAS_FLAG);pen.setColor(INK);pen.setTextSize(19);
-    canvas.drawText("Montageplan",28,36,pen);pen.setTextSize(12);
-    canvas.drawText(name,28,58,pen);canvas.save();canvas.translate(28,76);map.render(canvas,786,445);canvas.restore();
-    canvas.drawText("0,00 – "+String.format(java.util.Locale.GERMANY,"%.2f m",total)+" · Abschnittslängen gemessen, Richtungen aus der Skizze",28,553,pen);
-    canvas.drawText("Seite 1",765,566,pen);
-   }finally{pdf.finishPage(page);}
    StringBuilder list=new StringBuilder(name).append("\n\n");
    for(int i=0;i<fittings.length();i++)list.append(planFittingLabel(fittings.getJSONObject(i),i,map)).append("\n\n");
    if(fittings.length()==0)list.append("Keine Formstücke erfasst.");
@@ -4157,7 +4170,7 @@ public class MainActivity extends Activity {
  }
 
  public void onCreate(Bundle savedInstanceState){super.onCreate(savedInstanceState);activeProject=projectRegistry().getString("active",LEGACY_PROJECT);
- if(savedInstanceState!=null){projectChosen=savedInstanceState.getBoolean("projectChosen",false);selectedPoint=savedInstanceState.getString("selectedPoint");pendingPoint=savedInstanceState.getString("pendingPoint");pendingPhoto=savedInstanceState.getString("pendingPhoto");pendingMaterialProject=savedInstanceState.getString("pendingMaterialProject");pendingConnectionsProject=savedInstanceState.getString("pendingConnectionsProject");pendingPlanProject=savedInstanceState.getString("pendingPlanProject");pendingProtocolsProject=savedInstanceState.getString("pendingProtocolsProject");}
+ if(savedInstanceState!=null){pendingPdfProject=savedInstanceState.getString("pdfProject");String pdfScope=savedInstanceState.getString("pdfScope");if(pdfScope!=null)pendingPdfScope=PdfScope.valueOf(pdfScope);projectChosen=savedInstanceState.getBoolean("projectChosen",false);selectedPoint=savedInstanceState.getString("selectedPoint");pendingPoint=savedInstanceState.getString("pendingPoint");pendingPhoto=savedInstanceState.getString("pendingPhoto");pendingMaterialProject=savedInstanceState.getString("pendingMaterialProject");pendingConnectionsProject=savedInstanceState.getString("pendingConnectionsProject");pendingPlanProject=savedInstanceState.getString("pendingPlanProject");pendingProtocolsProject=savedInstanceState.getString("pendingProtocolsProject");}
  shell=page();shell.setPadding(0,0,0,0);shell.setBackgroundColor(Color.BLACK);setContentView(shell);fitSystemPanels(shell);
  planPage=page();measurePage=page();voicePage=page();profilePage=page();segmentPage=page();objectPage=page();quantityPage=page();
  LinearLayout header=new LinearLayout(this);
@@ -5042,7 +5055,25 @@ public class MainActivity extends Activity {
    writer.flush();notice("DXF gespeichert.");
   }catch(Exception e){notice("DXF konnte nicht gespeichert werden.");}
  }
- void exportPdf(){if(!calculate()){showPage(measurePage);return;}android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);i.addCategory(android.content.Intent.CATEGORY_OPENABLE);i.setType("application/pdf");i.putExtra(android.content.Intent.EXTRA_TITLE,"Feldaufmass.pdf");startActivityForResult(i,412);}
+ enum PdfScope {
+  DATA("Nur Projektdaten","Projektdaten"), DRAWINGS("Nur Zeichnungen","Zeichnungen"), BOTH("Projektdaten und Zeichnungen","Gesamtprojekt");
+  final String label,filename;
+  PdfScope(String label,String filename){this.label=label;this.filename=filename;}
+ }
+ PdfScope pendingPdfScope;
+ String pendingPdfProject;
+ void exportPdf(){
+  String[] choices={PdfScope.DATA.label,PdfScope.DRAWINGS.label,PdfScope.BOTH.label};
+  new android.app.AlertDialog.Builder(this).setTitle("PDF-Inhalt auswählen").setItems(choices,(dialog,index)->{
+   PdfScope scope=PdfScope.values()[index];
+   // A sketch or a single object can be printed before trench measurements exist.
+   if(scope!=PdfScope.DRAWINGS&&length.length()>0&&width.length()>0&&depth.length()>0&&!calculate()){showPage(measurePage);return;}
+   android.content.Intent intent=new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);
+   intent.addCategory(android.content.Intent.CATEGORY_OPENABLE);intent.setType("application/pdf");
+   intent.putExtra(android.content.Intent.EXTRA_TITLE,"Feldaufmass_"+scope.filename+".pdf");
+   pendingPdfScope=scope;pendingPdfProject=activeProject;startActivityForResult(intent,412);
+  }).setNegativeButton("Abbrechen",null).show();
+ }
  void drawReportView(Canvas canvas, View view, int top, int width, int height) {
   canvas.save();
   canvas.translate(36,top);
@@ -5572,71 +5603,67 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   try{report.append(surfaceVolumeReport());}catch(Exception e){report.append("Schichtmengen offen – Abschnittsmaße prüfen.");}
   return report.toString();
  }
- void writePdf(android.net.Uri uri) {
-  android.graphics.pdf.PdfDocument pdf=new android.graphics.pdf.PdfDocument();
-  try(java.io.OutputStream out=getContentResolver().openOutputStream(uri,"wt")) {
-   if(out==null)throw new java.io.IOException();
-   Paint pen=new Paint(Paint.ANTI_ALIAS_FLAG);
-   android.graphics.pdf.PdfDocument.Page page=pdf.startPage(new android.graphics.pdf.PdfDocument.PageInfo.Builder(595,842,1).create());
-   try {
-    Canvas canvas=page.getCanvas();
-    pen.setTextSize(19);
-    canvas.drawText("Feldaufmaß Pro – Entwurf",36,40,pen);
-    pen.setTextSize(13);
-    canvas.drawText(projectHeader.getText().toString(),36,64,pen);
-    canvas.drawText("Zeichnung",36,96,pen);
-    drawReportView(canvas,new Sketch(),100,523,260);
-    canvas.drawText("Regelprofil",36,390,pen);
-    drawReportView(canvas,new Profile(),408,360,300);
-    canvas.drawText("Vorläufige Maße – vor Abrechnung prüfen.",36,786,pen);
-   } finally {pdf.finishPage(page);}
+ void writePdf(android.net.Uri uri){writePdf(uri,PdfScope.BOTH);}
+ void writePdf(android.net.Uri uri,PdfScope scope){
+  try(android.graphics.pdf.PdfDocument pdf=new android.graphics.pdf.PdfDocument()){
    RouteSketch route=new RouteSketch(this,routeData());route.setStationLayers(objects,segments);route.setTrenchWidth(w);
-   String report=(route.vertices.size()>1?"Trassenskizze – Abschnittsmaße\n"+route.measurements()+"\n\n":"")+"Oberflächenaufbau\n"+surfaceLayers.getText()+"\n\n"+result.getText()+"\n"+legend.getText()+"\n"+
+   int next=1;
+   if(scope!=PdfScope.DATA){
+    route.printPlan=true;route.bindDimensionProject(activeProject);route.setVisibleLayers(drawingLayers());loadUtilitySheets(route);
+    route.setIndependentGpsTrack(gpsTrack());route.setImportedGpsReference(importedGpsReference());
+    SharedPreferences prefs=getPreferences(0);
+    if(prefs.getInt("routeUnderlayHidden",0)==0){
+     route.setUnderlay(reportPhoto(prefs.getString("routeUnderlay","")));
+     route.setUnderlayAlpha(prefs.getInt("routeUnderlayAlpha",150));
+     org.json.JSONArray transform=new org.json.JSONArray(prefs.getString("routeUnderlayTransform","[]"));
+     route.setUnderlayTransform((float)transform.optDouble(0,0),(float)transform.optDouble(1,0),(float)transform.optDouble(2,1),(float)transform.optDouble(3,0));
+    }
+    next=new ProjectPlanPdf(this).append(pdf,next,route);
+    next=appendScaledRoutePdf(pdf,next,route);
+    org.json.JSONArray fittings=new org.json.JSONArray(prefs.getString("montageFittings","[]"));
+    if(fittings.length()>0&&DxfExport.metricAvailable(route)&&Math.abs(route.measuredLength()-l)<.001){
+     appendMontageDrawing(pdf,next++,route,fittings,l);
+    }
+    if(route.vertices.size()>1||l>0)next=appendLongitudinalPdf(pdf,next,route);
+   }
+   if(scope!=PdfScope.DRAWINGS){
+    next=appendProjectInformation(pdf,next,route);
+    org.json.JSONArray daily=dailyReports();
+    for(int j=0;j<daily.length();j++)next=appendDailyReport(pdf,next,daily.getJSONObject(j));
+    org.json.JSONArray changes=nachtraege();
+    for(int j=0;j<changes.length();j++)next=appendNachtrag(pdf,next,changes.getJSONObject(j));
+    next=new MontageProtocols(this).appendPages(pdf,next);
+    next=new MontageConnections(this).appendPages(pdf,next);
+    appendPhotoPdf(pdf,next,route,projectHeader.getText().toString());
+   }
+   try(java.io.OutputStream out=getContentResolver().openOutputStream(uri,"wt")){
+    if(out==null)throw new java.io.IOException();pdf.writeTo(out);
+   }
+   notice("PDF gespeichert.");
+  }catch(Exception e){notice("PDF konnte nicht gespeichert werden.");}
+ }
+ int appendProjectInformation(android.graphics.pdf.PdfDocument pdf,int next,RouteSketch route)throws Exception{
+  String report=(route.vertices.size()>1?"Trassenskizze – Abschnittsmaße\n"+route.measurements()+"\n\n":"")+"Oberflächenaufbau\n"+surfaceLayers.getText()+"\n\n"+result.getText()+"\n"+legend.getText()+"\n"+
     "Nachschnitt links: "+reportMeasure(left)+" | rechts: "+reportMeasure(right)+"\n"+
     "Asphaltstärke: "+reportMeasure(asphalt)+"\nTragschicht: "+reportMeasure(base)+"\n\n"+
     "Trassenobjekte\n"+objectList.getText()+detailQuantities.getText()+"\n\n"+segmentsView.getText()+"\n\n"+shoringReport()+surfaceReportForExport();
-   android.text.TextPaint textPaint=new android.text.TextPaint(Paint.ANTI_ALIAS_FLAG);
-   textPaint.setTextSize(12);
-   android.text.StaticLayout layout=android.text.StaticLayout.Builder.obtain(report,0,report.length(),textPaint,523).build();
-   int line=0, pageNumber=2;
-   while(line<layout.getLineCount()){
-    int top=layout.getLineTop(line), end=line+1;
-    while(end<layout.getLineCount() && layout.getLineBottom(end)-top<=720)end++;
-    page=pdf.startPage(new android.graphics.pdf.PdfDocument.PageInfo.Builder(595,842,pageNumber++).create());
-    try {
-     Canvas canvas=page.getCanvas();
-     canvas.drawText("Mengen und Details – Seite "+(pageNumber-1),36,40,pen);
-     canvas.translate(36,64);
-     canvas.clipRect(0,0,523,layout.getLineTop(end)-top);
-     canvas.translate(0,-top);
-     layout.draw(canvas);
-    } finally {pdf.finishPage(page);}
-    line=end;
-   }
-   if(route.vertices.size()>1){
-    page=pdf.startPage(new android.graphics.pdf.PdfDocument.PageInfo.Builder(595,842,pageNumber++).create());
-    try{
-     page.getCanvas().drawText("Trassenskizze – schematisch",36,44,pen);
-     drawReportView(page.getCanvas(),route,80,523,523);
-     double factor=route.uniformMetresPerUnit();
-     if(Double.isFinite(factor)){
-      Canvas c=page.getCanvas();pen.setTextSize(11);
-      c.drawText("Proportionale Trassengeometrie – kein fester Druckmaßstab",36,640,pen);
-     }
-
-    }finally{pdf.finishPage(page);}
-   }
-   pageNumber=appendScaledRoutePdf(pdf,pageNumber,route);
-   pageNumber=appendLongitudinalPdf(pdf,pageNumber,route);
-   appendPhotoPdf(pdf,pageNumber,route,projectHeader.getText().toString());
-   pdf.writeTo(out);
-  } catch(Exception e) {
-   Toast.makeText(this,"PDF konnte nicht gespeichert werden.",Toast.LENGTH_LONG).show();
-   return;
-  } finally {pdf.close();}
-  Toast.makeText(this,"PDF gespeichert",Toast.LENGTH_SHORT).show();
+  StringBuilder body=new StringBuilder(projectHeader.getText()).append("\n\n").append(report);
+  for(RouteSketch.SingleObject o:route.singleObjects)body.append("\nEinzelobjekt · ").append(o.type).append(" · ohne Station");
+  for(RouteSketch.Vertex v:route.vertices){
+   if(!v.name.isEmpty()||Double.isFinite(v.latitude))body.append("\nPunkt ").append(route.vertices.indexOf(v)+1).append(" · ").append(v.name);
+   if(Double.isFinite(v.latitude))body.append(" · GPS ").append(v.latitude).append(", ").append(v.longitude);
+  }
+  org.json.JSONArray fittings=new org.json.JSONArray(getPreferences(0).getString("montageFittings","[]"));
+  for(int i=0;i<fittings.length();i++)body.append("\nFormstück · ").append(planFittingLabel(fittings.getJSONObject(i),i,null));
+  String materials=projectMaterialText(getPreferences(0));if(!materials.isEmpty())body.append("\n\nMaterialliste\n").append(materials);
+  org.json.JSONArray lv=lvPositions();for(int i=0;i<lv.length();i++){
+   org.json.JSONObject row=lv.getJSONObject(i);body.append("\nLV · ").append(lvLabel(row)).append(" · Ist: ").append(csvNumber(lvQuantity(row))).append(" · Soll: ").append(csvNumber(row.optDouble("target")));
+  }
+  org.json.JSONArray sheets=utilitySheets();for(int i=0;i<sheets.length();i++)body.append("\nSchachtschein · ").append(sheets.getJSONObject(i).optString("name"));
+  for(int i=0;i<documents.length();i++)body.append("\nUnterlage · ").append(documents.getJSONObject(i).optString("name"));
+  if(elevationPoints().length()>0)body.append("\n\n").append(elevationReport());
+  return dailyTextPdf(pdf,next,"Projektdaten und Mengen",body.toString(),null);
  }
-
  String reportMeasure(double value){
   return Double.isFinite(value)?String.format(java.util.Locale.GERMANY,"%.2f m",value):"nicht erfasst";
  }
@@ -6139,7 +6166,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   pendingPoint=null;pendingPhoto=null;
  }
  @Override protected void onSaveInstanceState(Bundle out){
-  super.onSaveInstanceState(out);out.putBoolean("projectChosen",projectChosen);out.putString("selectedPoint",selectedPoint);
+  super.onSaveInstanceState(out);out.putString("pdfProject",pendingPdfProject);if(pendingPdfScope!=null)out.putString("pdfScope",pendingPdfScope.name());out.putBoolean("projectChosen",projectChosen);out.putString("selectedPoint",selectedPoint);
   out.putString("pendingPoint",pendingPoint);out.putString("pendingPhoto",pendingPhoto);out.putString("pendingMaterialProject",pendingMaterialProject);out.putString("pendingConnectionsProject",pendingConnectionsProject);out.putString("pendingPlanProject",pendingPlanProject);out.putString("pendingProtocolsProject",pendingProtocolsProject);
  }
  com.google.mlkit.nl.translate.Translator translator;
@@ -6388,7 +6415,13 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  if(request==415&&result==RESULT_OK&&data!=null&&data.getData()!=null){importProjectBackup(data.getData());return;}
  if(request==414&&result==RESULT_OK&&data!=null&&data.getData()!=null){exportProjectBackup(data.getData());return;}
  if(request==413){finishPhoto(result==RESULT_OK);return;}
- if(request==412&&result==RESULT_OK&&data!=null&&data.getData()!=null){writePdf(data.getData());return;}
+ if(request==412){
+  PdfScope scope=pendingPdfScope;String owner=pendingPdfProject;pendingPdfScope=null;pendingPdfProject=null;
+  if(result==RESULT_OK&&data!=null&&data.getData()!=null){
+   if(scope!=null&&activeProject.equals(owner))writePdf(data.getData(),scope);else notice("Projekt gewechselt. Export erneut starten.");
+  }
+  return;
+ }
  if(request==411&&result==RESULT_OK&&data!=null){if(data.getClipData()!=null){for(int j=0;j<data.getClipData().getItemCount();j++)attachDocument(data.getClipData().getItemAt(j).getUri(),data.getFlags());}else attachDocument(data.getData(),data.getFlags());showDocuments();return;}
  if(request==410&&result==RESULT_OK&&data!=null){java.util.ArrayList<String> values=data.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS);if(values!=null&&!values.isEmpty())handleSpeech(values.get(0));}}
  int pendingAssistantField=-1;

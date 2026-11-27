@@ -12,6 +12,34 @@ import static org.junit.Assert.*;
 
 @RunWith(AndroidJUnit4.class)
 public class ProjectStateTest {
+ @Test public void pdfScopesKeepSingleObjectDrawingSeparateFromProjectData(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->{
+    String previous=activity.activeProject;
+    activity.activeProject=java.util.UUID.randomUUID().toString();
+    try{
+     RouteSketch route=new RouteSketch(activity,"[]");
+     route.singleObjects.add(new RouteSketch.SingleObject(new android.graphics.PointF(.4f,.6f),"Hausanschluss"));
+     assertTrue(activity.getPreferences(0).edit().putString("routeSketch",route.encode()).commit());
+     activity.l=0;activity.w=0;activity.d=0;
+     int[] counts=new int[MainActivity.PdfScope.values().length];
+     for(MainActivity.PdfScope scope:MainActivity.PdfScope.values()){
+      File file=File.createTempFile("project-plan",".pdf",activity.getCacheDir());
+      try{
+       activity.writePdf(Uri.fromFile(file),scope);
+       try(ParcelFileDescriptor fd=ParcelFileDescriptor.open(file,ParcelFileDescriptor.MODE_READ_ONLY);
+           PdfRenderer pdf=new PdfRenderer(fd);PdfRenderer.Page first=pdf.openPage(0)){
+        counts[scope.ordinal()]=pdf.getPageCount();
+        assertEquals(scope==MainActivity.PdfScope.DATA?595:842,first.getWidth());
+       }
+      }finally{file.delete();}
+     }
+     assertEquals(1,counts[1]);assertEquals(counts[0]+counts[1],counts[2]);
+    }catch(Exception e){throw new AssertionError(e);}
+    finally{activity.deleteSharedPreferences("project_"+activity.activeProject);activity.activeProject=previous;}
+   });
+  }
+ }
  @Test public void singleTapStoresHausanschlussWithoutCreatingARoute(){
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    scenario.onActivity(activity->{

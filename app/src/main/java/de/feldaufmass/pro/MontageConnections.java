@@ -50,13 +50,9 @@ final class MontageConnections {
         }
     }
 
-    void writePdf(android.net.Uri target) {
-        android.graphics.pdf.PdfDocument pdf = new android.graphics.pdf.PdfDocument();
-        try {
+    int appendPages(android.graphics.pdf.PdfDocument pdf,int page)throws org.json.JSONException{
             JSONArray rows = new JSONArray(prefs.getString(KEY, "[]"));
-            if (rows.length() == 0) { activity.notice("Keine Verbindungen erfasst."); return; }
             String project = prefs.getString("project", "Projekt");
-            int page = 1;
             for (int i = 0; i < rows.length(); i++) {
                 JSONObject row = rows.getJSONObject(i);
                 JSONArray photos = activity.dailyPhotos(row);
@@ -73,6 +69,12 @@ final class MontageConnections {
                     page = activity.dailyTextPdf(pdf, page, "Verbindungsfoto " + (j + 1), caption, bitmap);
                 }
             }
+            return page;
+    }
+    void writePdf(android.net.Uri target) {
+        android.graphics.pdf.PdfDocument pdf = new android.graphics.pdf.PdfDocument();
+        try {
+            if(appendPages(pdf,1)==1){activity.notice("Keine Einträge vorhanden.");return;}
             try (java.io.OutputStream stream = activity.getContentResolver().openOutputStream(target, "wt")) {
                 if (stream == null) throw new java.io.IOException();
                 pdf.writeTo(stream);

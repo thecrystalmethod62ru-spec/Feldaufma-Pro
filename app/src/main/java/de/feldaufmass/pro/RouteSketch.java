@@ -791,7 +791,7 @@ final class RouteSketch extends View {
  }
  java.util.LinkedHashMap<String,Integer> legendEntries(){
   java.util.LinkedHashMap<String,Integer> entries=new java.util.LinkedHashMap<>();
-  if(layerVisible(LAYER_ROUTE)&&vertices.size()>1)entries.put("Trasse",0xff13665f);
+  if(layerVisible(LAYER_ROUTE)&&vertices.size()>1)entries.put("Trasse",printPlan?0xff174dcc:0xff13665f);
   if(layerVisible(LAYER_ROUTE))try{JSONArray rows=new JSONArray(((android.app.Activity)getContext()).getPreferences(0).getString("metricVerbauSections","[]"));for(int j=0;j<rows.length();j++){JSONArray row=rows.optJSONArray(j);if(row!=null&&row.optDouble(0)<row.optDouble(1)&&stationPoint(row.optDouble(0))!=null&&stationPoint(row.optDouble(1))!=null&&(row.optDouble(2,0)>0||row.optDouble(3,0)>0)){entries.put("Verbau",darkPalette()?0xffe6a45e:0xffa65e19);break;}}}catch(Exception ignored){}
   if(layerVisible(LAYER_SURFACES))for(int j=0;j<surfaceSections.length();j++){
    org.json.JSONObject o=surfaceSections.optJSONObject(j);if(o==null)continue;
@@ -876,6 +876,7 @@ final class RouteSketch extends View {
    c.save();c.clipRect(x+21*d,yy-row,x+width-3*d,yy+3*d);c.drawText(label,x+21*d,yy,p);c.restore();i++;
   }
  }
+ boolean printPlan;
  boolean darkEditor=false;
  boolean darkPreview=false;
  private boolean darkPalette(){return darkEditor||darkPreview;}
@@ -890,10 +891,11 @@ final class RouteSketch extends View {
   drawShoring(c,density);
   for(int i=1;i<vertices.size();i++){
    PointF a=vertices.get(i-1).point,b=vertices.get(i).point;
-   if(layerVisible(LAYER_ROUTE)){paint.setColor(darkPalette()?0xff55c7b5:0xff13665f);paint.setStrokeWidth(4);line(c,a,b);}
+   if(layerVisible(LAYER_ROUTE)){paint.setColor(printPlan?0xff174dcc:darkPalette()?0xff55c7b5:0xff13665f);paint.setStrokeWidth(4);line(c,a,b);}
    if(!layerVisible(LAYER_DIMENSIONS))continue;
    double metres=vertices.get(i).metres;
    String label=Double.isFinite(metres)?String.format(Locale.GERMANY,"%.2f m",metres):"Maß fehlt";
+   if(printPlan)label=String.format(Locale.GERMANY,"A%02d · %s",i,label);
    float tx=left()+(a.x+b.x)*scale()/2,ty=top()+(a.y+b.y)*scale()/2-6*density;
    String key="route:"+i;tx+=density*dimensionOffsets.getOrDefault(key+":x",0f);ty+=density*dimensionOffsets.getOrDefault(key+":y",0f);
    float angle=dimensionOffsets.getOrDefault(key+":angle",0f);
@@ -908,7 +910,7 @@ final class RouteSketch extends View {
   for(int i=0;i<vertices.size();i++){
    PointF p=vertices.get(i).point;
    if(layerVisible(LAYER_ROUTE)){
-   paint.setColor(i==highlight?0xffdf8c14:darkPalette()?0xff55c7b5:0xff13665f);
+   paint.setColor(i==highlight?0xffdf8c14:printPlan?0xff174dcc:darkPalette()?0xff55c7b5:0xff13665f);
    c.drawCircle(left()+scale()*p.x,top()+scale()*p.y,5*density,paint);
    paint.setColor(Color.WHITE);c.drawCircle(left()+scale()*p.x,top()+scale()*p.y,2*density,paint);
    }
