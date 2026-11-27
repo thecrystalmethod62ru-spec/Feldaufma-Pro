@@ -254,12 +254,20 @@ public class MainActivity extends Activity {
    finally{if(temp!=null)temp.delete();}
   },"project-backup").start();
  }
+ boolean projectChosen=false;
+ void showProjectStart(){
+  LinearLayout start=page();start.setGravity(Gravity.CENTER_VERTICAL);start.setBackgroundColor(0xff151717);start.setPadding(dp(24),dp(24),dp(24),dp(24));setContentView(start);fitSystemPanels(start);
+  start.addView(sheetText("Feldaufmaß Pro",28,true));start.addView(sheetText("Projekt auswählen",18,false));
+  Button create=actionButtonSingle(start,"Neues Projekt erstellen",()->newProjectDialog());compactToolIcon(create,"Neues Projekt erstellen","objects");
+  Button open=actionButtonSingle(start,"Bestehendes Projekt öffnen",()->showProjects());compactToolIcon(open,"Bestehendes Projekt öffnen","layers");
+ }
+ void enterProject(){projectChosen=true;setContentView(shell);fitSystemPanels(shell);showPage(planPage);}
  void showProjects(){
   java.util.ArrayList<String> ids=new java.util.ArrayList<>(projectRegistry().getStringSet("ids",java.util.Collections.emptySet()));
   java.util.Collections.sort(ids);ids.remove(LEGACY_PROJECT);ids.add(0,LEGACY_PROJECT);
   String[] labels=new String[ids.size()];
   for(int j=0;j<ids.size();j++){String id=ids.get(j);String name=projectStorage(id).getString("project","");labels[j]=(id.equals(activeProject)?"● ":"")+ (name.trim().isEmpty()?"Bestandsprojekt":name);}
-  new android.app.AlertDialog.Builder(this).setTitle("Projekte").setItems(labels,(d,w)->{String id=ids.get(w);if(!id.equals(activeProject))confirmProjectSwitch(id);}).setNeutralButton("Neues Projekt",(d,w)->newProjectDialog()).setNegativeButton("Schließen",null).show();
+  new android.app.AlertDialog.Builder(this).setTitle("Projekte").setItems(labels,(d,w)->{String id=ids.get(w);if(!id.equals(activeProject)){if(!projectChosen){if(projectRegistry().edit().putString("active",id).commit())restartForProject();else notice("Projektwechsel fehlgeschlagen.");}else confirmProjectSwitch(id);}else if(!projectChosen)enterProject();}).setNeutralButton("Neues Projekt",(d,w)->newProjectDialog()).setNegativeButton("Schließen",null).show();
  }
  void newProjectDialog(){
   EditText name=new EditText(this);name.setSingleLine(true);name.setHint("Projektname");
@@ -281,7 +289,7 @@ public class MainActivity extends Activity {
  void restartForProject(){
   saveDraft();
   selectedPoint=null;pendingPoint=null;pendingPhoto=null;speechVersion++;
-  recreate();
+  projectChosen=true;recreate();
  }
  static final long AUTOSAVE_INTERVAL_MS=300000L;
  final java.util.LinkedHashMap<String,EditText> autosaveFields=new java.util.LinkedHashMap<>();
@@ -3668,7 +3676,7 @@ public class MainActivity extends Activity {
  }
 
  public void onCreate(Bundle savedInstanceState){super.onCreate(savedInstanceState);activeProject=projectRegistry().getString("active",LEGACY_PROJECT);
- if(savedInstanceState!=null){selectedPoint=savedInstanceState.getString("selectedPoint");pendingPoint=savedInstanceState.getString("pendingPoint");pendingPhoto=savedInstanceState.getString("pendingPhoto");pendingMaterialProject=savedInstanceState.getString("pendingMaterialProject");pendingConnectionsProject=savedInstanceState.getString("pendingConnectionsProject");pendingPlanProject=savedInstanceState.getString("pendingPlanProject");pendingProtocolsProject=savedInstanceState.getString("pendingProtocolsProject");}
+ if(savedInstanceState!=null){projectChosen=savedInstanceState.getBoolean("projectChosen",false);selectedPoint=savedInstanceState.getString("selectedPoint");pendingPoint=savedInstanceState.getString("pendingPoint");pendingPhoto=savedInstanceState.getString("pendingPhoto");pendingMaterialProject=savedInstanceState.getString("pendingMaterialProject");pendingConnectionsProject=savedInstanceState.getString("pendingConnectionsProject");pendingPlanProject=savedInstanceState.getString("pendingPlanProject");pendingProtocolsProject=savedInstanceState.getString("pendingProtocolsProject");}
  shell=page();shell.setPadding(0,0,0,0);shell.setBackgroundColor(0xff1b1b1b);setContentView(shell);fitSystemPanels(shell);
  planPage=page();measurePage=page();voicePage=page();profilePage=page();segmentPage=page();objectPage=page();quantityPage=page();
  LinearLayout header=new LinearLayout(this);
@@ -4128,7 +4136,7 @@ public class MainActivity extends Activity {
  LinearLayout toolbar=new LinearLayout(this);profilePage.addView(toolbar);String[] names={"Aufbau","Leitungen","Maße","Abschnitte","Optionen"};String[] icons={"layers","pipe","ruler","sections","settings"};LinearLayout[] panels={buildPanel,pipeDetails,sizes,sectionProfilePanel,optionsPanel};
  for(int j=0;j<names.length;j++){final int index=j;Button tool=new Button(this);styleEditorButton(tool,false);compactToolIcon(tool,names[j],icons[j]);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(64),1);lp.setMargins(dp(2),dp(2),dp(2),dp(2));toolbar.addView(tool,lp);tool.setOnClickListener(v->{if(index==3)openSectionProfilePicker();showProfilePanel(names[index],panels[index]);});}
 
- save.setOnClickListener(v->{if(calculate())showPage(planPage);});if(length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);
+ save.setOnClickListener(v->{if(calculate())showPage(planPage);});if(length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);if(!projectChosen)showProjectStart();
  }
  LinearLayout sectionProfilePanel;
  void showProfilePanel(String title,LinearLayout panel){
@@ -5484,7 +5492,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   pendingPoint=null;pendingPhoto=null;
  }
  @Override protected void onSaveInstanceState(Bundle out){
-  super.onSaveInstanceState(out);out.putString("selectedPoint",selectedPoint);
+  super.onSaveInstanceState(out);out.putBoolean("projectChosen",projectChosen);out.putString("selectedPoint",selectedPoint);
   out.putString("pendingPoint",pendingPoint);out.putString("pendingPhoto",pendingPhoto);out.putString("pendingMaterialProject",pendingMaterialProject);out.putString("pendingConnectionsProject",pendingConnectionsProject);out.putString("pendingPlanProject",pendingPlanProject);out.putString("pendingProtocolsProject",pendingProtocolsProject);
  }
  com.google.mlkit.nl.translate.Translator translator;
