@@ -222,6 +222,40 @@ public class ProjectStateTest {
    });
   }
  }
+ @Test public void routeProfileSnapshotsRestoreTruncatedRanges() throws Exception {
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->{
+    String original=activity.activeProject,id=java.util.UUID.randomUUID().toString();
+    org.json.JSONArray originalSegments=activity.segments;
+    try{
+     activity.activeProject=id;
+     RouteSketch route=new RouteSketch(activity,"[[0.1,0.1,null],[0.5,0.1,5],[0.8,0.1,5]]");
+     String full=route.encode();
+     route.vertices.remove(2);
+     String shortened=route.encode();
+     android.content.SharedPreferences prefs=activity.getPreferences(0);
+     org.json.JSONArray surfaces=new org.json.JSONArray("[{\"from\":0,\"to\":10,\"surface\":\"Asphalt\"}]");
+     org.json.JSONArray profiles=new org.json.JSONArray("[{\"from\":0,\"to\":10,\"width\":0.8,\"depth\":1.4,\"pipes\":[]}]");
+     activity.segments=surfaces;
+     assertTrue(prefs.edit().putString("segments",surfaces.toString()).putString(PipeLayoutStore.SECTION_KEY,profiles.toString()).commit());
+     android.content.SharedPreferences.Editor edit=prefs.edit();
+     activity.segments=activity.stageRouteProfileRemap(full,shortened,edit,false);
+     assertTrue(edit.commit());
+     assertEquals(5,activity.segments.getJSONObject(0).getDouble("to"),0);
+     edit=prefs.edit();
+     activity.segments=activity.stageRouteProfileRemap(shortened,full,edit,true);
+     assertTrue(edit.commit());
+     assertEquals(surfaces.toString(),activity.segments.toString());
+     assertEquals(profiles.toString(),prefs.getString(PipeLayoutStore.SECTION_KEY,""));
+     edit=prefs.edit();
+     activity.segments=activity.stageRouteProfileRemap(full,shortened,edit,true);
+     assertTrue(edit.commit());
+     assertEquals(5,activity.segments.getJSONObject(0).getDouble("to"),0);
+    }catch(Exception e){throw new AssertionError(e);}
+    finally{activity.activeProject=original;activity.segments=originalSegments;activity.deleteSharedPreferences("project_"+id);}
+   });
+  }
+ }
  @Test public void routeHistoryDistinguishesRestorationFromNewEdits(){
   MainActivity.RouteEditHistory history=new MainActivity.RouteEditHistory("a");
   history.record("b");
