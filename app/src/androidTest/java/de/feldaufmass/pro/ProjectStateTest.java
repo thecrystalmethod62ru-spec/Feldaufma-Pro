@@ -327,6 +327,24 @@ public class ProjectStateTest {
   return new org.json.JSONObject().put("kind","segment").put("mode",mode).put("unit","m²").put("quantity",quantity)
    .put("snapshot",new org.json.JSONObject().put("from",from).put("to",to).toString());
  }
+ @Test public void mainRouteOverlapSeparatesControlAreaFromGrossQuantities(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->{
+    try{
+     RouteSketch corner=new RouteSketch(activity,"[[0.1,0.2,null],[0.5,0.2,10],[0.5,0.6,10]]");
+     org.json.JSONArray profiles=new org.json.JSONArray();
+     StripOverlap.Result check=MainActivity.mainRouteOverlap(corner,20,2,1,profiles);
+     assertEquals(40,check.gross,0.001);assertEquals(39,check.net,0.001);assertEquals(1,check.overlap,0.001);
+     assertEquals(40,MainActivity.mainTrenchQuantities(20,2,1,profiles)[0],0.001);
+     RouteSketch straight=new RouteSketch(activity,"[[0.1,0.2,null],[0.5,0.2,10],[0.9,0.2,10]]");
+     profiles.put(new org.json.JSONObject().put("from",5).put("to",15).put("width",3).put("depth",1));
+     StripOverlap.Result variable=MainActivity.mainRouteOverlap(straight,20,2,1,profiles);
+     assertEquals(50,variable.gross,0.001);assertEquals(0,variable.overlap,0.001);
+     try{MainActivity.mainRouteOverlap(straight,25,2,1,profiles);fail("Mismatched lengths must not be used");}catch(IllegalArgumentException expected){}
+    }catch(Exception e){throw new AssertionError(e);}
+   });
+  }
+ }
  @Test public void measuredPdfCopyMatchesMetricDxfWithoutChangingOriginal(){
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    scenario.onActivity(activity->{
