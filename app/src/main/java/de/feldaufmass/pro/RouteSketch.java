@@ -73,6 +73,7 @@ final class RouteSketch extends View {
  SegmentListener strokeAdded;
  interface SegmentListener {void select(int endpoint);}
  SegmentListener selected;
+ SegmentListener dimensionSelected;
 
  RouteSketch(Context context,String data){
   super(context);
@@ -1080,10 +1081,10 @@ final class RouteSketch extends View {
   if(!editable && pointSelected==null)return false;
   int action=event.getActionMasked();
   if(event.getPointerCount()>=2&&activeDimension!=null){restoreDimensionDrag();activeDimension=null;}
-  if(editable&&moving&&!placingObject&&!editingObjects&&action==MotionEvent.ACTION_DOWN&&(!layerVisible(LAYER_ROUTE)||nearestPoint(event.getX(),event.getY())<0)){
+  if(editable&&!placingObject&&!editingObjects&&action==MotionEvent.ACTION_DOWN){
    for(int i=dimensionHits.size()-1;i>=0;i--){
     DimensionHit hit=dimensionHits.get(i);
-    if(hit.bounds.contains(event.getX(),event.getY())){
+    if((moving||hit.key.startsWith("route:"))&&hit.bounds.contains(event.getX(),event.getY())){
      activeDimension=hit;previousDimensionOffset=dimensionOffsets.get(hit.key);previousRouteX=dimensionOffsets.get(hit.key+":x");previousRouteY=dimensionOffsets.get(hit.key+":y");dimensionStartX=event.getX();dimensionStartY=event.getY();dimensionDownTime=event.getEventTime();dimensionMoved=false;getParent().requestDisallowInterceptTouchEvent(true);return true;
     }
    }
@@ -1091,7 +1092,7 @@ final class RouteSketch extends View {
   if(activeDimension!=null){
    if(action==MotionEvent.ACTION_MOVE){
     if(Math.hypot(event.getX()-dimensionStartX,event.getY()-dimensionStartY)>android.view.ViewConfiguration.get(getContext()).getScaledTouchSlop())dimensionMoved=true;
-    if(!dimensionMoved)return true;
+    if(!dimensionMoved||!moving)return true;
     float d=getResources().getDisplayMetrics().density;
     if(activeDimension.key.startsWith("route:")){dimensionOffsets.put(activeDimension.key+":x",Math.max(-1000,Math.min(1000,(previousRouteX==null?0:previousRouteX)+(event.getX()-dimensionStartX)/d)));dimensionOffsets.put(activeDimension.key+":y",Math.max(-1000,Math.min(1000,(previousRouteY==null?0:previousRouteY)+(event.getY()-dimensionStartY)/d)));invalidate();return true;}
     float delta=((event.getX()-dimensionStartX)*activeDimension.nx+(event.getY()-dimensionStartY)*activeDimension.ny)/d;
@@ -1099,9 +1100,9 @@ final class RouteSketch extends View {
    }
    if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL){
     if(action==MotionEvent.ACTION_CANCEL){restoreDimensionDrag();}
-    if(action==MotionEvent.ACTION_UP&&dimensionMoved&&!saveDimensionLayout()){restoreDimensionDrag();}
+    if(action==MotionEvent.ACTION_UP&&dimensionMoved&&moving&&!saveDimensionLayout()){restoreDimensionDrag();}
     String key=activeDimension.key;boolean rotate=action==MotionEvent.ACTION_UP&&!dimensionMoved&&key.startsWith("route:")&&event.getEventTime()-dimensionDownTime>=android.view.ViewConfiguration.getLongPressTimeout();
-    activeDimension=null;getParent().requestDisallowInterceptTouchEvent(false);invalidate();if(rotate)showDimensionRotation(key);return true;
+    boolean tap=action==MotionEvent.ACTION_UP&&!dimensionMoved&&!rotate&&key.startsWith("route:");activeDimension=null;getParent().requestDisallowInterceptTouchEvent(false);invalidate();if(rotate)showDimensionRotation(key);else if(tap&&dimensionSelected!=null){int endpoint=Integer.parseInt(key.substring(6));if(endpoint>0&&endpoint<vertices.size())dimensionSelected.select(endpoint);}return true;
    }
    return true;
   }
