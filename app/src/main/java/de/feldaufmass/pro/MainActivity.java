@@ -1599,15 +1599,7 @@ public class MainActivity extends Activity {
   PipeLayoutView fullCross=new PipeLayoutView(this);profileWork.addView(fullCross,new LinearLayout.LayoutParams(-1,0,3));profileWork.setOrientation(LinearLayout.VERTICAL);
   LinearLayout profileInfo=new LinearLayout(this);profileInfo.setOrientation(1);profileInfo.setPadding(dp(8),dp(8),dp(8),dp(8));android.graphics.drawable.GradientDrawable parameterFrame=editorShape(0xff041012,8);parameterFrame.setStroke(dp(1),0xff008b93);profileInfo.setBackground(parameterFrame);
   ScrollView profileInfoScroll=new ScrollView(this);profileInfoScroll.addView(profileInfo);profileInfoScroll.setFillViewport(true);profileWork.addView(profileInfoScroll,new LinearLayout.LayoutParams(-1,0,2));
-  profileWork.addOnLayoutChangeListener((view,left,top,right,bottom,oldLeft,oldTop,oldRight,oldBottom)->{
-   if(right<=left||bottom<=top)return;
-   boolean wide=right-left>=dp(560)||(right-left>=dp(320)&&right-left>bottom-top);
-   int profileOrientation=wide?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL;
-   if(profileWork.getOrientation()==profileOrientation)return;
-   profileWork.setOrientation(profileOrientation);
-   fullCross.setLayoutParams(wide?new LinearLayout.LayoutParams(0,-1,3):new LinearLayout.LayoutParams(-1,0,3));
-   profileInfoScroll.setLayoutParams(wide?new LinearLayout.LayoutParams(0,-1,2):new LinearLayout.LayoutParams(-1,0,2));
-  });
+  ProfileResponsiveLayout.bind(profileWork,fullCross,profileInfoScroll);
   TextView profileDimensions=sheetText("",14,true);profileDimensions.setTextColor(0xff28d5c7);TextView parameterTitle=sheetText("PARAMETER",12,true);parameterTitle.setTextColor(0xff28d5c7);profileInfo.addView(parameterTitle);profileInfo.addView(profileDimensions);profileDimensions.setPadding(dp(8),dp(10),dp(8),dp(10));android.graphics.drawable.GradientDrawable dimensionFrame=editorShape(Color.BLACK,4);dimensionFrame.setStroke(dp(1),0xff008b93);profileDimensions.setBackground(dimensionFrame);
   TextView profileMaterial=sheetText("",12,false);profileMaterial.setTextColor(0xffcbd6d5);profileInfo.addView(profileMaterial);profileMaterial.setPadding(dp(8),dp(10),dp(8),dp(10));
   LinearLayout profileLegend=new LinearLayout(this);profileLegend.setOrientation(1);profileLegend.setPadding(dp(4),dp(6),dp(4),dp(6));profileInfo.addView(profileLegend);TextView legendTitle=sheetText("LEGENDE",12,true);legendTitle.setTextColor(0xff28d5c7);profileLegend.addView(legendTitle);String[] legendNames={"Oberfläche / Deckschicht","Tragschicht","Verfüllung","Anstehender Boden"};for(int li=0;li<legendNames.length;li++){final int pattern=li;LinearLayout legendRow=new LinearLayout(this);legendRow.setGravity(Gravity.CENTER_VERTICAL);View swatch=new ProfileHatchView(this,pattern);legendRow.addView(swatch,new LinearLayout.LayoutParams(dp(32),dp(20)));TextView item=sheetText(legendNames[li],12,false);item.setTextColor(0xffcbd6d5);item.setPadding(dp(8),dp(3),0,dp(3));legendRow.addView(item,new LinearLayout.LayoutParams(0,-2,1));profileLegend.addView(legendRow,new LinearLayout.LayoutParams(-1,dp(26)));}
