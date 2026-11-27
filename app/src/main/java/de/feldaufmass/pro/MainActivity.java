@@ -813,7 +813,7 @@ public class MainActivity extends Activity {
   });
   for(View view:views)form.removeView(view);
   LinearLayout controls=new LinearLayout(this);controls.setPadding(dp(8),dp(4),dp(8),dp(4));controls.setBackground(editorShape(0xff202b2a,12));root.addView(controls);
-  controls.addView(mode,new LinearLayout.LayoutParams(0,-2,1));controls.addView(angles,new LinearLayout.LayoutParams(0,-2,1));
+  controls.addView(mode,new LinearLayout.LayoutParams(0,-2,1));controls.addView(angles,new LinearLayout.LayoutParams(0,-2,1));Spinner smartMode=new Spinner(this);smartMode.setAdapter(new android.widget.ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Freihand","Smart","Winkelraster 15°"}));smartMode.setSelection(route.smartDrawingMode);smartMode.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onItemSelected(android.widget.AdapterView<?> p,View v,int pos,long id){route.smartDrawingMode=pos;}public void onNothingSelected(android.widget.AdapterView<?> p){}});controls.addView(smartMode,new LinearLayout.LayoutParams(0,-2,1));
   route.darkEditor=true;route.invalidate();root.addView(route,new LinearLayout.LayoutParams(-1,0,1));
   LinearLayout sectionStrip=new LinearLayout(this);sectionStrip.setOrientation(1);sectionStrip.setPadding(dp(6),dp(2),dp(6),dp(2));
   TextView sectionTitle=sheetText("Abschnitte",13,true);sectionStrip.addView(sectionTitle);
