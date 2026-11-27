@@ -575,7 +575,11 @@ final class RouteSketch extends View {
  private int underlayAlpha=150;
  private float underlayX=0,underlayY=0,underlayScale=1,underlayRotation=0;
  void setUnderlayTransform(float x,float y,float zoom,float rotation){
-  underlayX=x;underlayY=y;underlayScale=Math.max(.1f,Math.min(5f,zoom));underlayRotation=rotation;invalidate();
+  underlayX=Float.isFinite(x)?Math.max(-2f,Math.min(2f,x)):0f;
+  underlayY=Float.isFinite(y)?Math.max(-2f,Math.min(2f,y)):0f;
+  underlayScale=Float.isFinite(zoom)?Math.max(.1f,Math.min(5f,zoom)):1f;
+  underlayRotation=Float.isFinite(rotation)?Math.max(-180f,Math.min(180f,rotation)):0f;
+  invalidate();
  }
  private boolean underlayVisible=true;
  private final Paint underlayPaint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
@@ -584,6 +588,7 @@ final class RouteSketch extends View {
  void setUnderlayVisible(boolean visible){underlayVisible=visible;invalidate();}
  void drawUnderlay(Canvas c){
   if(underlay==null||underlay.isRecycled()||!underlayVisible)return;
+  // Use the same normalized world coordinates as route vertices in every viewport.
   float side=scale(),factor=side/Math.max(underlay.getWidth(),underlay.getHeight());
   float w=underlay.getWidth()*factor,h=underlay.getHeight()*factor;
   float x=left()+(side-w)/2,y=top()+(side-h)/2;
