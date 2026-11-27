@@ -975,21 +975,27 @@ final class RouteSketch extends View {
  boolean darkEditor=false;
  boolean darkPreview=false;
  private boolean darkPalette(){return darkEditor||darkPreview;}
- private void drawTrenchPlan(Canvas c,float density){
+ private JSONArray trenchProfiles(){
+  if(getContext() instanceof android.app.Activity)try{return new PipeLayoutStore(((android.app.Activity)getContext()).getPreferences(0)).sections();}catch(Exception ignored){}
+  return new JSONArray();
+ }
+ private double trenchSectionWidth(JSONArray profiles,double station,double len){
   double base=trenchWidth;
   if(!Double.isFinite(base)||base<=0)base=getContext().getSharedPreferences("base_profile_defaults",0).getFloat("width",0.4f);
   if(!Double.isFinite(base)||base<=0)base=0.4;
-  JSONArray profiles=new JSONArray();
-  if(getContext() instanceof android.app.Activity)try{profiles=new PipeLayoutStore(((android.app.Activity)getContext()).getPreferences(0)).sections();}catch(Exception ignored){}
+  if(Double.isFinite(station)&&Double.isFinite(len)&&len>0)for(int j=0;j<profiles.length();j++){
+   JSONObject row=profiles.optJSONObject(j);if(row==null)continue;
+   double candidate=row.optDouble("width");
+   if(Math.abs(row.optDouble("from")-station)<0.001&&Math.abs(row.optDouble("to")-station-len)<0.001&&Double.isFinite(candidate)&&candidate>0)return candidate;
+  }
+  return base;
+ }
+ private void drawTrenchPlan(Canvas c,float density){
+  JSONArray profiles=trenchProfiles();
   Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);p.setStrokeCap(Paint.Cap.ROUND);
   double station=0;
   for(int i=1;i<vertices.size();i++){
-   Vertex a=vertices.get(i-1),b=vertices.get(i);double len=b.metres,end=station+len,w=base;
-   if(Double.isFinite(end)&&len>0)for(int j=0;j<profiles.length();j++){
-    JSONObject row=profiles.optJSONObject(j);if(row==null)continue;
-    double candidate=row.optDouble("width");
-    if(Math.abs(row.optDouble("from")-station)<0.001&&Math.abs(row.optDouble("to")-end)<0.001&&Double.isFinite(candidate)&&candidate>0){w=candidate;break;}
-   }
+   Vertex a=vertices.get(i-1),b=vertices.get(i);double len=b.metres,end=station+len,w=trenchSectionWidth(profiles,station,len);
    double pixels=Math.hypot(b.point.x-a.point.x,b.point.y-a.point.y)*scale();
    boolean measured=Double.isFinite(len)&&len>0;
    float sw=(float)(measured?pixels*w/len:24*density*w/0.4);
@@ -1024,6 +1030,7 @@ final class RouteSketch extends View {
   float density=getResources().getDisplayMetrics().density;
   paint.setTextSize(13*density);
   dimensionHits.clear();
+  JSONArray dimensionProfiles=darkEditor&&!printPlan?trenchProfiles():new JSONArray();
   if(darkEditor&&!printPlan&&layerVisible(LAYER_ROUTE))drawTrenchPlan(c,density);
   drawSurfaceSections(c,density);
   drawAsphaltCuts(c,density);
@@ -1040,10 +1047,9 @@ final class RouteSketch extends View {
     float ax=left()+a.x*scale(),ay=top()+a.y*scale(),bx=left()+b.x*scale(),by=top()+b.y*scale(),px=(float)Math.hypot(bx-ax,by-ay);
     if(px>1){
      float nx=-(by-ay)/px,ny=(bx-ax)/px;if(ny<0){nx=-nx;ny=-ny;}
-     double w=trenchWidth;if(!Double.isFinite(w)||w<=0)w=getContext().getSharedPreferences("base_profile_defaults",0).getFloat("width",.4f);
-     double start=0;for(int j=1;j<i;j++)start+=vertices.get(j).metres;
-     for(int j=0;j<surfaceSections.length();j++){JSONObject row=surfaceSections.optJSONObject(j);if(row!=null&&Math.abs(row.optDouble("from")-start)<.001&&Math.abs(row.optDouble("to")-start-metres)<.001&&row.optDouble("width")>0){w=row.optDouble("width");break;}}
-     float half=(float)(Double.isFinite(metres)&&metres>0?px*w/metres/2:12*density);half=Math.max(density,Math.min(half,Math.max(getWidth(),getHeight())));
+     double start=0;for(int j=1;j<i;j++){double length=vertices.get(j).metres;start=Double.isFinite(length)&&length>0?start+length:Double.NaN;}
+     double w=trenchSectionWidth(dimensionProfiles,start,metres);
+     float half=(float)(Double.isFinite(metres)&&metres>0?px*w/metres/2:12*density*w/0.4);half=Math.max(density,Math.min(half,Math.max(getWidth(),getHeight())));
      float offset=half+22*density;float x1=ax+nx*offset,y1=ay+ny*offset,x2=bx+nx*offset,y2=by+ny*offset;
      Paint dim=new Paint(Paint.ANTI_ALIAS_FLAG);dim.setColor(0xff9aafb1);dim.setStrokeWidth(density);
      c.drawLine(ax+nx*(half+4*density),ay+ny*(half+4*density),x1+nx*4*density,y1+ny*4*density,dim);
