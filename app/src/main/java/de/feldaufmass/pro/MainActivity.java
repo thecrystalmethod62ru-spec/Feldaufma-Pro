@@ -832,6 +832,18 @@ public class MainActivity extends Activity {
  }
  JSONArray stageRouteProfileRemap(String before,String after,SharedPreferences.Editor ed)throws org.json.JSONException{
   if(before.equals(after))return null;
+  // Preserve profile state for geometry snapshots before destructive remapping.
+  org.json.JSONArray snapshots=new org.json.JSONArray(getPreferences(0).getString("routeProfileSnapshots","[]"));
+  org.json.JSONArray nextSnapshots=new org.json.JSONArray();
+  for(int i=0;i<snapshots.length();i++){
+   org.json.JSONObject entry=snapshots.getJSONObject(i);
+   if(!before.equals(entry.optString("geometry")))nextSnapshots.put(entry);
+  }
+  nextSnapshots.put(new org.json.JSONObject().put("geometry",before).put("surfaces",new JSONArray(segments.toString())).put("profiles",new PipeLayoutStore(getPreferences(0)).sections()));
+  org.json.JSONArray bounded=new org.json.JSONArray();
+  for(int i=Math.max(0,nextSnapshots.length()-50);i<nextSnapshots.length();i++)bounded.put(nextSnapshots.getJSONObject(i));
+  ed.putString("routeProfileSnapshots",bounded.toString());
+
   double[][] stations=matchingRouteStations(before,after);
   if(stations==null){
    // A deletion is the inverse of an insertion when surviving anchors retain their order.
