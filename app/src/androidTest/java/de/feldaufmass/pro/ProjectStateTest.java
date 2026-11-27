@@ -666,6 +666,8 @@ public class ProjectStateTest {
   activity.length.setText("20");
   activity.width.setText("1");
   activity.depth.setText("2");
+  // This scenario must not inherit invalid optional fields from other tests.
+  for(android.widget.EditText field:new android.widget.EditText[]{activity.stoneLength,activity.stoneWidth,activity.stoneDepth,activity.asphaltInput,activity.baseInput,activity.pipeInput,activity.leftInput,activity.rightInput})field.setText("");
   assertTrue(activity.calculate());
   activity.surface.setSelection(2);
   activity.stoneDepth.setText("8");
