@@ -347,9 +347,12 @@ public class MainActivity extends Activity {
  RouteSketch livePreview;
  android.location.Location liveFix;
  boolean recordingGpsTrack=false;
+ String gpsRecordingProject=null;
  org.json.JSONArray gpsTrack(){try{return new org.json.JSONArray(getPreferences(0).getString("independentGpsTrack","[]"));}catch(org.json.JSONException e){return new org.json.JSONArray();}}
  void appendGpsTrack(android.location.Location fix){
-  if(!recordingGpsTrack||fix==null||!fix.hasAccuracy()||fix.getAccuracy()<=0||fix.getAccuracy()>15)return;
+  if(!recordingGpsTrack||!activeProject.equals(gpsRecordingProject)||fix==null||!fix.hasAccuracy()||!Float.isFinite(fix.getAccuracy())||fix.getAccuracy()<=0||fix.getAccuracy()>15)return;
+  if(!Double.isFinite(fix.getLatitude())||!Double.isFinite(fix.getLongitude())||Math.abs(fix.getLatitude())>90||Math.abs(fix.getLongitude())>180)return;
+  long age=android.os.SystemClock.elapsedRealtimeNanos()-fix.getElapsedRealtimeNanos();if(age<0||age>15000000000L)return;
   org.json.JSONArray rows=gpsTrack();
   if(rows.length()>=10000){recordingGpsTrack=false;notice("GPS-Aufzeichnung: Punktlimit erreicht.");return;}
   if(rows.length()>0){
@@ -384,7 +387,7 @@ public class MainActivity extends Activity {
    .setPositiveButton(recordingGpsTrack?"Stoppen":"Fortsetzen",(d,w)->{
     if(recordingGpsTrack){recordingGpsTrack=false;return;}
     if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=android.content.pm.PackageManager.PERMISSION_GRANTED){notice("Bitte zuerst GPS-Berechtigung erteilen.");return;}
-    startLiveGps();if(liveManager==null){notice("GPS nicht verfügbar.");return;}recordingGpsTrack=true;notice("GPS-Aufzeichnung gestartet.");
+    startLiveGps();if(liveManager==null){notice("GPS nicht verfügbar.");return;}gpsRecordingProject=activeProject;recordingGpsTrack=true;notice("GPS-Aufzeichnung gestartet.");
    }).setNeutralButton("Spur löschen",(d,w)->new android.app.AlertDialog.Builder(this).setMessage("Gespeicherte GPS-Spur wirklich löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(dd,ww)->{recordingGpsTrack=false;if(!getPreferences(0).edit().remove("independentGpsTrack").commit())notice("GPS-Spur konnte nicht gelöscht werden.");else if(livePreview!=null)livePreview.setIndependentGpsTrack(gpsTrack());}).show()).setNegativeButton("Schließen",null).show();
  }
 
