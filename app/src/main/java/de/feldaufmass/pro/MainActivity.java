@@ -1255,11 +1255,13 @@ public class MainActivity extends Activity {
    double start=0;for(int j=0;j<index;j++)start+=route.vertices.get(j+1).metres;final double from=start,to=start+route.vertices.get(index+1).metres;
    SharedPreferences defaults=getSharedPreferences("base_profile_defaults",MODE_PRIVATE);
    double bw=defaults.getFloat("width",0.4f),bd=defaults.getFloat("depth",1f);
+   try{double v=number(width);if(Double.isFinite(v)&&v>0)bw=v;}catch(Exception ignored){}
+   try{double v=number(depth);if(Double.isFinite(v)&&v>0)bd=v;}catch(Exception ignored){}
    JSONObject surfaceRow=null;try{for(int j=0;j<segments.length();j++){JSONObject p=segments.getJSONObject(j);if(p.optDouble("from")==from&&p.optDouble("to")==to){surfaceRow=p;bw=p.optDouble("width",bw);break;}}JSONArray profiles=new PipeLayoutStore(getPreferences(0)).sections();for(int j=0;j<profiles.length();j++){JSONObject p=profiles.getJSONObject(j);if(p.optDouble("from")==from&&p.optDouble("to")==to){bw=p.optDouble("width",bw);bd=p.optDouble("depth",bd);break;}}}catch(Exception ignored){}
    final double initialWidth=bw,initialDepth=bd;
    final String material=surfaceRow==null?covering:surfaceRow.optString("surface",covering);
    final double leftCut=surfaceRow==null?0:surfaceRow.optDouble("left",0),rightCut=surfaceRow==null?0:surfaceRow.optDouble("right",0);
-   Button lengthValue=new Button(this);styleEditorButton(lengthValue,false);lengthValue.setText(Double.isFinite(to-from)?String.format(java.util.Locale.GERMANY,"Länge  %.2f m",to-from):"Länge · Maß fehlt");lengthValue.setTextSize(11);lengthValue.setMinHeight(0);sectionEditor.addView(lengthValue,new LinearLayout.LayoutParams(-1,dp(32)));lengthValue.setOnClickListener(v->measureSegment(route,index+1));
+   Button lengthValue=new Button(this);styleEditorButton(lengthValue,false);lengthValue.setText(Double.isFinite(route.vertices.get(index+1).metres)&&route.vertices.get(index+1).metres>0?String.format(java.util.Locale.GERMANY,"Länge  %.2f m",route.vertices.get(index+1).metres):"Länge · Maß fehlt");lengthValue.setTextSize(11);lengthValue.setMinHeight(0);sectionEditor.addView(lengthValue,new LinearLayout.LayoutParams(-1,dp(32)));lengthValue.setOnClickListener(v->measureSegment(route,index+1));
    EditText widthField=referenceField(sectionEditor,"Breite (B)",String.format(java.util.Locale.GERMANY,"%.2f",bw),true);
    EditText depthField=referenceField(sectionEditor,"Tiefe (T)",String.format(java.util.Locale.GERMANY,"%.2f",bd),true);
    final String[] selectedMaterial={material};
