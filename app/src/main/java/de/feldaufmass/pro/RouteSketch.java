@@ -529,6 +529,21 @@ final class RouteSketch extends View {
   String encode(){
    JSONArray rows=new JSONArray();try{for(android.location.Location fix:observations)rows.put(new JSONArray().put(fix.getLatitude()).put(fix.getLongitude()).put((double)fix.getAccuracy()).put(fix.getTime()));}catch(JSONException e){throw new IllegalStateException(e);}return rows.toString();
   }
+  ArrayList<PointF> endpointAlignedPoints(RouteSketch manual){
+   ArrayList<PointF> points=new ArrayList<>();
+   if(observations.size()<2||manual.vertices.size()<2)return points;
+   android.location.Location first=observations.get(0),last=observations.get(observations.size()-1);
+   double cos=Math.cos(Math.toRadians(first.getLatitude()));
+   double ex=longitudeDelta(last.getLongitude(),first.getLongitude())*cos*111195,ey=(first.getLatitude()-last.getLatitude())*111195;
+   double norm=ex*ex+ey*ey;if(norm<100)return points;
+   PointF a=manual.vertices.get(0).point,b=manual.vertices.get(manual.vertices.size()-1).point;
+   double sx=b.x-a.x,sy=b.y-a.y;if(sx*sx+sy*sy<.0001)return points;
+   double real=(sx*ex+sy*ey)/norm,imag=(sy*ex-sx*ey)/norm;
+   for(android.location.Location fix:observations){
+    double x=longitudeDelta(fix.getLongitude(),first.getLongitude())*cos*111195,y=(first.getLatitude()-fix.getLatitude())*111195;
+    points.add(new PointF((float)(a.x+real*x-imag*y),(float)(a.y+imag*x+real*y)));
+   }return points;
+  }
   ArrayList<PointF> alignedPoints(RouteSketch manual){
    ArrayList<PointF> points=new ArrayList<>();
    for(android.location.Location fix:observations){PointF p=manual.gpsPosition(fix.getLatitude(),fix.getLongitude(),-1);if(p==null){points.clear();return points;}points.add(p);}
@@ -626,7 +641,9 @@ final class RouteSketch extends View {
   if(!layerVisible(LAYER_GPS_ROUTE)||!(getContext() instanceof android.app.Activity))return;
   GpsLayer layer=new GpsLayer(((android.app.Activity)getContext()).getPreferences(0).getString("gpsRouteLayer","[]"));
   if(layer.observations.size()<2)return;
-  ArrayList<PointF> pts=layer.alignedPoints(this);
+  boolean approximate=((android.app.Activity)getContext()).getPreferences(0).getBoolean("gpsEndpointAlignment",false);
+  ArrayList<PointF> pts=approximate?layer.endpointAlignedPoints(this):layer.alignedPoints(this);
+  if(approximate&&pts.size()>1){paint.setColor(0xff399cff);paint.setTextSize(12*getResources().getDisplayMetrics().density);c.drawText("GPS: schematisch ausgerichtet",12,24*getResources().getDisplayMetrics().density,paint);}
   if(pts.size()<2){
    paint.setColor(darkEditor?0xff62b3ff:0xff1565c0);paint.setTextSize(12*getResources().getDisplayMetrics().density);
    c.drawText("GPS-Ebene: Referenzpunkte fehlen",12,24*getResources().getDisplayMetrics().density,paint);return;
