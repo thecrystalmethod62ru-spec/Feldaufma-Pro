@@ -5090,7 +5090,8 @@ public class MainActivity extends Activity {
    if(rows.isEmpty()){sectionProfilePanel.addView(sheetText("Keine Abschnitte vorhanden",15,false));return;}
    LinearLayout body=page();sectionProfilePanel.addView(body);
    body.addView(sheetText("Abschnitte der Trasse",16,true));
-   Spinner picker=new Spinner(this);body.addView(picker);picker.setVisibility(View.GONE);
+   final int[] selected={0};
+   final java.util.function.IntConsumer[] selectProfile={null};
    LinearLayout stationList=page();stationList.setBackground(editorShape(0xff202525,12));body.addView(stationList);
    for(int j=0;j<rows.size();j++){
     final int selection=j+1;org.json.JSONObject row=rows.get(j);
@@ -5099,12 +5100,10 @@ public class MainActivity extends Activity {
     LinearLayout labelsBox=new LinearLayout(this);labelsBox.setOrientation(1);item.addView(labelsBox,new LinearLayout.LayoutParams(0,-2,1));
     labelsBox.addView(sheetText(String.format(java.util.Locale.GERMANY,"Abschnitt %02d",selection),15,true));
     TextView range=sheetText(String.format(java.util.Locale.GERMANY,"%.2f – %.2f m",row.getDouble("from"),row.getDouble("to")),13,false);range.setTextColor(0xffaeb9b8);labelsBox.addView(range);
-    TextView arrow=sheetText("›",24,false);item.addView(arrow);item.setBackground(editorShape(0xff202525,8));item.setClickable(true);item.setFocusable(true);item.setOnClickListener(v->{picker.setSelection(selection);for(int k=0;k<stationList.getChildCount();k++){View child=stationList.getChildAt(k);if(child instanceof LinearLayout)child.setBackground(editorShape(child==item?0xff28564c:0xff202525,8));}});
+    TextView arrow=sheetText("›",24,false);item.addView(arrow);item.setBackground(editorShape(0xff202525,8));item.setClickable(true);item.setFocusable(true);item.setOnClickListener(v->{selectProfile[0].accept(selection);for(int k=0;k<stationList.getChildCount();k++){View child=stationList.getChildAt(k);if(child instanceof LinearLayout)child.setBackground(editorShape(child==item?0xff28564c:0xff202525,8));}});
     if(j<rows.size()-1){View line=new View(this);line.setBackgroundColor(0xff414848);stationList.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));}
    }
-   String[] labels=new String[rows.size()+1];labels[0]="Standardprofil";for(int i=0;i<rows.size();i++){org.json.JSONObject p=rows.get(i);labels[i+1]=String.format(java.util.Locale.GERMANY,"Abschnitt %02d · %.2f – %.2f m",i+1,p.getDouble("from"),p.getDouble("to"));}
-   picker.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,labels));
-   actionButtonSingle(body,"Standardprofil",()->{picker.setSelection(0);for(int k=0;k<stationList.getChildCount();k++){View child=stationList.getChildAt(k);if(child instanceof LinearLayout)child.setBackground(editorShape(0xff202525,8));}});
+   actionButtonSingle(body,"Standardprofil",()->{selectProfile[0].accept(0);for(int k=0;k<stationList.getChildCount();k++){View child=stationList.getChildAt(k);if(child instanceof LinearLayout)child.setBackground(editorShape(0xff202525,8));}});
    LinearLayout controls=page();body.addView(controls);PipeLayoutView view=new PipeLayoutView(this);controls.addView(view,new LinearLayout.LayoutParams(-1,dp(240)));
    EditText bw=new EditText(this),bd=new EditText(this);bw.setHint("Grabenbreite (m)");bd.setHint("Grabentiefe (m)");controls.addView(bw);utilitySlider(controls,bw,"Grabenbreite (m)",0.1,6,0.01,true);controls.addView(bd);utilitySlider(controls,bd,"Grabentiefe (m)",0.1,8,0.01,true);
    EditText cutL=new EditText(this),cutR=new EditText(this),topLayer=new EditText(this),baseLayer=new EditText(this);
@@ -5112,7 +5111,7 @@ public class MainActivity extends Activity {
    for(int j=0;j<extras.length;j++){extras[j].setHint(extraLabels[j]);controls.addView(extras[j]);utilitySlider(controls,extras[j],extraLabels[j],0,j<2?2:1,0.01,true);}
    TextView quantity=sheetText("",14,false);controls.addView(quantity);
    final boolean[] loading={false};
-   Runnable preview=()->{if(loading[0])return;try{org.json.JSONObject p=rows.get(picker.getSelectedItemPosition()-1);double ww=number(bw),dd=number(bd);if(!Double.isFinite(ww)||!Double.isFinite(dd)||ww<=0||dd<=0)return;view.setLayoutData(PipeLayoutStore.decode(p.getJSONArray("pipes").toString()),ww,dd);
+   Runnable preview=()->{if(loading[0])return;try{org.json.JSONObject p=rows.get(selected[0]-1);double ww=number(bw),dd=number(bd);if(!Double.isFinite(ww)||!Double.isFinite(dd)||ww<=0||dd<=0)return;view.setLayoutData(PipeLayoutStore.decode(p.getJSONArray("pipes").toString()),ww,dd);
     org.json.JSONObject seg=findSurfaceSection(p);String type=seg==null?covering:seg.optString("surface",covering);
     RouteSketch style=new RouteSketch(MainActivity.this,"[]");style.bindDimensionProject(activeProject);
     view.setAsphaltProfile("Asphalt".equals(type));
@@ -5120,10 +5119,10 @@ public class MainActivity extends Activity {
     quantity.setText(String.format(java.util.Locale.GERMANY,"Aushub (brutto): %.3f m³",(p.getDouble("to")-p.getDouble("from"))*ww*dd));}catch(Exception ignored){}};
    android.text.TextWatcher watcher=new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){preview.run();}public void afterTextChanged(android.text.Editable e){}};
    bw.addTextChangedListener(watcher);bd.addTextChangedListener(watcher);for(EditText field:extras)field.addTextChangedListener(watcher);
-   java.util.function.IntConsumer load=i->{boolean standard=i==0;controls.setVisibility(standard?View.GONE:View.VISIBLE);if(standard)return;org.json.JSONObject p=rows.get(i-1);loading[0]=true;bw.setText(String.valueOf(p.optDouble("width")));bd.setText(p.optDouble("depth")>0?String.valueOf(p.optDouble("depth")):"");org.json.JSONObject seg=findSurfaceSection(p);String[] keys={"left","right","topThickness","baseThickness"};for(int j=0;j<extras.length;j++)extras[j].setText(seg==null?"":seg.optString(keys[j],""));loading[0]=false;preview.run();};
-   onChoice(picker,load);load.accept(0);
+   java.util.function.IntConsumer load=i->{selected[0]=i;boolean standard=i==0;controls.setVisibility(standard?View.GONE:View.VISIBLE);if(standard)return;org.json.JSONObject p=rows.get(i-1);loading[0]=true;bw.setText(String.valueOf(p.optDouble("width")));bd.setText(p.optDouble("depth")>0?String.valueOf(p.optDouble("depth")):"");org.json.JSONObject seg=findSurfaceSection(p);String[] keys={"left","right","topThickness","baseThickness"};for(int j=0;j<extras.length;j++)extras[j].setText(seg==null?"":seg.optString(keys[j],""));loading[0]=false;preview.run();};
+   selectProfile[0]=load;load.accept(0);
    actionButtonSingle(controls,"Abschnitt speichern",()->{try{
-    int i=picker.getSelectedItemPosition()-1;org.json.JSONObject p=rows.get(i);double ww=number(bw),dd=number(bd);
+    int i=selected[0]-1;org.json.JSONObject p=rows.get(i);double ww=number(bw),dd=number(bd);
     double cl=optional(cutL),cr=optional(cutR),tl=optional(topLayer),bl=optional(baseLayer);
     if((Double.isFinite(tl)?tl:0)+(Double.isFinite(bl)?bl:0)>dd)throw new IllegalArgumentException("Schichtstärken überschreiten Grabentiefe");
     org.json.JSONArray nextSurfaces=new org.json.JSONArray(segments.toString());
