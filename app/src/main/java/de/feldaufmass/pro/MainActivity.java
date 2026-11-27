@@ -1162,13 +1162,14 @@ public class MainActivity extends Activity {
   };
   icon.setBounds(0,0,dp(20),dp(20));button.setText(label);button.setContentDescription(label);button.setCompoundDrawables(null,icon,null,null);button.setCompoundDrawablePadding(dp(3));button.setGravity(Gravity.CENTER);button.setMinHeight(dp(52));button.setTextSize(12);
  }
- void showFullscreenRoute(android.app.AlertDialog editor,LinearLayout form,RouteSketch route,Spinner mode,Spinner angles,LinearLayout historyBar,Runnable openObjects,LinearLayout underlayControls){
+ void showFullscreenRoute(android.app.AlertDialog editor,LinearLayout form,RouteSketch route,Spinner mode,Spinner angles,LinearLayout historyBar,Runnable openObjects,LinearLayout underlayControls,boolean immersiveInitially){
+  final boolean[] immersive={immersiveInitially};
   // Move the existing views, not a second sketch: unsaved data and undo history stay shared.
   View[] views={route,mode,angles,historyBar};
   int[] positions=new int[views.length];android.view.ViewGroup.LayoutParams[] params=new android.view.ViewGroup.LayoutParams[views.length];
   for(int j=0;j<views.length;j++){if(views[j].getParent()!=form)return;positions[j]=form.indexOfChild(views[j]);params[j]=views[j].getLayoutParams();}
   android.app.Dialog full=new android.app.Dialog(this,android.R.style.Theme_Material_NoActionBar){
-   @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused&&getWindow()!=null){androidx.core.view.WindowInsetsControllerCompat c=androidx.core.view.WindowCompat.getInsetsController(getWindow(),getWindow().getDecorView());c.setSystemBarsBehavior(androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);c.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars());}}
+   @Override public void onWindowFocusChanged(boolean focused){super.onWindowFocusChanged(focused);if(focused&&immersive[0]&&getWindow()!=null){androidx.core.view.WindowInsetsControllerCompat c=androidx.core.view.WindowCompat.getInsetsController(getWindow(),getWindow().getDecorView());c.setSystemBarsBehavior(androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);c.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars());}}
   };
   full.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
   final int previousOrientation=getRequestedOrientation();
@@ -1347,7 +1348,7 @@ public class MainActivity extends Activity {
   Button floatingSave=new Button(this);floatingSave.setAllCaps(false);floatingSave.setText("Speichern");styleEditorButton(floatingSave,true);compactToolIcon(floatingSave,"Speichern","save");
   android.widget.FrameLayout.LayoutParams floatingSaveParams=new android.widget.FrameLayout.LayoutParams(dp(88),dp(54),Gravity.BOTTOM|Gravity.RIGHT);floatingSaveParams.setMargins(dp(8),dp(8),dp(8),dp(8));canvasFrame.addView(floatingSave,floatingSaveParams);floatingSave.setVisibility(View.GONE);
   floatingSave.setOnClickListener(v->save.performClick());
-  canvasToggle.setOnClickListener(v->{layerPanel.setVisibility(View.GONE);for(View bar:new View[]{header,viewTabs,controls,historyBar,tools,save,sectionStrip})bar.setVisibility(View.GONE);restoreTools.setVisibility(View.VISIBLE);floatingSave.setVisibility(View.VISIBLE);});
+  canvasToggle.setOnClickListener(v->{immersive[0]=true;if(full.getWindow()!=null)androidx.core.view.WindowCompat.getInsetsController(full.getWindow(),root).hide(androidx.core.view.WindowInsetsCompat.Type.systemBars());layerPanel.setVisibility(View.GONE);for(View bar:new View[]{header,viewTabs,controls,historyBar,tools,save,sectionStrip})bar.setVisibility(View.GONE);restoreTools.setVisibility(View.VISIBLE);floatingSave.setVisibility(View.VISIBLE);});
   restoreTools.setOnTouchListener(new View.OnTouchListener(){
    float startX,startY,baseX,baseY;boolean moved;
    public boolean onTouch(View v,android.view.MotionEvent e){
@@ -1363,7 +1364,7 @@ public class MainActivity extends Activity {
    }
   });
   canvasFrame.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(restoreTools.getVisibility()==View.VISIBLE){restoreTools.setX(Math.max(0,Math.min(canvasFrame.getWidth()-restoreTools.getWidth(),restoreTools.getX())));restoreTools.setY(Math.max(0,Math.min(canvasFrame.getHeight()-restoreTools.getHeight(),restoreTools.getY())));}});
-  restoreTools.setOnClickListener(v->{for(View bar:new View[]{header,controls,historyBar,tools,save,sectionStrip})bar.setVisibility(View.VISIBLE);restoreTools.setVisibility(View.GONE);floatingSave.setVisibility(View.GONE);});
+  restoreTools.setOnClickListener(v->{immersive[0]=immersiveInitially;if(!immersive[0]&&full.getWindow()!=null)androidx.core.view.WindowCompat.getInsetsController(full.getWindow(),root).show(androidx.core.view.WindowInsetsCompat.Type.systemBars());for(View bar:new View[]{header,viewTabs,controls,historyBar,tools,save,sectionStrip})bar.setVisibility(View.VISIBLE);restoreTools.setVisibility(View.GONE);floatingSave.setVisibility(View.GONE);});
   full.setContentView(root);
   full.setOnDismissListener(d->{
    int maxX=Math.max(0,canvasFrame.getWidth()-floatingProfile.getWidth()),maxY=Math.max(0,canvasFrame.getHeight()-floatingProfile.getHeight());
@@ -1375,7 +1376,7 @@ public class MainActivity extends Activity {
    for(int j=0;j<views.length;j++)form.addView(views[j],Math.min(positions[j],form.getChildCount()),params[j]);
    route.invalidate();
   });
-  back.setOnClickListener(v->full.dismiss());
+  back.setOnClickListener(v->{full.dismiss();if(editor.isShowing())editor.dismiss();});
   save.setOnClickListener(v->{
    if(editor.isShowing())editor.getButton(-1).performClick();
    if(!editor.isShowing())full.dismiss();
@@ -1390,7 +1391,7 @@ public class MainActivity extends Activity {
   }
   full.show();
   setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
-  if(window!=null){window.setLayout(-1,-1);androidx.core.view.WindowInsetsControllerCompat c=androidx.core.view.WindowCompat.getInsetsController(window,root);c.setSystemBarsBehavior(androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);c.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars());androidx.core.view.ViewCompat.requestApplyInsets(root);}
+  if(window!=null){window.setLayout(-1,-1);androidx.core.view.WindowInsetsControllerCompat c=androidx.core.view.WindowCompat.getInsetsController(window,root);c.setSystemBarsBehavior(androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);if(immersive[0])c.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars());else c.show(androidx.core.view.WindowInsetsCompat.Type.systemBars());androidx.core.view.ViewCompat.requestApplyInsets(root);}
  }
  void deleteRoutePoint(RouteSketch route){
   if(route.vertices.size()<3){notice("Mindestens drei Punkte erforderlich.");return;}
@@ -1577,8 +1578,8 @@ public class MainActivity extends Activity {
     refreshRoute();editor.dismiss();notice(route.vertices.isEmpty()&&!route.singleObjects.isEmpty()?"Einzelobjekte gespeichert.":"Trasse gespeichert.");
    }
   });
-  fullscreen.setOnClickListener(v->showFullscreenRoute(editor,form,route,mode,angles,historyBar,openObjects,underlayControls[0]));
-  if(startFullscreen)fullscreen.performClick();
+  fullscreen.setOnClickListener(v->showFullscreenRoute(editor,form,route,mode,angles,historyBar,openObjects,underlayControls[0],true));
+  if(!measure)showFullscreenRoute(editor,form,route,mode,angles,historyBar,openObjects,underlayControls[0],startFullscreen);
  }
 
  static org.json.JSONArray copyEditorObjects(String source){try{return new org.json.JSONArray(source);}catch(Exception e){throw new IllegalStateException(e);}}
