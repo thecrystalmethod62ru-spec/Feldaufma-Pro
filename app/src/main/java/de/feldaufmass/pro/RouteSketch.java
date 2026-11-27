@@ -1190,11 +1190,12 @@ final class RouteSketch extends View {
   int action=event.getActionMasked();
   if(event.getPointerCount()>=2&&activeDimension!=null){restoreDimensionDrag();activeDimension=null;}
   if(editable&&!placingObject&&!editingObjects&&action==MotionEvent.ACTION_DOWN){
-   for(int i=dimensionHits.size()-1;i>=0;i--){
+   // Prefer exact label hits before expanded accessibility targets.
+   for(int pass=0;pass<2;pass++)for(int i=dimensionHits.size()-1;i>=0;i--){
     DimensionHit hit=dimensionHits.get(i);
     boolean routeLabel=hit.key.startsWith("route:");
     android.graphics.RectF touchBounds=new android.graphics.RectF(hit.bounds);
-    if(routeLabel){float d=getResources().getDisplayMetrics().density;touchBounds.inset(-Math.max(0,(48*d-touchBounds.width())/2),-Math.max(0,(48*d-touchBounds.height())/2));}
+    if(pass==1&&routeLabel){float d=getResources().getDisplayMetrics().density;touchBounds.inset(-Math.max(0,(48*d-touchBounds.width())/2),-Math.max(0,(48*d-touchBounds.height())/2));}
     if(((!selectionOnly&&moving)||routeLabel)&&touchBounds.contains(event.getX(),event.getY())){
      activeDimension=hit;previousDimensionOffset=dimensionOffsets.get(hit.key);previousRouteX=dimensionOffsets.get(hit.key+":x");previousRouteY=dimensionOffsets.get(hit.key+":y");dimensionStartX=event.getX();dimensionStartY=event.getY();dimensionDownTime=event.getEventTime();dimensionMoved=false;getParent().requestDisallowInterceptTouchEvent(true);return true;
     }
