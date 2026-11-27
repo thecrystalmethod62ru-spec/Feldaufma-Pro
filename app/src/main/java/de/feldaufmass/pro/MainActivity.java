@@ -5605,7 +5605,8 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  }
  void writePdf(android.net.Uri uri){writePdf(uri,PdfScope.BOTH);}
  void writePdf(android.net.Uri uri,PdfScope scope){
-  try(android.graphics.pdf.PdfDocument pdf=new android.graphics.pdf.PdfDocument()){
+  android.graphics.pdf.PdfDocument pdf=new android.graphics.pdf.PdfDocument();
+  try{
    RouteSketch route=new RouteSketch(this,routeData());route.setStationLayers(objects,segments);route.setTrenchWidth(w);
    int next=1;
    if(scope!=PdfScope.DATA){
@@ -5640,7 +5641,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     if(out==null)throw new java.io.IOException();pdf.writeTo(out);
    }
    notice("PDF gespeichert.");
-  }catch(Exception e){notice("PDF konnte nicht gespeichert werden.");}
+  }catch(Exception e){notice("PDF konnte nicht gespeichert werden.");}finally{pdf.close();}
  }
  int appendProjectInformation(android.graphics.pdf.PdfDocument pdf,int next,RouteSketch route)throws Exception{
   String report=(route.vertices.size()>1?"Trassenskizze – Abschnittsmaße\n"+route.measurements()+"\n\n":"")+"Oberflächenaufbau\n"+surfaceLayers.getText()+"\n\n"+result.getText()+"\n"+legend.getText()+"\n"+
