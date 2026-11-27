@@ -746,7 +746,7 @@ public class MainActivity extends Activity {
   b.setAllCaps(false);b.setTextSize(primary?15:12);b.setTextColor(primary?Color.WHITE:0xff9edbd2);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(dp(4),dp(4),dp(4),dp(4));b.setBackgroundTintList(null);
   b.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x3312665f),editorShape(primary?TEAL:0xff202827,12),null));
  }
- void showFullscreenRoute(android.app.AlertDialog editor,LinearLayout form,RouteSketch route,Spinner mode,Spinner angles,LinearLayout historyBar,Runnable openObjects){
+ void showFullscreenRoute(android.app.AlertDialog editor,LinearLayout form,RouteSketch route,Spinner mode,Spinner angles,LinearLayout historyBar,Runnable openObjects,LinearLayout underlayControls){
   // Move the existing views, not a second sketch: unsaved data and undo history stay shared.
   View[] views={route,mode,angles,historyBar};
   int[] positions=new int[views.length];android.view.ViewGroup.LayoutParams[] params=new android.view.ViewGroup.LayoutParams[views.length];
@@ -786,6 +786,16 @@ public class MainActivity extends Activity {
   Button legendEdit=new Button(this);legendEdit.setAllCaps(false);legendEdit.setText("☷\nLegende");tools.addView(legendEdit,new LinearLayout.LayoutParams(0,-2,1));legendEdit.setOnClickListener(v->route.editLegend());
   resetZoom.setOnClickListener(v->{route.zoom=1;route.centerX=.5f;route.centerY=.5f;route.invalidate();});
   Button objectTools=new Button(this);objectTools.setAllCaps(false);objectTools.setText("□\nObjekte");tools.addView(objectTools,new LinearLayout.LayoutParams(0,-2,1));objectTools.setOnClickListener(v->openObjects.run());
+  if(underlayControls!=null){
+   Button underlay=new Button(this);underlay.setAllCaps(false);underlay.setText("▧\nVorlage");tools.addView(underlay,new LinearLayout.LayoutParams(0,-2,1));styleEditorButton(underlay,false);
+   underlay.setOnClickListener(v->{
+    if(underlayControls.getParent()!=form)return;
+    int position=form.indexOfChild(underlayControls);android.view.ViewGroup.LayoutParams originalParams=underlayControls.getLayoutParams();
+    form.removeView(underlayControls);ScrollView panel=new ScrollView(this);panel.addView(underlayControls);
+    android.app.AlertDialog settings=new android.app.AlertDialog.Builder(this).setTitle("Zeichenvorlage").setView(panel).setPositiveButton("Fertig",null).create();
+    settings.setOnDismissListener(d->{panel.removeView(underlayControls);form.addView(underlayControls,Math.min(position,form.getChildCount()),originalParams);});settings.show();
+   });
+  }
   for(Button b:new Button[]{back,mic,measureList,resetZoom,legendEdit,objectTools})styleEditorButton(b,false);
   styleEditorButton(save,true);LinearLayout.LayoutParams saveParams=new LinearLayout.LayoutParams(-1,dp(48));saveParams.setMargins(dp(10),dp(4),dp(10),dp(8));root.addView(save,saveParams);
   Button canvasToggle=new Button(this);canvasToggle.setText("⛶");canvasToggle.setContentDescription("Zeichenfläche maximieren");styleEditorButton(canvasToggle,false);
@@ -871,12 +881,14 @@ public class MainActivity extends Activity {
   form.addView(route,new LinearLayout.LayoutParams(-1,dp(260)));
   final org.json.JSONObject[] calibration={savedSketchCalibration()};
   final Runnable[] refreshCalibration={()->{}};
+  final LinearLayout[] underlayControls={null};
   String template=getPreferences(0).getString("routeUnderlay","");
   if(!template.isEmpty()){
    android.graphics.Bitmap image=reportPhoto(template);
    if(image!=null){
     route.setUnderlay(image);
-    LinearLayout transform=fold(form,"Unterlage ausrichten",false);
+    LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);form.addView(panel);underlayControls[0]=panel;
+    LinearLayout transform=fold(panel,"Unterlage ausrichten",false);
     CheckBox lock=new CheckBox(this);lock.setText("Unterlage sperren");lock.setChecked(true);transform.addView(lock);
     String transformKey="routeUnderlayTransform";
     float[] vals={0,0,1,0};
@@ -891,12 +903,12 @@ public class MainActivity extends Activity {
     }
     lock.setOnCheckedChangeListener((b,checked)->{for(SeekBar bar:bars)bar.setEnabled(!checked);});
 
-    android.widget.CheckBox showTemplate=new android.widget.CheckBox(this);showTemplate.setText("Zeichenvorlage anzeigen");showTemplate.setChecked(getPreferences(0).getInt("routeUnderlayHidden",0)==0);route.setUnderlayVisible(showTemplate.isChecked());form.addView(showTemplate);
+    android.widget.CheckBox showTemplate=new android.widget.CheckBox(this);showTemplate.setText("Zeichenvorlage anzeigen");showTemplate.setChecked(getPreferences(0).getInt("routeUnderlayHidden",0)==0);route.setUnderlayVisible(showTemplate.isChecked());panel.addView(showTemplate);
     showTemplate.setOnCheckedChangeListener((b,checked)->{route.setUnderlayVisible(checked);getPreferences(0).edit().putInt("routeUnderlayHidden",checked?0:1).apply();});
-    form.addView(sheetText("Deckkraft der Vorlage",13,false));
-    android.widget.SeekBar opacity=new android.widget.SeekBar(this);opacity.setMax(255);opacity.setProgress(Math.max(0,Math.min(255,getPreferences(0).getInt("routeUnderlayAlpha",150))));route.setUnderlayAlpha(opacity.getProgress());form.addView(opacity);
+    panel.addView(sheetText("Deckkraft der Vorlage",13,false));
+    android.widget.SeekBar opacity=new android.widget.SeekBar(this);opacity.setMax(255);opacity.setProgress(Math.max(0,Math.min(255,getPreferences(0).getInt("routeUnderlayAlpha",150))));route.setUnderlayAlpha(opacity.getProgress());panel.addView(opacity);
     opacity.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(android.widget.SeekBar bar,int progress,boolean user){route.setUnderlayAlpha(progress);if(user)getPreferences(0).edit().putInt("routeUnderlayAlpha",progress).apply();}public void onStartTrackingTouch(android.widget.SeekBar bar){}public void onStopTrackingTouch(android.widget.SeekBar bar){}});
-    Button removeTemplate=new Button(this);removeTemplate.setAllCaps(false);removeTemplate.setText("Vorlage aus Projekt entfernen");form.addView(removeTemplate);
+    Button removeTemplate=new Button(this);removeTemplate.setAllCaps(false);removeTemplate.setText("Vorlage aus Projekt entfernen");panel.addView(removeTemplate);
     removeTemplate.setOnClickListener(v->new android.app.AlertDialog.Builder(this).setTitle("Zeichenvorlage entfernen?").setMessage("Die gezeichnete Trasse und Maße bleiben erhalten.").setNegativeButton("Abbrechen",null).setPositiveButton("Entfernen",(d,w)->{
      if(template.equals(getPreferences(0).getString("routeUnderlay",""))&&getPreferences(0).edit().remove("routeUnderlay").remove("routeUnderlayTransform").remove("routeUnderlayAlpha").remove("routeUnderlayHidden").remove("sketchCalibration").commit()){route.setUnderlay(null);calibration[0]=new org.json.JSONObject();refreshCalibration[0].run();lock.setEnabled(false);for(SeekBar bar:bars)bar.setEnabled(false);showTemplate.setEnabled(false);opacity.setEnabled(false);removeTemplate.setEnabled(false);recordProjectEvent("Zeichenvorlage entfernt");}else notice("Vorlage konnte nicht entfernt werden.");
     }).show());
@@ -997,7 +1009,7 @@ public class MainActivity extends Activity {
     refreshRoute();editor.dismiss();notice("Trasse gespeichert.");
    }
   });
-  fullscreen.setOnClickListener(v->showFullscreenRoute(editor,form,route,mode,angles,historyBar,openObjects));
+  fullscreen.setOnClickListener(v->showFullscreenRoute(editor,form,route,mode,angles,historyBar,openObjects,underlayControls[0]));
   if(startFullscreen)fullscreen.performClick();
  }
 
