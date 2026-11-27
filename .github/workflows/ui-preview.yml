@@ -56,6 +56,20 @@ jobs:
       - name: Compile screenshot harness only
         if: steps.harness.outputs.cache-hit != 'true'
         run: gradle :app:assembleDebugAndroidTest --stacktrace
+      - name: Match APK signatures for screenshot instrumentation
+        run: |
+          set -euo pipefail
+          KEY="$HOME/.android/debug.keystore"
+          if ! test -f "$KEY"; then
+            mkdir -p "$HOME/.android"
+            keytool -genkeypair -keystore "$KEY" -storepass android -keypass android -alias androiddebugkey -dname "CN=Android Debug,O=Android,C=US" -keyalg RSA -keysize 2048 -validity 10000
+          fi
+          SIGN="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          for apk in preview-apk/app-debug.apk app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk; do
+            "$SIGN" sign --ks "$KEY" --ks-pass pass:android --key-pass pass:android --ks-key-alias androiddebugkey --out "$apk.signed" "$apk"
+            mv "$apk.signed" "$apk"
+            "$SIGN" verify "$apk"
+          done
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -96,7 +110,8 @@ jobs:
             mkdir -p ui-screenshots
             for method in fullPortrait fullLandscape regelprofil regelprofilLandscape; do adb shell am instrument -w -r -e class "de.feldaufmass.pro.UiScreenshotTest#$method" de.feldaufmass.pro.test/androidx.test.runner.AndroidJUnitRunner > "ui-screenshots/$method.log" || true; done
             for name in 04-full-portrait 05-full-landscape 06-regelprofil 07-regelprofil-landscape; do adb exec-out run-as de.feldaufmass.pro cat "files/ui-screenshots/$name.png" > "ui-screenshots/$name.png" || true; if ! test -s "ui-screenshots/$name.png"; then rm -f "ui-screenshots/$name.png"; fi; done
-            test "$(find ui-screenshots -name '*.png' | wc -l)" -eq 4
+            python3 -c 'from pathlib import Path; files=list(Path("ui-screenshots").glob("*.png")); bad=[p for p in files if p.read_bytes()[:8]!=bytes.fromhex("89504e470d0a1a0a") or len(p.read_bytes())<1024]; [p.unlink() for p in bad]; assert len(files)==4 and not bad, "Missing or invalid PNG screenshots"'
+            for log in ui-screenshots/*.log; do grep -F "OK (1 test)" "$log" || exit 1; done
       - name: Upload screenshots and logs
         if: always()
         uses: actions/upload-artifact@v4
