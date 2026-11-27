@@ -1249,6 +1249,7 @@ public class MainActivity extends Activity {
   sectionTitle.setOnClickListener(v->{sectionsCollapsed[0]=!sectionsCollapsed[0];int visibility=sectionsCollapsed[0]?View.GONE:View.VISIBLE;sectionScroll.setVisibility(sectionScroll.getParent()==sectionStrip?visibility:View.GONE);verticalSections.setVisibility(verticalSections.getParent()==sectionStrip?visibility:View.GONE);String label=sectionTitle.getText().toString();if(label.endsWith("▾")||label.endsWith("▴"))label=label.substring(0,label.length()-1).trim();sectionTitle.setText(label+" "+(sectionsCollapsed[0]?"▾":"▴"));});
   root.addView(sectionStrip,new LinearLayout.LayoutParams(-1,-2));
   final int[] selectedSection={-1};
+  final String[] selectedSectionStart={null},selectedSectionEnd={null};
   final TextView sectionPosition=sheetText("Abschnitt auswählen",12,false);sectionPosition.setTextColor(0xff69d6b7);sectionStrip.addView(sectionPosition,1);
   LinearLayout sectionEditor=new LinearLayout(this);sectionEditor.setOrientation(1);sectionEditor.setPadding(dp(4),dp(4),dp(4),dp(4));sectionEditor.setBackground(proButtonShape(false));
   sectionStrip.addView(sectionEditor,new LinearLayout.LayoutParams(-1,-2));sectionEditor.setVisibility(View.GONE);
@@ -1283,18 +1284,20 @@ public class MainActivity extends Activity {
   sectionPosition.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){refreshSectionEditor.run();}public void afterTextChanged(android.text.Editable e){}});
   Runnable refreshSections=()->{
    sectionCards.removeAllViews();int count=Math.max(0,route.vertices.size()-1);
-   if(selectedSection[0]<0&&count>0)selectedSection[0]=0;sectionTitle.setText("Abschnitte ("+count+") "+(sectionsCollapsed[0]?"▾":"▴"));sectionPosition.setText(selectedSection[0]>=0?"Abschnitt "+(selectedSection[0]+1)+" / "+count:"Abschnitt auswählen");double station=0;
+   if(selectedSectionStart[0]!=null){selectedSection[0]=-1;for(int k=0;k<count;k++){if(java.util.Objects.equals(selectedSectionStart[0],route.vertices.get(k).id)&&java.util.Objects.equals(selectedSectionEnd[0],route.vertices.get(k+1).id)){selectedSection[0]=k;break;}}}
+   if(selectedSection[0]<0||selectedSection[0]>=count)selectedSection[0]=count>0?0:-1;
+   selectedSectionStart[0]=selectedSection[0]<0?null:route.vertices.get(selectedSection[0]).id;selectedSectionEnd[0]=selectedSection[0]<0?null:route.vertices.get(selectedSection[0]+1).id;sectionTitle.setText("Abschnitte ("+count+") "+(sectionsCollapsed[0]?"▾":"▴"));sectionPosition.setText(selectedSection[0]>=0?"Abschnitt "+(selectedSection[0]+1)+" / "+count:"Abschnitt auswählen");double station=0;
    for(int j=0;j<count;j++){
     final int index=j;double length=route.vertices.get(j+1).metres;double end=station+length;
     Button card=new Button(this);styleEditorButton(card,selectedSection[0]==j);
     card.setText(String.format(java.util.Locale.GERMANY,"A%d",j+1)+"  "+(Double.isFinite(length)&&length>0?(Double.isFinite(end)?String.format(java.util.Locale.GERMANY,"%.2f – %.2f m",station,end):"Station offen"):"Maß fehlt")+(Double.isFinite(length)&&length>0?String.format(java.util.Locale.GERMANY,"\n%.2f m",length):""));
     LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(sectionCards.getOrientation()==LinearLayout.VERTICAL?-1:dp(104),dp(48));cp.setMargins(dp(2),0,dp(2),0);sectionCards.addView(card,cp);
-    card.setOnClickListener(v->{if(index+1>=route.vertices.size())return;selectedSection[0]=index;sectionPosition.setText("Abschnitt "+(index+1)+" / "+count);for(int k=0;k<sectionCards.getChildCount();k++)styleEditorButton((Button)sectionCards.getChildAt(k),k==index);if(!Double.isFinite(route.vertices.get(index+1).metres)||route.vertices.get(index+1).metres<=0)measureSegment(route,index+1);});
+    card.setOnClickListener(v->{if(index+1>=route.vertices.size())return;selectedSection[0]=index;selectedSectionStart[0]=route.vertices.get(index).id;selectedSectionEnd[0]=route.vertices.get(index+1).id;sectionPosition.setText("Abschnitt "+(index+1)+" / "+count);for(int k=0;k<sectionCards.getChildCount();k++)styleEditorButton((Button)sectionCards.getChildAt(k),k==index);if(!Double.isFinite(route.vertices.get(index+1).metres)||route.vertices.get(index+1).metres<=0)measureSegment(route,index+1);});
     station=Double.isFinite(length)&&length>0?end:Double.NaN;
    }
   };
   refreshSections.run();
-  route.inspectorSelection=index->{selectedSection[0]=index;refreshSections.run();};
+  route.inspectorSelection=index->{selectedSection[0]=index;selectedSectionStart[0]=null;selectedSectionEnd[0]=null;refreshSections.run();};
   final Runnable originalRouteChanged=route.changed;
   route.changed=()->{if(originalRouteChanged!=null)originalRouteChanged.run();if(selectedSection[0]>=route.vertices.size()-1)selectedSection[0]=-1;refreshSections.run();};
   root.addView(historyBar,new LinearLayout.LayoutParams(-1,-2));historyBar.setVisibility(View.GONE);
