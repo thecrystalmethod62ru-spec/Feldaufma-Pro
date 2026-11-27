@@ -64,13 +64,8 @@ jobs:
             adb install -r preview-apk/app-debug.apk
             adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
             mkdir -p ui-screenshots
-            for method in fullPortrait fullLandscape regelprofil regelprofilLandscape; do
-              adb shell am instrument -w -r -e class "de.feldaufmass.pro.UiScreenshotTest#$method" de.feldaufmass.pro.test/androidx.test.runner.AndroidJUnitRunner > "ui-screenshots/$method.log" || true
-            done
-            for name in 04-full-portrait 05-full-landscape 06-regelprofil 07-regelprofil-landscape; do
-              adb exec-out run-as de.feldaufmass.pro cat "files/ui-screenshots/$name.png" > "ui-screenshots/$name.png" || true
-              if ! test -s "ui-screenshots/$name.png"; then rm -f "ui-screenshots/$name.png"; fi
-            done
+            for method in fullPortrait fullLandscape regelprofil regelprofilLandscape; do adb shell am instrument -w -r -e class "de.feldaufmass.pro.UiScreenshotTest#$method" de.feldaufmass.pro.test/androidx.test.runner.AndroidJUnitRunner > "ui-screenshots/$method.log" || true; done
+            for name in 04-full-portrait 05-full-landscape 06-regelprofil 07-regelprofil-landscape; do adb exec-out run-as de.feldaufmass.pro cat "files/ui-screenshots/$name.png" > "ui-screenshots/$name.png" || true; if ! test -s "ui-screenshots/$name.png"; then rm -f "ui-screenshots/$name.png"; fi; done
             test "$(find ui-screenshots -name '*.png' | wc -l)" -eq 4
       - name: Upload screenshots and logs
         if: always()
