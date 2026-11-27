@@ -342,6 +342,17 @@ public class MainActivity extends Activity {
   public void onProviderEnabled(String provider){}
   public void onStatusChanged(String provider,int status,android.os.Bundle extras){}
  };
+ void openSavedGpsTemplate(RouteSketch route){
+  RouteSketch.GpsLayer layer=new RouteSketch.GpsLayer(getPreferences(0).getString("gpsRouteLayer","[]"));
+  if(layer.observations.size()<2){notice("Keine GPS-Ebene vorhanden.");return;}
+  RouteSketch.GpsRecording recording=new RouteSketch.GpsRecording();
+  recording.samples.addAll(layer.observations);
+  if(!route.vertices.isEmpty()){notice("GPS-Vorlage kann nur in eine leere manuelle Trasse übernommen werden. Bestehende Maße bleiben geschützt.");return;}
+  new android.app.AlertDialog.Builder(this).setTitle("GPS als Vorlage übernehmen").setMessage("Die GPS-Ebene bleibt unverändert. Eine bearbeitbare Skizze ohne Abrechnungsmaße wird erstellt.").setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",(d,w)->{
+   if(!recording.apply(route)){notice("GPS-Vorlage konnte nicht übernommen werden.");return;}
+   route.invalidate();notice("Vorlage übernommen. Bitte Aufmaßmaße eintragen.");
+  }).show();
+ }
  void recordGpsRoute(RouteSketch route,android.app.Dialog editor){
   if(liveManager==null){notice("Bitte GPS aktivieren.");return;}
   RouteSketch.GpsRecording recording=new RouteSketch.GpsRecording();
@@ -848,6 +859,7 @@ public class MainActivity extends Activity {
    String status=fix==null?"GPS-Signal wird gesucht …":fix.hasAccuracy()?String.format(java.util.Locale.GERMANY,"GPS-Genauigkeit: ± %.1f m",fix.getAccuracy()):"GPS-Genauigkeit unbekannt";
    android.app.AlertDialog.Builder menu=new android.app.AlertDialog.Builder(this).setTitle("GPS / Live-Position").setMessage(status+"\nGPS dient zur Orientierung. Aufmaßmaße bleiben unverändert.").setNegativeButton("Schließen",null);
    menu.setPositiveButton("GPS-Ebene aufnehmen",(d,w)->{if(!getPreferences(0).getString("gpsRouteLayer","[]").equals("[]"))new android.app.AlertDialog.Builder(this).setTitle("GPS-Ebene ersetzen?").setMessage("Die manuelle Trasse bleibt unverändert.").setNegativeButton("Abbrechen",null).setPositiveButton("Neu aufnehmen",(dd,ww)->recordGpsRoute(route,full)).show();else recordGpsRoute(route,full);});
+   if(!getPreferences(0).getString("gpsRouteLayer","[]").equals("[]"))menu.setNeutralButton("GPS-Vorlage",(d,w)->openSavedGpsTemplate(route));
    menu.show();
   });
   styleEditorButton(save,true);LinearLayout.LayoutParams saveParams=new LinearLayout.LayoutParams(-1,dp(48));saveParams.setMargins(dp(10),dp(4),dp(10),dp(8));root.addView(save,saveParams);
