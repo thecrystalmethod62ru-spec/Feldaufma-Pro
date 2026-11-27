@@ -745,7 +745,9 @@ public class MainActivity extends Activity {
    try{
     double value=metres.length()==0?Double.NaN:number(metres);
     if(metres.length()>0 && (!Double.isFinite(value)||value<=0))throw new NumberFormatException();
-    route.vertices.get(i).metres=value;route.changed.run();route.invalidate();dialog.dismiss();
+    if(i<=0||i>=route.vertices.size()){dialog.dismiss();notice("Abschnitt nicht mehr vorhanden.");return;}
+    if(Double.compare(route.vertices.get(i).metres,value)==0){dialog.dismiss();return;}
+    route.vertices.get(i).metres=value;if(route.changed!=null)route.changed.run();route.invalidate();dialog.dismiss();
    }catch(NumberFormatException e){metres.setError("Positive Länge in Metern eingeben");}
   }));
   dialog.show();
