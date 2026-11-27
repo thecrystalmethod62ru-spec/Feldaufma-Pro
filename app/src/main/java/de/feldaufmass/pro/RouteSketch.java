@@ -955,7 +955,7 @@ final class RouteSketch extends View {
     if(editingObjects){if(!touchMoved&&objectSelected!=null&&event.getEventTime()-touchStartTime>=android.view.ViewConfiguration.getLongPressTimeout()){double tolerance=20*getResources().getDisplayMetrics().density/scale();objectSelected.accept(objectCandidates((event.getX()-left())/scale(),(event.getY()-top())/scale(),tolerance));}performClick();invalidate();return true;}
     if(placingObject){if(!touchMoved&&stationSelected!=null){double tolerance=24*getResources().getDisplayMetrics().density/scale();stationSelected.accept(stationCandidates((event.getX()-left())/scale(),(event.getY()-top())/scale(),tolerance));}performClick();invalidate();return true;}
     if(editable&&tappedPoint>=0&&!touchMoved&&pointSelected!=null){
-     stroke.clear();dragged=-1;highlight=tappedPoint;if(event.getEventTime()-touchStartTime>=android.view.ViewConfiguration.getLongPressTimeout())pointSelected.select(tappedPoint);tappedPoint=-1;performClick();invalidate();return true;
+     stroke.clear();dragged=-1;highlight=tappedPoint;if(event.getEventTime()-touchStartTime>=2000L){performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);pointSelected.select(tappedPoint);}tappedPoint=-1;performClick();invalidate();return true;
     }
     if(moving || !editable){
      if(dragged>=0){
