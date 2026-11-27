@@ -387,9 +387,42 @@ public class MainActivity extends Activity {
   }).start();
  }
  String pendingGpsExport=null;
+ void requestGpsImport(){
+  android.content.Intent intent=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);
+  intent.addCategory(android.content.Intent.CATEGORY_OPENABLE);intent.setType("*/*");startActivityForResult(intent,453);
+ }
+ void readGpsImport(android.net.Uri uri){
+  final String project=activeProject;
+  new Thread(()->{
+   try(java.io.InputStream in=getContentResolver().openInputStream(uri)){
+    if(in==null)throw new java.io.IOException("Datei fehlt");
+    org.xmlpull.v1.XmlPullParser parser=android.util.Xml.newPullParser();parser.setFeature(org.xmlpull.v1.XmlPullParser.FEATURE_PROCESS_DOCDECL,false);parser.setInput(in,null);
+    org.json.JSONArray rows=new org.json.JSONArray();int segments=0;boolean root=false;
+    for(int event=parser.getEventType();event!=org.xmlpull.v1.XmlPullParser.END_DOCUMENT;event=parser.next()){
+     if(event==org.xmlpull.v1.XmlPullParser.DOCDECL)throw new java.io.IOException("DOCTYPE nicht erlaubt");
+     if(event!=org.xmlpull.v1.XmlPullParser.START_TAG)continue;
+     String tag=parser.getName();if(!root){if(!"gpx".equals(tag))throw new java.io.IOException("Keine GPX-Datei");root=true;}
+     if("trkseg".equals(tag)&&++segments>1)throw new java.io.IOException("Mehrere GPX-Segmente nicht unterstützt");
+     if(!"trkpt".equals(tag))continue;
+     if(rows.length()>=10000)throw new java.io.IOException("GPS-Punktlimit überschritten");
+     double lat=Double.parseDouble(parser.getAttributeValue(null,"lat")),lon=Double.parseDouble(parser.getAttributeValue(null,"lon"));
+     if(!Double.isFinite(lat)||!Double.isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180)throw new java.io.IOException("Ungültige Koordinaten");
+     org.json.JSONObject row=new org.json.JSONObject();row.put("lat",lat);row.put("lon",lon);rows.put(row);
+    }
+    if(rows.length()<2)throw new java.io.IOException("Mindestens zwei Punkte erforderlich");
+    runOnUiThread(()->{if(isFinishing()||isDestroyed()||!project.equals(activeProject))return;
+     new android.app.AlertDialog.Builder(this,android.R.style.Theme_Material_Dialog_Alert).setTitle("GPX-Vorschau").setMessage(rows.length()+" Punkte. Genauigkeit unbekannt. Import als separate Referenzdatei?").setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",(d,w)->{
+      if(!project.equals(activeProject))return;
+      if(getPreferences(0).edit().putString("importedGpsReference",rows.toString()).commit())notice("GPX-Referenz gespeichert.");else notice("GPX konnte nicht gespeichert werden.");
+     }).show();
+    });
+   }catch(Exception e){runOnUiThread(()->notice("GPX-Import fehlgeschlagen: "+e.getMessage()));}
+  },"gps-import").start();
+ }
  void requestGpsExport(){
-  if(!gpsTrackStorageValid()||gpsTrack().length()==0){notice("Keine gültige GPS-Spur vorhanden.");return;}
-  new android.app.AlertDialog.Builder(this,android.R.style.Theme_Material_Dialog_Alert).setTitle("GPS-Spur exportieren").setItems(new String[]{"GPX – GIS / Karte","CSV – Koordinatenliste"},(d,w)->{
+  new android.app.AlertDialog.Builder(this,android.R.style.Theme_Material_Dialog_Alert).setTitle("GPS-Spur exportieren").setItems(new String[]{"GPX – GIS / Karte","CSV – Koordinatenliste","GPX importieren"},(d,w)->{
+   if(w==2){requestGpsImport();return;}
+   if(!gpsTrackStorageValid()||gpsTrack().length()==0){notice("Keine gültige GPS-Spur vorhanden.");return;}
    pendingGpsExport=gpsTrack().toString();
    android.content.Intent intent=new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);
    intent.addCategory(android.content.Intent.CATEGORY_OPENABLE);intent.setType(w==0?"application/gpx+xml":"text/csv");intent.putExtra(android.content.Intent.EXTRA_TITLE,w==0?"GPS-Trasse.gpx":"GPS-Trasse.csv");
@@ -5924,6 +5957,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  try{startActivityForResult(i,410);}catch(android.content.ActivityNotFoundException e){Toast.makeText(this,"Keine Spracherkennung verfügbar.",Toast.LENGTH_LONG).show();}
  }
  @Override protected void onActivityResult(int request,int result,android.content.Intent data){super.onActivityResult(request,result,data);
+ if(request==453){if(result==RESULT_OK&&data!=null&&data.getData()!=null)readGpsImport(data.getData());return;}
  if(request==451||request==452){String snapshot=pendingGpsExport;pendingGpsExport=null;if(result==RESULT_OK&&data!=null&&data.getData()!=null&&snapshot!=null)writeGpsExport(data.getData(),request==451,snapshot);return;}
  if(request==432){
   String projectId=pendingProtocolsProject;pendingProtocolsProject=null;
