@@ -1643,7 +1643,7 @@ public class MainActivity extends Activity {
   Button floatingSave=new Button(this);floatingSave.setAllCaps(false);floatingSave.setText("Speichern");styleEditorButton(floatingSave,true);compactToolIcon(floatingSave,"Speichern","save");
   android.widget.FrameLayout.LayoutParams floatingSaveParams=new android.widget.FrameLayout.LayoutParams(dp(88),dp(54),Gravity.BOTTOM|Gravity.RIGHT);floatingSaveParams.setMargins(dp(8),dp(8),dp(8),dp(8));canvasFrame.addView(floatingSave,floatingSaveParams);floatingSave.setVisibility(View.GONE);
   floatingSave.setOnClickListener(v->save.performClick());
-  canvasToggle.setOnClickListener(v->{immersive[0]=true;if(full.getWindow()!=null)androidx.core.view.WindowCompat.getInsetsController(full.getWindow(),root).hide(androidx.core.view.WindowInsetsCompat.Type.systemBars());layerPanel.setVisibility(View.GONE);for(View bar:new View[]{header,viewTabs,controls,historyBar,tools,save,sectionStrip})bar.setVisibility(View.GONE);restoreTools.setVisibility(View.VISIBLE);floatingSave.setVisibility(View.VISIBLE);});
+  canvasToggle.setOnClickListener(v->{immersive[0]=true;if(full.getWindow()!=null)androidx.core.view.WindowCompat.getInsetsController(full.getWindow(),root).hide(androidx.core.view.WindowInsetsCompat.Type.systemBars());layerPanel.setVisibility(View.GONE);for(View bar:new View[]{header,viewTabs,controls,historyBar,tools,save,sectionStrip})bar.setVisibility(View.GONE);restoreTools.setVisibility(View.VISIBLE);floatingSave.setVisibility(View.VISIBLE);restoreTools.bringToFront();floatingSave.bringToFront();});
   restoreTools.setOnTouchListener(new View.OnTouchListener(){
    float startX,startY,baseX,baseY;boolean moved;
    public boolean onTouch(View v,android.view.MotionEvent e){
