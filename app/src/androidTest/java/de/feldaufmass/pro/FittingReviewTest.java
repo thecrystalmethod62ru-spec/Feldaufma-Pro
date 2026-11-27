@@ -53,13 +53,26 @@ public class FittingReviewTest {
                         assertFalse(items.getJSONObject(1).getBoolean("installed"));
                     } catch (JSONException e) {throw new AssertionError(e);}
                 });
+            } finally {
+                scenario.onActivity(activity->{activity.activeProject=original[0];activity.deleteSharedPreferences("project_"+id);});
+            }
+        }
+    }
+    @Test public void reviewChangedStationInFittingEditor() {
+        try (ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
+            String id=UUID.randomUUID().toString();
+            String[] original=new String[1];
+            try {
                 scenario.onActivity(activity->{
                     try {
-                        JSONArray route=new JSONArray(activity.routeData());
-                        route.getJSONArray(1).put(2,7.5);
-                        assertTrue(activity.projectStorage(id).edit().putString("routeSketch",route.toString()).commit());
-                        JSONArray items=new JSONArray(activity.projectStorage(id).getString("montageFittings","[]"));
-                        activity.showMontageFitting(MontageCatalog.Fitting.COUPLING,items.getJSONObject(1));
+                        original[0]=activity.activeProject;
+                        activity.activeProject=id;
+                        org.json.JSONObject fitting=new org.json.JSONObject().put("id","m1").put("type","COUPLING")
+                            .put("station",6.25).put("routePointId","p2");
+                        assertTrue(activity.projectStorage(id).edit().putString("length","20")
+                            .putString("routeSketch","[[0,0],[1,0,7.5,\"p2\",[],null,null,null,\"Schacht\"]]")
+                            .putString("montageFittings",new JSONArray().put(fitting).toString()).commit());
+                        activity.showMontageFitting(MontageCatalog.Fitting.COUPLING,fitting);
                     } catch (JSONException e) {throw new AssertionError(e);}
                 });
                 onView(withText("Punkt 2 · Schacht · Jetzt bei 7,500 m. Zum Übernehmen Punkt erneut wählen."))
@@ -70,8 +83,8 @@ public class FittingReviewTest {
                 scenario.onActivity(activity->{
                     try {
                         JSONArray items=new JSONArray(activity.projectStorage(id).getString("montageFittings","[]"));
-                        assertEquals(7.5,items.getJSONObject(1).getDouble("station"),0);
-                        assertEquals("p2",items.getJSONObject(1).getString("routePointId"));
+                        assertEquals(7.5,items.getJSONObject(0).getDouble("station"),0);
+                        assertEquals("p2",items.getJSONObject(0).getString("routePointId"));
                     } catch (JSONException e) {throw new AssertionError(e);}
                 });
             } finally {
