@@ -110,6 +110,33 @@ final class ProjectPlanPdf {
             profile.setLayoutData(PipeLayoutStore.decode(row.getJSONArray("pipes").toString()),row.getDouble("width"),row.getDouble("depth"));
             next=profilePage(pdf,next,"Regelprofil · "+metres(row.getDouble("from"))+" – "+metres(row.getDouble("to")),profile);
         }
+        return appendLegend(pdf,next,route);
+    }
+
+    private int appendLegend(PdfDocument pdf,int next,RouteSketch route){
+        java.util.LinkedHashMap<String,Integer> entries=route.legendEntries();
+        JSONObject settings=route.legendSettings();
+        java.util.ArrayList<String> keys=new java.util.ArrayList<>(entries.keySet());
+        keys.removeIf(key->{JSONObject item=settings.optJSONObject(key);return item!=null&&!item.optBoolean("visible",true);});
+        keys.sort((a,b)->Integer.compare(settings.optJSONObject(a)==null?0:settings.optJSONObject(a).optInt("order",0),settings.optJSONObject(b)==null?0:settings.optJSONObject(b).optInt("order",0)));
+        // A single-object plan already has its own object list; avoid redundant extra pages.
+        if(keys.size()<=1)return next;
+        for(int first=0;first<keys.size();first+=24){
+            PdfDocument.Page page=pdf.startPage(new PdfDocument.PageInfo.Builder(595,842,next++).create());
+            try{
+                Canvas c=page.getCanvas();
+                label(c,"Legende · schematischer Lageplan",36,48,20,523,true);
+                label(c,activity.projectHeader.getText().toString(),36,75,13,523,false);
+                for(int i=first;i<Math.min(first+24,keys.size());i++){
+                    String key=keys.get(i);JSONObject item=settings.optJSONObject(key);int color=entries.get(key);
+                    if(item!=null)try{color=android.graphics.Color.parseColor(item.optString("color"));}catch(Exception ignored){}
+                    int y=110+(i-first)*27;pen.setColor(color);c.drawRect(36,y-12,54,y+2,pen);
+                    label(c,item==null?key:item.optString("name",key),66,y,12,490,false);
+                }
+                label(c,"Schachtscheine: Symbolik und Farben gemäß Originalunterlage.",36,780,11,523,false);
+                label(c,"Blatt "+(next-1),36,800,11,523,false);
+            }finally{pdf.finishPage(page);}
+        }
         return next;
     }
 
