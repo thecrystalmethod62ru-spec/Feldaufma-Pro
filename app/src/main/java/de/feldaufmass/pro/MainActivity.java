@@ -1280,8 +1280,9 @@ public class MainActivity extends Activity {
   Button collapseProfile=new Button(this);styleEditorButton(collapseProfile,false);collapseProfile.setText("−");floatingHeader.addView(collapseProfile,new LinearLayout.LayoutParams(dp(32),dp(30)));
   TextView profilePlaceholder=sheetText("Abschnitt auswählen",12,false);profilePlaceholder.setTextColor(0xffaeb9b8);floatingProfile.addView(profilePlaceholder,new LinearLayout.LayoutParams(-1,dp(36)));
   PipeLayoutView floatingCross=new PipeLayoutView(this);floatingCross.setEnabled(false);floatingCross.setVisibility(View.GONE);floatingProfile.addView(floatingCross,new LinearLayout.LayoutParams(-1,dp(140)));
+  android.content.SharedPreferences baseProfilePrefs=getSharedPreferences("base_profile_defaults",MODE_PRIVATE);
   java.util.function.Consumer<PipeLayoutView> showBaseCross=cross->{
-   double w=0.4,d=1.0;
+   double w=baseProfilePrefs.getFloat("width",0.4f),d=baseProfilePrefs.getFloat("depth",1.0f);
    try{double v=number(width);if(Double.isFinite(v)&&v>0)w=v;}catch(Exception ignored){}
    try{double v=number(depth);if(Double.isFinite(v)&&v>0)d=v;}catch(Exception ignored){}
    java.util.List<PipeLayout.Pipe> pipes=new java.util.ArrayList<>();
@@ -1350,6 +1351,27 @@ public class MainActivity extends Activity {
   Button editSectionProfile=new Button(this);styleEditorButton(editSectionProfile,false);compactToolIcon(editSectionProfile,"Abschnitt bearbeiten","settings");profilePage.addView(editSectionProfile,new LinearLayout.LayoutParams(-1,dp(54)));editSectionProfile.setOnClickListener(v->{if(sectionProfilePanel.getParent()!=null)return;openSectionProfilePicker();showProfilePanel("Abschnitte",sectionProfilePanel);});
   canvasFrame.addView(profilePage,new android.widget.FrameLayout.LayoutParams(-1,-1));
   Runnable refreshFullProfile=()->{profilePageTitle.setText(selectedSection[0]<0?"Regelprofil · Standardprofil":"Regelprofil · "+sectionPosition.getText());showBaseCross.accept(fullCross);if(selectedSection[0]<0||selectedSection[0]+1>=route.vertices.size())return;double start=0;for(int j=0;j<selectedSection[0];j++)start+=route.vertices.get(j+1).metres;double end=start+route.vertices.get(selectedSection[0]+1).metres;try{org.json.JSONArray rows=new PipeLayoutStore(getPreferences(0)).sections();for(int j=0;j<rows.length();j++){org.json.JSONObject p=rows.getJSONObject(j);if(Math.abs(p.optDouble("from")-start)>0.001||Math.abs(p.optDouble("to")-end)>0.001)continue;double w=p.optDouble("width"),d=p.optDouble("depth");if(w>0&&d>0){fullCross.setLayoutData(PipeLayoutStore.decode(p.getJSONArray("pipes").toString()),w,d);fullCross.setVisibility(View.VISIBLE);}break;}}catch(Exception ignored){}};
+  Button baseSettings=new Button(this);styleEditorButton(baseSettings,false);compactToolIcon(baseSettings,"Standardprofil einstellen","settings");
+  profilePage.addView(baseSettings,new LinearLayout.LayoutParams(-1,dp(48)));
+  baseSettings.setOnClickListener(v->{
+   LinearLayout fields=new LinearLayout(this);fields.setOrientation(1);fields.setPadding(dp(20),dp(8),dp(20),dp(8));
+   EditText bw=new EditText(this),bd=new EditText(this);
+   bw.setInputType(8194);bd.setInputType(8194);
+   bw.setText(String.format(java.util.Locale.GERMANY,"%.2f",baseProfilePrefs.getFloat("width",0.4f)));
+   bd.setText(String.format(java.util.Locale.GERMANY,"%.2f",baseProfilePrefs.getFloat("depth",1.0f)));
+   fields.addView(sheetText("Grabenbreite (m)",14,false));fields.addView(bw);
+   fields.addView(sheetText("Grabentiefe (m)",14,false));fields.addView(bd);
+   fields.addView(sheetText("Vorgabe für fehlende Profilmaße. Gespeicherte Maße bleiben unverändert.",12,false));
+   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Standardprofil").setView(fields).setNegativeButton("Abbrechen",null).setNeutralButton("Zurücksetzen",null).setPositiveButton("Speichern",null).create();
+   dialog.show();
+   dialog.getButton(-3).setOnClickListener(x->{bw.setText("0,40");bd.setText("1,00");});
+   dialog.getButton(-1).setOnClickListener(x->{try{
+    double w=number(bw),d=number(bd);
+    if(!Double.isFinite(w)||!Double.isFinite(d)||w<=0||d<=0||w>Float.MAX_VALUE||d>Float.MAX_VALUE)throw new IllegalArgumentException();
+    baseProfilePrefs.edit().putFloat("width",(float)w).putFloat("depth",(float)d).apply();
+    updateFloatingCross.run();refreshFullProfile.run();dialog.dismiss();
+   }catch(Exception ex){bw.setError("Positive Maße eingeben");bd.setError("Positive Maße eingeben");}});
+  });
   drawingTab.setOnClickListener(v->{profilePage.setVisibility(View.GONE);route.setVisibility(View.VISIBLE);floatingProfile.setVisibility(View.VISIBLE);styleEditorButton(drawingTab,true);styleEditorButton(profileTab,false);});
   profileTab.setOnClickListener(v->{route.setVisibility(View.GONE);floatingProfile.setVisibility(View.GONE);profilePage.setVisibility(View.VISIBLE);styleEditorButton(drawingTab,false);styleEditorButton(profileTab,true);refreshFullProfile.run();});
   sectionPosition.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){if(profilePage.getVisibility()==View.VISIBLE)refreshFullProfile.run();}public void afterTextChanged(android.text.Editable e){}});
