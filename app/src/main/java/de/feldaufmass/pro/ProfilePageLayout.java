@@ -10,7 +10,7 @@ import android.widget.TextView;
 
 final class ProfilePageLayout {
  final LinearLayout profilePage,profileWork,profileInfo;
- final TextView profilePageTitle;
+ final TextView profilePageTitle,profileDimensions,profileMaterial;
  final PipeLayoutView fullCross;
  final ScrollView profileInfoScroll;
  private final Context context;
@@ -22,6 +22,8 @@ final class ProfilePageLayout {
   fullCross=new PipeLayoutView(context);profileWork.addView(fullCross,new LinearLayout.LayoutParams(-1,0,3));profileWork.setOrientation(LinearLayout.VERTICAL);
   profileInfo=new LinearLayout(context);profileInfo.setOrientation(1);profileInfo.setPadding(dp(8),dp(8),dp(8),dp(8));android.graphics.drawable.GradientDrawable parameterFrame=editorShape(0xff041012,8);parameterFrame.setStroke(dp(1),0xff008b93);profileInfo.setBackground(parameterFrame);
   profileInfoScroll=new ScrollView(context);profileInfoScroll.addView(profileInfo);profileInfoScroll.setFillViewport(true);profileWork.addView(profileInfoScroll,new LinearLayout.LayoutParams(-1,0,2));
+  profileDimensions=sheetText("",14,true);profileDimensions.setTextColor(0xff28d5c7);TextView parameterTitle=sheetText("PARAMETER",12,true);parameterTitle.setTextColor(0xff28d5c7);profileInfo.addView(parameterTitle);profileInfo.addView(profileDimensions);profileDimensions.setPadding(dp(8),dp(10),dp(8),dp(10));android.graphics.drawable.GradientDrawable dimensionFrame=editorShape(Color.BLACK,4);dimensionFrame.setStroke(dp(1),0xff008b93);profileDimensions.setBackground(dimensionFrame);
+  profileMaterial=sheetText("",12,false);profileMaterial.setTextColor(0xffcbd6d5);profileInfo.addView(profileMaterial);profileMaterial.setPadding(dp(8),dp(10),dp(8),dp(10));
   ProfileResponsiveLayout.bind(profileWork,fullCross,profileInfoScroll);
  }
  private int dp(int value){return Math.round(value*context.getResources().getDisplayMetrics().density);}
