@@ -48,7 +48,7 @@ public class UiScreenshotTest {
  @Test public void fullLandscape() throws Exception {editor(true,true,"05-full-landscape");}
  private android.graphics.Rect findTab(android.view.accessibility.AccessibilityNodeInfo node){
   if(node==null)return null;
-  if("Regelprofil".contentEquals(node.getContentDescription()==null?"":node.getContentDescription()) && node.isVisibleToUser() && node.isClickable()){
+  if(("Regelprofil".contentEquals(node.getContentDescription()==null?"":node.getContentDescription()) || "Regelprofil".contentEquals(node.getText()==null?"":node.getText())) && node.isVisibleToUser() && node.isClickable()){
    android.graphics.Rect r=new android.graphics.Rect();node.getBoundsInScreen(r);if(!r.isEmpty())return r;
   }
   for(int i=0;i<node.getChildCount();i++){android.graphics.Rect r=findTab(node.getChild(i));if(r!=null)return r;}
@@ -61,11 +61,17 @@ public class UiScreenshotTest {
    scenario.onActivity(a->a.editRoute(false,true));
    android.app.Instrumentation inst=InstrumentationRegistry.getInstrumentation();
    android.app.UiAutomation automation=inst.getUiAutomation();
+   android.accessibilityservice.AccessibilityServiceInfo info=automation.getServiceInfo();
+   info.flags |= android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS;
+   automation.setServiceInfo(info);
    android.graphics.Rect bounds=null;
    for(int attempt=0;attempt<40 && bounds==null;attempt++){
     android.os.SystemClock.sleep(250);
     android.view.accessibility.AccessibilityNodeInfo root=automation.getRootInActiveWindow();
     bounds=findTab(root);
+    if(bounds==null)for(android.view.accessibility.AccessibilityWindowInfo window:automation.getWindows()){
+     bounds=findTab(window.getRoot());if(bounds!=null)break;
+    }
    }
    assertNotNull("Regelprofil tab not visible",bounds);
    long now=android.os.SystemClock.uptimeMillis();
