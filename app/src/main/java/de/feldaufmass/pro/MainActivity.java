@@ -1240,10 +1240,10 @@ public class MainActivity extends Activity {
   route.darkEditor=true;route.invalidate();root.addView(route,new LinearLayout.LayoutParams(-1,0,1));
   LinearLayout sectionStrip=new LinearLayout(this);sectionStrip.setOrientation(1);sectionStrip.setPadding(dp(6),dp(2),dp(6),dp(2));android.graphics.drawable.GradientDrawable sectionFrame=editorShape(0xff041012,8);sectionFrame.setStroke(dp(1),0xff008b93);sectionStrip.setBackground(sectionFrame);
   TextView sectionTitle=sheetText("Abschnitte",13,true);sectionStrip.addView(sectionTitle);
-  android.widget.HorizontalScrollView sectionScroll=new android.widget.HorizontalScrollView(this);sectionScroll.setHorizontalScrollBarEnabled(false);sectionStrip.addView(sectionScroll);sectionTitle.setText("Abschnitte ▾");final boolean[] sectionsCollapsed={false};sectionScroll.setVisibility(View.VISIBLE);
+  android.widget.HorizontalScrollView sectionScroll=new android.widget.HorizontalScrollView(this);sectionScroll.setHorizontalScrollBarEnabled(false);sectionStrip.addView(sectionScroll);sectionTitle.setText("Abschnitte ▴");final boolean[] sectionsCollapsed={false};sectionScroll.setVisibility(View.VISIBLE);
   LinearLayout sectionCards=new LinearLayout(this);sectionScroll.addView(sectionCards);
   ScrollView verticalSections=new ScrollView(this);verticalSections.setFillViewport(false);verticalSections.setVisibility(View.GONE);
-  sectionTitle.setOnClickListener(v->{sectionsCollapsed[0]=!sectionsCollapsed[0];int visibility=sectionsCollapsed[0]?View.GONE:View.VISIBLE;sectionScroll.setVisibility(visibility);verticalSections.setVisibility(visibility);});
+  sectionTitle.setOnClickListener(v->{sectionsCollapsed[0]=!sectionsCollapsed[0];int visibility=sectionsCollapsed[0]?View.GONE:View.VISIBLE;sectionScroll.setVisibility(visibility);verticalSections.setVisibility(visibility);String label=sectionTitle.getText().toString();if(label.endsWith("▾")||label.endsWith("▴"))label=label.substring(0,label.length()-1).trim();sectionTitle.setText(label+" "+(sectionsCollapsed[0]?"▾":"▴"));});
   root.addView(sectionStrip,new LinearLayout.LayoutParams(-1,-2));
   final int[] selectedSection={-1};
   final TextView sectionPosition=sheetText("Abschnitt auswählen",12,false);sectionPosition.setTextColor(0xff69d6b7);sectionStrip.addView(sectionPosition,1);
