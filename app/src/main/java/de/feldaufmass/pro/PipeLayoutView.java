@@ -47,11 +47,11 @@ public final class PipeLayoutView extends View {
         if(r<=l||b<=t)return;
         p.setStyle(Paint.Style.FILL);p.setColor(fill);c.drawRect(l,t,r,b,p);
         c.save();c.clipRect(l,t,r,b);p.setColor(grain);p.setStrokeWidth(1);
-        float step=8*getResources().getDisplayMetrics().density;
+        float step=6*getResources().getDisplayMetrics().density;
         for(int row=0;row<(b-t)/step+1;row++)for(float x=l+step/3+(row%2)*step/2;x<r;x+=step){
             float y=t+step/3+row*step;
             if(gravel){p.setStyle(Paint.Style.STROKE);c.drawOval(x,y,x+step/3,y+step/4,p);}
-            else c.drawLine(x,y,x+step/4,y-step/8,p);
+            else {p.setStyle(Paint.Style.FILL);float k=(float)(.65+.35*Math.sin(x*1.7+y*.8));c.drawOval(x,y,x+step*.38f*k,y+step*.22f,p);}
         }
         p.setStyle(Paint.Style.FILL);c.restore();
     }
@@ -65,19 +65,18 @@ public final class PipeLayoutView extends View {
         else{cx=getWidth()/2f;bottom=getHeight()-pad;}
         if(scale<=0)return;
         float left=cx-(float)(width*scale/2),right=cx+(float)(width*scale/2),top=bottom-(float)(depth*scale);
-        if(civilProfile)texture(c,left,top,right,bottom,0xff303b35,0xff64766a,false);else{p.setColor(0x33b79b70);c.drawRect(left,top,right,bottom,p);}
-        p.setColor(0xff68945d);p.setStrokeWidth(3);c.drawLine(left,top,right,top,p);
-        p.setColor(0xffb79b70);c.drawLine(left,top,left,bottom,p);c.drawLine(right,top,right,bottom,p);c.drawLine(left,bottom,right,bottom,p);
+        texture(c,left,top,right,bottom,0xff674323,0xffa87949,false);
+        p.setColor(0xff00e5ee);p.setStrokeWidth(1.5f);c.drawLine(left,top,right,top,p);
+        p.setColor(0xff00e5ee);c.drawLine(left,top,left,bottom,p);c.drawLine(right,top,right,bottom,p);c.drawLine(left,bottom,right,bottom,p);
         if(civilProfile){
             float a=left-(float)(cutLeft*scale),b=right+(float)(cutRight*scale);
             texture(c,0,top,left,bottom,0xff302922,0xff78634d,false);texture(c,right,top,getWidth(),bottom,0xff302922,0xff78634d,false);
             float deckBottom=top+(float)(Math.min(depth,deck)*scale),baseBottom=top+(float)(Math.min(depth,deck+base)*scale);
-            p.setColor(surfaceColor);c.drawRect(0,top,a,deckBottom,p);c.drawRect(b,top,getWidth(),deckBottom,p);
+            texture(c,0,top,a,deckBottom,asphaltProfile?0xff383c3f:surfaceColor,asphaltProfile?0xff777b7e:0xff96938a, !asphaltProfile);texture(c,b,top,getWidth(),deckBottom,asphaltProfile?0xff383c3f:surfaceColor,asphaltProfile?0xff777b7e:0xff96938a,!asphaltProfile);
             texture(c,0,deckBottom,left,baseBottom,0xff666052,0xffa39a83,true);texture(c,right,deckBottom,getWidth(),baseBottom,0xff666052,0xffa39a83,true);
-            p.setColor(0xffd0dedb);p.setStrokeWidth(1.5f);c.drawLine(left,top,left,bottom,p);c.drawLine(right,top,right,bottom,p);c.drawLine(left,bottom,right,bottom,p);
+            p.setColor(0xff00e5ee);p.setStrokeWidth(1.5f);c.drawLine(left,top,left,bottom,p);c.drawLine(right,top,right,bottom,p);c.drawLine(left,bottom,right,bottom,p);
             p.setTextSize(11*getResources().getDisplayMetrics().scaledDensity);
-            dimension(c,left,bottom+pad/2,right,bottom+pad/2,width);
-            dimension(c,right+pad/3,top,right+pad/3,bottom,depth);
+
             if(cutLeft+cutRight>0)dimension(c,a,top-pad/2,b,top-pad/2,width+cutLeft+cutRight);
             if(asphaltProfile){
                 float cutBottom=Math.max(top+6,deckBottom);
@@ -91,6 +90,9 @@ public final class PipeLayoutView extends View {
                 p.setPathEffect(prior);
             }
         }
+        p.setTextSize(11*getResources().getDisplayMetrics().scaledDensity);
+        dimension(c,left,bottom+pad/2,right,bottom+pad/2,width);
+        dimension(c,right+pad/3,top,right+pad/3,bottom,depth);
         int[] colors={0xff397db5,0xffd4ab35,0xff398b75,0xff9567b8};
         p.setTextSize(12*getResources().getDisplayMetrics().scaledDensity);
         for(int i=0;i<pipes.size();i++){
@@ -128,7 +130,7 @@ public final class PipeLayoutView extends View {
         }
     }
     private void dimension(Canvas c,float x1,float y1,float x2,float y2,double metres){
-        int color=metres<0?0xffff8a80:0xff28d5c7;
+        int color=metres<0?0xffff8a80:0xff00e5ee;
         p.setColor(color);
         p.setStrokeWidth(1.5f);
         c.drawLine(x1,y1,x2,y2,p);
@@ -137,9 +139,15 @@ public final class PipeLayoutView extends View {
             float nx=(float)(-(y2-y1)/length*4),ny=(float)((x2-x1)/length*4);
             c.drawLine(x1-nx,y1-ny,x1+nx,y1+ny,p);
             c.drawLine(x2-nx,y2-ny,x2+nx,y2+ny,p);
+            float ux=(float)((x2-x1)/length*6),uy=(float)((y2-y1)/length*6);
+            c.drawLine(x1,y1,x1+ux+nx,y1+uy+ny,p);c.drawLine(x1,y1,x1+ux-nx,y1+uy-ny,p);
+            c.drawLine(x2,y2,x2-ux+nx,y2-uy+ny,p);c.drawLine(x2,y2,x2-ux-nx,y2-uy-ny,p);
         }
         String label=String.format(java.util.Locale.GERMANY,"%.3f m",metres);
-        drawLabel(c,label,(x1+x2-p.measureText(label))/2,(y1+y2)/2-5,color);
+        float x=(x1+x2-p.measureText(label))/2,y=(y1+y2)/2-5;float d=getResources().getDisplayMetrics().density;
+        x=Math.max(4*d,Math.min(x,getWidth()-p.measureText(label)-4*d));y=Math.max(p.getTextSize()+4*d,Math.min(y,getHeight()-4*d));
+        p.setStyle(Paint.Style.FILL);p.setColor(0xff041012);c.drawRoundRect(x-3*d,y-p.getTextSize(),x+p.measureText(label)+3*d,y+3*d,3*d,3*d,p);
+        p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(d);p.setColor(color);c.drawRoundRect(x-3*d,y-p.getTextSize(),x+p.measureText(label)+3*d,y+3*d,3*d,3*d,p);p.setStyle(Paint.Style.FILL);c.drawText(label,x,y,p);
     }
     private void drawLabel(Canvas c,String label,float x,float y,int color){
         Paint.Style previous=p.getStyle();float stroke=p.getStrokeWidth();
