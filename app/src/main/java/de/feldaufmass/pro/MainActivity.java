@@ -3591,7 +3591,7 @@ public class MainActivity extends Activity {
      syncTrench.setOnClickListener(button->new android.app.AlertDialog.Builder(this).setTitle("Grabenmaße übernehmen?").setMessage("Breite "+bw+" m und Tiefe "+bd+" m werden als allgemeine Grabenmaße des Projekts übernommen. Abschnittsbezogene Maße bleiben unverändert.").setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",(dialog,which)->{
       if(!overlapPrefs.edit().putString("width",String.valueOf(bw)).putString("depth",String.valueOf(bd)).commit()){warnings.setText("Grabenmaße konnten nicht gespeichert werden.");return;}
       width.setText(String.valueOf(bw));depth.setText(String.valueOf(bd));
-      if(profile!=null)profile.invalidate();if(sketch!=null)sketch.invalidate();
+      if(profile!=null)profile.invalidate();refreshMainProfileLayout();if(sketch!=null)sketch.invalidate();
       android.widget.Toast.makeText(this,"Grabenmaße übernommen",android.widget.Toast.LENGTH_SHORT).show();
      }).show());
      refresh.run();
@@ -4564,7 +4564,7 @@ public class MainActivity extends Activity {
    tab.setBackground(editorShape(selected?0xff28564c:0xff202827,10));
    tab.setTextColor(selected?Color.WHITE:0xffb5b5b5);
   }
-  if(p==profilePage&&profile!=null)profile.invalidate();if(p==documentsPage)compareSoll();if(p==quantityPage)refreshDetailQuantities();body.removeAllViews();ScrollView sc=new ScrollView(this);sc.setFillViewport(true);if(p.getParent()!=null)((android.view.ViewGroup)p.getParent()).removeView(p);sc.addView(p);body.addView(sc,new LinearLayout.LayoutParams(-1,-1));}
+  if(p==profilePage&&mainProfileLayout!=null){if(profilePage.getParent()!=null)((android.view.ViewGroup)profilePage.getParent()).removeView(profilePage);body.removeAllViews();body.addView(profilePage,new LinearLayout.LayoutParams(-1,-1));refreshMainProfileLayout();return;}if(p==documentsPage)compareSoll();if(p==quantityPage)refreshDetailQuantities();body.removeAllViews();ScrollView sc=new ScrollView(this);sc.setFillViewport(true);if(p.getParent()!=null)((android.view.ViewGroup)p.getParent()).removeView(p);sc.addView(p);body.addView(sc,new LinearLayout.LayoutParams(-1,-1));}
  private void fitSystemPanels(LinearLayout root){
   Window window=getWindow();
   androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window,false);
@@ -4759,7 +4759,7 @@ public class MainActivity extends Activity {
    for(double[] e:entries){double a=(e[1]-e[0])*e[2],b=(e[1]-e[0])*e[3];left+=a;right+=b;report.append(String.format(java.util.Locale.GERMANY,"%.2f – %.2f m: L %.2f / R %.2f m²\n",e[0],e[1],a,b));}
    report.append(String.format(java.util.Locale.GERMANY,"\nLinks: %.2f m²\nRechts: %.2f m²\nGesamt: %.2f m²",left,right,left+right));resultText.setText(report.toString());
   };
-  Runnable saveVerbau=()->{org.json.JSONArray data=new org.json.JSONArray();for(double[] e:entries){org.json.JSONArray row=new org.json.JSONArray();for(double v:e)try{row.put(v);}catch(Exception ex){throw new IllegalArgumentException(ex);}data.put(row);}getPreferences(0).edit().putString("metricVerbauSections",data.toString()).apply();refreshVerbau.run();if(sketch!=null)sketch.invalidate();refreshMainQuantities();if(livePreview!=null)livePreview.invalidate();if(profile!=null)profile.invalidate();};
+  Runnable saveVerbau=()->{org.json.JSONArray data=new org.json.JSONArray();for(double[] e:entries){org.json.JSONArray row=new org.json.JSONArray();for(double v:e)try{row.put(v);}catch(Exception ex){throw new IllegalArgumentException(ex);}data.put(row);}getPreferences(0).edit().putString("metricVerbauSections",data.toString()).apply();refreshVerbau.run();if(sketch!=null)sketch.invalidate();refreshMainQuantities();if(livePreview!=null)livePreview.invalidate();if(profile!=null)profile.invalidate();refreshMainProfileLayout();};
   try{org.json.JSONArray data=new org.json.JSONArray(getPreferences(0).getString("metricVerbauSections","[]"));for(int i=0;i<data.length();i++){org.json.JSONArray row=data.getJSONArray(i);entries.add(new double[]{row.getDouble(0),row.getDouble(1),row.getDouble(2),row.getDouble(3)});}}catch(Exception ex){notice("Verbaudaten konnten nicht geladen werden.");return;}
   refreshVerbau.run();
   Button remove=new Button(this);remove.setText("Einzelnen Abschnitt löschen");fields.addView(remove);
@@ -5001,7 +5001,7 @@ public class MainActivity extends Activity {
  updateSurfaceControls.run();
  LinearLayout pipeDetails=page();
  utilitySlider(pipeDetails,pipeInput,"Rohr-Außendurchmesser (mm)",1,2000,1,true);
- pipeInput.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){if(profile!=null)profile.invalidate();}public void afterTextChanged(android.text.Editable e){}});
+ pipeInput.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){if(profile!=null)profile.invalidate();refreshMainProfileLayout();}public void afterTextChanged(android.text.Editable e){}});
  overviewAction(pipeDetails,"Weitere Leitungen / Kabel","pipe",()->editUtilities());
  profilePage.removeView(legend);pipeDetails.addView(legend);
  profilePage.removeView(sectionProfilePanel);
@@ -5047,7 +5047,67 @@ public class MainActivity extends Activity {
  profileFooter.addView(standard,new LinearLayout.LayoutParams(0,dp(52),1));profileFooter.addView(applyProfile,new LinearLayout.LayoutParams(0,dp(52),1));
  standard.setOnClickListener(v->manageStandardProfile());
  applyProfile.setOnClickListener(v->{if(length.length()>0){if(calculate())notice("Regelprofil übernommen.");}else{refreshProfileDraft();if(saveDraft())notice("Profilentwurf gespeichert.");}});
+ installMainProfileLayout(sizes,buildPanel,pipeDetails,optionsPanel);
  save.setOnClickListener(v->{if(calculate())showPage(planPage);});if(projectChosen&&length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);if(!projectChosen)showProjectStart();
+ }
+ ProfilePageLayout mainProfileLayout;
+ void installMainProfileLayout(LinearLayout sizes,LinearLayout buildPanel,LinearLayout pipeDetails,LinearLayout optionsPanel){
+  // Reuse the same page and engineering drawing as the route editor, retaining existing project fields.
+  for(LinearLayout panel:new LinearLayout[]{sizes,buildPanel,pipeDetails,optionsPanel,sectionProfilePanel}){
+   if(panel.getParent() instanceof android.view.ViewGroup)((android.view.ViewGroup)panel.getParent()).removeView(panel);
+  }
+  profilePage.removeAllViews();profilePage.setPadding(0,0,0,0);
+  mainProfileLayout=new ProfilePageLayout(this);
+  ProfilePageLayout ui=mainProfileLayout;
+  ui.buildActions(this::styleEditorButton,(button,label)->compactToolIcon(button,label,"settings"));
+  ui.profilePage.setVisibility(View.VISIBLE);
+  profilePage.addView(ui.profilePage,new LinearLayout.LayoutParams(-1,-1));
+  ui.profileEdit.setOnClickListener(v->showProfilePanel("Grabenmaße",sizes));
+  ui.baseSettings.setOnClickListener(v->manageStandardProfile());
+  ui.editSectionProfile.setOnClickListener(v->{if(sectionProfilePanel.getParent()!=null)return;openSectionProfilePicker();showProfilePanel("Abschnitte",sectionProfilePanel);});
+  ui.applyProfile.setOnClickListener(v->{if(length.length()>0){if(calculate())notice("Regelprofil übernommen.");}else{refreshProfileDraft();if(saveDraft())notice("Profilentwurf gespeichert.");}refreshMainProfileLayout();});
+  ui.fullButtons[0].setOnClickListener(v->showProfilePanel("Schichtaufbau",buildPanel));
+  ui.fullButtons[1].setOnClickListener(v->showProfilePanel("Leitungen",pipeDetails));
+  ui.fullButtons[2].setOnClickListener(v->openBelagsDetails());
+  ui.fullButtons[3].setOnClickListener(v->{if(length.length()>0){if(calculate())showPage(quantityPage);}else notice("Bitte zuerst die Trassenlänge eingeben.");});
+  Button advanced=new Button(this);styleEditorButton(advanced,false);advanced.setText("Längsschnitt / Verbau");ui.profileInfo.addView(advanced);advanced.setOnClickListener(v->showProfilePanel("Weitere Profiloptionen",optionsPanel));
+  Button details=new Button(this);styleEditorButton(details,false);details.setText("Oberflächenaufbau");ui.profileInfo.addView(details);details.setOnClickListener(v->showProfilePanel("Schichtaufbau",buildPanel));
+  android.text.TextWatcher watcher=new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){refreshMainProfileLayout();}public void afterTextChanged(android.text.Editable e){}};
+  for(EditText f:new EditText[]{width,depth,leftInput,rightInput,asphaltInput,baseInput,stoneDepth,pipeInput})f.addTextChangedListener(watcher);
+  refreshMainProfileLayout();
+ }
+ double profileInput(EditText field,double fallback){try{double value=number(field);return Double.isFinite(value)?value:fallback;}catch(Exception ex){return fallback;}}
+ void refreshMainProfileLayout(){
+  if(mainProfileLayout==null)return;
+  ProfilePageLayout ui=mainProfileLayout;
+  double bw=profileInput(width,0.4),bd=profileInput(depth,1.0);if(bw<=0||bd<=0)return;
+  String type=String.valueOf(surface.getSelectedItem());
+  double deck="Asphalt".equals(type)?profileInput(asphaltInput,0):isStoneSurface(type)?profileInput(stoneDepth,0)/100:0;
+  double foundation=profileInput(baseInput,0);
+  java.util.List<PipeLayout.Pipe> pipes=new java.util.ArrayList<>();
+  double nominal=profileInput(pipeInput,0)/1000;
+  if(nominal>0)pipes.add(new PipeLayout.Pipe("Rohr",0,nominal,nominal*.05,0));
+  org.json.JSONArray rows=extraUtilities();
+  java.util.ArrayList<Integer> indices=new java.util.ArrayList<>();
+  if(nominal>0)indices.add(-1);
+  double sum=nominal>0?nominal:0;
+  for(int j=0;j<rows.length();j++){org.json.JSONObject row=rows.optJSONObject(j);if(row!=null){double diameter=row.optDouble("diameter",0)/1000;if(Double.isFinite(diameter)&&diameter>0)sum+=diameter;}}
+  double gap=Math.max(0,(bw-sum)/(rows.length()+(nominal>0?1:0)+1)),cursor=gap+(nominal>0?nominal+gap:0);
+  if(nominal>0&&rows.length()>0)pipes.set(0,new PipeLayout.Pipe("Rohr",gap+nominal/2-bw/2,nominal,nominal*.05,0));
+  for(int j=0;j<rows.length();j++){
+   org.json.JSONObject row=rows.optJSONObject(j);if(row==null)continue;double diameter=row.optDouble("diameter",0)/1000;if(!Double.isFinite(diameter)||diameter<=0)continue;
+   double offset=row.optDouble("offset",cursor+diameter/2)-bw/2;
+   double bed=Math.max(0,bd-row.optDouble("axisDepth",bd-diameter/2)-diameter/2);
+   if(!Double.isFinite(offset)||!Double.isFinite(bed))continue;
+   String name=row.optString("name",row.optString("type","Leitung"));if(name.trim().isEmpty())name="Leitung";
+   pipes.add(new PipeLayout.Pipe(name,offset,diameter,diameter*.05,bed));indices.add(j);cursor+=diameter+gap;
+  }
+  ui.fullCross.setLayoutData(pipes,bw,bd);
+  ui.fullCross.setAsphaltProfile("Asphalt".equals(type));
+  ui.fullCross.setCivilProfile(profileInput(leftInput,0),profileInput(rightInput,0),deck,foundation,0xff777777);
+  ui.profileDimensions.setText(ui.fullCross.dimensionSummary());ui.profileMaterial.setText("Oberfläche: "+type+"\\n"+String.format(java.util.Locale.GERMANY,"Aushub je Meter: %.2f m³",bw*bd));
+  ui.fullCross.setSelection(index->{if(index>=0&&index<indices.size()){int source=indices.get(index);if(source>=0)utilityMenu(source);else showPage(measurePage);}});
+  ui.fullCross.setMove((index,offset,bed)->{if(index<0||index>=indices.size()||indices.get(index)<0)return;org.json.JSONArray current=extraUtilities();org.json.JSONObject row=current.optJSONObject(indices.get(index));if(row==null)return;try{double diameter=row.optDouble("diameter")/1000;row.put("offset",offset+bw/2).put("axisDepth",bd-bed-diameter/2);saveUtilities(current);}catch(Exception ex){notice("Leitungslage konnte nicht gespeichert werden.");}});
  }
  void addTechnicalLayerRow(LinearLayout parent,String name,EditText field,int color,Runnable edit){
   LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(8),dp(4),dp(8),dp(4));
@@ -5077,7 +5137,7 @@ public class MainActivity extends Activity {
  }
  LinearLayout sectionProfilePanel;
  void showProfilePanel(String title,LinearLayout panel){
-  if(panel.getParent()!=null)return;ScrollView scroll=new ScrollView(this);scroll.addView(panel);android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(title).setView(scroll).setPositiveButton("Fertig",null).create();dialog.setOnDismissListener(v->{scroll.removeView(panel);refreshProfileDraft();if(profile!=null)profile.invalidate();});dialog.show();
+  if(panel.getParent()!=null)return;ScrollView scroll=new ScrollView(this);scroll.addView(panel);android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(title).setView(scroll).setPositiveButton("Fertig",null).create();dialog.setOnDismissListener(v->{scroll.removeView(panel);refreshProfileDraft();if(profile!=null)profile.invalidate();refreshMainProfileLayout();});dialog.show();
  }
  void openSectionProfilePicker(){
   sectionProfilePanel.removeAllViews();
@@ -5205,7 +5265,7 @@ public class MainActivity extends Activity {
    double na="Asphalt".equals(cover)?optional(asphaltInput):Double.NaN,nt="Asphalt".equals(cover)?na:isStoneSurface(cover)?optional(stoneDepth)/100:Double.NaN;
    if((Double.isFinite(nt)&&nt>bd)||(Double.isFinite(nb)&&nb+(Double.isFinite(nt)?nt:0)>bd))return;
    w=bw;d=bd;left=nl;right=nr;base=nb;asphalt=na;topThickness=nt;covering=cover;
-   if(profile!=null)profile.invalidate();
+   if(profile!=null)profile.invalidate();refreshMainProfileLayout();
    if(length.length()>0)calculate();
   }catch(Exception ignored){}
  }
@@ -5227,7 +5287,7 @@ public class MainActivity extends Activity {
  if(stoneSelected&&(bedding.length()>0))details.append("\nBettung: "+bedding.getText());
  if(underlying.length()>0)details.append("\nAltbelag darunter: "+underlying.getText());
  if(handling.getSelectedItemPosition()>0)details.append("\n"+handling.getSelectedItem());
- compareSoll();showObjects();refreshStationLayers();refreshDetailQuantities();legend.setText(details.toString());showSurfaceLayers();sketch.invalidate();profile.invalidate();return true;
+ compareSoll();showObjects();refreshStationLayers();refreshDetailQuantities();legend.setText(details.toString());showSurfaceLayers();sketch.invalidate();profile.invalidate();refreshMainProfileLayout();return true;
  }catch(Exception e){Toast.makeText(this,"Maße prüfen. Stand wurde nicht gespeichert.",Toast.LENGTH_SHORT).show();return false;}}
  void detailObject(int index){org.json.JSONObject o=objects.optJSONObject(index);if(o==null)return;LinearLayout form=page();Spinner mode=new Spinner(this);mode.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Draufsicht","Querschnitt","Längsschnitt"}));form.addView(mode);if(!overlapSignature(index).isEmpty()){actionButtonSingle(form,overlapAccepted(index)?"Überlappung: Bestätigung zurücknehmen":"Überlappung beibehalten",()->confirmObjectOverlap(index));}EditText a=new EditText(this),b=new EditText(this),h=new EditText(this);EditText[] es={a,b,h};String[] keys={"detailLength","detailWidth","detailDepth"},labels={"Länge (m)","Breite (m)","Tiefe (m)"};for(int j=0;j<3;j++){es[j].setInputType(8194);es[j].setHint(labels[j]);es[j].setText(o.optString(keys[j],""));form.addView(es[j]);}View preview=new View(this){Paint p=new Paint(3);protected void onDraw(Canvas c){float x=getWidth()/2f,y=getHeight()/2f; p.setColor(0xffdce9f4);c.drawRect(x-85,y-45,x+85,y+45,p);p.setColor(0xff203849);p.setStyle(Paint.Style.STROKE);c.drawRect(x-85,y-45,x+85,y+45,p);p.setStyle(Paint.Style.FILL);p.setTextSize(18);c.drawText(mode.getSelectedItem().toString()+" – schematisch",12,24,p);c.drawText((mode.getSelectedItemPosition()==1?b:a).getText()+" m",x-35,y-55,p);c.drawText((mode.getSelectedItemPosition()==0?b:h).getText()+" m",x+90,y,p);}};form.addView(preview,new LinearLayout.LayoutParams(-1,dp(180)));for(EditText e:es)e.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int count,int after){}public void onTextChanged(CharSequence s,int st,int before,int count){preview.invalidate();}public void afterTextChanged(android.text.Editable e){}});mode.setSelection(Math.max(0,Math.min(2,o.optInt("detailMode",0))));mode.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onItemSelected(android.widget.AdapterView<?> p,View v,int pos,long id){preview.invalidate();}public void onNothingSelected(android.widget.AdapterView<?> p){}});android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Detailzeichnung – "+o.optString("type")+" / "+o.optString("station")+" m").setView(form).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(btn->{try{for(EditText e:es){if(e.length()>0){double n=number(e);if(!Double.isFinite(n)||n<=0){e.setError("Positives Maß erforderlich");return;}}}for(int j=0;j<3;j++)o.put(keys[j],es[j].getText().toString());o.put("detailMode",mode.getSelectedItemPosition());saveObjects();dialog.dismiss();}catch(Exception e){Toast.makeText(this,"Detail konnte nicht gespeichert werden",Toast.LENGTH_LONG).show();}}));dialog.show();}
  void editObject(int index){org.json.JSONObject o=objects.optJSONObject(index);if(o==null)return;LinearLayout form=page();EditText st=new EditText(this);st.setInputType(8194);st.setHint("Station (m)");st.setText(o.optString("station"));form.addView(st);String[] sides={"Unbekannt","links","rechts","mittig"};Spinner side=choices(form,sides);side.setSelection(Math.max(0,java.util.Arrays.asList(sides).indexOf(o.optString("side"))));EditText offset=new EditText(this);offset.setInputType(8194);offset.setHint("Abstand zum Grabenrand (m, optional)");offset.setText(o.optString("detailOffset",""));form.addView(offset);TextView gapHint=sheetText("Nur links / rechts: 0 = direkt angrenzend; leer = nicht gemessen.",13,false);form.addView(gapHint);EditText note=new EditText(this);note.setHint("Bemerkung");note.setText(o.optString("note"));form.addView(note);android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(o.optString("type")+" bearbeiten").setView(form).setNeutralButton("Detailzeichnung",(v,j)->detailObject(index)).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(b->{try{double x=number(st),total=l;if(!Double.isFinite(x)||!Double.isFinite(total)||x<0||x>total)throw new Exception();String chosenSide=side.getSelectedItem().toString();double gap=Double.NaN;if(offset.length()>0&&("links".equals(chosenSide)||"rechts".equals(chosenSide))){try{gap=number(offset);}catch(Exception ignored){}if(!Double.isFinite(gap)||gap<0){offset.setError("Abstand ab 0 m eingeben");return;}}o.put("station",x);o.put("side",chosenSide);if(Double.isFinite(gap))o.put("detailOffset",offset.getText().toString());else o.remove("detailOffset");o.put("note",note.getText().toString());saveObjects();dialog.dismiss();}catch(Exception e){st.setError("Station außerhalb der Trasse");}}));dialog.show();}
@@ -7489,7 +7549,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  }
  boolean saveUtilities(org.json.JSONArray rows){
   boolean ok=getPreferences(0).edit().putString("extraUtilities",rows.toString()).commit();
-  if(ok){if(profile!=null)profile.invalidate();if(sketch!=null)sketch.invalidate();if(livePreview!=null)livePreview.invalidate();}else notice("Leitungen konnten nicht gespeichert werden.");return ok;
+  if(ok){if(profile!=null)profile.invalidate();refreshMainProfileLayout();if(sketch!=null)sketch.invalidate();if(livePreview!=null)livePreview.invalidate();}else notice("Leitungen konnten nicht gespeichert werden.");return ok;
  }
  double profileShoringStation=0;
  double[] shoringAtStation(double station){
