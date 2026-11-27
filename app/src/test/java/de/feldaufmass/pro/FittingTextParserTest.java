@@ -4,6 +4,28 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
 public class FittingTextParserTest {
+    @Test public void bendAngleMayPrecedeNameOrFollowDiameter() {
+        for(String line:new String[]{"45°-Bogen DN 80","Bogen DN80 45 Grad","Bogen: 45° DN 80"}){
+            FittingTextParser.Candidate item=FittingTextParser.parse(line).get(0);
+            assertEquals(MontageCatalog.Fitting.BEND_45,item.type);
+            assertEquals("80",item.dn);
+            assertEquals(line,item.evidence);
+        }
+        for(String line:new String[]{"Bogen 45° oder 90°","Bogen DN80 Drehung 45°","Bogen 15°"})
+            assertEquals(0,FittingTextParser.parse(line).size());
+    }
+
+    @Test public void fittingWithCompoundDiameterKeepsItsSourceForReview() {
+        for(String sizes:new String[]{"DN 100 x 80","DN100 / 80","DN100×80","DN 80 oder 100","DN 80 DN ?"}){
+            String line="Reduzierung "+sizes+" Station 5 m";
+            FittingTextParser.Candidate item=FittingTextParser.parse(line).get(0);
+            assertEquals("",item.dn);
+            assertEquals("5",item.station);
+            assertEquals(line,item.evidence);
+        }
+        assertEquals("80",FittingTextParser.parse("Muffe DN: 80").get(0).dn);
+    }
+
     private String station(String source) {
         return FittingTextParser.parse("Muffe DN 80 " + source).get(0).station;
     }

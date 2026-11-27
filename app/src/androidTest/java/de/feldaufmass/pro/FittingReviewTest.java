@@ -19,19 +19,19 @@ public class FittingReviewTest {
         try (ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
             String id=UUID.randomUUID().toString();
             String[] original=new String[1];
-            String tee="T-Stück DN 80 Station 0+012,5";
+            String bend="45°-Bogen DN 80 Station 0+012,5";
             try {
                 scenario.onActivity(activity->{
                     original[0]=activity.activeProject;
                     activity.activeProject=id;
                     assertTrue(activity.projectStorage(id).edit().putString("length","20").commit());
-                    activity.reviewFittingText("Blatt A",tee+"\nMuffe");
+                    activity.reviewFittingText("Blatt A",bend+"\nMuffe");
                 });
                 onView(withText("Zeile 2 · Muffe")).perform(click());
                 onView(withText("Zurück")).perform(click());
-                onView(withText("Zeile 1 · "+tee)).perform(click());
+                onView(withText("Zeile 1 · "+bend)).perform(click());
                 onView(withText("Zum Projekt hinzufügen")).perform(click());
-                onView(withText("Zeile 1 · "+tee)).check(doesNotExist());
+                onView(withText("Zeile 1 · "+bend)).check(doesNotExist());
                 onView(withText("Zeile 2 · Muffe")).perform(click());
                 onView(withText("Zum Projekt hinzufügen")).perform(click());
                 scenario.onActivity(activity->{

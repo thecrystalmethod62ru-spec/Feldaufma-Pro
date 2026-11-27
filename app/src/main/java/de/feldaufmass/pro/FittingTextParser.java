@@ -8,8 +8,11 @@ import java.util.regex.Pattern;
 final class FittingTextParser {
     private static final int FLAGS=Pattern.CASE_INSENSITIVE|Pattern.UNICODE_CASE;
     private static final Pattern NAME=Pattern.compile("\\b(Bogen|T[- ]?Stück|Kreuzstück|Reduzierung|Muffe|Flansch|Endkappe|Schieber)\\b",FLAGS);
-    private static final Pattern ANGLE=Pattern.compile("^\\s*[:=]?\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:°|Grad\\b)",FLAGS);
-    private static final Pattern DN=Pattern.compile("\\bDN\\s*([1-9]\\d{0,3})(?![\\d/]|[.,]\\d)",FLAGS);
+    private static final Pattern ANGLE=Pattern.compile("(?<![\\w.,+\\-])(\\d+(?:[.,]\\d+)?)\\s*(?:°|Grad\\b)",FLAGS);
+    private static final Pattern ANGLE_GAP=Pattern.compile("\\s*(?:[-:=]\\s*)?(?:DN\\s*[1-9]\\d{0,3}\\s*)?",FLAGS);
+    private static final Pattern DN_LABEL=Pattern.compile("\\bDN(?=\\d|\\b)",FLAGS);
+    private static final Pattern DN_VALUE=Pattern.compile("\\s*[:=]?\\s*([1-9]\\d{0,3})\\b(?![.,]\\d)",FLAGS);
+    private static final Pattern SECOND_SIZE=Pattern.compile("\\s*(?:[/×x–—-]|bis\\b|oder\\b)\\s*(?:DN\\s*)?\\d",FLAGS);
     private static final Pattern STATION_LABEL=Pattern.compile("\\b(?:Station\\b|Stat\\.)",FLAGS);
     private static final Pattern STATION_VALUE=Pattern.compile(
             "\\s*[:=]?\\s*(?:(\\d+)\\s*\\+\\s*(\\d{3}(?:[.,]\\d+)?)(?:\\s*m\\b)?|(\\d+(?:[.,]\\d+)?)\\s*m\\b)(?![\\w+]|[.,]\\d)",FLAGS);
@@ -32,13 +35,16 @@ final class FittingTextParser {
             String line=lines[i].trim();
             Matcher name=NAME.matcher(line);
             if(!name.find())continue;
-            String label=name.group(1);int end=name.end();
+            String label=name.group(1);int start=name.start(),end=name.end();
             if(name.find())continue;
             MontageCatalog.Fitting type=null;
             if(label.equalsIgnoreCase("Bogen")){
-                Matcher angle=ANGLE.matcher(line.substring(end));
+                Matcher angle=ANGLE.matcher(line);
                 if(!angle.find())continue;
+                String gap=angle.end()<=start ? line.substring(angle.end(),start) : line.substring(end,angle.start());
+                if(!ANGLE_GAP.matcher(gap).matches())continue;
                 double degrees=Double.parseDouble(angle.group(1).replace(',','.'));
+                if(angle.find())continue;
                 for(MontageCatalog.Fitting candidate:MontageCatalog.Fitting.values()){
                     if(candidate.bendAngle>0&&candidate.bendAngle==degrees)type=candidate;
                 }
@@ -47,7 +53,7 @@ final class FittingTextParser {
                     if(normalize(candidate.label).equalsIgnoreCase(normalize(label)))type=candidate;
                 }
             }
-            if(type!=null)result.add(new Candidate(type,unique(DN,line),station(line),line,i+1));
+            if(type!=null)result.add(new Candidate(type,diameter(line),station(line),line,i+1));
         }
         return result;
     }
@@ -66,10 +72,13 @@ final class FittingTextParser {
     }
 
     private static String normalize(String label){return label.replace("-","").replace(" ","");}
-    private static String unique(Pattern pattern,String line){
-        Matcher m=pattern.matcher(line);
-        if(!m.find())return "";
-        String value=m.group(1);
-        return m.find()?"":value;
+    private static String diameter(String line){
+        Matcher label=DN_LABEL.matcher(line);
+        if(!label.find())return "";
+        int start=label.end();
+        if(label.find())return "";
+        Matcher value=DN_VALUE.matcher(line).region(start,line.length());
+        if(!value.lookingAt() || SECOND_SIZE.matcher(line).region(value.end(),line.length()).lookingAt())return "";
+        return value.group(1);
     }
 }
