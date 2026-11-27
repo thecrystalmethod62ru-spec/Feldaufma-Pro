@@ -1381,12 +1381,12 @@ public class MainActivity extends Activity {
    for(int col=0;col<2;col++){
     int i=row*2+col;
     LinearLayout metric=page();
-    metric.setBackgroundColor(Color.WHITE);
+    metric.setBackground(editorShape(0xff171717,12));
     LinearLayout.LayoutParams box=new LinearLayout.LayoutParams(0,-2,1);
-    box.setMargins(0,0,dp(4),dp(4));
+    box.setMargins(col==0?0:dp(3),0,col==0?dp(3):0,dp(6));
     pair.addView(metric,box);
     overviewValues[i]=sheetText("–",21,true);
-    overviewValues[i].setTextColor(TEAL);
+    overviewValues[i].setTextColor(0xff58c99a);
     metric.addView(overviewValues[i]);
     metric.addView(sheetText(names[i],13,false));
    }
@@ -1406,7 +1406,7 @@ public class MainActivity extends Activity {
   for(int index:sorted){
    org.json.JSONObject object=objects.optJSONObject(index);
    Button entry=new Button(this);
-   entry.setAllCaps(false);
+   styleEditorButton(entry,false);entry.setTextSize(14);entry.setPadding(dp(12),dp(6),dp(12),dp(6));
    entry.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);
    entry.setTextColor(objectWarning(index)?0xffff927d:UI_TEXT);
    entry.setText(String.format(java.util.Locale.GERMANY,"%.2f m   ·   %s",object.optDouble("station"),object.optString("type")));
@@ -1421,7 +1421,7 @@ public class MainActivity extends Activity {
 
  void addSheetTab(LinearLayout bar,String name,LinearLayout sheet){
   Button tab=new Button(this);
-  tab.setAllCaps(false);
+  styleEditorButton(tab,false);tab.setTextSize(14);
   tab.setSingleLine(true);
   tab.setText(name);
   bar.addView(tab,new LinearLayout.LayoutParams(0,-2,1));
@@ -3953,7 +3953,8 @@ public class MainActivity extends Activity {
  assistant.setOnClickListener(v->startDictation());
  assistant.setOnLongClickListener(v->{showPage(voicePage);return true;});
  Button persistentSave=actionButtonSingle(dock,"Speichern",()->{if(calculate())Toast.makeText(this,"Gespeichert",Toast.LENGTH_SHORT).show();});
- persistentSave.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(52)));
+ compactToolIcon(persistentSave,"Speichern","save");
+ persistentSave.setLayoutParams(new LinearLayout.LayoutParams(dp(124),dp(48)));
  actionButtonSingle(planPage,"Zeichnungsebenen",()->showDrawingLayers());
  actionButtonSingle(planPage,"GPS-Aufzeichnung",()->showGpsTrackControls());
  actionButtonSingle(planPage,"Trassenvergleich",()->showGpsTrackComparison());
