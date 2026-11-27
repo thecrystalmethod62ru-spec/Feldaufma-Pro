@@ -78,8 +78,21 @@ final class RouteSketch extends View {
  }
  /** Similarity transform from two independent GPS anchors, local tangent plane.
   * Returns null when calibration is insufficient or the target is outside the sketch. */
+ private static final class GpsTransform{
+  final double lat,lon,x,y,cos,real,imag;
+  GpsTransform(double lat,double lon,double x,double y,double cos,double real,double imag){this.lat=lat;this.lon=lon;this.x=x;this.y=y;this.cos=cos;this.real=real;this.imag=imag;}
+  PointF project(double latitude,double longitude){
+   if(!Double.isFinite(latitude)||!Double.isFinite(longitude)||Math.abs(latitude)>85||Math.abs(longitude)>180)return null;
+   double tx=longitudeDelta(longitude,lon)*cos*111195,ty=-(latitude-lat)*111195;
+   double px=x+real*tx-imag*ty,py=y+imag*tx+real*ty;
+   if(!Double.isFinite(px)||!Double.isFinite(py)||px<0||px>1||py<0||py>1)return null;
+   return new PointF((float)px,(float)py);
+  }
+ }
  PointF gpsPosition(double lat,double lon,int excluded){
-  if(!Double.isFinite(lat)||!Double.isFinite(lon)||Math.abs(lat)>85||Math.abs(lon)>180)return null;
+  GpsTransform transform=gpsTransform(excluded);return transform==null?null:transform.project(lat,lon);
+ }
+ private GpsTransform gpsTransform(int excluded){
   Vertex a=null,b=null;double best=0;
   for(int i=0;i<vertices.size();i++){
    Vertex u=vertices.get(i);
@@ -95,12 +108,8 @@ final class RouteSketch extends View {
   double ex=longitudeDelta(b.longitude,a.longitude)*cos*111195,ey=-(b.latitude-a.latitude)*111195;
   double norm=ex*ex+ey*ey;
   if(norm<Math.pow(Math.max(10,3*Math.hypot(a.accuracy,b.accuracy)),2))return null;
-  double tx=longitudeDelta(lon,a.longitude)*cos*111195,ty=-(lat-a.latitude)*111195;
   double sx=b.point.x-a.point.x,sy=b.point.y-a.point.y;
-  double real=(sx*ex+sy*ey)/norm,imag=(sy*ex-sx*ey)/norm;
-  double x=a.point.x+real*tx-imag*ty,y=a.point.y+imag*tx+real*ty;
-  if(!Double.isFinite(x)||!Double.isFinite(y)||x<0||x>1||y<0||y>1)return null;
-  return new PointF((float)x,(float)y);
+  return new GpsTransform(a.latitude,a.longitude,a.point.x,a.point.y,cos,(sx*ex+sy*ey)/norm,(sy*ex-sx*ey)/norm);
  }
  private static double longitudeDelta(double lon,double origin){return ((lon-origin+540)%360)-180;}
  private static boolean gpsAnchor(Vertex v){
@@ -537,10 +546,12 @@ final class RouteSketch extends View {
   java.util.ArrayList<PointF> gps=new java.util.ArrayList<>();
   double gpsLength=0,planLength=0;
   org.json.JSONObject last=null;
+  GpsTransform transform=gpsTransform(-1);
+  if(transform==null)return "GPS-Kalibrierung fehlt.";
   for(int i=0;i<independentGpsTrack.length();i++){
    org.json.JSONObject row=independentGpsTrack.optJSONObject(i);
    if(row==null)return "Ungültige GPS-Spur.";
-   PointF p=gpsPosition(row.optDouble("lat"),row.optDouble("lon"),-1);
+   PointF p=transform.project(row.optDouble("lat"),row.optDouble("lon"));
    if(p==null)return "GPS-Spur nicht vollständig kalibriert oder außerhalb des Plans.";
    if(last!=null){float[] d=new float[1];android.location.Location.distanceBetween(last.optDouble("lat"),last.optDouble("lon"),row.optDouble("lat"),row.optDouble("lon"),d);gpsLength+=d[0];planLength+=distance(gps.get(gps.size()-1),p);}
    gps.add(p);last=row;
@@ -569,9 +580,11 @@ final class RouteSketch extends View {
   if(!layerVisible(LAYER_GPS_DEVIATIONS)||vertices.size()<2||independentGpsTrack.length()<2)return;
   java.util.ArrayList<PointF> points=new java.util.ArrayList<>();
   double metres=0,span=0;org.json.JSONObject last=null;
+  GpsTransform transform=gpsTransform(-1);
+  if(transform==null)return;
   for(int i=0;i<independentGpsTrack.length();i++){
    org.json.JSONObject row=independentGpsTrack.optJSONObject(i);if(row==null)return;
-   PointF p=gpsPosition(row.optDouble("lat"),row.optDouble("lon"),-1);if(p==null)return;
+   PointF p=transform.project(row.optDouble("lat"),row.optDouble("lon"));if(p==null)return;
    if(last!=null){float[] d=new float[1];android.location.Location.distanceBetween(last.optDouble("lat"),last.optDouble("lon"),row.optDouble("lat"),row.optDouble("lon"),d);metres+=d[0];span+=distance(points.get(points.size()-1),p);}
    points.add(p);last=row;
   }
@@ -611,9 +624,11 @@ final class RouteSketch extends View {
  void drawIndependentGpsTrack(Canvas c,float density){
   if(!layerVisible(LAYER_GPS_TRACK)||independentGpsTrack.length()==0)return;
   PointF previous=null;paint.setColor(0xff35b9ff);paint.setStrokeWidth(3*density);
+  GpsTransform transform=gpsTransform(-1);
+  if(transform==null)return;
   for(int i=0;i<independentGpsTrack.length();i++){
    org.json.JSONObject row=independentGpsTrack.optJSONObject(i);
-   PointF p=row==null?null:gpsPosition(row.optDouble("lat"),row.optDouble("lon"),-1);
+   PointF p=row==null?null:transform.project(row.optDouble("lat"),row.optDouble("lon"));
    if(p!=null){if(previous!=null)line(c,previous,p);c.drawCircle(left()+scale()*p.x,top()+scale()*p.y,3*density,paint);}
    previous=p;
   }
