@@ -261,11 +261,38 @@ public class MainActivity extends Activity {
   },"project-backup").start();
  }
  boolean projectChosen=false;
+ private static final String CLOUD_PREFS="cloud_shortcut";
+ private android.net.Uri validatedCloudUri(String input){
+  try{
+   android.net.Uri uri=android.net.Uri.parse(input.trim());
+   if("https".equalsIgnoreCase(uri.getScheme())&&"login.yoursecurecloud.de".equalsIgnoreCase(uri.getHost())&&uri.getUserInfo()==null&&(uri.getPort()==-1||uri.getPort()==443))return uri;
+  }catch(RuntimeException ignored){}
+  return null;
+ }
+ void launchCloud(android.net.Uri uri){
+  try{startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW,uri).addCategory(android.content.Intent.CATEGORY_BROWSABLE));}
+  catch(android.content.ActivityNotFoundException|SecurityException ex){notice("Kein Browser verfügbar. Cloud konnte nicht geöffnet werden.");}
+ }
+ void openCloud(){
+  SharedPreferences prefs=getSharedPreferences(CLOUD_PREFS,MODE_PRIVATE);
+  android.net.Uri saved=validatedCloudUri(prefs.getString("url",""));
+  if(saved!=null){launchCloud(saved);return;}
+  EditText link=new EditText(this);link.setSingleLine(true);link.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_URI);link.setHint("https://login.yoursecurecloud.de/…");
+  LinearLayout form=page();form.addView(sheetText("Cloud-Link einmalig hinterlegen. Er gilt für alle Projekte auf diesem Gerät und bleibt außerhalb der Projektsicherungen.",14,false));form.addView(link);
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Cloud").setView(form).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern und öffnen",null).create();
+  dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(button->{
+   android.net.Uri uri=validatedCloudUri(link.getText().toString());
+   if(uri==null){link.setError("Gültigen HTTPS-Link zu login.yoursecurecloud.de eingeben");return;}
+   if(!prefs.edit().putString("url",uri.toString()).commit()){notice("Cloud-Link konnte nicht gespeichert werden.");return;}
+   dialog.dismiss();launchCloud(uri);
+  }));dialog.show();
+ }
  void showProjectStart(){
   LinearLayout start=page();start.setGravity(Gravity.CENTER_VERTICAL);start.setBackgroundColor(Color.BLACK);start.setPadding(dp(24),dp(24),dp(24),dp(24));setContentView(start);fitSystemPanels(start);
   start.addView(sheetText("Feldaufmaß Pro",28,true));start.addView(sheetText("Projekt auswählen",18,false));
   Button create=actionButtonSingle(start,"Neues Projekt erstellen",()->newProjectDialog());compactToolIcon(create,"Neues Projekt erstellen","objects");
   Button open=actionButtonSingle(start,"Bestehendes Projekt öffnen",()->showProjects());compactToolIcon(open,"Bestehendes Projekt öffnen","layers");
+  overviewAction(start,"Cloud","cloud",()->openCloud());
  }
  void enterProject(){projectChosen=true;startLiveGps();setContentView(shell);fitSystemPanels(shell);if(length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);}
  void showProjects(){
@@ -945,7 +972,8 @@ public class MainActivity extends Activity {
      case "sections":c.drawLine(3,12,21,12,p);for(int x:new int[]{3,9,15,21}){c.drawLine(x,7,x,17,p);}break;
      case "pipe":c.drawCircle(7.5f,12,6,p);c.drawCircle(7.5f,12,3.8f,p);c.drawCircle(19,14,4,p);c.drawCircle(19,14,2.1f,p);break;
      case "settings":c.drawCircle(12,12,7,p);c.drawCircle(12,12,3,p);for(int k=0;k<8;k++){c.save();c.rotate(k*45,12,12);c.drawLine(12,2,12,5,p);c.restore();}break;
-     case "layers":c.drawLine(4,8,12,3,p);c.drawLine(12,3,20,8,p);c.drawLine(20,8,12,13,p);c.drawLine(12,13,4,8,p);c.drawLine(4,13,12,18,p);c.drawLine(12,18,20,13,p);c.drawLine(4,18,12,22,p);c.drawLine(12,22,20,18,p);break;
+     case "cloud":{android.graphics.Path cloud=new android.graphics.Path();cloud.moveTo(6,18);cloud.cubicTo(0,18,1,9,7,9);cloud.cubicTo(7,2,18,2,18,10);cloud.cubicTo(24,10,24,18,18,18);cloud.close();c.drawPath(cloud,p);break;}
+      case "layers":c.drawLine(4,8,12,3,p);c.drawLine(12,3,20,8,p);c.drawLine(20,8,12,13,p);c.drawLine(12,13,4,8,p);c.drawLine(4,13,12,18,p);c.drawLine(12,18,20,13,p);c.drawLine(4,18,12,22,p);c.drawLine(12,22,20,18,p);break;
      default:for(int y=6;y<=18;y+=6)c.drawLine(4,y,20,y,p);
     }c.restore();
    }
@@ -3995,6 +4023,7 @@ public class MainActivity extends Activity {
  header.addView(assistant,header.indexOfChild(toolsMenu),new LinearLayout.LayoutParams(dp(48),dp(48)));
  assistant.setOnClickListener(v->startDictation());
  assistant.setOnLongClickListener(v->{showPage(voicePage);return true;});
+ Button cloudButton=actionButtonSingle(dock,"Cloud",()->openCloud());compactToolIcon(cloudButton,"Cloud","cloud");android.graphics.drawable.Drawable cloudIcon=cloudButton.getCompoundDrawables()[1];cloudButton.setCompoundDrawables(cloudIcon,null,null,null);cloudButton.setCompoundDrawablePadding(dp(6));cloudButton.setMinHeight(dp(48));LinearLayout.LayoutParams cloudParams=new LinearLayout.LayoutParams(dp(96),dp(48));cloudParams.setMargins(0,0,dp(8),0);cloudButton.setLayoutParams(cloudParams);
  Button persistentSave=actionButtonSingle(dock,"Speichern",()->{if(calculate())Toast.makeText(this,"Gespeichert",Toast.LENGTH_SHORT).show();});
  compactToolIcon(persistentSave,"Speichern","save");
  android.graphics.drawable.Drawable saveIcon=persistentSave.getCompoundDrawables()[1];
