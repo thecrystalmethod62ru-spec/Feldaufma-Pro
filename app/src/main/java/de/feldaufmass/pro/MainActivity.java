@@ -5121,8 +5121,17 @@ public class MainActivity extends Activity {
   result.setText(basic+routeLengthWarning(measured));
   if(shoringQuantities!=null)shoringQuantities.setText(shoringReport());
  }
+ RouteSketch measuredExportRoute(RouteSketch original){
+  if(!DxfExport.metricAvailable(original))return null;
+  RouteSketch copy=new RouteSketch(this,original.encode());
+  if(!copy.rebuildMeasuredGeometry()||!Double.isFinite(copy.uniformMetresPerUnit()))return null;
+  copy.setStationLayers(original.stationObjects,original.surfaceSections);copy.setTrenchWidth(w);
+  return copy;
+ }
  int appendScaledRoutePdf(android.graphics.pdf.PdfDocument pdf,int pageNumber,RouteSketch route){
-  double factor=route.uniformMetresPerUnit();if(!Double.isFinite(factor))return pageNumber;
+  RouteSketch measured=measuredExportRoute(route);if(measured==null)return pageNumber;
+  route=measured;
+  double factor=route.uniformMetresPerUnit();
   double minX=Double.POSITIVE_INFINITY,minY=minX,maxX=Double.NEGATIVE_INFINITY,maxY=maxX;
   for(RouteSketch.Vertex v:route.vertices){minX=Math.min(minX,v.point.x);minY=Math.min(minY,v.point.y);maxX=Math.max(maxX,v.point.x);maxY=Math.max(maxY,v.point.y);}
   double trenchWidth=Double.isFinite(w)&&w>0?w:0;
@@ -5144,7 +5153,7 @@ minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
   android.graphics.pdf.PdfDocument.Page page=pdf.startPage(new android.graphics.pdf.PdfDocument.PageInfo.Builder(width,height,pageNumber++).create());
   try{
    Canvas c=page.getCanvas();Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);p.setColor(INK);p.setTextSize(16);c.drawText("Trassenachse – Maßstab 1:"+denominator,36,40,p);
-   p.setTextSize(10);c.drawText("A"+format+" · Druckgröße 100 % · "+(trenchWidth>0?"Grabenbreite "+reportMeasure(trenchWidth):"nur Trassenachse"),36,58,p);
+   p.setTextSize(10);c.drawText("A"+format+" · Druckgröße 100 % · gemessene Längen, skizzierte Richtungen · "+(trenchWidth>0?"Grabenbreite "+reportMeasure(trenchWidth):"nur Trassenachse"),36,58,p);
    if(widths.length()>0){
     double st=0;
     for(int i=1;i<route.vertices.size();i++){
@@ -5386,7 +5395,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     drawReportView(canvas,new Profile(),408,360,300);
     canvas.drawText("Vorläufige Maße – vor Abrechnung prüfen.",36,786,pen);
    } finally {pdf.finishPage(page);}
-   RouteSketch route=new RouteSketch(this,routeData());
+   RouteSketch route=new RouteSketch(this,routeData());route.setStationLayers(objects,segments);route.setTrenchWidth(w);
    String report=(route.vertices.size()>1?"Trassenskizze – Abschnittsmaße\n"+route.measurements()+"\n\n":"")+"Oberflächenaufbau\n"+surfaceLayers.getText()+"\n\n"+result.getText()+"\n"+legend.getText()+"\n"+
     "Nachschnitt links: "+reportMeasure(left)+" | rechts: "+reportMeasure(right)+"\n"+
     "Asphaltstärke: "+reportMeasure(asphalt)+"\nTragschicht: "+reportMeasure(base)+"\n\n"+
