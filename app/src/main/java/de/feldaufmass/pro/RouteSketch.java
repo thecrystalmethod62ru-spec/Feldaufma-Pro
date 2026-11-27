@@ -15,7 +15,7 @@ import java.util.Locale;
 
 /** Coordinates describe a schematic only. Metres are entered in the field. */
 final class RouteSketch extends View {
- static final int LAYER_ROUTE=1,LAYER_DIMENSIONS=2,LAYER_NAMES=4,LAYER_GPS=8,LAYER_PHOTOS=16,LAYER_OBJECTS=32,LAYER_SURFACES=64,LAYER_SURFACE_DIMENSIONS=128,ALL_LAYERS=255;
+ static final int LAYER_ROUTE=1,LAYER_DIMENSIONS=2,LAYER_NAMES=4,LAYER_GPS=8,LAYER_PHOTOS=16,LAYER_OBJECTS=32,LAYER_SURFACES=64,LAYER_SURFACE_DIMENSIONS=128,LAYER_GPS_ROUTE=256,ALL_LAYERS=511;
  int visibleLayers=ALL_LAYERS;
  boolean layerVisible(int layer){return (visibleLayers&layer)!=0;}
  void setVisibleLayers(int layers){visibleLayers=layers&ALL_LAYERS;invalidate();}
@@ -622,6 +622,20 @@ final class RouteSketch extends View {
  void setUnderlay(android.graphics.Bitmap bitmap){underlay=bitmap;invalidate();}
  void setUnderlayAlpha(int alpha){underlayAlpha=Math.max(0,Math.min(255,alpha));invalidate();}
  void setUnderlayVisible(boolean visible){underlayVisible=visible;invalidate();}
+ void drawGpsRouteLayer(Canvas c){
+  if(!layerVisible(LAYER_GPS_ROUTE)||!(getContext() instanceof android.app.Activity))return;
+  GpsLayer layer=new GpsLayer(((android.app.Activity)getContext()).getPreferences(0).getString("gpsRouteLayer","[]"));
+  if(layer.observations.size()<2)return;
+  ArrayList<PointF> pts=layer.alignedPoints(this);
+  if(pts.size()<2){
+   paint.setColor(darkEditor?0xff62b3ff:0xff1565c0);paint.setTextSize(12*getResources().getDisplayMetrics().density);
+   c.drawText("GPS-Ebene: Referenzpunkte fehlen",12,24*getResources().getDisplayMetrics().density,paint);return;
+  }
+  paint.setColor(0xff399cff);paint.setStrokeWidth(3*getResources().getDisplayMetrics().density);
+  paint.setPathEffect(new android.graphics.DashPathEffect(new float[]{12,8},0));
+  for(int i=1;i<pts.size();i++)line(c,pts.get(i-1),pts.get(i));
+  paint.setPathEffect(null);
+ }
  void drawUnderlay(Canvas c){
   if(underlay==null||underlay.isRecycled()||!underlayVisible)return;
   float side=scale(),factor=side/Math.max(underlay.getWidth(),underlay.getHeight());
@@ -721,6 +735,7 @@ final class RouteSketch extends View {
  @Override protected void onDraw(Canvas c){
   c.drawColor(darkEditor?Color.BLACK:Color.WHITE);
   drawUnderlay(c);
+  drawGpsRouteLayer(c);
   float density=getResources().getDisplayMetrics().density;
   paint.setTextSize(13*density);
   dimensionHits.clear();
