@@ -420,7 +420,7 @@ public class MainActivity extends Activity {
      if(!original.equals(getPreferences(0).getString("importedGpsReference",""))){notice("Referenz geändert. Bitte erneut importieren.");return;}
      new android.app.AlertDialog.Builder(this).setTitle("GPX-Vorschau").setMessage(rows.length()+" Punkte. Genauigkeit unbekannt. "+(importedGpsReference().length()>0?"Vorhandene GPX-Referenz ersetzen?":"Import als separate Referenz?")).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",(d,w)->{
       if(!project.equals(activeProject)||!original.equals(getPreferences(0).getString("importedGpsReference",""))){notice("Referenz oder Projekt geändert. Bitte erneut importieren.");return;}
-      if(getPreferences(0).edit().putString("importedGpsReference",rows.toString()).commit()){if(livePreview!=null)livePreview.setImportedGpsReference(rows);applyDrawingLayers(drawingLayers()|RouteSketch.LAYER_GPS_REFERENCE);notice("GPX-Referenz gespeichert.");}else notice("GPX konnte nicht gespeichert werden.");
+      if(getPreferences(0).edit().putString("importedGpsReference",rows.toString()).commit()){if(livePreview!=null)livePreview.setImportedGpsReference(rows);if(activeRouteEditor!=null)activeRouteEditor.setImportedGpsReference(rows);applyDrawingLayers(drawingLayers()|RouteSketch.LAYER_GPS_REFERENCE);notice("GPX-Referenz gespeichert.");}else notice("GPX konnte nicht gespeichert werden.");
      }).show();
     });
    }catch(Exception e){runOnUiThread(()->notice("GPX-Import fehlgeschlagen: "+e.getMessage()));}
@@ -432,7 +432,7 @@ public class MainActivity extends Activity {
   if(original.isEmpty()){notice("Keine GPX-Referenz vorhanden.");return;}
   new android.app.AlertDialog.Builder(this).setTitle("GPX-Referenz löschen").setMessage("Nur die importierte Referenz wird gelöscht. Manuelle Trasse und GPS-Aufzeichnung bleiben erhalten.").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(d,w)->{
    if(!project.equals(activeProject)||!original.equals(getPreferences(0).getString("importedGpsReference",""))){notice("Referenz geändert. Bitte erneut öffnen.");return;}
-   if(getPreferences(0).edit().remove("importedGpsReference").commit()){if(livePreview!=null)livePreview.setImportedGpsReference(new org.json.JSONArray());notice("GPX-Referenz gelöscht.");}else notice("GPX-Referenz konnte nicht gelöscht werden.");
+   if(getPreferences(0).edit().remove("importedGpsReference").commit()){if(livePreview!=null)livePreview.setImportedGpsReference(new org.json.JSONArray());if(activeRouteEditor!=null)activeRouteEditor.setImportedGpsReference(new org.json.JSONArray());notice("GPX-Referenz gelöscht.");}else notice("GPX-Referenz konnte nicht gelöscht werden.");
   }).show();
  }
  void requestGpsExport(){
@@ -492,7 +492,7 @@ public class MainActivity extends Activity {
  }
  @Override protected void onResume(){super.onResume();if(projectChosen)startLiveGps();autosaveHandler.removeCallbacks(autosaveTick);autosaveHandler.postDelayed(autosaveTick,AUTOSAVE_INTERVAL_MS);}
  @Override protected void onPause(){
-  recordingGpsTrack=false;autosaveHandler.removeCallbacks(autosaveTick);saveDraft();
+  recordingGpsTrack=false;gpsRecordingProject=null;autosaveHandler.removeCallbacks(autosaveTick);saveDraft();
   if(liveManager!=null){liveManager.removeUpdates(liveListener);liveManager=null;}
   updateLiveFix(null);super.onPause();
  }
@@ -976,6 +976,7 @@ public class MainActivity extends Activity {
   LinearLayout controls=new LinearLayout(this);controls.setPadding(dp(8),dp(4),dp(8),dp(4));controls.setBackground(editorShape(0xff202b2a,12));root.addView(controls);
   controls.addView(mode,new LinearLayout.LayoutParams(0,-2,1));controls.addView(angles,new LinearLayout.LayoutParams(0,-2,1));Spinner smartMode=new Spinner(this);smartMode.setAdapter(new android.widget.ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Freihand","Smart","Winkelraster 15°"}));smartMode.setSelection(route.smartDrawingMode);smartMode.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onItemSelected(android.widget.AdapterView<?> p,View v,int pos,long id){route.smartDrawingMode=pos;}public void onNothingSelected(android.widget.AdapterView<?> p){}});controls.addView(smartMode,new LinearLayout.LayoutParams(0,-2,1));
   Button layersButton=new Button(this);styleEditorButton(layersButton,false);compactToolIcon(layersButton,"","layers");layersButton.setContentDescription("Zeichnungsebenen");layersButton.setMinHeight(0);controls.addView(layersButton,new LinearLayout.LayoutParams(dp(48),dp(48)));layersButton.setOnClickListener(v->showDrawingLayers(route));
+  Button gpsButton=new Button(this);styleEditorButton(gpsButton,false);compactToolIcon(gpsButton,"","center");gpsButton.setContentDescription("GPS-Aufzeichnung");gpsButton.setMinHeight(0);controls.addView(gpsButton,new LinearLayout.LayoutParams(dp(48),dp(48)));gpsButton.setOnClickListener(v->showGpsTrackControls());
   route.darkEditor=true;route.invalidate();root.addView(route,new LinearLayout.LayoutParams(-1,0,1));
   LinearLayout sectionStrip=new LinearLayout(this);sectionStrip.setOrientation(1);sectionStrip.setPadding(dp(6),dp(2),dp(6),dp(2));
   TextView sectionTitle=sheetText("Abschnitte",13,true);sectionStrip.addView(sectionTitle);
