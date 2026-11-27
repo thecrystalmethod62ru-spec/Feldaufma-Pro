@@ -131,20 +131,23 @@ public final class PipeLayoutView extends View {
     }
     private void dimension(Canvas c,float x1,float y1,float x2,float y2,double metres){
         int color=metres<0?0xffff8a80:0xff00e5ee;
+        float d=getResources().getDisplayMetrics().density;
         p.setColor(color);
-        p.setStrokeWidth(1.5f);
+        p.setStrokeWidth(1.5f*d);
         c.drawLine(x1,y1,x2,y2,p);
         double length=Math.hypot(x2-x1,y2-y1);
         if(length>0){
-            float nx=(float)(-(y2-y1)/length*4),ny=(float)((x2-x1)/length*4);
+            float tick=(float)Math.min(4*d,length/4);
+            float nx=(float)(-(y2-y1)/length*tick),ny=(float)((x2-x1)/length*tick);
             c.drawLine(x1-nx,y1-ny,x1+nx,y1+ny,p);
             c.drawLine(x2-nx,y2-ny,x2+nx,y2+ny,p);
-            float ux=(float)((x2-x1)/length*6),uy=(float)((y2-y1)/length*6);
+            float arrow=(float)Math.min(6*d,length/3);
+            float ux=(float)((x2-x1)/length*arrow),uy=(float)((y2-y1)/length*arrow);
             c.drawLine(x1,y1,x1+ux+nx,y1+uy+ny,p);c.drawLine(x1,y1,x1+ux-nx,y1+uy-ny,p);
             c.drawLine(x2,y2,x2-ux+nx,y2-uy+ny,p);c.drawLine(x2,y2,x2-ux-nx,y2-uy-ny,p);
         }
         String label=String.format(java.util.Locale.GERMANY,"%.3f m",metres);
-        float x=(x1+x2-p.measureText(label))/2,y=(y1+y2)/2-5;float d=getResources().getDisplayMetrics().density;
+        float x=(x1+x2-p.measureText(label))/2,y=(y1+y2)/2-5*d;
         x=Math.max(4*d,Math.min(x,getWidth()-p.measureText(label)-4*d));y=Math.max(p.getTextSize()+4*d,Math.min(y,getHeight()-4*d));
         p.setStyle(Paint.Style.FILL);p.setColor(0xff041012);c.drawRoundRect(x-3*d,y-p.getTextSize(),x+p.measureText(label)+3*d,y+3*d,3*d,3*d,p);
         p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(d);p.setColor(color);c.drawRoundRect(x-3*d,y-p.getTextSize(),x+p.measureText(label)+3*d,y+3*d,3*d,3*d,p);p.setStyle(Paint.Style.FILL);c.drawText(label,x,y,p);
