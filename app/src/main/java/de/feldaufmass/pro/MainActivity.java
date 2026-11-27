@@ -256,7 +256,7 @@ public class MainActivity extends Activity {
  }
  boolean projectChosen=false;
  void showProjectStart(){
-  LinearLayout start=page();start.setGravity(Gravity.CENTER_VERTICAL);start.setBackgroundColor(0xff151717);start.setPadding(dp(24),dp(24),dp(24),dp(24));setContentView(start);fitSystemPanels(start);
+  LinearLayout start=page();start.setGravity(Gravity.CENTER_VERTICAL);start.setBackgroundColor(Color.BLACK);start.setPadding(dp(24),dp(24),dp(24),dp(24));setContentView(start);fitSystemPanels(start);
   start.addView(sheetText("Feldaufmaß Pro",28,true));start.addView(sheetText("Projekt auswählen",18,false));
   Button create=actionButtonSingle(start,"Neues Projekt erstellen",()->newProjectDialog());compactToolIcon(create,"Neues Projekt erstellen","objects");
   Button open=actionButtonSingle(start,"Bestehendes Projekt öffnen",()->showProjects());compactToolIcon(open,"Bestehendes Projekt öffnen","layers");
@@ -3651,7 +3651,7 @@ public class MainActivity extends Activity {
    boolean selected=entry.getKey()==p;
    Button tab=entry.getValue();
    tab.setSelected(selected);
-   tab.setBackground(editorShape(selected?0xff28564c:0xff1b1b1b,10));
+   tab.setBackground(editorShape(selected?0xff28564c:0xff202827,10));
    tab.setTextColor(selected?Color.WHITE:0xffb5b5b5);
   }
   if(p==profilePage&&profile!=null)profile.invalidate();if(p==documentsPage)compareSoll();if(p==quantityPage)refreshDetailQuantities();body.removeAllViews();ScrollView sc=new ScrollView(this);sc.setFillViewport(true);if(p.getParent()!=null)((android.view.ViewGroup)p.getParent()).removeView(p);sc.addView(p);body.addView(sc,new LinearLayout.LayoutParams(-1,-1));}
@@ -3679,12 +3679,12 @@ public class MainActivity extends Activity {
 
  public void onCreate(Bundle savedInstanceState){super.onCreate(savedInstanceState);activeProject=projectRegistry().getString("active",LEGACY_PROJECT);
  if(savedInstanceState!=null){projectChosen=savedInstanceState.getBoolean("projectChosen",false);selectedPoint=savedInstanceState.getString("selectedPoint");pendingPoint=savedInstanceState.getString("pendingPoint");pendingPhoto=savedInstanceState.getString("pendingPhoto");pendingMaterialProject=savedInstanceState.getString("pendingMaterialProject");pendingConnectionsProject=savedInstanceState.getString("pendingConnectionsProject");pendingPlanProject=savedInstanceState.getString("pendingPlanProject");pendingProtocolsProject=savedInstanceState.getString("pendingProtocolsProject");}
- shell=page();shell.setPadding(0,0,0,0);shell.setBackgroundColor(0xff1b1b1b);setContentView(shell);fitSystemPanels(shell);
+ shell=page();shell.setPadding(0,0,0,0);shell.setBackgroundColor(Color.BLACK);setContentView(shell);fitSystemPanels(shell);
  planPage=page();measurePage=page();voicePage=page();profilePage=page();segmentPage=page();objectPage=page();quantityPage=page();
  LinearLayout header=new LinearLayout(this);
  header.setGravity(Gravity.CENTER_VERTICAL);
  header.setPadding(dp(16),dp(4),dp(8),dp(4));
- header.setBackgroundColor(0xff1b1b1b);
+ header.setBackgroundColor(Color.BLACK);
  shell.addView(header);
  projectHeader=sheetText(getPreferences(0).getString("project","Feldaufmaß Pro"),22,true);
  projectHeader.setTextColor(UI_TEXT);
@@ -3702,8 +3702,8 @@ public class MainActivity extends Activity {
  addSheetTab(tabs,"Mengen",quantityPage);
  body=new LinearLayout(this);shell.addView(body,new LinearLayout.LayoutParams(-1,0,1));
  LinearLayout dock=new LinearLayout(this);dock.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);
- dock.setBackgroundColor(0xff1b1b1b);dock.setPadding(dp(8),dp(4),dp(8),dp(4));shell.addView(dock);
- ImageButton assistant=new ImageButton(this);assistant.setImageResource(android.R.drawable.ic_btn_speak_now);
+ dock.setBackgroundColor(Color.BLACK);dock.setPadding(dp(8),dp(4),dp(8),dp(4));shell.addView(dock);
+ ImageButton assistant=new ImageButton(this);assistant.setImageResource(android.R.drawable.ic_btn_speak_now);assistant.setBackground(editorShape(0xff202827,12));assistant.setColorFilter(Color.WHITE);
  assistant.setContentDescription("Sprachassistent starten; lange drücken für Assistent");
  header.addView(assistant,header.indexOfChild(toolsMenu),new LinearLayout.LayoutParams(dp(48),dp(48)));
  assistant.setOnClickListener(v->startDictation());
@@ -4221,7 +4221,7 @@ public class MainActivity extends Activity {
  }
  LinearLayout fold(LinearLayout parent,String title,boolean expanded){
   Button toggle=new Button(this);toggle.setAllCaps(false);toggle.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);
-  toggle.setText(title+(expanded?" ▴":" ▾"));parent.addView(toggle);
+  toggle.setText(title+(expanded?" ▴":" ▾"));styleEditorButton(toggle,false);toggle.setTextSize(14);parent.addView(toggle);
   LinearLayout content=page();parent.addView(content);content.setVisibility(expanded?View.VISIBLE:View.GONE);
   toggle.setOnClickListener(v->{boolean open=content.getVisibility()!=View.VISIBLE;
    content.setVisibility(open?View.VISIBLE:View.GONE);toggle.setText(title+(open?" ▴":" ▾"));});
@@ -6228,7 +6228,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  }
  String m(double x){return String.format(java.util.Locale.GERMANY,"%.2f m",x);}
  void label(Canvas c,String s,float x,float y){p.setColor(0xffcbd6d5);p.setTextSize(12);c.drawText(s,x,y,p);}
- protected void onDraw(Canvas c){super.onDraw(c);c.drawColor(0xff151717);utilityHits.clear();if(!Double.isFinite(w)||!Double.isFinite(d)||w<=0||d<=0)return;
+ protected void onDraw(Canvas c){super.onDraw(c);c.drawColor(Color.BLACK);utilityHits.clear();if(!Double.isFinite(w)||!Double.isFinite(d)||w<=0||d<=0)return;
  c.save();c.scale(getWidth()/360f,getHeight()/300f);
  double nl=Double.isFinite(left)?left:0,nr=Double.isFinite(right)?right:0;
  float scale=(float)Math.min(190/(w+nl+nr),155/d);
