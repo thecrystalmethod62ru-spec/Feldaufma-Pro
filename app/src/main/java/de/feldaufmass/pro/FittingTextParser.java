@@ -10,7 +10,9 @@ final class FittingTextParser {
     private static final Pattern NAME=Pattern.compile("\\b(Bogen|T[- ]?Stück|Kreuzstück|Reduzierung|Muffe|Flansch|Endkappe|Schieber)\\b",FLAGS);
     private static final Pattern ANGLE=Pattern.compile("^\\s*[:=]?\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:°|Grad\\b)",FLAGS);
     private static final Pattern DN=Pattern.compile("\\bDN\\s*([1-9]\\d{0,3})(?![\\d/]|[.,]\\d)",FLAGS);
-    private static final Pattern STATION=Pattern.compile("\\b(?:Station|Stat\\.)\\s*[:=]?\\s*(\\d+(?:[.,]\\d+)?)\\s*m\\b",FLAGS);
+    private static final Pattern STATION_LABEL=Pattern.compile("\\b(?:Station\\b|Stat\\.)",FLAGS);
+    private static final Pattern STATION_VALUE=Pattern.compile(
+            "\\s*[:=]?\\s*(?:(\\d+)\\s*\\+\\s*(\\d{3}(?:[.,]\\d+)?)(?:\\s*m\\b)?|(\\d+(?:[.,]\\d+)?)\\s*m\\b)(?![\\w+]|[.,]\\d)",FLAGS);
 
     static final class Candidate {
         final MontageCatalog.Fitting type;
@@ -43,9 +45,22 @@ final class FittingTextParser {
                     if(normalize(candidate.label).equalsIgnoreCase(normalize(label)))type=candidate;
                 }
             }
-            if(type!=null)result.add(new Candidate(type,unique(DN,line),unique(STATION,line),line,i+1));
+            if(type!=null)result.add(new Candidate(type,unique(DN,line),station(line),line,i+1));
         }
         return result;
+    }
+
+    private static String station(String line){
+        Matcher label=STATION_LABEL.matcher(line);
+        if(!label.find())return "";
+        int start=label.end();
+        if(label.find())return "";
+        Matcher value=STATION_VALUE.matcher(line).region(start,line.length());
+        if(!value.lookingAt())return "";
+        if(value.group(3)!=null)return value.group(3);
+        // Three metre digits follow the kilometre prefix, including leading zeros.
+        String metres=value.group(1)+value.group(2);
+        return metres.replaceFirst("^0+(?=[0-9])","");
     }
 
     private static String normalize(String label){return label.replace("-","").replace(" ","");}
