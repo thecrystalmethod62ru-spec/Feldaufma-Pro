@@ -5622,6 +5622,14 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   menu.getMenu().add(0,4,6,"GNSS / RTK – NMEA importieren");
   if(point.gpsUndo!=null)menu.getMenu().add(0,5,7,"GPS-Verschiebung rückgängig machen");
   for(int i=0;i<point.photos.length();i++)menu.getMenu().add(0,100+i,8+i,"Foto "+(i+1)+" · Details");
+  menu.getMenu().findItem(12).setIcon(android.R.drawable.ic_menu_mylocation);
+  menu.getMenu().findItem(13).setIcon(android.R.drawable.ic_menu_directions);
+  menu.getMenu().findItem(1).setIcon(android.R.drawable.ic_menu_mapmode);
+  menu.getMenu().findItem(2).setIcon(android.R.drawable.ic_menu_camera);
+  menu.getMenu().findItem(3).setIcon(android.R.drawable.ic_menu_edit);
+  menu.getMenu().findItem(4).setIcon(android.R.drawable.ic_menu_upload);
+  if(menu.getMenu().findItem(5)!=null)menu.getMenu().findItem(5).setIcon(android.R.drawable.ic_menu_revert);
+  if(android.os.Build.VERSION.SDK_INT>=29)menu.setForceShowIcon(true);
   menu.setOnMenuItemClickListener(item->{switch(item.getItemId()){
    case 12:showGpsTrackControls();return true;
    case 13:showGpsTrackComparison();return true;
