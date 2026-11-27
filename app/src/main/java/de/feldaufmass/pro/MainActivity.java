@@ -5615,13 +5615,19 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
    // Longitudinal asphalt cuts, separate from the excavation outline.
    Paint asphaltPen=new Paint(Paint.ANTI_ALIAS_FLAG);asphaltPen.setStrokeWidth(.8f);
    boolean originalCuts=false,recutCuts=false;
-   for(int j=0;j<route.surfaceSections.length();j++){
-    org.json.JSONObject row=route.surfaceSections.optJSONObject(j);
-    if(row==null||!"Asphalt".equals(row.optString("surface")))continue;
+   java.util.ArrayList<org.json.JSONObject> cutRows=new java.util.ArrayList<>();
+   for(int j=0;j<route.surfaceSections.length();j++){org.json.JSONObject item=route.surfaceSections.optJSONObject(j);if(item!=null)cutRows.add(item);}
+   cutRows.sort((aa,bb)->Double.compare(aa.optDouble("from"),bb.optDouble("from")));
+   float[] lastX=new float[4],lastY=new float[4];double[] lastStation={Double.NaN,Double.NaN,Double.NaN,Double.NaN};
+   double previousEnd=Double.NaN;
+   for(org.json.JSONObject row:cutRows){
+    if(!"Asphalt".equals(row.optString("surface"))){previousEnd=Double.NaN;continue;}
     double from=row.optDouble("from"),to=row.optDouble("to"),bw=row.optDouble("width");
     if(!Double.isFinite(from+to+bw)||from<0||to<=from||to>route.measuredLength()+1e-8||bw<=0)continue;
     double st=0;
-    float[] lastX=new float[4],lastY=new float[4];double[] lastStation={Double.NaN,Double.NaN,Double.NaN,Double.NaN};
+    if(!Double.isFinite(previousEnd)||Math.abs(previousEnd-from)>1e-8)java.util.Arrays.fill(lastStation,Double.NaN);
+    previousEnd=to;
+    for(int side=0;side<2;side++)if(!(row.optDouble(side==0?"left":"right")>0))lastStation[side*2+1]=Double.NaN;
     for(int i=1;i<route.vertices.size();i++){
      RouteSketch.Vertex aa=route.vertices.get(i-1),bb=route.vertices.get(i);
      double len=bb.metres,dx=bb.point.x-aa.point.x,dy=bb.point.y-aa.point.y,n=Math.hypot(dx,dy);
