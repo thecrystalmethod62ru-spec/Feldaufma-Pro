@@ -4759,8 +4759,14 @@ public class MainActivity extends Activity {
  overviewAction(pipeDetails,"Weitere Leitungen / Kabel","pipe",()->editUtilities());
  profilePage.removeView(legend);pipeDetails.addView(legend);
  profilePage.removeView(sectionProfilePanel);
- LinearLayout toolbar=new LinearLayout(this);profilePage.addView(toolbar);String[] names={"Aufbau","Leitungen","Maße","Abschnitte","Optionen"};String[] icons={"layers","pipe","ruler","sections","settings"};LinearLayout[] panels={buildPanel,pipeDetails,sizes,sectionProfilePanel,optionsPanel};
- for(int j=0;j<names.length;j++){final int index=j;Button tool=new Button(this);styleEditorButton(tool,false);compactToolIcon(tool,names[j],icons[j]);tool.setSingleLine(true);if(android.os.Build.VERSION.SDK_INT>=26)tool.setAutoSizeTextTypeUniformWithConfiguration(9,12,1,android.util.TypedValue.COMPLEX_UNIT_SP);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(54),1);lp.setMargins(dp(2),dp(2),dp(2),dp(2));toolbar.addView(tool,lp);tool.setOnClickListener(v->{if(index==3)openSectionProfilePicker();showProfilePanel(names[index],panels[index]);});}
+ profilePage.removeView(profile);
+ LinearLayout profileWorkspace=new LinearLayout(this);profileWorkspace.setOrientation(getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL);
+ profilePage.addView(profileWorkspace,Math.min(2,profilePage.getChildCount()));
+ boolean wideProfile=profileWorkspace.getOrientation()==LinearLayout.HORIZONTAL;
+ profileWorkspace.addView(profile,wideProfile?new LinearLayout.LayoutParams(0,dp(300),1):new LinearLayout.LayoutParams(-1,dp(260)));
+ profileWorkspace.addView(sizes,wideProfile?new LinearLayout.LayoutParams(0,-2,1):new LinearLayout.LayoutParams(-1,-2));
+ LinearLayout toolbar=new LinearLayout(this);profilePage.addView(toolbar,1);String[] names={"Aufbau","Leitungen","Maße","Abschnitte","Optionen"};String[] icons={"layers","pipe","ruler","sections","settings"};LinearLayout[] panels={buildPanel,pipeDetails,sizes,sectionProfilePanel,optionsPanel};
+ for(int j=0;j<names.length;j++){final int index=j;Button tool=new Button(this);styleEditorButton(tool,false);compactToolIcon(tool,names[j],icons[j]);tool.setSingleLine(true);if(android.os.Build.VERSION.SDK_INT>=26)tool.setAutoSizeTextTypeUniformWithConfiguration(9,12,1,android.util.TypedValue.COMPLEX_UNIT_SP);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(54),1);lp.setMargins(dp(2),dp(2),dp(2),dp(2));toolbar.addView(tool,lp);tool.setOnClickListener(v->{if(index==2){sizes.requestFocus();return;}if(index==3)openSectionProfilePicker();showProfilePanel(names[index],panels[index]);});}
 
  save.setOnClickListener(v->{if(calculate())showPage(planPage);});if(projectChosen&&length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);if(!projectChosen)showProjectStart();
  }
