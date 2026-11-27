@@ -267,7 +267,7 @@ public class MainActivity extends Activity {
   Button create=actionButtonSingle(start,"Neues Projekt erstellen",()->newProjectDialog());compactToolIcon(create,"Neues Projekt erstellen","objects");
   Button open=actionButtonSingle(start,"Bestehendes Projekt öffnen",()->showProjects());compactToolIcon(open,"Bestehendes Projekt öffnen","layers");
  }
- void enterProject(){projectChosen=true;startLiveGps();setContentView(shell);fitSystemPanels(shell);showPage(planPage);}
+ void enterProject(){projectChosen=true;startLiveGps();setContentView(shell);fitSystemPanels(shell);if(length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);}
  void showProjects(){
   java.util.ArrayList<String> ids=new java.util.ArrayList<>(projectRegistry().getStringSet("ids",java.util.Collections.emptySet()));
   java.util.Collections.sort(ids);ids.remove(LEGACY_PROJECT);
