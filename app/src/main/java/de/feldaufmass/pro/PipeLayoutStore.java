@@ -94,7 +94,8 @@ public final class PipeLayoutStore {
         return result;
     }
     private static double remapStation(double value,double[] oldStations,double[] newStations){
-        if(!Double.isFinite(value)||value<oldStations[0]||value>oldStations[oldStations.length-1])throw new IllegalArgumentException("Station außerhalb der Trasse");
+        if(!Double.isFinite(value)||value<oldStations[0]-1e-8||value>oldStations[oldStations.length-1]+1e-8)throw new IllegalArgumentException("Station außerhalb der Trasse");
+        value=Math.max(oldStations[0],Math.min(oldStations[oldStations.length-1],value));
         for(int i=1;i<oldStations.length;i++)if(value<=oldStations[i]){
             if(value==oldStations[i])return newStations[i];
             double fraction=(value-oldStations[i-1])/(oldStations[i]-oldStations[i-1]);
