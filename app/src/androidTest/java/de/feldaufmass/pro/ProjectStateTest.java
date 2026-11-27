@@ -277,8 +277,9 @@ public class ProjectStateTest {
  }
  @Test public void contentClearsVisibleSystemBars(){
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->activity.enterProject());
+   androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().waitForIdleSync();
    scenario.onActivity(activity->{
-    activity.enterProject();
     androidx.core.view.WindowInsetsCompat windowInsets=
       androidx.core.view.ViewCompat.getRootWindowInsets(activity.shell);
     assertNotNull(windowInsets);
