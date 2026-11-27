@@ -292,10 +292,16 @@ public class MainActivity extends Activity {
   }));dialog.show();
  }
  void showProjectStart(){
-  LinearLayout start=page();start.setGravity(Gravity.CENTER_VERTICAL);start.setBackgroundColor(Color.BLACK);start.setPadding(dp(24),dp(24),dp(24),dp(24));setContentView(start);fitSystemPanels(start);
-  start.addView(sheetText("Feldaufmaß Pro",28,true));start.addView(sheetText("Projekt auswählen",18,false));
-  Button create=actionButtonSingle(start,"Neues Projekt erstellen",()->newProjectDialog());compactToolIcon(create,"Neues Projekt erstellen","objects");
-  Button open=actionButtonSingle(start,"Bestehendes Projekt öffnen",()->showProjects());compactToolIcon(open,"Bestehendes Projekt öffnen","layers");
+  LinearLayout start=page();start.setGravity(Gravity.TOP);start.setPadding(dp(20),dp(16),dp(20),dp(12));setContentView(start);fitSystemPanels(start);
+  ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);start.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+  LinearLayout content=page();content.setPadding(0,0,0,0);scroll.addView(content);
+  TextView brand=sheetText("Feldaufmaß Pro",28,true);content.addView(brand);
+  TextView subtitle=sheetText("Tiefbau · Leitungsbau",14,false);subtitle.setTextColor(0xff9aabaa);content.addView(subtitle);
+  TextView heading=sheetText("Projekte",20,true);heading.setPadding(0,dp(24),0,dp(12));content.addView(heading);
+  overviewAction(content,"Neues Projekt erstellen","objects",()->newProjectDialog());
+  Button create=(Button)content.getChildAt(content.getChildCount()-1);
+  create.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x33ffffff),editorShape(TEAL,10),null));
+  overviewAction(content,"Bestehendes Projekt öffnen","layers",()->showProjects());
   overviewAction(start,"Cloud","cloud",()->openCloud());
  }
  void enterProject(){projectChosen=true;startLiveGps();setContentView(shell);fitSystemPanels(shell);if(length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);}
