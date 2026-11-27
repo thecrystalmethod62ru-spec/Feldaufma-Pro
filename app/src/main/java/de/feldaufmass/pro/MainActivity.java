@@ -137,11 +137,11 @@ public class MainActivity extends Activity {
   }
   if(manifest==null||!"FeldaufmassPro".equals(manifest.optString("format"))||manifest.optInt("version")!=1)throw new java.io.IOException("Unbekanntes Sicherungsformat");
   org.json.JSONObject fields=manifest.getJSONObject("preferences");
-  java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","sollUtilities","montageFittings","metricWidthSections","objectUndo","objectRedo","elevationPoints","lvPositions","dailyReports","nachtraege","routeUnderlay","sketchCalibration"));
+  java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","sollUtilities","montageFittings","metricWidthSections","objectUndo","objectRedo","elevationPoints","lvPositions","dailyReports","nachtraege","routeUnderlay","routeUnderlayTransform","sketchCalibration"));
   strings.addAll(java.util.Arrays.asList("metricAreaCorrection","metricAreaCorrectionReason","metricCrossSectionDimensions",
       "metricDepthSections","metricElevationPoints","metricMainExcavationDepth","metricMinimumCover","metricPipeMinGap",
       "metricPipeMinCover","metricPipeProfile","extraUtilities",MontageProtocols.KEY,MontageConnections.KEY,PipeLayoutStore.KEY,PipeLayoutStore.SECTION_KEY,"metricVerbauSections",RouteBranchStore.KEY));
-  java.util.Set<String> ints=new java.util.HashSet<>(java.util.Arrays.asList("surface","handling","dictationLanguage","gpsDurationSeconds","metricCornerMode","metricOverlapMode"));
+  java.util.Set<String> ints=new java.util.HashSet<>(java.util.Arrays.asList("surface","handling","dictationLanguage","gpsDurationSeconds","metricCornerMode","metricOverlapMode","routeUnderlayAlpha","routeUnderlayHidden"));
   SharedPreferences.Editor ed=projectStorage(id).edit();
   java.util.Iterator<String> keys=fields.keys();String name="Importiertes Projekt";java.util.Set<String> used=new java.util.HashSet<>();
   while(keys.hasNext()){
@@ -544,7 +544,7 @@ public class MainActivity extends Activity {
     final java.io.File saved=file;
     runOnUiThread(()->{
      if(isDestroyed()||isFinishing()||!projectId.equals(activeProject)||!original.equals(getPreferences(0).getString("routeUnderlay",""))){saved.delete();return;}
-     if(!getPreferences(0).edit().putString("routeUnderlay",saved.getName()).remove("routeUnderlayTransform").remove("sketchCalibration").commit()){saved.delete();notice("Vorlage konnte nicht gespeichert werden.");return;}
+     if(!getPreferences(0).edit().putString("routeUnderlay",saved.getName()).remove("routeUnderlayTransform").remove("routeUnderlayAlpha").remove("routeUnderlayHidden").remove("sketchCalibration").commit()){saved.delete();notice("Vorlage konnte nicht gespeichert werden.");return;}
      recordProjectEvent("Zeichenvorlage geändert");editRoute(false,true);
     });
    }catch(Exception e){if(file!=null)file.delete();runOnUiThread(()->{if(!isDestroyed())notice("Vorlage konnte nicht geladen werden.");});}
@@ -888,14 +888,14 @@ public class MainActivity extends Activity {
     }
     lock.setOnCheckedChangeListener((b,checked)->{for(SeekBar bar:bars)bar.setEnabled(!checked);});
 
-    android.widget.CheckBox showTemplate=new android.widget.CheckBox(this);showTemplate.setText("Zeichenvorlage anzeigen");showTemplate.setChecked(true);form.addView(showTemplate);
-    showTemplate.setOnCheckedChangeListener((b,checked)->route.setUnderlayVisible(checked));
+    android.widget.CheckBox showTemplate=new android.widget.CheckBox(this);showTemplate.setText("Zeichenvorlage anzeigen");showTemplate.setChecked(getPreferences(0).getInt("routeUnderlayHidden",0)==0);route.setUnderlayVisible(showTemplate.isChecked());form.addView(showTemplate);
+    showTemplate.setOnCheckedChangeListener((b,checked)->{route.setUnderlayVisible(checked);getPreferences(0).edit().putInt("routeUnderlayHidden",checked?0:1).apply();});
     form.addView(sheetText("Deckkraft der Vorlage",13,false));
-    android.widget.SeekBar opacity=new android.widget.SeekBar(this);opacity.setMax(255);opacity.setProgress(150);form.addView(opacity);
-    opacity.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(android.widget.SeekBar bar,int progress,boolean user){route.setUnderlayAlpha(progress);}public void onStartTrackingTouch(android.widget.SeekBar bar){}public void onStopTrackingTouch(android.widget.SeekBar bar){}});
+    android.widget.SeekBar opacity=new android.widget.SeekBar(this);opacity.setMax(255);opacity.setProgress(Math.max(0,Math.min(255,getPreferences(0).getInt("routeUnderlayAlpha",150))));route.setUnderlayAlpha(opacity.getProgress());form.addView(opacity);
+    opacity.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(android.widget.SeekBar bar,int progress,boolean user){route.setUnderlayAlpha(progress);if(user)getPreferences(0).edit().putInt("routeUnderlayAlpha",progress).apply();}public void onStartTrackingTouch(android.widget.SeekBar bar){}public void onStopTrackingTouch(android.widget.SeekBar bar){}});
     Button removeTemplate=new Button(this);removeTemplate.setAllCaps(false);removeTemplate.setText("Vorlage aus Projekt entfernen");form.addView(removeTemplate);
     removeTemplate.setOnClickListener(v->new android.app.AlertDialog.Builder(this).setTitle("Zeichenvorlage entfernen?").setMessage("Die gezeichnete Trasse und Maße bleiben erhalten.").setNegativeButton("Abbrechen",null).setPositiveButton("Entfernen",(d,w)->{
-     if(template.equals(getPreferences(0).getString("routeUnderlay",""))&&getPreferences(0).edit().remove("routeUnderlay").remove("routeUnderlayTransform").remove("sketchCalibration").commit()){route.setUnderlay(null);showTemplate.setEnabled(false);opacity.setEnabled(false);removeTemplate.setEnabled(false);recordProjectEvent("Zeichenvorlage entfernt");}else notice("Vorlage konnte nicht entfernt werden.");
+     if(template.equals(getPreferences(0).getString("routeUnderlay",""))&&getPreferences(0).edit().remove("routeUnderlay").remove("routeUnderlayTransform").remove("routeUnderlayAlpha").remove("routeUnderlayHidden").remove("sketchCalibration").commit()){route.setUnderlay(null);lock.setEnabled(false);for(SeekBar bar:bars)bar.setEnabled(false);showTemplate.setEnabled(false);opacity.setEnabled(false);removeTemplate.setEnabled(false);recordProjectEvent("Zeichenvorlage entfernt");}else notice("Vorlage konnte nicht entfernt werden.");
     }).show());
    }else form.addView(sheetText("Zeichenvorlage fehlt oder ist nicht lesbar.",13,false));
   }
