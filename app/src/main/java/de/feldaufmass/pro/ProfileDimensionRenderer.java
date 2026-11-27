@@ -16,10 +16,14 @@ final class ProfileDimensionRenderer {
   this.width=width;this.height=height;this.density=density;dimensionLabels.clear();
  }
     void dimension(Canvas c,float x1,float y1,float x2,float y2,double metres){
-        int color=metres<0?0xffff8a80:0xffeeeeee;
+        int color=metres<0?0xffff8a80:0xffdce9e8;
         float d=density;
+        // A dark underlay keeps dimensions readable over dense material hatches.
+        p.setColor(0xff000000);
+        p.setStrokeWidth(3.5f*d);
+        c.drawLine(x1,y1,x2,y2,p);
         p.setColor(color);
-        p.setStrokeWidth(1.5f*d);
+        p.setStrokeWidth(1.2f*d);
         c.drawLine(x1,y1,x2,y2,p);
         double length=Math.hypot(x2-x1,y2-y1);
         if(length>0){
