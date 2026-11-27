@@ -573,6 +573,10 @@ final class RouteSketch extends View {
  }
  private android.graphics.Bitmap underlay;
  private int underlayAlpha=150;
+ private float underlayX=0,underlayY=0,underlayScale=1,underlayRotation=0;
+ void setUnderlayTransform(float x,float y,float zoom,float rotation){
+  underlayX=x;underlayY=y;underlayScale=Math.max(.1f,Math.min(5f,zoom));underlayRotation=rotation;invalidate();
+ }
  private boolean underlayVisible=true;
  private final Paint underlayPaint=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
  void setUnderlay(android.graphics.Bitmap bitmap){underlay=bitmap;invalidate();}
@@ -584,7 +588,12 @@ final class RouteSketch extends View {
   float w=underlay.getWidth()*factor,h=underlay.getHeight()*factor;
   float x=left()+(side-w)/2,y=top()+(side-h)/2;
   underlayPaint.setAlpha(underlayAlpha);
+  c.save();
+  c.translate(underlayX*side,underlayY*side);
+  c.rotate(underlayRotation,x+w/2,y+h/2);
+  c.scale(underlayScale,underlayScale,x+w/2,y+h/2);
   c.drawBitmap(underlay,null,new android.graphics.RectF(x,y,x+w,y+h),underlayPaint);
+  c.restore();
  }
  java.util.LinkedHashMap<String,Integer> legendEntries(){
   java.util.LinkedHashMap<String,Integer> entries=new java.util.LinkedHashMap<>();
