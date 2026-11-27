@@ -1242,7 +1242,7 @@ public class MainActivity extends Activity {
   compactToolIcon(mic,"","mic");mic.setContentDescription("Sprachassistent");mic.setMinHeight(0);
   compactToolIcon(measureList,"Maße","ruler");compactToolIcon(resetZoom,"Zentrieren","center");compactToolIcon(legendEdit,"Legende","legend");compactToolIcon(objectTools,"Objekte","objects");
   styleEditorButton(save,true);compactToolIcon(save,"Speichern","save");LinearLayout.LayoutParams saveParams=new LinearLayout.LayoutParams(dp(88),dp(54));saveParams.setMargins(dp(6),0,dp(4),0);tools.addView(save,saveParams);compactToolIcon(back,"","back");back.setContentDescription("Vollbild beenden");
-  Button drawingTab=new Button(this),profileTab=new Button(this);styleEditorButton(drawingTab,true);styleEditorButton(profileTab,false);compactToolIcon(drawingTab,"Zeichnungsebene","view");compactToolIcon(profileTab,"Regelprofil","layers");header.addView(drawingTab,new LinearLayout.LayoutParams(dp(112),dp(54)));header.addView(profileTab,new LinearLayout.LayoutParams(dp(88),dp(54)));
+  Button drawingTab=new Button(this),profileTab=new Button(this);styleEditorButton(drawingTab,true);styleEditorButton(profileTab,false);compactToolIcon(drawingTab,"Zeichnungsebene","view");compactToolIcon(profileTab,"Regelprofil","layers");LinearLayout viewTabs=new LinearLayout(this);viewTabs.setPadding(dp(8),0,dp(8),dp(4));root.addView(viewTabs,1);viewTabs.addView(drawingTab,new LinearLayout.LayoutParams(0,dp(48),1));viewTabs.addView(profileTab,new LinearLayout.LayoutParams(0,dp(48),1));
   Button canvasToggle=new Button(this);canvasToggle.setText("⛶");canvasToggle.setContentDescription("Zeichenfläche maximieren");styleEditorButton(canvasToggle,false);
   compactToolIcon(canvasToggle,"","view");canvasToggle.setContentDescription("Zeichenfläche maximieren");header.addView(canvasToggle,new LinearLayout.LayoutParams(dp(44),dp(48)));
   android.widget.FrameLayout canvasFrame=new android.widget.FrameLayout(this);
@@ -1314,7 +1314,7 @@ public class MainActivity extends Activity {
   Button floatingSave=new Button(this);floatingSave.setAllCaps(false);floatingSave.setText("Speichern");styleEditorButton(floatingSave,true);compactToolIcon(floatingSave,"Speichern","save");
   android.widget.FrameLayout.LayoutParams floatingSaveParams=new android.widget.FrameLayout.LayoutParams(dp(88),dp(54),Gravity.BOTTOM|Gravity.RIGHT);floatingSaveParams.setMargins(dp(8),dp(8),dp(8),dp(8));canvasFrame.addView(floatingSave,floatingSaveParams);floatingSave.setVisibility(View.GONE);
   floatingSave.setOnClickListener(v->save.performClick());
-  canvasToggle.setOnClickListener(v->{for(View bar:new View[]{header,controls,historyBar,tools,save,sectionStrip})bar.setVisibility(View.GONE);restoreTools.setVisibility(View.VISIBLE);floatingSave.setVisibility(View.VISIBLE);});
+  canvasToggle.setOnClickListener(v->{for(View bar:new View[]{header,viewTabs,controls,historyBar,tools,save,sectionStrip})bar.setVisibility(View.GONE);restoreTools.setVisibility(View.VISIBLE);floatingSave.setVisibility(View.VISIBLE);});
   restoreTools.setOnTouchListener(new View.OnTouchListener(){
    float startX,startY,baseX,baseY;boolean moved;
    public boolean onTouch(View v,android.view.MotionEvent e){
