@@ -769,6 +769,7 @@ public class MainActivity extends Activity {
      case "image":c.drawRoundRect(3,4,21,20,2,2,p);c.drawCircle(8,9,2,p);c.drawLine(4,18,11,12,p);c.drawLine(11,12,16,17,p);break;
      case "mic":c.drawRoundRect(9,3,15,14,3,3,p);c.drawArc(6,7,18,18,0,180,false,p);c.drawLine(12,18,12,22,p);c.drawLine(8,22,16,22,p);break;
      case "ruler":c.save();c.rotate(-45,12,12);c.drawRect(8,3,16,21,p);for(int y=6;y<20;y+=3)c.drawLine(8,y,y%2==0?12:11,y,p);c.restore();break;
+     case "center":c.drawCircle(12,12,5,p);c.drawLine(12,2,12,7,p);c.drawLine(12,17,12,22,p);c.drawLine(2,12,7,12,p);c.drawLine(17,12,22,12,p);break;
      case "view":for(int x:new int[]{4,20})for(int y:new int[]{4,20}){c.drawLine(x,y,x+(x==4?5:-5),y,p);c.drawLine(x,y,x,y+(y==4?5:-5),p);}break;
      case "legend":for(int y=6;y<=18;y+=6){c.drawCircle(5,y,1,p);c.drawLine(9,y,20,y,p);}break;
      case "objects":c.drawRoundRect(5,5,19,19,2,2,p);c.drawLine(9,12,15,12,p);c.drawLine(12,9,12,15,p);break;
@@ -859,7 +860,7 @@ public class MainActivity extends Activity {
   }
   for(Button b:new Button[]{back,mic,measureList,resetZoom,legendEdit,objectTools})styleEditorButton(b,false);
   compactToolIcon(mic,"","mic");mic.setContentDescription("Sprachassistent");mic.setMinHeight(0);
-  compactToolIcon(measureList,"Maße","ruler");compactToolIcon(resetZoom,"Ansicht","view");compactToolIcon(legendEdit,"Legende","legend");compactToolIcon(objectTools,"Objekte","objects");
+  compactToolIcon(measureList,"Maße","ruler");compactToolIcon(resetZoom,"Zentrieren","center");compactToolIcon(legendEdit,"Legende","legend");compactToolIcon(objectTools,"Objekte","objects");
   styleEditorButton(save,true);compactToolIcon(save,"Speichern","save");LinearLayout.LayoutParams saveParams=new LinearLayout.LayoutParams(dp(88),dp(54));saveParams.setMargins(dp(6),0,dp(4),0);tools.addView(save,saveParams);compactToolIcon(back,"","back");back.setContentDescription("Vollbild beenden");
   Button canvasToggle=new Button(this);canvasToggle.setText("⛶");canvasToggle.setContentDescription("Zeichenfläche maximieren");styleEditorButton(canvasToggle,false);
   compactToolIcon(canvasToggle,"","view");canvasToggle.setContentDescription("Zeichenfläche maximieren");header.addView(canvasToggle,new LinearLayout.LayoutParams(dp(44),dp(48)));
