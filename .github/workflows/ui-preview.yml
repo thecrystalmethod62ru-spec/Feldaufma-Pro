@@ -47,19 +47,49 @@ jobs:
       - uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+      - name: Restore compiled screenshot harness
+        id: harness
+        uses: actions/cache@v4
+        with:
+          path: app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          key: ui-harness-v1-${{ runner.os }}-${{ steps.source.outputs.sha }}-${{ hashFiles('app/src/androidTest/java/de/feldaufmass/pro/UiScreenshotTest.java') }}
       - name: Compile screenshot harness only
+        if: steps.harness.outputs.cache-hit != 'true'
         run: gradle :app:assembleDebugAndroidTest --stacktrace
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      - name: Restore clean Android emulator snapshot
+        id: avd
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android/avd/test.avd
+            ~/.android/avd/test.ini
+          key: ui-avd-v1-${{ runner.os }}-api34-default-x86_64-pixel2
+      - name: Prepare clean emulator snapshot
+        if: steps.avd.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          profile: pixel_2
+          arch: x86_64
+          avd-name: test
+          force-avd-creation: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: false
+          script: echo "Clean emulator snapshot prepared"
       - name: Capture four actual app screenshots
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
           profile: pixel_2
           arch: x86_64
+          avd-name: test
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot-save
           script: |
             adb install -r preview-apk/app-debug.apk
             adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
