@@ -386,6 +386,34 @@ public class MainActivity extends Activity {
    });
   }).start();
  }
+ String pendingGpsExport=null;
+ void requestGpsExport(){
+  if(!gpsTrackStorageValid()||gpsTrack().length()==0){notice("Keine gültige GPS-Spur vorhanden.");return;}
+  new android.app.AlertDialog.Builder(this,android.R.style.Theme_Material_Dialog_Alert).setTitle("GPS-Spur exportieren").setItems(new String[]{"GPX – GIS / Karte","CSV – Koordinatenliste"},(d,w)->{
+   pendingGpsExport=gpsTrack().toString();
+   android.content.Intent intent=new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);
+   intent.addCategory(android.content.Intent.CATEGORY_OPENABLE);intent.setType(w==0?"application/gpx+xml":"text/csv");intent.putExtra(android.content.Intent.EXTRA_TITLE,w==0?"GPS-Trasse.gpx":"GPS-Trasse.csv");
+   startActivityForResult(intent,w==0?451:452);
+  }).show();
+ }
+ void writeGpsExport(android.net.Uri uri,boolean gpx,String snapshot){
+  new Thread(()->{
+   try(java.io.OutputStream out=getContentResolver().openOutputStream(uri,"wt")){
+    if(out==null)throw new java.io.IOException("Datei fehlt");
+    org.json.JSONArray rows=new org.json.JSONArray(snapshot);
+    java.io.Writer writer=new java.io.OutputStreamWriter(out,java.nio.charset.StandardCharsets.UTF_8);
+    java.text.SimpleDateFormat date=new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",java.util.Locale.US);date.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+    if(gpx)writer.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?><gpx version=\"1.1\" creator=\"Feldaufmass Pro\" xmlns=\"http://www.topografix.com/GPX/1/1\"><trk><name>GPS-Trasse</name><trkseg>");
+    else writer.write("latitude;longitude;accuracy_m;time_utc\n");
+    for(int i=0;i<rows.length();i++){org.json.JSONObject row=rows.getJSONObject(i);double lat=row.getDouble("lat"),lon=row.getDouble("lon"),acc=row.getDouble("accuracy");String time=date.format(new java.util.Date(row.getLong("time")));
+     if(gpx)writer.write(String.format(java.util.Locale.US,"<trkpt lat=\"%.8f\" lon=\"%.8f\"><time>%s</time></trkpt>",lat,lon,time));
+     else writer.write(String.format(java.util.Locale.US,"%.8f;%.8f;%.2f;%s%n",lat,lon,acc,time));
+    }
+    if(gpx)writer.write("</trkseg></trk></gpx>");writer.flush();
+    runOnUiThread(()->notice("GPS-Spur exportiert."));
+   }catch(Exception e){runOnUiThread(()->notice("GPS-Export fehlgeschlagen."));}
+  },"gps-export").start();
+ }
  void showGpsTrackControls(){
   org.json.JSONArray rows=gpsTrack();
   new android.app.AlertDialog.Builder(this,android.R.style.Theme_Material_Dialog_Alert).setTitle("GPS-Aufzeichnung").setMessage((recordingGpsTrack?"Aufzeichnung aktiv":"Aufzeichnung gestoppt")+" · "+rows.length()+" Punkte\nUnabhängig von der manuellen Trasse.")
@@ -394,7 +422,7 @@ public class MainActivity extends Activity {
     if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=android.content.pm.PackageManager.PERMISSION_GRANTED){notice("Bitte zuerst GPS-Berechtigung erteilen.");return;}
     if(!gpsTrackStorageValid()){notice("GPS-Spur beschädigt. Bitte Sicherung prüfen.");return;}
     startLiveGps();if(liveManager==null){notice("GPS nicht verfügbar.");return;}gpsRecordingProject=activeProject;recordingGpsTrack=true;notice("GPS-Aufzeichnung gestartet.");
-   }).setNeutralButton("Spur löschen",(d,w)->new android.app.AlertDialog.Builder(this).setMessage("Gespeicherte GPS-Spur wirklich löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(dd,ww)->{recordingGpsTrack=false;if(!getPreferences(0).edit().remove("independentGpsTrack").commit())notice("GPS-Spur konnte nicht gelöscht werden.");else if(livePreview!=null)livePreview.setIndependentGpsTrack(gpsTrack());}).show()).setNegativeButton("Schließen",null).show();
+   }).setNeutralButton("Spur löschen",(d,w)->new android.app.AlertDialog.Builder(this).setMessage("Gespeicherte GPS-Spur wirklich löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(dd,ww)->{recordingGpsTrack=false;if(!getPreferences(0).edit().remove("independentGpsTrack").commit())notice("GPS-Spur konnte nicht gelöscht werden.");else if(livePreview!=null)livePreview.setIndependentGpsTrack(gpsTrack());}).show()).setNegativeButton("Exportieren",(d,w)->requestGpsExport()).show();
  }
 
  android.location.LocationManager liveManager;
@@ -5896,6 +5924,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  try{startActivityForResult(i,410);}catch(android.content.ActivityNotFoundException e){Toast.makeText(this,"Keine Spracherkennung verfügbar.",Toast.LENGTH_LONG).show();}
  }
  @Override protected void onActivityResult(int request,int result,android.content.Intent data){super.onActivityResult(request,result,data);
+ if(request==451||request==452){String snapshot=pendingGpsExport;pendingGpsExport=null;if(result==RESULT_OK&&data!=null&&data.getData()!=null&&snapshot!=null)writeGpsExport(data.getData(),request==451,snapshot);return;}
  if(request==432){
   String projectId=pendingProtocolsProject;pendingProtocolsProject=null;
   if(result==RESULT_OK&&data!=null&&data.getData()!=null){
