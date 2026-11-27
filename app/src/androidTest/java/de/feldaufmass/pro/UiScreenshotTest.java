@@ -50,7 +50,7 @@ public class UiScreenshotTest {
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    scenario.onActivity(a->{a.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);a.enterProject();});
    android.os.SystemClock.sleep(1000);
-   scenario.onActivity(a->a.editRoute(false,false));
+   scenario.onActivity(a->a.editRoute(false,true));
    androidx.test.espresso.Espresso.onView(org.hamcrest.Matchers.allOf(
     androidx.test.espresso.matcher.ViewMatchers.withContentDescription("Regelprofil"),
     androidx.test.espresso.matcher.ViewMatchers.isDisplayed())).perform(androidx.test.espresso.action.ViewActions.click());
