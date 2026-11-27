@@ -4257,16 +4257,17 @@ public class MainActivity extends Activity {
     double cut=row.optDouble("cutWidth",bw);
     if(!Double.isFinite(cut)||cut<bw)throw new IllegalArgumentException("Ungültige Nachschnittbreite");
     report.append(String.format(java.util.Locale.GERMANY,"%.2f – %.2f m | %s\n",from,to,type));
-    boolean asphaltLayer=type.equals("Asphalt"),stoneLayer=type.toLowerCase(java.util.Locale.ROOT).matches(".*(pflaster|platten).*");
+    boolean asphaltLayer=type.equals("Asphalt"),stoneLayer=isStoneSurface(type);
+    boolean sameMaterial=type.equals(covering);
     if(asphaltLayer||stoneLayer){
-     double thickness=row.has("topThickness")?row.optDouble("topThickness"):optional(asphaltLayer?asphaltInput:stoneDepth)/(asphaltLayer?1:100);
+     double thickness=row.has("topThickness")?row.optDouble("topThickness"):sameMaterial?topThickness:Double.NaN;
      if(Double.isFinite(thickness)&&thickness>0){
       double volume=CivilGeometry.rectangularVolume(to-from,cut,thickness);
       totals.put(type,totals.getOrDefault(type,0.0)+volume);
-      report.append(String.format(java.util.Locale.GERMANY,"Deckschicht: %.3f m³%s\n",volume,row.has("cutWidth")?"":" (nur Graben; Nachschnitt unbekannt)"));
+      report.append(String.format(java.util.Locale.GERMANY,"Deckschicht: %.3f m³%s%s\n",volume,row.has("cutWidth")?"":" (nur Graben; Nachschnitt unbekannt)",row.has("topThickness")?"":" · Standardprofil"));
      }else report.append("Deckschichtstärke fehlt\n");
     }else report.append("Deckschicht nicht berechnet\n");
-    double baseThickness=row.has("baseThickness")?row.optDouble("baseThickness"):optional(baseInput);
+    double baseThickness=row.has("baseThickness")?row.optDouble("baseThickness"):sameMaterial?base:Double.NaN;
     if(Double.isFinite(baseThickness)&&baseThickness>0&&(asphaltLayer||stoneLayer)){
      double volume=CivilGeometry.rectangularVolume(to-from,bw,baseThickness);totals.put("Tragschicht",totals.getOrDefault("Tragschicht",0.0)+volume);
      report.append(String.format(java.util.Locale.GERMANY,"Tragschicht (Grabenbreite): %.3f m³\n",volume));
@@ -4274,7 +4275,7 @@ public class MainActivity extends Activity {
    }
    report.append("\nTeilsummen (nur erfasste Schichten)\n");
    for(java.util.Map.Entry<String,Double> entry:totals.entrySet())report.append(String.format(java.util.Locale.GERMANY,"%s: %.3f m³\n",entry.getKey(),entry.getValue()));
-   report.append("\nNicht individuell erfasste Stärken verwenden das Standardprofil. Bettung und Altbelag nicht berechnet. Nicht zusätzlich zum Bruttoaushub addieren.");
+   report.append("\nStandardstärken nur bei gleicher Oberfläche. Fehlende Schichten bleiben offen. Bettung und Altbelag nicht berechnet. Nicht zusätzlich zum Bruttoaushub addieren.");
    TextView resultText=new TextView(this);resultText.setPadding(dp(16),dp(12),dp(16),dp(12));resultText.setText(report.toString());ScrollView scroll=new ScrollView(this);scroll.addView(resultText);
    new android.app.AlertDialog.Builder(this).setTitle("Oberflächenaufbau – Schichtvolumen").setView(scroll).setPositiveButton("Schließen",null).show();
   }catch(Exception ex){notice("Schichtvolumen: "+ex.getMessage());}
