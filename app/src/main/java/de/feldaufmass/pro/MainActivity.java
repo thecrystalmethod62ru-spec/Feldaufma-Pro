@@ -5016,14 +5016,28 @@ public class MainActivity extends Activity {
  profilePage.removeView(legend);pipeDetails.addView(legend);
  profilePage.removeView(sectionProfilePanel);
  profilePage.removeView(profile);
- LinearLayout profileWorkspace=new LinearLayout(this);profileWorkspace.setOrientation(getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL);
+ LinearLayout profileWorkspace=new LinearLayout(this);
+ profileWorkspace.setOrientation(getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL);
+ profileWorkspace.setPadding(dp(6),dp(6),dp(6),dp(6));
+ profilePage.setBackgroundColor(Color.BLACK);
  profilePage.addView(profileWorkspace,Math.min(2,profilePage.getChildCount()));
  boolean wideProfile=profileWorkspace.getOrientation()==LinearLayout.HORIZONTAL;
- profileWorkspace.addView(profile,wideProfile?new LinearLayout.LayoutParams(0,dp(300),1):new LinearLayout.LayoutParams(-1,dp(260)));
- profileWorkspace.addView(sizes,wideProfile?new LinearLayout.LayoutParams(0,-2,1):new LinearLayout.LayoutParams(-1,-2));
- LinearLayout toolbar=new LinearLayout(this);profilePage.addView(toolbar,1);String[] names={"Aufbau","Leitungen","Maße","Abschnitte","Optionen"};String[] icons={"layers","pipe","ruler","sections","settings"};LinearLayout[] panels={buildPanel,pipeDetails,sizes,sectionProfilePanel,optionsPanel};
- for(int j=0;j<names.length;j++){final int index=j;Button tool=new Button(this);styleEditorButton(tool,false);compactToolIcon(tool,names[j],icons[j]);tool.setSingleLine(true);if(android.os.Build.VERSION.SDK_INT>=26)tool.setAutoSizeTextTypeUniformWithConfiguration(9,12,1,android.util.TypedValue.COMPLEX_UNIT_SP);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(54),1);lp.setMargins(dp(2),dp(2),dp(2),dp(2));toolbar.addView(tool,lp);tool.setOnClickListener(v->{if(index==2){sizes.requestFocus();return;}if(index==3)openSectionProfilePicker();showProfilePanel(names[index],panels[index]);});}
-
+ profileWorkspace.addView(profile,wideProfile?new LinearLayout.LayoutParams(0,dp(300),3):new LinearLayout.LayoutParams(-1,dp(260)));
+ LinearLayout parameterBox=new LinearLayout(this);parameterBox.setOrientation(1);parameterBox.setPadding(dp(8),dp(6),dp(8),dp(6));
+ android.graphics.drawable.GradientDrawable parameterBorder=editorShape(0xff080e10,6);parameterBorder.setStroke(dp(1),0xff008b93);parameterBox.setBackground(parameterBorder);
+ parameterBox.addView(sheetText("Parameter",16,true));parameterBox.addView(sizes);
+ profileWorkspace.addView(parameterBox,wideProfile?new LinearLayout.LayoutParams(0,-2,2):new LinearLayout.LayoutParams(-1,-2));
+ LinearLayout toolbar=new LinearLayout(this);profilePage.addView(toolbar,1);
+ String[] names={"Aufbau","Leitungen","Material","Berechnung"};
+ String[] icons={"layers","pipe","settings","ruler"};
+ LinearLayout contentPanel=new LinearLayout(this);contentPanel.setOrientation(1);contentPanel.setPadding(dp(8),dp(6),dp(8),dp(6));profilePage.addView(contentPanel);
+ TextView layerTitle=sheetText("Schichten (von oben nach unten)",15,true);contentPanel.addView(layerTitle);
+ contentPanel.addView(buildPanel);
+ LinearLayout[] panels={buildPanel,pipeDetails,optionsPanel};
+ Button[] profileTabs=new Button[names.length];
+ for(int j=0;j<names.length;j++){final int index=j;Button tool=new Button(this);profileTabs[j]=tool;styleEditorButton(tool,j==0);tool.setText(names[j]);tool.setAllCaps(false);tool.setTextSize(12);tool.setMinHeight(0);tool.setMinimumHeight(0);tool.setPadding(dp(2),0,dp(2),0);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(44),1);lp.setMargins(dp(2),dp(2),dp(2),dp(2));toolbar.addView(tool,lp);
+ tool.setOnClickListener(v->{if(index==3){if(length.length()>0)calculate();else notice("Bitte zuerst die Trassenlänge eingeben.");return;}contentPanel.removeAllViews();contentPanel.addView(sheetText(index==0?"Schichten (von oben nach unten)":names[index],15,true));LinearLayout panel=panels[index];if(panel.getParent() instanceof android.view.ViewGroup)((android.view.ViewGroup)panel.getParent()).removeView(panel);contentPanel.addView(panel);for(int k=0;k<profileTabs.length;k++)styleEditorButton(profileTabs[k],k==index);});}
+ Button sectionPicker=new Button(this);styleEditorButton(sectionPicker,false);sectionPicker.setText("Abschnitte");profilePage.addView(sectionPicker);sectionPicker.setOnClickListener(v->{openSectionProfilePicker();showProfilePanel("Abschnitte",sectionProfilePanel);});
  LinearLayout profileFooter=new LinearLayout(this);profilePage.addView(profileFooter);
  Button standard=new Button(this),applyProfile=new Button(this);
  styleEditorButton(standard,false);styleEditorButton(applyProfile,true);
