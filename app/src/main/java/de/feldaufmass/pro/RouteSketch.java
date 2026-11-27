@@ -157,12 +157,14 @@ final class RouteSketch extends View {
   java.util.ArrayList<StationHit> hits=stationCandidates(x,y,Double.POSITIVE_INFINITY);if(hits.isEmpty())return;
   StationHit h=hits.get(0);Vertex a=vertices.get(h.segment-1),b=vertices.get(h.segment);
   double dx=b.point.x-a.point.x,dy=b.point.y-a.point.y,n=Math.hypot(dx,dy);
-  double wid=positiveDimension(o,"detailWidth");if(n<=0||!Double.isFinite(b.metres)||b.metres<=0)return;
+  double wid=positiveDimension(o,"detailWidth");
+  double widthAcrossRoute=projectedWidth(positiveDimension(o,"detailLength"),wid,objectRotation(o));
+  if(n<=0||!Double.isFinite(b.metres)||b.metres<=0)return;
   PointF anchor=stationPoint(h.station);if(anchor==null)return;
   double lateral=((x-anchor.x)*dy-(y-anchor.y)*dx)/n*b.metres/n;
   try{o.put("station",Math.round(h.station*100)/100.0);
-   if(Double.isFinite(wid)&&Double.isFinite(trenchWidth)&&trenchWidth>0){
-    double half=(wid+trenchWidth)/2;
+   if(Double.isFinite(widthAcrossRoute)&&Double.isFinite(trenchWidth)&&trenchWidth>0){
+    double half=(widthAcrossRoute+trenchWidth)/2;
     o.put("side",Math.abs(lateral)<half/2?"mittig":lateral>0?"links":"rechts");
     o.put("detailOffset",Math.round(Math.max(0,Math.abs(lateral)-half)*100)/100.0);
    }
@@ -447,6 +449,15 @@ final class RouteSketch extends View {
    this.anchor=anchor;this.center=center;this.angle=angle;this.length=length;this.width=width;this.measured=measured;this.sideLocated=sideLocated;
   }
  }
+ private static double objectRotation(org.json.JSONObject object){
+  double angle=object.optDouble("detailRotation",0);
+  return Double.isFinite(angle)?angle:0;
+ }
+ private static double projectedWidth(double length,double width,double rotation){
+  if(!Double.isFinite(length))return width;
+  double radians=Math.toRadians(rotation);
+  return Math.abs(length*Math.sin(radians))+Math.abs(width*Math.cos(radians));
+ }
  ObjectFootprint objectFootprint(org.json.JSONObject o){
   double station=o.optDouble("station");PointF anchor=stationPoint(station);if(anchor==null)return null;
   double start=0;
@@ -459,7 +470,8 @@ final class RouteSketch extends View {
     String side=o.optString("side");int sign="links".equals(side)?1:"rechts".equals(side)?-1:0;
     boolean measured=Double.isFinite(len)&&Double.isFinite(wid)&&Double.isFinite(unit*len)&&Double.isFinite(unit*wid)&&unit*len<=Float.MAX_VALUE&&unit*wid<=Float.MAX_VALUE;
     boolean located=sign==0?"mittig".equals(side):measured&&Double.isFinite(trenchWidth)&&trenchWidth>0;
-    double rotation=o.optDouble("detailRotation",0);if(!Double.isFinite(rotation))rotation=0;double rad=Math.toRadians(rotation);double projectedWidth=Math.abs(len*Math.sin(rad))+Math.abs(wid*Math.cos(rad));
+    double rotation=objectRotation(o);
+    double projectedWidth=projectedWidth(len,wid,rotation);
     double gap=lateralGap(o);
     double shift=located&&sign!=0?sign*((trenchWidth+projectedWidth)/2+(Double.isFinite(gap)?gap:0))*unit:0;
     double cx=anchor.x+dy/n*shift,cy=anchor.y-dx/n*shift;
