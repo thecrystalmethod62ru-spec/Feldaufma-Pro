@@ -961,8 +961,8 @@ final class RouteSketch extends View {
    if(!Float.isFinite(sw)||sw<=0)sw=24*density;
    sw=Math.max(2*density,Math.min(sw,Math.max(getWidth(),getHeight())*2f));
    float x1=left()+a.point.x*scale(),y1=top()+a.point.y*scale(),x2=left()+b.point.x*scale(),y2=top()+b.point.y*scale();
-   p.setColor(0xff78918a);p.setStrokeWidth(sw+2*density);c.drawLine(x1,y1,x2,y2,p);
-   p.setColor(0xff443b30);p.setStrokeWidth(sw);c.drawLine(x1,y1,x2,y2,p);
+   p.setColor(0xff00e5ee);p.setStrokeWidth(sw+3*density);c.drawLine(x1,y1,x2,y2,p);
+   p.setColor(0xff674323);p.setStrokeWidth(sw);c.drawLine(x1,y1,x2,y2,p);
    if(pixels>1&&sw>=6*density){
     float nx=(float)((y2-y1)/pixels),ny=(float)((x1-x2)/pixels);
     Paint marks=new Paint(Paint.ANTI_ALIAS_FLAG);marks.setColor(0xff746451);marks.setStrokeWidth(density);
@@ -980,8 +980,8 @@ final class RouteSketch extends View {
      marks.setTextSize(11*density);String label=String.format(Locale.GERMANY,"B = %.2f m",w);
      float tx=cx+nx*(half+8*density),ty=cy+ny*(half+8*density);
      tx=Math.max(4*density,Math.min(tx,getWidth()-marks.measureText(label)-4*density));ty=Math.max(14*density,Math.min(ty,getHeight()-4*density));
-     marks.setColor(0xff142b2b);c.drawRoundRect(tx-3*density,ty-12*density,tx+marks.measureText(label)+3*density,ty+3*density,3*density,3*density,marks);
-     marks.setColor(0xff5eead4);c.drawText(label,tx,ty,marks);
+     marks.setColor(0xff061416);c.drawRoundRect(tx-3*density,ty-12*density,tx+marks.measureText(label)+3*density,ty+3*density,3*density,3*density,marks);
+     marks.setColor(0xff00e5ee);marks.setStyle(Paint.Style.STROKE);marks.setStrokeWidth(density);c.drawRoundRect(tx-3*density,ty-12*density,tx+marks.measureText(label)+3*density,ty+3*density,3*density,3*density,marks);marks.setStyle(Paint.Style.FILL);c.drawText(label,tx,ty,marks);
     }
    }
    station=measured?end:Double.NaN;
@@ -1000,7 +1000,7 @@ final class RouteSketch extends View {
   drawShoring(c,density);
   for(int i=1;i<vertices.size();i++){
    PointF a=vertices.get(i-1).point,b=vertices.get(i).point;
-   if(layerVisible(LAYER_ROUTE)){paint.setColor(printPlan?0xff174dcc:darkPalette()?0xff55c7b5:0xff13665f);paint.setStrokeWidth(4);line(c,a,b);}
+   if(layerVisible(LAYER_ROUTE)){paint.setColor(printPlan?0xff174dcc:darkPalette()?0xff00e5ee:0xff13665f);paint.setStrokeWidth(darkEditor&&!printPlan?2*density:4);if(darkEditor&&!printPlan)paint.setPathEffect(new android.graphics.DashPathEffect(new float[]{8*density,5*density},0));line(c,a,b);paint.setPathEffect(null);}
    if(!layerVisible(LAYER_DIMENSIONS))continue;
    double metres=vertices.get(i).metres;
    String label=Double.isFinite(metres)&&metres>0?String.format(Locale.GERMANY,"%.2f m",metres):"Maß fehlt";
@@ -1080,8 +1080,8 @@ final class RouteSketch extends View {
    Path draft=new Path();PointF first=stroke.get(0);draft.moveTo(left()+scale()*first.x,top()+scale()*first.y);
    for(int i=1;i<stroke.size();i++){PointF pt=stroke.get(i);draft.lineTo(left()+scale()*pt.x,top()+scale()*pt.y);}
    Paint previewPaint=new Paint(Paint.ANTI_ALIAS_FLAG);previewPaint.setStyle(Paint.Style.STROKE);previewPaint.setStrokeJoin(Paint.Join.ROUND);previewPaint.setStrokeCap(Paint.Cap.ROUND);
-   previewPaint.setColor(0xff78918a);previewPaint.setStrokeWidth(sw+2*density);c.drawPath(draft,previewPaint);
-   previewPaint.setColor(0xff443b30);previewPaint.setStrokeWidth(sw);c.drawPath(draft,previewPaint);
+   previewPaint.setColor(0xff00e5ee);previewPaint.setStrokeWidth(sw+3*density);c.drawPath(draft,previewPaint);
+   previewPaint.setColor(0xff674323);previewPaint.setStrokeWidth(sw);c.drawPath(draft,previewPaint);
    previewPaint.setColor(0xff55c7b5);previewPaint.setStrokeWidth(2*density);c.drawPath(draft,previewPaint);
   }else{
    paint.setColor(0xff42799e);paint.setStrokeWidth(3);
