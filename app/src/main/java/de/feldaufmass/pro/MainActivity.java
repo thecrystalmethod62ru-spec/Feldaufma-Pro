@@ -3572,7 +3572,7 @@ public class MainActivity extends Activity {
    tab.setBackgroundTintList(android.content.res.ColorStateList.valueOf(selected?TEAL:Color.WHITE));
    tab.setTextColor(selected?Color.WHITE:INK);
   }
-  if(p==documentsPage)compareSoll();if(p==quantityPage)refreshDetailQuantities();body.removeAllViews();ScrollView sc=new ScrollView(this);sc.setFillViewport(true);if(p.getParent()!=null)((android.view.ViewGroup)p.getParent()).removeView(p);sc.addView(p);body.addView(sc,new LinearLayout.LayoutParams(-1,-1));}
+  if(p==profilePage&&sectionProfilePanel!=null)openSectionProfilePicker();if(p==documentsPage)compareSoll();if(p==quantityPage)refreshDetailQuantities();body.removeAllViews();ScrollView sc=new ScrollView(this);sc.setFillViewport(true);if(p.getParent()!=null)((android.view.ViewGroup)p.getParent()).removeView(p);sc.addView(p);body.addView(sc,new LinearLayout.LayoutParams(-1,-1));}
  private void fitSystemPanels(LinearLayout root){
   Window window=getWindow();
   androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window,false);
@@ -4005,7 +4005,7 @@ public class MainActivity extends Activity {
  Button undo=new Button(this);undo.setText("Letztes Objekt entfernen");root.addView(undo);undo.setOnClickListener(v->{if(objects.length()>0){objects.remove(objects.length()-1);saveObjects();}});
  root=profilePage;
  profile=new Profile();root.addView(profile,1,new LinearLayout.LayoutParams(-1,(int)(300*getResources().getDisplayMetrics().density)));
- actionButtonSingle(profilePage,"Abschnittsprofil wählen / bearbeiten",()->openSectionProfilePicker());
+ sectionProfilePanel=page();profilePage.addView(sectionProfilePanel,0);
 
  actionButtonSingle(profilePage,"Verbau – Profilstation wählen",()->{
   EditText station=new EditText(this);station.setInputType(8194);station.setText(String.valueOf(profileShoringStation));
@@ -4039,7 +4039,9 @@ public class MainActivity extends Activity {
 
  save.setOnClickListener(v->{if(calculate())showPage(planPage);});if(length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);
  }
+ LinearLayout sectionProfilePanel;
  void openSectionProfilePicker(){
+  sectionProfilePanel.removeAllViews();for(int j=0;j<profilePage.getChildCount();j++)profilePage.getChildAt(j).setVisibility(View.VISIBLE);
   try{
    org.json.JSONArray stored=new PipeLayoutStore(getPreferences(0)).sections();
    java.util.ArrayList<org.json.JSONObject> rows=new java.util.ArrayList<>();
@@ -4050,26 +4052,26 @@ public class MainActivity extends Activity {
     if(!overlap)rows.add(new org.json.JSONObject().put("from",a).put("to",b).put("width",seg.getDouble("width")).put("depth",d>0?d:0).put("pipes",new org.json.JSONArray()));
    }
    rows.sort((a,b)->Double.compare(a.optDouble("from"),b.optDouble("from")));
-   if(rows.isEmpty()){notice("Zuerst einen Oberflächenabschnitt oder ein Abschnittsprofil anlegen.");return;}
-   LinearLayout body=page();Spinner picker=new Spinner(this);body.addView(picker);
-   String[] labels=new String[rows.size()];for(int i=0;i<rows.size();i++){org.json.JSONObject p=rows.get(i);labels[i]=String.format(java.util.Locale.GERMANY,"Abschnitt %02d · %.2f – %.2f m",i+1,p.getDouble("from"),p.getDouble("to"));}
+   if(rows.isEmpty())return;
+   LinearLayout body=page();sectionProfilePanel.addView(body);Spinner picker=new Spinner(this);body.addView(picker);
+   String[] labels=new String[rows.size()+1];labels[0]="Standardprofil";for(int i=0;i<rows.size();i++){org.json.JSONObject p=rows.get(i);labels[i+1]=String.format(java.util.Locale.GERMANY,"Abschnitt %02d · %.2f – %.2f m",i+1,p.getDouble("from"),p.getDouble("to"));}
    picker.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,labels));
-   PipeLayoutView view=new PipeLayoutView(this);body.addView(view,new LinearLayout.LayoutParams(-1,dp(240)));
-   EditText bw=new EditText(this),bd=new EditText(this);bw.setHint("Grabenbreite (m)");bd.setHint("Grabentiefe (m)");body.addView(bw);utilitySlider(body,bw,"Grabenbreite (m)",0.1,6,0.01,true);body.addView(bd);utilitySlider(body,bd,"Grabentiefe (m)",0.1,8,0.01,true);
-   TextView quantity=sheetText("",14,false);body.addView(quantity);
+   LinearLayout controls=page();body.addView(controls);PipeLayoutView view=new PipeLayoutView(this);controls.addView(view,new LinearLayout.LayoutParams(-1,dp(240)));
+   EditText bw=new EditText(this),bd=new EditText(this);bw.setHint("Grabenbreite (m)");bd.setHint("Grabentiefe (m)");controls.addView(bw);utilitySlider(controls,bw,"Grabenbreite (m)",0.1,6,0.01,true);controls.addView(bd);utilitySlider(controls,bd,"Grabentiefe (m)",0.1,8,0.01,true);
+   TextView quantity=sheetText("",14,false);controls.addView(quantity);
    final boolean[] loading={false};
-   Runnable preview=()->{if(loading[0])return;try{org.json.JSONObject p=rows.get(picker.getSelectedItemPosition());double ww=number(bw),dd=number(bd);if(!Double.isFinite(ww)||!Double.isFinite(dd)||ww<=0||dd<=0)return;view.setLayoutData(PipeLayoutStore.decode(p.getJSONArray("pipes").toString()),ww,dd);quantity.setText(String.format(java.util.Locale.GERMANY,"Aushub (brutto): %.3f m³",(p.getDouble("to")-p.getDouble("from"))*ww*dd));}catch(Exception ignored){}};
+   Runnable preview=()->{if(loading[0])return;try{org.json.JSONObject p=rows.get(picker.getSelectedItemPosition()-1);double ww=number(bw),dd=number(bd);if(!Double.isFinite(ww)||!Double.isFinite(dd)||ww<=0||dd<=0)return;view.setLayoutData(PipeLayoutStore.decode(p.getJSONArray("pipes").toString()),ww,dd);quantity.setText(String.format(java.util.Locale.GERMANY,"Aushub (brutto): %.3f m³",(p.getDouble("to")-p.getDouble("from"))*ww*dd));}catch(Exception ignored){}};
    android.text.TextWatcher watcher=new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){preview.run();}public void afterTextChanged(android.text.Editable e){}};
    bw.addTextChangedListener(watcher);bd.addTextChangedListener(watcher);
-   java.util.function.IntConsumer load=i->{org.json.JSONObject p=rows.get(i);loading[0]=true;bw.setText(String.valueOf(p.optDouble("width")));bd.setText(p.optDouble("depth")>0?String.valueOf(p.optDouble("depth")):"");loading[0]=false;preview.run();};
+   java.util.function.IntConsumer load=i->{boolean standard=i==0;controls.setVisibility(standard?View.GONE:View.VISIBLE);for(int j=0;j<profilePage.getChildCount();j++){View child=profilePage.getChildAt(j);if(child!=sectionProfilePanel)child.setVisibility(standard?View.VISIBLE:View.GONE);}if(standard)return;org.json.JSONObject p=rows.get(i-1);loading[0]=true;bw.setText(String.valueOf(p.optDouble("width")));bd.setText(p.optDouble("depth")>0?String.valueOf(p.optDouble("depth")):"");loading[0]=false;preview.run();};
    onChoice(picker,load);load.accept(0);
-   actionButtonSingle(body,"Abschnitt speichern",()->{try{
-    int i=picker.getSelectedItemPosition();org.json.JSONObject p=rows.get(i);double ww=number(bw),dd=number(bd);
+   actionButtonSingle(controls,"Abschnitt speichern",()->{try{
+    int i=picker.getSelectedItemPosition()-1;org.json.JSONObject p=rows.get(i);double ww=number(bw),dd=number(bd);
     new PipeLayoutStore(getPreferences(0)).saveSection(p.getDouble("from"),p.getDouble("to"),ww,dd,PipeLayoutStore.decode(p.getJSONArray("pipes").toString()));
     p.put("width",ww).put("depth",dd);if(sketch!=null)sketch.invalidate();refreshMainQuantities();notice("Abschnittsprofil gespeichert.");
    }catch(Exception ex){notice("Abschnittsprofil: "+ex.getMessage());}});
-   body.addView(sheetText("Vor dem Wechsel Änderungen speichern. Standardprofil bleibt unverändert.",13,false));
-   ScrollView scroll=new ScrollView(this);scroll.addView(body);new android.app.AlertDialog.Builder(this).setTitle("Regelprofil – Abschnitte").setView(scroll).setPositiveButton("Schließen",null).show();
+   controls.addView(sheetText("Vor dem Wechsel Änderungen speichern. Standardprofil bleibt unverändert.",13,false));
+   
   }catch(Exception ex){notice("Abschnittsprofile: "+ex.getMessage());}
  }
  void actionButton(LinearLayout bar,String label,Runnable action){
