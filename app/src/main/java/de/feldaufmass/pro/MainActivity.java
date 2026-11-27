@@ -4063,7 +4063,11 @@ public class MainActivity extends Activity {
    for(int j=0;j<extras.length;j++){extras[j].setHint(extraLabels[j]);controls.addView(extras[j]);utilitySlider(controls,extras[j],extraLabels[j],0,j<2?2:1,0.01,true);}
    TextView quantity=sheetText("",14,false);controls.addView(quantity);
    final boolean[] loading={false};
-   Runnable preview=()->{if(loading[0])return;try{org.json.JSONObject p=rows.get(picker.getSelectedItemPosition()-1);double ww=number(bw),dd=number(bd);if(!Double.isFinite(ww)||!Double.isFinite(dd)||ww<=0||dd<=0)return;view.setLayoutData(PipeLayoutStore.decode(p.getJSONArray("pipes").toString()),ww,dd);quantity.setText(String.format(java.util.Locale.GERMANY,"Aushub (brutto): %.3f m³",(p.getDouble("to")-p.getDouble("from"))*ww*dd));}catch(Exception ignored){}};
+   Runnable preview=()->{if(loading[0])return;try{org.json.JSONObject p=rows.get(picker.getSelectedItemPosition()-1);double ww=number(bw),dd=number(bd);if(!Double.isFinite(ww)||!Double.isFinite(dd)||ww<=0||dd<=0)return;view.setLayoutData(PipeLayoutStore.decode(p.getJSONArray("pipes").toString()),ww,dd);
+    org.json.JSONObject seg=findSurfaceSection(p);String type=seg==null?covering:seg.optString("surface",covering);
+    RouteSketch style=new RouteSketch(MainActivity.this,"[]");style.bindDimensionProject(activeProject);
+    view.setCivilProfile(optional(cutL),optional(cutR),optional(topLayer),optional(baseLayer),style.configuredSurfaceColor(type,style.legendSettings()));
+    quantity.setText(String.format(java.util.Locale.GERMANY,"Aushub (brutto): %.3f m³",(p.getDouble("to")-p.getDouble("from"))*ww*dd));}catch(Exception ignored){}};
    android.text.TextWatcher watcher=new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){preview.run();}public void afterTextChanged(android.text.Editable e){}};
    bw.addTextChangedListener(watcher);bd.addTextChangedListener(watcher);for(EditText field:extras)field.addTextChangedListener(watcher);
    java.util.function.IntConsumer load=i->{boolean standard=i==0;controls.setVisibility(standard?View.GONE:View.VISIBLE);for(int j=0;j<profilePage.getChildCount();j++){View child=profilePage.getChildAt(j);if(child!=sectionProfilePanel)child.setVisibility(standard?View.VISIBLE:View.GONE);}if(standard)return;org.json.JSONObject p=rows.get(i-1);loading[0]=true;bw.setText(String.valueOf(p.optDouble("width")));bd.setText(p.optDouble("depth")>0?String.valueOf(p.optDouble("depth")):"");org.json.JSONObject seg=findSurfaceSection(p);String[] keys={"left","right","topThickness","baseThickness"};for(int j=0;j<extras.length;j++)extras[j].setText(seg==null?"":seg.optString(keys[j],""));loading[0]=false;preview.run();};
@@ -4073,10 +4077,15 @@ public class MainActivity extends Activity {
     double cl=optional(cutL),cr=optional(cutR),tl=optional(topLayer),bl=optional(baseLayer);
     if((Double.isFinite(tl)?tl:0)+(Double.isFinite(bl)?bl:0)>dd)throw new IllegalArgumentException("Schichtstärken überschreiten Grabentiefe");
     org.json.JSONObject seg=findSurfaceSection(p);
-    if(seg==null&&(cutL.length()>0||cutR.length()>0||topLayer.length()>0||baseLayer.length()>0))throw new IllegalArgumentException("Passenden Oberflächenabschnitt anlegen");
+    if(seg==null){
+     for(int j=0;j<segments.length();j++){org.json.JSONObject other=segments.getJSONObject(j);if(p.getDouble("from")<other.getDouble("to")&&p.getDouble("to")>other.getDouble("from"))throw new IllegalArgumentException("Oberflächenabschnitt überlappt – Grenzen zuerst angleichen");}
+     seg=new org.json.JSONObject().put("from",p.getDouble("from")).put("to",p.getDouble("to")).put("surface",covering).put("width",ww);
+    }
+    boolean newSurface=findSurfaceSection(p)==null;
+    if(l>0&&p.getDouble("to")>l)throw new IllegalArgumentException("Abschnitt außerhalb der Trasse");
     new PipeLayoutStore(getPreferences(0)).saveSection(p.getDouble("from"),p.getDouble("to"),ww,dd,PipeLayoutStore.decode(p.getJSONArray("pipes").toString()));
-    if(seg!=null){seg.put("width",ww);String[] keys={"left","right","topThickness","baseThickness"};double[] vals={cl,cr,tl,bl};for(int j=0;j<keys.length;j++){if(Double.isFinite(vals[j]))seg.put(keys[j],vals[j]);else seg.remove(keys[j]);}if(Double.isFinite(cl)&&Double.isFinite(cr))seg.put("cutWidth",ww+cl+cr);else seg.remove("cutWidth");persistSegments();}
-    p.put("width",ww).put("depth",dd);if(sketch!=null)sketch.invalidate();refreshMainQuantities();notice("Abschnittsprofil gespeichert.");
+    if(seg!=null){if(newSurface)segments.put(seg);seg.put("width",ww);String[] keys={"left","right","topThickness","baseThickness"};double[] vals={cl,cr,tl,bl};for(int j=0;j<keys.length;j++){if(Double.isFinite(vals[j]))seg.put(keys[j],vals[j]);else seg.remove(keys[j]);}if(Double.isFinite(cl)&&Double.isFinite(cr))seg.put("cutWidth",ww+cl+cr);else seg.remove("cutWidth");persistSegments();}
+    p.put("width",ww).put("depth",dd);if(sketch!=null)sketch.invalidate();refreshMainQuantities();refreshDetailQuantities();notice("Abschnittsprofil gespeichert.");
    }catch(Exception ex){notice("Abschnittsprofil: "+ex.getMessage());}});
    controls.addView(sheetText("Vor dem Wechsel Änderungen speichern. Standardprofil bleibt unverändert.",13,false));
    
@@ -4625,7 +4634,20 @@ public class MainActivity extends Activity {
  }
  void refreshMainQuantities(){
   if(result==null)return;
-  String basic=l>0&&w>0&&d>0?String.format(java.util.Locale.GERMANY,"Aushub: %.2f m³\nGrundfläche: %.2f m²",l*w*d,l*w):"Trassenmaße fehlen";
+  String basic="Trassenmaße fehlen";
+  if(l>0&&w>0&&d>0){
+   double volume=l*w*d,area=l*w;
+   try{
+    org.json.JSONArray profiles=new PipeLayoutStore(getPreferences(0)).sections();
+    for(int i=0;i<profiles.length();i++){
+     org.json.JSONObject p=profiles.getJSONObject(i);double a=p.getDouble("from"),b=p.getDouble("to"),bw=p.getDouble("width"),bd=p.getDouble("depth");
+     if(a<0||b<=a||b>l||bw<=0||bd<=0||!Double.isFinite(a+b+bw+bd))throw new IllegalArgumentException();
+     for(int j=0;j<i;j++){org.json.JSONObject q=profiles.getJSONObject(j);if(a<q.getDouble("to")&&b>q.getDouble("from"))throw new IllegalArgumentException();}
+     volume+=(b-a)*(bw*bd-w*d);area+=(b-a)*(bw-w);
+    }
+    basic=String.format(java.util.Locale.GERMANY,"Aushub: %.2f m³\nGrundfläche: %.2f m²",volume,area);
+   }catch(Exception ex){basic="Abschnittsprofile prüfen – Mengen nicht eindeutig";}
+  }
   result.setText(basic);
   if(shoringQuantities!=null)shoringQuantities.setText(shoringReport());
  }
