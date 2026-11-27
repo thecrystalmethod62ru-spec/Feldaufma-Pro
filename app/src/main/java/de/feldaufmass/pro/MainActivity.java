@@ -775,6 +775,21 @@ public class MainActivity extends Activity {
   return history;
  }
  boolean persistRouteHistory(RouteEditHistory history){return persistRouteHistory(history,getPreferences(0).edit());}
+ double[][] matchingRouteStations(String before,String after){
+  RouteSketch oldRoute=new RouteSketch(this,before),newRoute=new RouteSketch(this,after);
+  int count=oldRoute.vertices.size();
+  if(count<2||count!=newRoute.vertices.size())return null;
+  double[][] stations=new double[2][count];
+  for(int i=0;i<count;i++){
+   RouteSketch.Vertex a=oldRoute.vertices.get(i),b=newRoute.vertices.get(i);
+   if(!a.hasStoredId||!b.hasStoredId||!java.util.Objects.equals(a.id,b.id))return null;
+   if(i>0){
+    if(!Double.isFinite(a.metres)||!Double.isFinite(b.metres)||a.metres<=0||b.metres<=0)return null;
+    stations[0][i]=stations[0][i-1]+a.metres;stations[1][i]=stations[1][i-1]+b.metres;
+   }
+  }
+  return stations;
+ }
  boolean persistRouteHistory(RouteEditHistory history,SharedPreferences.Editor ed){
   try{
    String before=routeData();
