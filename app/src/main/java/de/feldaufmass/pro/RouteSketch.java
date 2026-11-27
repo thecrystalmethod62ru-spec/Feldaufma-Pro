@@ -1195,7 +1195,7 @@ final class RouteSketch extends View {
   if(!editable && pointSelected==null)return false;
   int action=event.getActionMasked();
   if(event.getPointerCount()>=2&&activeDimension!=null){restoreDimensionDrag();activeDimension=null;}
-  if(editable&&!placingObject&&!editingObjects&&action==MotionEvent.ACTION_DOWN){
+  if(editable&&!placingObject&&!editingObjects&&!placingSingle&&layerVisible(LAYER_DIMENSIONS)&&action==MotionEvent.ACTION_DOWN){
    // Prefer exact label hits before expanded accessibility targets.
    for(int pass=0;pass<2;pass++)for(int i=dimensionHits.size()-1;i>=0;i--){
     DimensionHit hit=dimensionHits.get(i);
@@ -1220,7 +1220,7 @@ final class RouteSketch extends View {
     if(action==MotionEvent.ACTION_CANCEL){restoreDimensionDrag();}
     if(action==MotionEvent.ACTION_UP&&dimensionMoved&&moving&&!saveDimensionLayout()){restoreDimensionDrag();}
     String key=activeDimension.key;boolean rotate=!selectionOnly&&action==MotionEvent.ACTION_UP&&!dimensionMoved&&key.startsWith("route:")&&event.getEventTime()-dimensionDownTime>=android.view.ViewConfiguration.getLongPressTimeout();
-    boolean tap=action==MotionEvent.ACTION_UP&&!dimensionMoved&&!rotate&&key.startsWith("route:");activeDimension=null;getParent().requestDisallowInterceptTouchEvent(false);invalidate();if(rotate)showDimensionRotation(key);else if(tap&&dimensionSelected!=null){int endpoint=Integer.parseInt(key.substring(6));if(endpoint>0&&endpoint<vertices.size())dimensionSelected.select(endpoint);}return true;
+    boolean tap=action==MotionEvent.ACTION_UP&&!dimensionMoved&&!rotate&&key.startsWith("route:");activeDimension=null;getParent().requestDisallowInterceptTouchEvent(false);invalidate();if(rotate)showDimensionRotation(key);else if(tap&&dimensionSelected!=null){int endpoint=Integer.parseInt(key.substring(6));if(endpoint>0&&endpoint<vertices.size()){highlight=endpoint;if(inspectorSelection!=null)inspectorSelection.accept(endpoint-1);dimensionSelected.select(endpoint);invalidate();}}return true;
    }
    return true;
   }
@@ -1240,7 +1240,7 @@ final class RouteSketch extends View {
   if(selectionOnly){
    if(action==MotionEvent.ACTION_DOWN){getParent().requestDisallowInterceptTouchEvent(true);stroke.clear();return true;}
    if(action==MotionEvent.ACTION_MOVE){if(Math.hypot(event.getX()-touchStartX,event.getY()-touchStartY)>android.view.ViewConfiguration.get(getContext()).getScaledTouchSlop())touchMoved=true;if(touchMoved){centerX=clamp(centerX-(event.getX()-lastTouchX)/scale());centerY=clamp(centerY-(event.getY()-lastTouchY)/scale());lastTouchX=event.getX();lastTouchY=event.getY();invalidate();}return true;}
-   if(action==MotionEvent.ACTION_UP){getParent().requestDisallowInterceptTouchEvent(false);if(!touchMoved&&layerVisible(LAYER_ROUTE)){int nearest=-1;double best=24*getResources().getDisplayMetrics().density/scale();for(int i=1;i<vertices.size();i++){double dist=distanceToLine(p,vertices.get(i-1).point,vertices.get(i).point);if(dist<best){best=dist;nearest=i;}}if(nearest>0&&inspectorSelection!=null)inspectorSelection.accept(nearest-1);}performClick();invalidate();return true;}
+   if(action==MotionEvent.ACTION_UP){getParent().requestDisallowInterceptTouchEvent(false);if(!touchMoved&&layerVisible(LAYER_ROUTE)){int nearest=-1;double best=24*getResources().getDisplayMetrics().density/scale();for(int i=1;i<vertices.size();i++){double dist=distanceToLine(p,vertices.get(i-1).point,vertices.get(i).point);if(dist<best){best=dist;nearest=i;}}if(nearest>0){highlight=nearest;if(inspectorSelection!=null)inspectorSelection.accept(nearest-1);}}performClick();invalidate();return true;}
    if(action==MotionEvent.ACTION_CANCEL)getParent().requestDisallowInterceptTouchEvent(false);return true;
   }
   switch(event.getActionMasked()){
