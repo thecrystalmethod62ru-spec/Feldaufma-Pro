@@ -73,6 +73,10 @@ public final class PipeLayoutStore {
             JSONObject row=result.getJSONObject(i);
             double from=remapStation(row.getDouble("from"),oldStations,newStations),to=remapStation(row.getDouble("to"),oldStations,newStations);
             if(to<=from)throw new IllegalArgumentException("Ungültiger Abschnitt");
+            for(int j=0;j<i;j++){
+                JSONObject previous=result.getJSONObject(j);
+                if(from<previous.getDouble("to")-1e-8&&to>previous.getDouble("from")+1e-8)throw new IllegalArgumentException("Abschnitte überlappen");
+            }
             row.put("from",from).put("to",to);
         }
         return result;
