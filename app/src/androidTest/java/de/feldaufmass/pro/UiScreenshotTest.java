@@ -10,6 +10,13 @@ import org.junit.runner.RunWith;
 import java.io.File;
 import java.io.FileOutputStream;
 import static org.junit.Assert.*;
+import static androidx.test.espresso.Espresso.onView;
+import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.action.ViewActions.scrollTo;
+import static androidx.test.espresso.assertion.ViewAssertions.matches;
+import static androidx.test.espresso.matcher.RootMatchers.withDecorView;
+import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
+import static androidx.test.espresso.matcher.ViewMatchers.withText;
 
 @RunWith(AndroidJUnit4.class)
 public class UiScreenshotTest {
@@ -46,46 +53,19 @@ public class UiScreenshotTest {
  @Test public void normalLandscape() throws Exception {editor(false,true,"03-normal-landscape");}
  @Test public void fullPortrait() throws Exception {editor(true,false,"04-full-portrait");}
  @Test public void fullLandscape() throws Exception {editor(true,true,"05-full-landscape");}
- private android.widget.Button visibleButton(android.view.View view,String label){
-  if(view instanceof android.widget.Button){
-   android.widget.Button b=(android.widget.Button)view;
-   android.graphics.Rect bounds=new android.graphics.Rect();
-   if(label.contentEquals(b.getText())&&b.isShown()&&b.isEnabled()&&b.isClickable()&&b.getGlobalVisibleRect(bounds)&&!bounds.isEmpty())return b;
-  }
-  if(view instanceof android.view.ViewGroup){
-   android.view.ViewGroup group=(android.view.ViewGroup)view;
-   for(int i=0;i<group.getChildCount();i++){
-    android.widget.Button b=visibleButton(group.getChildAt(i),label);if(b!=null)return b;
-   }
-  }
-  return null;
- }
- @androidx.test.filters.SdkSuppress(minSdkVersion=29)
  @Test public void regelprofil() throws Exception {
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    scenario.onActivity(a->{a.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);a.enterProject();});
-   android.os.SystemClock.sleep(1000);
-   scenario.onActivity(a->a.editRoute(false,true));
-   boolean[] opened={false};
-   for(int attempt=0;attempt<40&&!opened[0];attempt++){
-    InstrumentationRegistry.getInstrumentation().waitForIdleSync();
-    scenario.onActivity(a->{
-     for(android.view.View root:android.view.inspector.WindowInspector.getGlobalWindowViews()){
-      android.widget.Button tab=visibleButton(root,"Regelprofil");
-      if(tab!=null){assertTrue(tab.performClick());opened[0]=true;break;}
-     }
-    });
-    if(!opened[0])android.os.SystemClock.sleep(250);
-   }
-   assertTrue("Regelprofil tab not visible",opened[0]);
-   InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+   android.view.View[] editorWindow=new android.view.View[1];
    scenario.onActivity(a->{
-    boolean visible=false;
-    for(android.view.View root:android.view.inspector.WindowInspector.getGlobalWindowViews()){
-     if(visibleButton(root,"Maße bearbeiten")!=null){visible=true;break;}
-    }
-    assertTrue("Regelprofil content not visible after switching tabs",visible);
+    a.editRoute(false,true);
+    editorWindow[0]=a.activeRouteEditor.getRootView();
    });
+   org.hamcrest.Matcher<androidx.test.espresso.Root> editor=withDecorView(org.hamcrest.Matchers.is(editorWindow[0]));
+   onView(org.hamcrest.Matchers.allOf(withText("Regelprofil"), androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom(android.widget.Button.class))).inRoot(editor)
+     .check(matches(isDisplayed())).perform(click());
+   onView(withText("Abschnitt bearbeiten")).inRoot(editor).check(matches(isDisplayed()));
+   onView(withText("Maße bearbeiten")).inRoot(editor).perform(scrollTo()).check(matches(isDisplayed()));
    capture("06-regelprofil");
   }
  }

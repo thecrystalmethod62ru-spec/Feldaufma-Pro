@@ -1395,12 +1395,12 @@ public class MainActivity extends Activity {
   root.addView(sectionStrip,new LinearLayout.LayoutParams(-1,-2));
   final int[] selectedSection={-1};
   final String[] selectedSectionStart={null},selectedSectionEnd={null};
-  final TextView sectionPosition=sheetText("Abschnitt auswählen",12,false);sectionPosition.setTextColor(0xff69d6b7);sectionStrip.addView(sectionPosition,1);
-  LinearLayout sectionEditor=new LinearLayout(this);sectionEditor.setOrientation(1);sectionEditor.setPadding(dp(4),dp(4),dp(4),dp(4));sectionEditor.setBackground(proButtonShape(false));
+  final TextView sectionPosition=sheetText("Abschnitt auswählen",12,false);sectionPosition.setTextColor(0xff69d6b7);sectionStrip.addView(sectionPosition,1);sectionPosition.setVisibility(View.GONE);
+  LinearLayout sectionEditor=new LinearLayout(this);sectionEditor.setOrientation(1);sectionEditor.setPadding(dp(4),dp(4),dp(4),dp(4));android.graphics.drawable.GradientDrawable editorFrame=editorShape(0xff041012,4);editorFrame.setStroke(dp(1),0xff008b93);sectionEditor.setBackground(editorFrame);
   sectionStrip.addView(sectionEditor,new LinearLayout.LayoutParams(-1,-2));sectionEditor.setVisibility(View.GONE);
   Runnable refreshSectionEditor=()->{
    sectionEditor.removeAllViews();int index=selectedSection[0];if(index<0||index+1>=route.vertices.size()){sectionEditor.setVisibility(View.GONE);return;}
-   sectionEditor.setVisibility(View.VISIBLE);sectionEditor.addView(sheetText("A"+(index+1)+"  Abschnitt bearbeiten",13,true));
+   sectionEditor.setVisibility(View.VISIBLE);sectionEditor.addView(sheetText("A"+(index+1)+"  Abschnitt",13,true));
    double start=0;for(int j=0;j<index;j++){double length=route.vertices.get(j+1).metres;if(!Double.isFinite(length)||length<=0){start=Double.NaN;break;}start+=length;}final double from=start,to=start+route.vertices.get(index+1).metres;
    SharedPreferences defaults=getSharedPreferences("base_profile_defaults",MODE_PRIVATE);
    double bw=defaults.getFloat("width",0.4f),bd=defaults.getFloat("depth",1f);
@@ -1411,6 +1411,22 @@ public class MainActivity extends Activity {
    final String material=surfaceRow==null?covering:surfaceRow.optString("surface",covering);
    final double leftCut=surfaceRow==null?0:surfaceRow.optDouble("left",0),rightCut=surfaceRow==null?0:surfaceRow.optDouble("right",0);
    Button lengthValue=new Button(this);styleEditorButton(lengthValue,false);lengthValue.setText(Double.isFinite(route.vertices.get(index+1).metres)&&route.vertices.get(index+1).metres>0?String.format(java.util.Locale.GERMANY,"Länge  %.2f m",route.vertices.get(index+1).metres):"Länge · Maß fehlt");lengthValue.setTextSize(11);lengthValue.setMinHeight(0);sectionEditor.addView(lengthValue,new LinearLayout.LayoutParams(-1,dp(32)));lengthValue.setOnClickListener(v->measureSegment(route,index+1));
+   Button splitSection=new Button(this);styleEditorButton(splitSection,false);splitSection.setText("Abschnitt teilen");splitSection.setTextSize(11);sectionEditor.addView(splitSection,new LinearLayout.LayoutParams(-1,dp(34)));
+   sectionEditor.removeView(splitSection);splitSection.setEnabled(Double.isFinite(from)&&Double.isFinite(to)&&to>from);
+   splitSection.setOnClickListener(v->{
+    if(index+1>=route.vertices.size())return;
+    final RouteSketch.Vertex first=route.vertices.get(index),last=route.vertices.get(index+1);final double length=last.metres;
+    EditText distance=new EditText(this);distance.setInputType(8194);distance.setHint("Ab Abschnittsbeginn (m)");distance.setText(String.format(java.util.Locale.GERMANY,"%.2f",length/2));
+    android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Abschnitt teilen").setView(distance).setNegativeButton("Abbrechen",null).setPositiveButton("Teilen",null).create();
+    dialog.setOnShowListener(d->dialog.getButton(-1).setOnClickListener(btn->{try{
+     double cut=number(distance);if(!Double.isFinite(cut)||cut<=0||cut>=length){distance.setError("Maß innerhalb des Abschnitts eingeben");return;}
+     if(index+1>=route.vertices.size()||route.vertices.get(index)!=first||route.vertices.get(index+1)!=last||Double.compare(last.metres,length)!=0){dialog.dismiss();notice("Abschnitt erneut auswählen.");return;}
+     float f=(float)(cut/length);android.graphics.PointF point=new android.graphics.PointF(first.point.x+(last.point.x-first.point.x)*f,first.point.y+(last.point.y-first.point.y)*f);
+     if((point.x==first.point.x&&point.y==first.point.y)||(point.x==last.point.x&&point.y==last.point.y)){distance.setError("Teilung zu nah am Endpunkt");return;}
+     RouteSketch.Vertex middle=new RouteSketch.Vertex(point,cut);last.metres=length-cut;route.vertices.add(index+1,middle);route.highlight=-1;route.dragged=-1;selectedSectionStart[0]=middle.id;selectedSectionEnd[0]=last.id;route.invalidate();if(route.changed!=null)route.changed.run();dialog.dismiss();
+    }catch(Exception ex){distance.setError("Ungültiges Maß");}}));dialog.show();
+   });
+   lengthValue.setOnLongClickListener(v->{splitSection.performClick();return true;});lengthValue.setContentDescription("Länge bearbeiten; lange drücken zum Teilen");
    EditText widthField=referenceField(sectionEditor,"Breite (B)",String.format(java.util.Locale.GERMANY,"%.2f",bw),true);
    EditText depthField=referenceField(sectionEditor,"Tiefe (T)",String.format(java.util.Locale.GERMANY,"%.2f",bd),true);
    final String[] selectedMaterial={material};
@@ -1436,10 +1452,12 @@ public class MainActivity extends Activity {
     final int index=j;double length=route.vertices.get(j+1).metres;double end=station+length;
     Button card=new Button(this);styleEditorButton(card,selectedSection[0]==j);
     card.setText(String.format(java.util.Locale.GERMANY,"A%d",j+1)+"  "+(Double.isFinite(length)&&length>0?(Double.isFinite(end)?String.format(java.util.Locale.GERMANY,"%.2f – %.2f m",station,end):"Station offen"):"Maß fehlt")+(Double.isFinite(length)&&length>0?String.format(java.util.Locale.GERMANY,"\n%.2f m",length):""));
-    LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(sectionCards.getOrientation()==LinearLayout.VERTICAL?-1:dp(104),dp(48));cp.setMargins(dp(2),0,dp(2),0);sectionCards.addView(card,cp);
-    card.setOnClickListener(v->{if(index+1>=route.vertices.size())return;selectedSection[0]=index;selectedSectionStart[0]=route.vertices.get(index).id;selectedSectionEnd[0]=route.vertices.get(index+1).id;sectionPosition.setText("Abschnitt "+(index+1)+" / "+count);for(int k=0;k<sectionCards.getChildCount();k++)styleEditorButton((Button)sectionCards.getChildAt(k),k==index);if(!Double.isFinite(route.vertices.get(index+1).metres)||route.vertices.get(index+1).metres<=0)measureSegment(route,index+1);});
+    LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(sectionCards.getOrientation()==LinearLayout.VERTICAL?-1:dp(104),dp(48));card.setGravity(Gravity.CENTER_VERTICAL|Gravity.START);card.setPadding(dp(8),dp(2),dp(6),dp(2));card.setTextSize(12);card.setMinHeight(0);card.setMinimumHeight(0);cp.setMargins(dp(2),dp(2),dp(2),dp(2));sectionCards.addView(card,cp);
+    card.setOnClickListener(v->{if(index+1>=route.vertices.size())return;selectedSection[0]=index;selectedSectionStart[0]=route.vertices.get(index).id;selectedSectionEnd[0]=route.vertices.get(index+1).id;sectionPosition.setText("Abschnitt "+(index+1)+" / "+count);for(int k=0;k<count;k++)styleEditorButton((Button)sectionCards.getChildAt(k),k==index);if(!Double.isFinite(route.vertices.get(index+1).metres)||route.vertices.get(index+1).metres<=0)measureSegment(route,index+1);});
     station=Double.isFinite(length)&&length>0&&Double.isFinite(end)?end:Double.NaN;
    }
+   Button addSection=new Button(this);styleEditorButton(addSection,false);addSection.setText("+ Neu");addSection.setContentDescription("Neuen Abschnitt zeichnen");sectionCards.addView(addSection,new LinearLayout.LayoutParams(sectionCards.getOrientation()==LinearLayout.VERTICAL?-1:dp(84),dp(48)));
+   addSection.setOnClickListener(v->{route.selectionOnly=false;mode.setSelection(0);notice("Nächsten Trassenpunkt antippen.");});
   };
   refreshSections.run();
   route.inspectorSelection=index->{selectedSection[0]=index;selectedSectionStart[0]=null;selectedSectionEnd[0]=null;refreshSections.run();};
@@ -1500,26 +1518,46 @@ public class MainActivity extends Activity {
   ScrollView layerScroll=new ScrollView(this);LinearLayout layerChoices=new LinearLayout(this);layerChoices.setOrientation(1);layerScroll.addView(layerChoices);layerPanel.addView(layerScroll,new LinearLayout.LayoutParams(-1,0,1));
   String[] layerNames={"Trasse","Oberflächen","Bemaßung","Oberflächenmaße","Punktnamen","Objekte","Schachtscheine","GPS","GPS-Spur","GPS-Abweichung","GPX-Referenz","Fotos"};
   int[] layerMasks={RouteSketch.LAYER_ROUTE,RouteSketch.LAYER_SURFACES,RouteSketch.LAYER_DIMENSIONS,RouteSketch.LAYER_SURFACE_DIMENSIONS,RouteSketch.LAYER_NAMES,RouteSketch.LAYER_OBJECTS,RouteSketch.LAYER_SCHACHTSCHEINE,RouteSketch.LAYER_GPS,RouteSketch.LAYER_GPS_TRACK,RouteSketch.LAYER_GPS_DEVIATIONS,RouteSketch.LAYER_GPS_REFERENCE,RouteSketch.LAYER_PHOTOS};
-  for(int k=0;k<layerNames.length;k++){final int mask=layerMasks[k];CheckBox check=new CheckBox(this);check.setText(layerNames[k]);check.setTextSize(12);check.setTextColor(Color.WHITE);check.setButtonTintList(new android.content.res.ColorStateList(new int[][]{new int[]{android.R.attr.state_checked},new int[]{}},new int[]{0xff00e5ee,0xff52686d}));check.setMinHeight(0);check.setMinimumHeight(0);check.setPadding(0,0,0,0);check.setChecked((drawingLayers()&mask)!=0);layerChoices.addView(check,new LinearLayout.LayoutParams(-1,dp(30)));check.setOnCheckedChangeListener((b,on)->{int current=drawingLayers();int next=on?current|mask:current&~mask;if(applyDrawingLayers(next))route.setVisibleLayers(next);});}
-  CheckBox templateVisible=new CheckBox(this);templateVisible.setText("Unterlage PDF/Foto");templateVisible.setTextColor(Color.WHITE);templateVisible.setTextSize(12);templateVisible.setButtonTintList(android.content.res.ColorStateList.valueOf(TEAL));templateVisible.setChecked(getPreferences(0).getInt("routeUnderlayHidden",0)==0);layerChoices.addView(templateVisible,new LinearLayout.LayoutParams(-1,dp(32)));
-  TextView alphaLabel=sheetText("Deckkraft",12,false);layerChoices.addView(alphaLabel);
-  SeekBar layerOpacity=new SeekBar(this);layerOpacity.setMax(255);layerOpacity.setProgress(Math.max(0,Math.min(255,getPreferences(0).getInt("routeUnderlayAlpha",150))));layerChoices.addView(layerOpacity,new LinearLayout.LayoutParams(-1,dp(30)));layerOpacity.setProgressTintList(android.content.res.ColorStateList.valueOf(0xff00e5ee));layerOpacity.setThumbTintList(android.content.res.ColorStateList.valueOf(0xff00e5ee));
+  for(int k=0;k<layerNames.length;k++){final int mask=layerMasks[k];CheckBox check=new CheckBox(this);check.setText(layerNames[k]);if(k==0)check.setText("Tiefbau (Trasse)");if(k==5)check.setText("Leitungen");if(k==11)check.setText("Foto / Skizze");check.setTextSize(12);check.setTextColor(Color.WHITE);check.setButtonTintList(new android.content.res.ColorStateList(new int[][]{new int[]{android.R.attr.state_checked},new int[]{}},new int[]{0xff00e5ee,0xff52686d}));check.setMinHeight(0);check.setMinimumHeight(0);check.setPadding(0,0,0,0);check.setChecked((drawingLayers()&mask)!=0);layerChoices.addView(check,new LinearLayout.LayoutParams(-1,dp(38)));if(k!=0&&k!=5&&k!=6&&k!=11)check.setVisibility(View.GONE);check.setOnCheckedChangeListener((b,on)->{int current=drawingLayers();int next=on?current|mask:current&~mask;if(applyDrawingLayers(next))route.setVisibleLayers(next);});}
+  CheckBox[] layerChecks=new CheckBox[layerMasks.length];for(int k=0;k<layerMasks.length;k++)layerChecks[k]=(CheckBox)layerChoices.getChildAt(k);
+  CheckBox templateVisible=new CheckBox(this);templateVisible.setText("Ausführungsplan");templateVisible.setTextColor(Color.WHITE);templateVisible.setTextSize(12);templateVisible.setButtonTintList(android.content.res.ColorStateList.valueOf(TEAL));templateVisible.setChecked(getPreferences(0).getInt("routeUnderlayHidden",0)==0);layerChoices.addView(templateVisible,new LinearLayout.LayoutParams(-1,dp(32)));
+  layerChoices.removeView(layerChecks[11]);layerChoices.addView(layerChecks[11],layerChoices.indexOfChild(templateVisible)+1);
+  // Reuse the editor's vector icons, without replacing the layer checkboxes.
+  CheckBox[] visibleLayerRows={layerChecks[0],layerChecks[5],layerChecks[6],templateVisible,layerChecks[11]};
+  String[] visibleLayerIcons={"sections","pipe","map","document","image"};
+  for(int k=0;k<visibleLayerRows.length;k++){
+   CheckBox row=visibleLayerRows[k];Button iconSource=new Button(this);compactToolIcon(iconSource,"",visibleLayerIcons[k]);
+   android.graphics.drawable.Drawable glyph=iconSource.getCompoundDrawables()[1];
+   glyph.setBounds(0,0,dp(18),dp(18));row.setCompoundDrawables(glyph,null,null,null);row.setCompoundDrawablePadding(dp(6));
+   row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(4),0,dp(4),0);
+   android.graphics.drawable.GradientDrawable rowFrame=editorShape(k==0?0xff07383c:0xff041012,4);rowFrame.setStroke(dp(1),k==0?0xff00c8d0:0xff203638);row.setBackground(rowFrame);
+   LinearLayout.LayoutParams rowParams=new LinearLayout.LayoutParams(-1,dp(38));rowParams.setMargins(0,0,0,dp(4));row.setLayoutParams(rowParams);
+  }
+  TextView alphaLabel=sheetText("Deckkraft",12,false);layerChoices.addView(alphaLabel);alphaLabel.setVisibility(View.GONE);
+  SeekBar layerOpacity=new SeekBar(this);layerOpacity.setMax(255);layerOpacity.setProgress(Math.max(0,Math.min(255,getPreferences(0).getInt("routeUnderlayAlpha",150))));layerChoices.addView(layerOpacity,new LinearLayout.LayoutParams(-1,dp(30)));layerOpacity.setVisibility(View.GONE);layerOpacity.setProgressTintList(android.content.res.ColorStateList.valueOf(0xff00e5ee));layerOpacity.setThumbTintList(android.content.res.ColorStateList.valueOf(0xff00e5ee));
   alphaLabel.setText("Deckkraft "+Math.round(layerOpacity.getProgress()*100f/255)+" %");
   templateVisible.setOnCheckedChangeListener((b,on)->{route.setUnderlayVisible(on);getPreferences(0).edit().putInt("routeUnderlayHidden",on?0:1).apply();});
   layerOpacity.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onStartTrackingTouch(SeekBar b){}public void onStopTrackingTouch(SeekBar b){}public void onProgressChanged(SeekBar b,int p,boolean user){alphaLabel.setText("Deckkraft "+Math.round(p*100f/255)+" %");if(user){route.setUnderlayAlpha(p);getPreferences(0).edit().putInt("routeUnderlayAlpha",p).apply();}}});
-  Button utilityShortcut=new Button(this);styleEditorButton(utilityShortcut,false);utilityShortcut.setText("Schachtscheine  ›");utilityShortcut.setTextSize(11);utilityShortcut.setMinHeight(0);utilityShortcut.setMinimumHeight(0);layerPanel.addView(utilityShortcut,new LinearLayout.LayoutParams(-1,dp(32)));utilityShortcut.setOnClickListener(v->showUtilitySheets());
+  Button utilityShortcut=new Button(this);styleEditorButton(utilityShortcut,false);utilityShortcut.setText("+ Ebene hinzufügen");utilityShortcut.setTextSize(12);utilityShortcut.setMinHeight(0);utilityShortcut.setMinimumHeight(0);layerPanel.addView(utilityShortcut,new LinearLayout.LayoutParams(-1,dp(32)));utilityShortcut.setOnClickListener(v->showDrawingLayers(route));
   android.widget.FrameLayout.LayoutParams layerParams=new android.widget.FrameLayout.LayoutParams(dp(160),-1,Gravity.RIGHT|Gravity.TOP);canvasFrame.addView(layerPanel,layerParams);layerPanel.setVisibility(View.GONE);
-  layersButton.setOnClickListener(v->{if(layerPanel.getVisibility()==View.VISIBLE){layerPanel.setVisibility(View.GONE);return;}for(int k=0;k<layerMasks.length;k++)((CheckBox)layerChoices.getChildAt(k)).setChecked((drawingLayers()&layerMasks[k])!=0);boolean hasTemplate=!getPreferences(0).getString("routeUnderlay","").isEmpty();templateVisible.setEnabled(hasTemplate);layerOpacity.setEnabled(hasTemplate);templateVisible.setChecked(getPreferences(0).getInt("routeUnderlayHidden",0)==0);layerOpacity.setProgress(Math.max(0,Math.min(255,getPreferences(0).getInt("routeUnderlayAlpha",150))));if(layerPanel.getParent()==canvasFrame)layerPanel.bringToFront();layerPanel.setVisibility(View.VISIBLE);});
+  layersButton.setOnClickListener(v->{if(layerPanel.getVisibility()==View.VISIBLE){layerPanel.setVisibility(View.GONE);return;}for(int k=0;k<layerMasks.length;k++)layerChecks[k].setChecked((drawingLayers()&layerMasks[k])!=0);boolean hasTemplate=!getPreferences(0).getString("routeUnderlay","").isEmpty();templateVisible.setEnabled(hasTemplate);layerOpacity.setEnabled(hasTemplate);templateVisible.setChecked(getPreferences(0).getInt("routeUnderlayHidden",0)==0);layerOpacity.setProgress(Math.max(0,Math.min(255,getPreferences(0).getInt("routeUnderlayAlpha",150))));if(layerPanel.getParent()==canvasFrame)layerPanel.bringToFront();layerPanel.setVisibility(View.VISIBLE);});
 
   LinearLayout workspace=new LinearLayout(this);workspace.setOrientation(LinearLayout.VERTICAL);root.removeView(canvasFrame);root.removeView(sectionStrip);root.addView(workspace,canvasIndex,new LinearLayout.LayoutParams(-1,0,1));workspace.addView(canvasFrame,new LinearLayout.LayoutParams(-1,0,1));workspace.addView(sectionStrip,new LinearLayout.LayoutParams(-1,-2));
   final boolean[] landscapeSections={false};
   final boolean[] landscapeInitialized={false};
   root.addOnLayoutChangeListener((v,l,t,rr,bb,ol,ot,orr,ob)->{boolean landscape=rr-l>bb-t;if(rr<=l||bb<=t)return;if(landscapeInitialized[0]&&landscape==landscapeSections[0])return;landscapeInitialized[0]=true;landscapeSections[0]=landscape;
+   int available=(int)((rr-l)/getResources().getDisplayMetrics().density);
+   heading.setVisibility(landscape||available>=600?View.VISIBLE:View.GONE);
+   for(int k=0;k<heading.getChildCount();k++)if(heading.getChildAt(k) instanceof TextView){TextView label=(TextView)heading.getChildAt(k);label.setSingleLine(true);label.setEllipsize(android.text.TextUtils.TruncateAt.END);}
+   for(View button:new View[]{back,layersButton,gpsButton,settingsTool,canvasToggle}){android.view.ViewGroup.LayoutParams lp=button.getLayoutParams();lp.width=dp(landscape?40:32);button.setLayoutParams(lp);button.setMinimumWidth(0);if(button instanceof Button)((Button)button).setMinWidth(0);}
    if(tools.getParent() instanceof android.view.ViewGroup)((android.view.ViewGroup)tools.getParent()).removeView(tools);
    tools.setOrientation(LinearLayout.HORIZONTAL);
-   for(int k=0;k<tools.getChildCount();k++){View tool=tools.getChildAt(k);if(tool instanceof Button){Button button=(Button)tool;button.setMinHeight(dp(52));button.setMinimumHeight(dp(52));button.setPadding(dp(4),dp(2),dp(4),dp(2));button.setSingleLine(true);button.setTextSize(12);}LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(54),(tool==buildTool||tool==docsTool)?1.6f:1);lp.setMargins(dp(2),dp(1),dp(2),dp(1));tool.setLayoutParams(lp);}
+   for(int k=0;k<tools.getChildCount();k++){View tool=tools.getChildAt(k);if(tool instanceof Button){Button button=(Button)tool;button.setMinHeight(dp(52));button.setMinimumHeight(dp(52));button.setPadding(dp(4),dp(2),dp(4),dp(2));button.setSingleLine(landscape);button.setMaxLines(2);button.setTextSize(landscape?12:9);button.setMinWidth(0);button.setMinimumWidth(0);button.setEllipsize(null);}LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(54),(tool==buildTool||tool==docsTool)?1.6f:1);lp.setMargins(dp(2),dp(1),dp(2),dp(1));tool.setLayoutParams(lp);}
    root.addView(tools,new LinearLayout.LayoutParams(-1,-2));
-   workspace.setOrientation(landscape?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL);canvasFrame.setLayoutParams(landscape?new LinearLayout.LayoutParams(0,-1,1):new LinearLayout.LayoutParams(-1,0,1));sectionStrip.setLayoutParams(landscape?new LinearLayout.LayoutParams(dp(190),-1):new LinearLayout.LayoutParams(-1,-2));workspace.removeView(sectionStrip);workspace.addView(sectionStrip,landscape?workspace.getChildCount():1);if(layerPanel.getParent() instanceof android.view.ViewGroup)((android.view.ViewGroup)layerPanel.getParent()).removeView(layerPanel);if(landscape){workspace.addView(layerPanel,0,new LinearLayout.LayoutParams(dp(160),-1));layerPanel.setVisibility(sectionStrip.getVisibility()==View.VISIBLE?View.VISIBLE:View.GONE);}else{canvasFrame.addView(layerPanel,new android.widget.FrameLayout.LayoutParams(dp(160),-1,Gravity.RIGHT|Gravity.TOP));layerPanel.setVisibility(View.GONE);}if(landscape){sectionScroll.removeView(sectionCards);sectionStrip.removeView(sectionScroll);sectionCards.setOrientation(LinearLayout.VERTICAL);verticalSections.addView(sectionCards);sectionStrip.addView(verticalSections,2,new LinearLayout.LayoutParams(-1,0,1));}else{if(sectionCards.getParent()==verticalSections)verticalSections.removeView(sectionCards);sectionStrip.removeView(verticalSections);sectionCards.setOrientation(LinearLayout.HORIZONTAL);if(sectionCards.getParent()==null)sectionScroll.addView(sectionCards);if(sectionScroll.getParent()==null)sectionStrip.addView(sectionScroll);}sectionScroll.setVisibility(!landscape&&!sectionsCollapsed[0]?View.VISIBLE:View.GONE);verticalSections.setVisibility(landscape&&!sectionsCollapsed[0]?View.VISIBLE:View.GONE);refreshSections.run();});
+   if(viewTabs.getParent() instanceof android.view.ViewGroup)((android.view.ViewGroup)viewTabs.getParent()).removeView(viewTabs);
+   if(landscape){viewTabs.setPadding(0,0,0,dp(4));LinearLayout.LayoutParams tabsParams=new LinearLayout.LayoutParams(-1,Math.round((bb-t)*56f/864f));tabsParams.leftMargin=Math.round((rr-l)*302f/1536f);tabsParams.rightMargin=Math.round((rr-l)*364f/1536f);root.addView(viewTabs,1,tabsParams);}else{viewTabs.setPadding(dp(8),0,dp(8),dp(4));root.addView(viewTabs,1,new LinearLayout.LayoutParams(-1,dp(48)));}
+
+   workspace.setOrientation(landscape?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL);canvasFrame.setLayoutParams(landscape?new LinearLayout.LayoutParams(0,-1,1):new LinearLayout.LayoutParams(-1,0,1));sectionStrip.setLayoutParams(landscape?new LinearLayout.LayoutParams(Math.round((rr-l)*348f/1536f),-1):new LinearLayout.LayoutParams(-1,-2));workspace.removeView(sectionStrip);workspace.addView(sectionStrip,landscape?workspace.getChildCount():1);if(layerPanel.getParent() instanceof android.view.ViewGroup)((android.view.ViewGroup)layerPanel.getParent()).removeView(layerPanel);if(landscape){workspace.addView(layerPanel,0,new LinearLayout.LayoutParams(Math.round((rr-l)*290f/1536f),-1));layerPanel.setVisibility(sectionStrip.getVisibility()==View.VISIBLE?View.VISIBLE:View.GONE);}else{canvasFrame.addView(layerPanel,new android.widget.FrameLayout.LayoutParams(dp(160),-1,Gravity.RIGHT|Gravity.TOP));layerPanel.setVisibility(View.GONE);}if(landscape){sectionScroll.removeView(sectionCards);sectionStrip.removeView(sectionScroll);sectionCards.setOrientation(LinearLayout.VERTICAL);verticalSections.addView(sectionCards);sectionStrip.addView(verticalSections,2,new LinearLayout.LayoutParams(-1,0,1));}else{if(sectionCards.getParent()==verticalSections)verticalSections.removeView(sectionCards);sectionStrip.removeView(verticalSections);sectionCards.setOrientation(LinearLayout.HORIZONTAL);if(sectionCards.getParent()==null)sectionScroll.addView(sectionCards);if(sectionScroll.getParent()==null)sectionStrip.addView(sectionScroll);}sectionScroll.setVisibility(!landscape&&!sectionsCollapsed[0]?View.VISIBLE:View.GONE);verticalSections.setVisibility(landscape&&!sectionsCollapsed[0]?View.VISIBLE:View.GONE);refreshSections.run();});
   LinearLayout floatingProfile=new LinearLayout(this);floatingProfile.setOrientation(1);floatingProfile.setPadding(dp(6),dp(4),dp(6),dp(4));floatingProfile.setBackground(editorShape(0xff151b1a,10));
   LinearLayout floatingHeader=new LinearLayout(this);floatingHeader.setGravity(Gravity.CENTER_VERTICAL);floatingProfile.addView(floatingHeader);
   TextView floatingTitle=sheetText("Regelprofil",12,true);floatingTitle.setTextColor(Color.WHITE);floatingHeader.addView(floatingTitle,new LinearLayout.LayoutParams(0,dp(30),1));
@@ -1593,25 +1631,30 @@ public class MainActivity extends Activity {
   collapseProfile.setOnClickListener(v->{boolean hide=resizeProfile.getVisibility()==View.VISIBLE;if(hide){profilePlaceholder.setVisibility(View.GONE);floatingCross.setVisibility(View.GONE);}else updateFloatingCross.run();resizeProfile.setVisibility(hide?View.GONE:View.VISIBLE);collapseProfile.setText(hide?"+":"−");});
   sectionPosition.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){floatingTitle.setText(selectedSection[0]<0?"Regelprofil":String.format(java.util.Locale.GERMANY,"Regelprofil · A%02d",selectedSection[0]+1));if(resizeProfile.getVisibility()==View.VISIBLE)updateFloatingCross.run();}public void afterTextChanged(android.text.Editable e){}});
 
-  LinearLayout profilePage=new LinearLayout(this);profilePage.setOrientation(1);profilePage.setBackgroundColor(Color.BLACK);profilePage.setVisibility(View.GONE);
+  LinearLayout profilePage=new LinearLayout(this);profilePage.setOrientation(1);profilePage.setPadding(dp(6),dp(4),dp(6),dp(4));profilePage.setBackgroundColor(Color.BLACK);profilePage.setVisibility(View.GONE);
   TextView profilePageTitle=sheetText("Regelprofil",16,true);profilePageTitle.setTextColor(Color.WHITE);profilePage.addView(profilePageTitle);
-  LinearLayout profileWork=new LinearLayout(this);profileWork.setOrientation(0);profilePage.addView(profileWork,new LinearLayout.LayoutParams(-1,0,1));
-  PipeLayoutView fullCross=new PipeLayoutView(this);profileWork.addView(fullCross,new LinearLayout.LayoutParams(0,-1,3));
-  LinearLayout profileInfo=new LinearLayout(this);profileInfo.setOrientation(1);profileInfo.setPadding(dp(8),dp(8),dp(8),dp(8));profileInfo.setBackgroundColor(0xff101c1e);
-  ScrollView profileInfoScroll=new ScrollView(this);profileInfoScroll.addView(profileInfo);profileWork.addView(profileInfoScroll,new LinearLayout.LayoutParams(0,-1,2));
-  profileWork.addOnLayoutChangeListener((view,left,top,right,bottom,oldLeft,oldTop,oldRight,oldBottom)->{
-   if(right<=left||bottom<=top)return;
-   boolean wide=right-left>=dp(560);
-   int profileOrientation=wide?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL;
-   if(profileWork.getOrientation()==profileOrientation)return;
-   profileWork.setOrientation(profileOrientation);
-   fullCross.setLayoutParams(wide?new LinearLayout.LayoutParams(0,-1,3):new LinearLayout.LayoutParams(-1,0,3));
-   profileInfoScroll.setLayoutParams(wide?new LinearLayout.LayoutParams(0,-1,2):new LinearLayout.LayoutParams(-1,0,2));
-  });
-  TextView profileDimensions=sheetText("",14,true);profileDimensions.setTextColor(0xff28d5c7);profileInfo.addView(sheetText("Profilparameter",14,true));profileInfo.addView(profileDimensions);
+  PipeLayoutView fullCross=new PipeLayoutView(this);
+  ScrollView profileInfoScroll=new ScrollView(this);
+  LinearLayout profileWork=new LinearLayout(this){
+   @Override protected void onMeasure(int widthSpec,int heightSpec){
+    boolean wide=View.MeasureSpec.getSize(widthSpec)>=dp(560);
+    int orientation=wide?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL;
+    if(getOrientation()!=orientation||((LinearLayout.LayoutParams)fullCross.getLayoutParams()).width!=(wide?0:-1)){
+     setOrientation(orientation);
+     fullCross.setLayoutParams(wide?new LinearLayout.LayoutParams(0,-1,3):new LinearLayout.LayoutParams(-1,0,3));
+     profileInfoScroll.setLayoutParams(wide?new LinearLayout.LayoutParams(0,-1,2):new LinearLayout.LayoutParams(-1,0,2));
+    }
+    super.onMeasure(widthSpec,heightSpec);
+   }
+  };
+  profilePage.addView(profileWork,new LinearLayout.LayoutParams(-1,0,1));
+  profileWork.addView(fullCross,new LinearLayout.LayoutParams(0,-1,3));
+  LinearLayout profileInfo=new LinearLayout(this);profileInfo.setOrientation(1);profileInfo.setPadding(dp(8),dp(8),dp(8),dp(8));android.graphics.drawable.GradientDrawable parameterFrame=editorShape(0xff041012,8);parameterFrame.setStroke(dp(1),0xff008b93);profileInfo.setBackground(parameterFrame);
+  profileInfoScroll.addView(profileInfo);profileWork.addView(profileInfoScroll,new LinearLayout.LayoutParams(0,-1,2));
+  TextView profileDimensions=sheetText("",14,true);profileDimensions.setTextColor(0xff28d5c7);profileInfo.addView(sheetText("Parameter",14,true));profileInfo.addView(profileDimensions);
   TextView profileMaterial=sheetText("",12,false);profileMaterial.setTextColor(0xffcbd6d5);profileInfo.addView(profileMaterial);
-  Button profileEdit=new Button(this);profileEdit.setText("Maße bearbeiten");styleEditorButton(profileEdit,false);profileInfo.addView(profileEdit);
-  Button editSectionProfile=new Button(this);styleEditorButton(editSectionProfile,false);compactToolIcon(editSectionProfile,"Abschnitt bearbeiten","settings");LinearLayout profileActions=new LinearLayout(this);profilePage.addView(profileActions,new LinearLayout.LayoutParams(-1,dp(40)));profileActions.addView(editSectionProfile,new LinearLayout.LayoutParams(0,-1,1));editSectionProfile.setOnClickListener(v->{if(sectionProfilePanel.getParent()!=null)return;openSectionProfilePicker();showProfilePanel("Abschnitte",sectionProfilePanel);});
+  Button profileEdit=new Button(this);profileEdit.setText("Parameter bearbeiten");styleEditorButton(profileEdit,false);profileInfo.addView(profileEdit);
+  Button editSectionProfile=new Button(this);styleEditorButton(editSectionProfile,false);compactToolIcon(editSectionProfile,"Abschnitt bearbeiten","settings");LinearLayout profileActions=new LinearLayout(this);profilePage.addView(profileActions,new LinearLayout.LayoutParams(-1,dp(48)));profileActions.addView(editSectionProfile,new LinearLayout.LayoutParams(0,-1,1));editSectionProfile.setOnClickListener(v->{if(sectionProfilePanel.getParent()!=null)return;openSectionProfilePicker();showProfilePanel("Abschnitte",sectionProfilePanel);});
   canvasFrame.addView(profilePage,new android.widget.FrameLayout.LayoutParams(-1,-1));
   Runnable refreshFullProfile=()->{profilePageTitle.setText(selectedSection[0]<0?"Regelprofil · Standardprofil":"Regelprofil · "+sectionPosition.getText());showBaseCross.accept(fullCross);profileDimensions.setText(fullCross.dimensionSummary());profileMaterial.setText("Oberfläche: "+covering);if(selectedSection[0]<0||selectedSection[0]+1>=route.vertices.size())return;double start=0;for(int j=0;j<selectedSection[0];j++){double len=route.vertices.get(j+1).metres;if(!Double.isFinite(len)||len<=0)return;start+=len;}double end=start+route.vertices.get(selectedSection[0]+1).metres;if(!Double.isFinite(start)||!Double.isFinite(end)||end<=start)return;try{org.json.JSONArray rows=new PipeLayoutStore(getPreferences(0)).sections();for(int j=0;j<rows.length();j++){org.json.JSONObject p=rows.getJSONObject(j);if(!(Math.abs(p.optDouble("from")-start)<0.001&&Math.abs(p.optDouble("to")-end)<0.001))continue;double w=p.optDouble("width"),d=p.optDouble("depth");if(Double.isFinite(w)&&Double.isFinite(d)&&w>0&&d>0){fullCross.setLayoutData(PipeLayoutStore.decode(p.getJSONArray("pipes").toString()),w,d);org.json.JSONObject seg=findSurfaceSection(p);String type=seg==null?covering:seg.optString("surface",covering);fullCross.setAsphaltProfile("Asphalt".equals(type));fullCross.setCivilProfile(seg==null?0:seg.optDouble("left",0),seg==null?0:seg.optDouble("right",0),seg==null?0:seg.optDouble("topThickness",0),seg==null?0:seg.optDouble("baseThickness",0),route.configuredSurfaceColor(type,route.legendSettings()));profileMaterial.setText("Oberfläche: "+type);fullCross.setVisibility(View.VISIBLE);profileDimensions.setText(fullCross.dimensionSummary());}break;}}catch(Exception ignored){}};
   Button baseSettings=new Button(this);styleEditorButton(baseSettings,false);compactToolIcon(baseSettings,"Standard-Profil verwalten","settings");
@@ -1643,10 +1686,13 @@ public class MainActivity extends Activity {
   sectionPosition.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){if(profilePage.getVisibility()==View.VISIBLE)refreshFullProfile.run();}public void afterTextChanged(android.text.Editable e){}});
   Button restoreTools=new Button(this);restoreTools.setText("☰");restoreTools.setContentDescription("Werkzeuge anzeigen");styleEditorButton(restoreTools,false);
   android.widget.FrameLayout.LayoutParams floating=new android.widget.FrameLayout.LayoutParams(dp(44),dp(44),Gravity.TOP|Gravity.RIGHT);floating.setMargins(dp(4),dp(4),dp(4),dp(4));canvasFrame.addView(restoreTools,floating);restoreTools.setVisibility(View.GONE);
+  Button rotateCanvas=new Button(this);styleEditorButton(rotateCanvas,false);rotateCanvas.setText("↻");rotateCanvas.setTextSize(24);rotateCanvas.setContentDescription("Bildschirmausrichtung");
+  android.widget.FrameLayout.LayoutParams rotateParams=new android.widget.FrameLayout.LayoutParams(dp(44),dp(44),Gravity.TOP|Gravity.LEFT);rotateParams.setMargins(dp(8),dp(8),dp(8),dp(8));canvasFrame.addView(rotateCanvas,rotateParams);rotateCanvas.setVisibility(View.GONE);
+  rotateCanvas.setOnClickListener(v->new android.app.AlertDialog.Builder(MainActivity.this).setTitle("Ausrichtung").setItems(new String[]{"Automatisch","Querformat","Hochformat"},(dialog,which)->{setRequestedOrientation(which==0?android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR:which==1?android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE:android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);}).setNegativeButton("Abbrechen",null).show());
   Button floatingSave=new Button(this);floatingSave.setAllCaps(false);floatingSave.setText("Speichern");styleEditorButton(floatingSave,true);compactToolIcon(floatingSave,"Speichern","save");
   android.widget.FrameLayout.LayoutParams floatingSaveParams=new android.widget.FrameLayout.LayoutParams(dp(88),dp(54),Gravity.BOTTOM|Gravity.RIGHT);floatingSaveParams.setMargins(dp(8),dp(8),dp(8),dp(8));canvasFrame.addView(floatingSave,floatingSaveParams);floatingSave.setVisibility(View.GONE);
   floatingSave.setOnClickListener(v->save.performClick());
-  canvasToggle.setOnClickListener(v->{immersive[0]=true;if(full.getWindow()!=null)androidx.core.view.WindowCompat.getInsetsController(full.getWindow(),root).hide(androidx.core.view.WindowInsetsCompat.Type.systemBars());layerPanel.setVisibility(View.GONE);for(View bar:new View[]{header,viewTabs,controls,historyBar,tools,save,sectionStrip})bar.setVisibility(View.GONE);restoreTools.setVisibility(View.VISIBLE);floatingSave.setVisibility(View.VISIBLE);restoreTools.bringToFront();floatingSave.bringToFront();});
+  canvasToggle.setOnClickListener(v->{immersive[0]=true;if(full.getWindow()!=null)androidx.core.view.WindowCompat.getInsetsController(full.getWindow(),root).hide(androidx.core.view.WindowInsetsCompat.Type.systemBars());layerPanel.setVisibility(View.GONE);for(View bar:new View[]{header,viewTabs,controls,historyBar,tools,save,sectionStrip})bar.setVisibility(View.GONE);restoreTools.setVisibility(View.VISIBLE);rotateCanvas.setVisibility(View.VISIBLE);floatingSave.setVisibility(View.VISIBLE);restoreTools.bringToFront();rotateCanvas.bringToFront();floatingSave.bringToFront();});
   restoreTools.setOnTouchListener(new View.OnTouchListener(){
    float startX,startY,baseX,baseY;boolean moved;
    public boolean onTouch(View v,android.view.MotionEvent e){
@@ -1662,7 +1708,7 @@ public class MainActivity extends Activity {
    }
   });
   canvasFrame.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(restoreTools.getVisibility()==View.VISIBLE){restoreTools.setX(Math.max(0,Math.min(canvasFrame.getWidth()-restoreTools.getWidth(),restoreTools.getX())));restoreTools.setY(Math.max(0,Math.min(canvasFrame.getHeight()-restoreTools.getHeight(),restoreTools.getY())));}});
-  restoreTools.setOnClickListener(v->{immersive[0]=immersiveInitially;if(!immersive[0]&&full.getWindow()!=null)androidx.core.view.WindowCompat.getInsetsController(full.getWindow(),root).show(androidx.core.view.WindowInsetsCompat.Type.systemBars());for(View bar:new View[]{header,viewTabs,save,sectionStrip})bar.setVisibility(View.VISIBLE);tools.setVisibility(profilePage.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE);if(landscapeSections[0])layerPanel.setVisibility(View.VISIBLE);restoreTools.setVisibility(View.GONE);floatingSave.setVisibility(View.GONE);});
+  restoreTools.setOnClickListener(v->{immersive[0]=immersiveInitially;if(!immersive[0]&&full.getWindow()!=null)androidx.core.view.WindowCompat.getInsetsController(full.getWindow(),root).show(androidx.core.view.WindowInsetsCompat.Type.systemBars());for(View bar:new View[]{header,viewTabs,save,sectionStrip})bar.setVisibility(View.VISIBLE);tools.setVisibility(profilePage.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE);if(landscapeSections[0])layerPanel.setVisibility(View.VISIBLE);restoreTools.setVisibility(View.GONE);rotateCanvas.setVisibility(View.GONE);floatingSave.setVisibility(View.GONE);});
   full.setContentView(root);
   full.setOnDismissListener(d->{
    int maxX=Math.max(0,canvasFrame.getWidth()-floatingProfile.getWidth()),maxY=Math.max(0,canvasFrame.getHeight()-floatingProfile.getHeight());
@@ -5020,8 +5066,8 @@ public class MainActivity extends Activity {
  boolean wideProfile=profileWorkspace.getOrientation()==LinearLayout.HORIZONTAL;
  profileWorkspace.addView(profile,wideProfile?new LinearLayout.LayoutParams(0,dp(300),1):new LinearLayout.LayoutParams(-1,dp(260)));
  profileWorkspace.addView(sizes,wideProfile?new LinearLayout.LayoutParams(0,-2,1):new LinearLayout.LayoutParams(-1,-2));
- LinearLayout toolbar=new LinearLayout(this);profilePage.addView(toolbar,1);String[] names={"Aufbau","Leitungen","Maße","Abschnitte","Optionen"};String[] icons={"layers","pipe","ruler","sections","settings"};LinearLayout[] panels={buildPanel,pipeDetails,sizes,sectionProfilePanel,optionsPanel};
- for(int j=0;j<names.length;j++){final int index=j;Button tool=new Button(this);styleEditorButton(tool,false);compactToolIcon(tool,names[j],icons[j]);tool.setSingleLine(true);if(android.os.Build.VERSION.SDK_INT>=26)tool.setAutoSizeTextTypeUniformWithConfiguration(9,12,1,android.util.TypedValue.COMPLEX_UNIT_SP);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(54),1);lp.setMargins(dp(2),dp(2),dp(2),dp(2));toolbar.addView(tool,lp);tool.setOnClickListener(v->{if(index==2){sizes.requestFocus();return;}if(index==3)openSectionProfilePicker();showProfilePanel(names[index],panels[index]);});}
+ LinearLayout toolbar=new LinearLayout(this);profilePage.addView(toolbar,1);String[] names={"Aufbau","Leitungen","Material","Berechnung","Abschnitte","Optionen"};String[] icons={"layers","pipe","layers","ruler","sections","settings"};LinearLayout[] panels={buildPanel,pipeDetails,null,null,sectionProfilePanel,optionsPanel};
+ for(int j=0;j<names.length;j++){final int index=j;Button tool=new Button(this);styleEditorButton(tool,false);compactToolIcon(tool,names[j],icons[j]);tool.setSingleLine(true);if(android.os.Build.VERSION.SDK_INT>=26)tool.setAutoSizeTextTypeUniformWithConfiguration(9,12,1,android.util.TypedValue.COMPLEX_UNIT_SP);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(54),1);lp.setMargins(dp(2),dp(2),dp(2),dp(2));toolbar.addView(tool,lp);tool.setOnClickListener(v->{if(index==2){openBelagsDetails();return;}if(index==3){if(length.length()>0)calculate();else notice("Trassenlänge eingeben.");return;}if(index==4)openSectionProfilePicker();showProfilePanel(names[index],panels[index]);});}
 
  LinearLayout profileFooter=new LinearLayout(this);profilePage.addView(profileFooter);
  Button standard=new Button(this),applyProfile=new Button(this);
@@ -5068,7 +5114,8 @@ public class MainActivity extends Activity {
    if(rows.isEmpty()){sectionProfilePanel.addView(sheetText("Keine Abschnitte vorhanden",15,false));return;}
    LinearLayout body=page();sectionProfilePanel.addView(body);
    body.addView(sheetText("Abschnitte der Trasse",16,true));
-   Spinner picker=new Spinner(this);body.addView(picker);picker.setVisibility(View.GONE);
+   final int[] selected={0};
+   final java.util.function.IntConsumer[] selectProfile={null};
    LinearLayout stationList=page();stationList.setBackground(editorShape(0xff202525,12));body.addView(stationList);
    for(int j=0;j<rows.size();j++){
     final int selection=j+1;org.json.JSONObject row=rows.get(j);
@@ -5077,12 +5124,10 @@ public class MainActivity extends Activity {
     LinearLayout labelsBox=new LinearLayout(this);labelsBox.setOrientation(1);item.addView(labelsBox,new LinearLayout.LayoutParams(0,-2,1));
     labelsBox.addView(sheetText(String.format(java.util.Locale.GERMANY,"Abschnitt %02d",selection),15,true));
     TextView range=sheetText(String.format(java.util.Locale.GERMANY,"%.2f – %.2f m",row.getDouble("from"),row.getDouble("to")),13,false);range.setTextColor(0xffaeb9b8);labelsBox.addView(range);
-    TextView arrow=sheetText("›",24,false);item.addView(arrow);item.setBackground(editorShape(0xff202525,8));item.setClickable(true);item.setFocusable(true);item.setOnClickListener(v->{picker.setSelection(selection);for(int k=0;k<stationList.getChildCount();k++){View child=stationList.getChildAt(k);if(child instanceof LinearLayout)child.setBackground(editorShape(child==item?0xff28564c:0xff202525,8));}});
+    TextView arrow=sheetText("›",24,false);item.addView(arrow);item.setBackground(editorShape(0xff202525,8));item.setClickable(true);item.setFocusable(true);item.setOnClickListener(v->{selectProfile[0].accept(selection);for(int k=0;k<stationList.getChildCount();k++){View child=stationList.getChildAt(k);if(child instanceof LinearLayout)child.setBackground(editorShape(child==item?0xff28564c:0xff202525,8));}});
     if(j<rows.size()-1){View line=new View(this);line.setBackgroundColor(0xff414848);stationList.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));}
    }
-   String[] labels=new String[rows.size()+1];labels[0]="Standardprofil";for(int i=0;i<rows.size();i++){org.json.JSONObject p=rows.get(i);labels[i+1]=String.format(java.util.Locale.GERMANY,"Abschnitt %02d · %.2f – %.2f m",i+1,p.getDouble("from"),p.getDouble("to"));}
-   picker.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,labels));
-   actionButtonSingle(body,"Standardprofil",()->{picker.setSelection(0);for(int k=0;k<stationList.getChildCount();k++){View child=stationList.getChildAt(k);if(child instanceof LinearLayout)child.setBackground(editorShape(0xff202525,8));}});
+   actionButtonSingle(body,"Standardprofil",()->{selectProfile[0].accept(0);for(int k=0;k<stationList.getChildCount();k++){View child=stationList.getChildAt(k);if(child instanceof LinearLayout)child.setBackground(editorShape(0xff202525,8));}});
    LinearLayout controls=page();body.addView(controls);PipeLayoutView view=new PipeLayoutView(this);controls.addView(view,new LinearLayout.LayoutParams(-1,dp(240)));
    EditText bw=new EditText(this),bd=new EditText(this);bw.setHint("Grabenbreite (m)");bd.setHint("Grabentiefe (m)");controls.addView(bw);utilitySlider(controls,bw,"Grabenbreite (m)",0.1,6,0.01,true);controls.addView(bd);utilitySlider(controls,bd,"Grabentiefe (m)",0.1,8,0.01,true);
    EditText cutL=new EditText(this),cutR=new EditText(this),topLayer=new EditText(this),baseLayer=new EditText(this);
@@ -5090,7 +5135,7 @@ public class MainActivity extends Activity {
    for(int j=0;j<extras.length;j++){extras[j].setHint(extraLabels[j]);controls.addView(extras[j]);utilitySlider(controls,extras[j],extraLabels[j],0,j<2?2:1,0.01,true);}
    TextView quantity=sheetText("",14,false);controls.addView(quantity);
    final boolean[] loading={false};
-   Runnable preview=()->{if(loading[0])return;try{org.json.JSONObject p=rows.get(picker.getSelectedItemPosition()-1);double ww=number(bw),dd=number(bd);if(!Double.isFinite(ww)||!Double.isFinite(dd)||ww<=0||dd<=0)return;view.setLayoutData(PipeLayoutStore.decode(p.getJSONArray("pipes").toString()),ww,dd);
+   Runnable preview=()->{if(loading[0])return;try{org.json.JSONObject p=rows.get(selected[0]-1);double ww=number(bw),dd=number(bd);if(!Double.isFinite(ww)||!Double.isFinite(dd)||ww<=0||dd<=0)return;view.setLayoutData(PipeLayoutStore.decode(p.getJSONArray("pipes").toString()),ww,dd);
     org.json.JSONObject seg=findSurfaceSection(p);String type=seg==null?covering:seg.optString("surface",covering);
     RouteSketch style=new RouteSketch(MainActivity.this,"[]");style.bindDimensionProject(activeProject);
     view.setAsphaltProfile("Asphalt".equals(type));
@@ -5098,10 +5143,10 @@ public class MainActivity extends Activity {
     quantity.setText(String.format(java.util.Locale.GERMANY,"Aushub (brutto): %.3f m³",(p.getDouble("to")-p.getDouble("from"))*ww*dd));}catch(Exception ignored){}};
    android.text.TextWatcher watcher=new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){preview.run();}public void afterTextChanged(android.text.Editable e){}};
    bw.addTextChangedListener(watcher);bd.addTextChangedListener(watcher);for(EditText field:extras)field.addTextChangedListener(watcher);
-   java.util.function.IntConsumer load=i->{boolean standard=i==0;controls.setVisibility(standard?View.GONE:View.VISIBLE);if(standard)return;org.json.JSONObject p=rows.get(i-1);loading[0]=true;bw.setText(String.valueOf(p.optDouble("width")));bd.setText(p.optDouble("depth")>0?String.valueOf(p.optDouble("depth")):"");org.json.JSONObject seg=findSurfaceSection(p);String[] keys={"left","right","topThickness","baseThickness"};for(int j=0;j<extras.length;j++)extras[j].setText(seg==null?"":seg.optString(keys[j],""));loading[0]=false;preview.run();};
-   onChoice(picker,load);load.accept(0);
+   java.util.function.IntConsumer load=i->{selected[0]=i;boolean standard=i==0;controls.setVisibility(standard?View.GONE:View.VISIBLE);if(standard)return;org.json.JSONObject p=rows.get(i-1);loading[0]=true;bw.setText(String.valueOf(p.optDouble("width")));bd.setText(p.optDouble("depth")>0?String.valueOf(p.optDouble("depth")):"");org.json.JSONObject seg=findSurfaceSection(p);String[] keys={"left","right","topThickness","baseThickness"};for(int j=0;j<extras.length;j++)extras[j].setText(seg==null?"":seg.optString(keys[j],""));loading[0]=false;preview.run();};
+   selectProfile[0]=load;load.accept(0);
    actionButtonSingle(controls,"Abschnitt speichern",()->{try{
-    int i=picker.getSelectedItemPosition()-1;org.json.JSONObject p=rows.get(i);double ww=number(bw),dd=number(bd);
+    int i=selected[0]-1;org.json.JSONObject p=rows.get(i);double ww=number(bw),dd=number(bd);
     double cl=optional(cutL),cr=optional(cutR),tl=optional(topLayer),bl=optional(baseLayer);
     if((Double.isFinite(tl)?tl:0)+(Double.isFinite(bl)?bl:0)>dd)throw new IllegalArgumentException("Schichtstärken überschreiten Grabentiefe");
     org.json.JSONArray nextSurfaces=new org.json.JSONArray(segments.toString());
