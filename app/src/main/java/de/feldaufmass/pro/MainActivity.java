@@ -368,12 +368,12 @@ public class MainActivity extends Activity {
     if(recordingGpsTrack){recordingGpsTrack=false;return;}
     if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=android.content.pm.PackageManager.PERMISSION_GRANTED){notice("Bitte zuerst GPS-Berechtigung erteilen.");return;}
     startLiveGps();if(liveManager==null){notice("GPS nicht verfügbar.");return;}recordingGpsTrack=true;notice("GPS-Aufzeichnung gestartet.");
-   }).setNeutralButton("Spur löschen",(d,w)->new android.app.AlertDialog.Builder(this).setMessage("Gespeicherte GPS-Spur wirklich löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(dd,ww)->{recordingGpsTrack=false;if(!getPreferences(0).edit().remove("independentGpsTrack").commit())notice("GPS-Spur konnte nicht gelöscht werden.");}).show()).setNegativeButton("Schließen",null).show();
+   }).setNeutralButton("Spur löschen",(d,w)->new android.app.AlertDialog.Builder(this).setMessage("Gespeicherte GPS-Spur wirklich löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(dd,ww)->{recordingGpsTrack=false;if(!getPreferences(0).edit().remove("independentGpsTrack").commit())notice("GPS-Spur konnte nicht gelöscht werden.");else if(livePreview!=null)livePreview.setIndependentGpsTrack(gpsTrack());}).show()).setNegativeButton("Schließen",null).show();
  }
 
  android.location.LocationManager liveManager;
  final android.location.LocationListener liveListener=new android.location.LocationListener(){
-  public void onLocationChanged(android.location.Location fix){liveFix=fix;appendGpsTrack(fix);if(livePreview!=null)livePreview.setLiveFix(fix);}
+  public void onLocationChanged(android.location.Location fix){liveFix=fix;appendGpsTrack(fix);if(livePreview!=null)livePreview.setLiveFix(fix);if(livePreview!=null&&recordingGpsTrack)livePreview.setIndependentGpsTrack(gpsTrack());}
   public void onProviderDisabled(String provider){liveFix=null;if(livePreview!=null)livePreview.setLiveFix(null);}
   public void onProviderEnabled(String provider){}
   public void onStatusChanged(String provider,int status,android.os.Bundle extras){}
@@ -398,11 +398,15 @@ public class MainActivity extends Activity {
    else mask&=~RouteSketch.LAYER_SURFACE_DIMENSIONS;
    prefs.edit().putInt(activeProject,mask).putBoolean("surfaceDimensionsMigrated:"+activeProject,true).apply();
   }
+  if(!prefs.getBoolean("gpsTrackLayerMigrated:"+activeProject,false)){
+   mask|=RouteSketch.LAYER_GPS_TRACK;
+   prefs.edit().putInt(activeProject,mask).putBoolean("gpsTrackLayerMigrated:"+activeProject,true).apply();
+  }
   return mask;
  }
  void showDrawingLayers(){
-  String[] labels={"Leitungsverlauf / Punkte","Bemaßung","Punktnamen","GPS / Standort","Fotodokumentation","Objekte","Oberflächen","Oberflächenbemaßung"};
-  int[] masks={RouteSketch.LAYER_ROUTE,RouteSketch.LAYER_DIMENSIONS,RouteSketch.LAYER_NAMES,RouteSketch.LAYER_GPS,RouteSketch.LAYER_PHOTOS,RouteSketch.LAYER_OBJECTS,RouteSketch.LAYER_SURFACES,RouteSketch.LAYER_SURFACE_DIMENSIONS};
+  String[] labels={"Leitungsverlauf / Punkte","Bemaßung","Punktnamen","GPS / Standort","Fotodokumentation","Objekte","Oberflächen","Oberflächenbemaßung","GPS-Aufzeichnung"};
+  int[] masks={RouteSketch.LAYER_ROUTE,RouteSketch.LAYER_DIMENSIONS,RouteSketch.LAYER_NAMES,RouteSketch.LAYER_GPS,RouteSketch.LAYER_PHOTOS,RouteSketch.LAYER_OBJECTS,RouteSketch.LAYER_SURFACES,RouteSketch.LAYER_SURFACE_DIMENSIONS,RouteSketch.LAYER_GPS_TRACK};
   boolean[] checked=new boolean[labels.length];int current=drawingLayers();
   for(int j=0;j<labels.length;j++)checked[j]=(current&masks[j])!=0;
   new android.app.AlertDialog.Builder(this).setTitle("Zeichnungsebenen")
@@ -439,7 +443,7 @@ public class MainActivity extends Activity {
  void refreshRoute(){
   routePreviewBox.removeAllViews();
   RouteSketch preview=new RouteSketch(this,routeData());preview.bindDimensionProject(activeProject);
-  livePreview=preview;preview.setVisibleLayers(drawingLayers());preview.setLiveFix(liveFix);
+  livePreview=preview;preview.setVisibleLayers(drawingLayers());preview.setLiveFix(liveFix);preview.setIndependentGpsTrack(gpsTrack());
   preview.pointSelected=i->{selectedPoint=preview.vertices.get(i).id;refreshRoute();pointMenu();};
   preview.selected=i->measureSegment(preview,i);
   preview.changed=()->{saveRoute(preview);refreshRoute();};
@@ -1042,7 +1046,7 @@ public class MainActivity extends Activity {
  void editRoute(boolean measure,boolean startFullscreen){
   LinearLayout form=page();
   ScrollView scroll=new ScrollView(this);scroll.addView(form);
-  RouteSketch route=new RouteSketch(this,routeData());route.editable=true;route.bindDimensionProject(activeProject);
+  RouteSketch route=new RouteSketch(this,routeData());route.editable=true;route.bindDimensionProject(activeProject);route.setIndependentGpsTrack(gpsTrack());route.setVisibleLayers(drawingLayers());
   TextView hint=sheetText("Trasse mit dem Finger zeichnen. Loslassen zum Bearbeiten.",15,false);
   form.addView(hint);
   Button fullscreen=new Button(this);fullscreen.setAllCaps(false);fullscreen.setText("⛶ Vollbild");form.addView(fullscreen);
