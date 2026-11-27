@@ -137,7 +137,7 @@ public class MainActivity extends Activity {
   }
   if(manifest==null||!"FeldaufmassPro".equals(manifest.optString("format"))||manifest.optInt("version")!=1)throw new java.io.IOException("Unbekanntes Sicherungsformat");
   org.json.JSONObject fields=manifest.getJSONObject("preferences");
-  java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","sollUtilities","montageFittings","metricWidthSections","objectUndo","objectRedo","elevationPoints","lvPositions","dailyReports","nachtraege","routeUnderlay","routeUnderlayTransform","sketchCalibration"));
+  java.util.Set<String> strings=new java.util.HashSet<>(java.util.Arrays.asList("project","length","width","depth","base","pipe","asphalt","left","right","stoneLength","stoneWidth","stoneDepth","stoneColor","pattern","bedding","underlying","stationFrom","stationTo","objectStation","objectNote","sollLength","sollWidth","sollDepth","sollAsphalt","sollSource","routeSketch","objects","segments","documents","sollUtilities","montageFittings","metricWidthSections","objectUndo","objectRedo","elevationPoints","lvPositions","dailyReports","nachtraege","routeUnderlay","routeUnderlayTransform","sketchCalibration","independentGpsTrack"));
   strings.addAll(java.util.Arrays.asList("metricAreaCorrection","metricAreaCorrectionReason","metricCrossSectionDimensions",
       "metricDepthSections","metricElevationPoints","metricMainExcavationDepth","metricMinimumCover","metricPipeMinGap",
       "metricPipeMinCover","metricPipeProfile","extraUtilities",MontageProtocols.KEY,MontageConnections.KEY,PipeLayoutStore.KEY,PipeLayoutStore.SECTION_KEY,"metricVerbauSections",RouteBranchStore.KEY));
@@ -148,7 +148,10 @@ public class MainActivity extends Activity {
    String key=keys.next();org.json.JSONObject field=fields.getJSONObject(key);String type=field.getString("type");Object value=field.get("value");
    if(strings.contains(key)&&type.equals("String")&&value instanceof String){
     String v=(String)value;
-    if(key.equals("routeSketch")){
+    if(key.equals("independentGpsTrack")){
+     org.json.JSONArray rows=new org.json.JSONArray(v);if(rows.length()>10000)throw new java.io.IOException("GPS-Punktlimit überschritten");
+     long previous=0;for(int j=0;j<rows.length();j++){org.json.JSONObject row=rows.getJSONObject(j);double lat=row.getDouble("lat"),lon=row.getDouble("lon"),accuracy=row.getDouble("accuracy");long time=row.getLong("time");if(!Double.isFinite(lat)||!Double.isFinite(lon)||!Double.isFinite(accuracy)||Math.abs(lat)>90||Math.abs(lon)>180||accuracy<=0||accuracy>15||time<=previous)throw new java.io.IOException("Ungültige GPS-Spur");previous=time;}
+    }else if(key.equals("routeSketch")){
      org.json.JSONArray rows=new org.json.JSONArray(v);
      for(int j=0;j<rows.length();j++){
       org.json.JSONArray row=rows.getJSONArray(j);double x=row.getDouble(0),y=row.getDouble(1);
