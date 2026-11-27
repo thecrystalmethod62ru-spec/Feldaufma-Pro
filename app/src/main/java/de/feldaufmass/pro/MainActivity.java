@@ -1367,6 +1367,15 @@ public class MainActivity extends Activity {
   PipeLayoutView fullCross=new PipeLayoutView(this);profileWork.addView(fullCross,new LinearLayout.LayoutParams(0,-1,3));
   LinearLayout profileInfo=new LinearLayout(this);profileInfo.setOrientation(1);profileInfo.setPadding(dp(8),dp(8),dp(8),dp(8));profileInfo.setBackgroundColor(0xff101c1e);
   ScrollView profileInfoScroll=new ScrollView(this);profileInfoScroll.addView(profileInfo);profileWork.addView(profileInfoScroll,new LinearLayout.LayoutParams(0,-1,2));
+  profileWork.addOnLayoutChangeListener((view,left,top,right,bottom,oldLeft,oldTop,oldRight,oldBottom)->{
+   if(right<=left||bottom<=top)return;
+   boolean wide=right-left>=dp(560);
+   int orientation=wide?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL;
+   if(profileWork.getOrientation()==orientation)return;
+   profileWork.setOrientation(orientation);
+   fullCross.setLayoutParams(wide?new LinearLayout.LayoutParams(0,-1,3):new LinearLayout.LayoutParams(-1,0,3));
+   profileInfoScroll.setLayoutParams(wide?new LinearLayout.LayoutParams(0,-1,2):new LinearLayout.LayoutParams(-1,0,2));
+  });
   TextView profileDimensions=sheetText("",14,true);profileDimensions.setTextColor(0xff28d5c7);profileInfo.addView(sheetText("Profilparameter",14,true));profileInfo.addView(profileDimensions);
   TextView profileMaterial=sheetText("",12,false);profileMaterial.setTextColor(0xffcbd6d5);profileInfo.addView(profileMaterial);
   Button profileEdit=new Button(this);profileEdit.setText("Maße bearbeiten");styleEditorButton(profileEdit,false);profileInfo.addView(profileEdit);
