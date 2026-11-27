@@ -46,38 +46,46 @@ public class UiScreenshotTest {
  @Test public void normalLandscape() throws Exception {editor(false,true,"03-normal-landscape");}
  @Test public void fullPortrait() throws Exception {editor(true,false,"04-full-portrait");}
  @Test public void fullLandscape() throws Exception {editor(true,true,"05-full-landscape");}
- private android.graphics.Rect findTab(android.view.accessibility.AccessibilityNodeInfo node){
-  if(node==null)return null;
-  if(("Regelprofil".contentEquals(node.getContentDescription()==null?"":node.getContentDescription()) || "Regelprofil".contentEquals(node.getText()==null?"":node.getText())) && node.isVisibleToUser() && node.isClickable()){
-   android.graphics.Rect r=new android.graphics.Rect();node.getBoundsInScreen(r);if(!r.isEmpty())return r;
+ private android.widget.Button visibleButton(android.view.View view,String label){
+  if(view instanceof android.widget.Button){
+   android.widget.Button b=(android.widget.Button)view;
+   android.graphics.Rect bounds=new android.graphics.Rect();
+   if(label.contentEquals(b.getText())&&b.isShown()&&b.isEnabled()&&b.isClickable()&&b.getGlobalVisibleRect(bounds)&&!bounds.isEmpty())return b;
   }
-  for(int i=0;i<node.getChildCount();i++){android.graphics.Rect r=findTab(node.getChild(i));if(r!=null)return r;}
+  if(view instanceof android.view.ViewGroup){
+   android.view.ViewGroup group=(android.view.ViewGroup)view;
+   for(int i=0;i<group.getChildCount();i++){
+    android.widget.Button b=visibleButton(group.getChildAt(i),label);if(b!=null)return b;
+   }
+  }
   return null;
  }
+ @androidx.test.filters.SdkSuppress(minSdkVersion=29)
  @Test public void regelprofil() throws Exception {
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    scenario.onActivity(a->{a.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);a.enterProject();});
    android.os.SystemClock.sleep(1000);
    scenario.onActivity(a->a.editRoute(false,true));
-   android.app.Instrumentation inst=InstrumentationRegistry.getInstrumentation();
-   android.app.UiAutomation automation=inst.getUiAutomation();
-   android.accessibilityservice.AccessibilityServiceInfo info=automation.getServiceInfo();
-   info.flags |= android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS;
-   automation.setServiceInfo(info);
-   android.graphics.Rect bounds=null;
-   for(int attempt=0;attempt<40 && bounds==null;attempt++){
-    android.os.SystemClock.sleep(250);
-    android.view.accessibility.AccessibilityNodeInfo root=automation.getRootInActiveWindow();
-    bounds=findTab(root);
-    if(bounds==null)for(android.view.accessibility.AccessibilityWindowInfo window:automation.getWindows()){
-     bounds=findTab(window.getRoot());if(bounds!=null)break;
-    }
+   boolean[] opened={false};
+   for(int attempt=0;attempt<40&&!opened[0];attempt++){
+    InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+    scenario.onActivity(a->{
+     for(android.view.View root:android.view.inspector.WindowInspector.getGlobalWindowViews()){
+      android.widget.Button tab=visibleButton(root,"Regelprofil");
+      if(tab!=null){assertTrue(tab.performClick());opened[0]=true;break;}
+     }
+    });
+    if(!opened[0])android.os.SystemClock.sleep(250);
    }
-   assertNotNull("Regelprofil tab not visible",bounds);
-   long now=android.os.SystemClock.uptimeMillis();
-   android.view.MotionEvent down=android.view.MotionEvent.obtain(now,now,0,bounds.centerX(),bounds.centerY(),0);
-   android.view.MotionEvent up=android.view.MotionEvent.obtain(now,now+50,1,bounds.centerX(),bounds.centerY(),0);
-   try{assertTrue(automation.injectInputEvent(down,true));assertTrue(automation.injectInputEvent(up,true));}finally{down.recycle();up.recycle();}
+   assertTrue("Regelprofil tab not visible",opened[0]);
+   InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+   scenario.onActivity(a->{
+    boolean visible=false;
+    for(android.view.View root:android.view.inspector.WindowInspector.getGlobalWindowViews()){
+     if(visibleButton(root,"Maße bearbeiten")!=null){visible=true;break;}
+    }
+    assertTrue("Regelprofil content not visible after switching tabs",visible);
+   });
    capture("06-regelprofil");
   }
  }
