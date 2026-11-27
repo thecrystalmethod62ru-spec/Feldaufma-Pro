@@ -45,19 +45,25 @@ final class ProjectPlanPdf {
         int sections=Math.max(0,route.vertices.size()-1);
         JSONArray profiles=new PipeLayoutStore(activity.getPreferences(0)).sections();
         double totalVolume=activity.currentTrenchQuantities()[1];
-        boolean stationVolumes=Double.isFinite(totalVolume)&&Math.abs(route.measuredLength()-activity.l)<.001;
+        boolean stationVolumes=sections>0&&activity.l>0&&activity.w>0&&activity.d>0&&Double.isFinite(totalVolume)&&Math.abs(route.measuredLength()-activity.l)<.001;
         double station=0;
         for(int first=0;first<Math.max(1,sections);first+=ROWS){
             PdfDocument.Page page=pdf.startPage(new PdfDocument.PageInfo.Builder(842,595,next++).create());
             try{
                 Canvas c=page.getCanvas();
                 label(c,activity.projectHeader.getText().toString(),26,39,25,600,true);
-                label(c,"Abschnittsplan · Lage und Aufmaß",26,61,13,550,false);
+                label(c,sections>0?"Abschnittsplan · Lage und Aufmaß":"Lageplan · Einzelobjekte",26,61,13,550,false);
                 label(c,"Feldaufmaß Pro",667,43,16,155,true);
                 pen.setColor(INK);c.drawLine(26,76,816,76,pen);
                 pen.setColor(0xffedf2f5);c.drawRect(26,91,214,535,pen);
                 label(c,"Abschnitte",39,121,18,168,true);
                 if(sections==0)label(c,"Keine Trassenabschnitte",39,150,12,164,false);
+                if(sections==0&&!route.singleObjects.isEmpty()){
+                    label(c,"Einzelobjekte",39,183,14,164,true);
+                    for(int i=0;i<Math.min(10,route.singleObjects.size());i++)
+                        label(c,(i+1)+". "+route.singleObjects.get(i).type,39,205+i*23,12,164,false);
+                    if(route.singleObjects.size()>10)label(c,"Weitere: "+(route.singleObjects.size()-10),39,445,11,164,false);
+                }
                 for(int i=first;i<Math.min(sections,first+ROWS);i++){
                     double length=route.vertices.get(i+1).metres;
                     int y=155+(i-first)*59;
@@ -76,7 +82,7 @@ final class ProjectPlanPdf {
                     label(c,detail,39,y+33,11,164,false);
                     station+=length;
                 }
-                if(Double.isFinite(totalVolume))label(c,String.format(Locale.GERMANY,"Aushub   %.2f m³",totalVolume),39,521,13,164,true);
+                if(profileAvailable()&&activity.l>0&&Double.isFinite(totalVolume))label(c,String.format(Locale.GERMANY,"Aushub   %.2f m³",totalVolume),39,521,13,164,true);
                 label(c,sections>0?"Gesamttrasse":"Lageplan",228,116,16,580,true);
                 if(route.vertices.isEmpty()&&route.singleObjects.isEmpty()&&activity.l>0)
                     view(c,activity.new Sketch(),228,128,581,271);
