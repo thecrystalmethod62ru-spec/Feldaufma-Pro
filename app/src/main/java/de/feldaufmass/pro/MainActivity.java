@@ -1333,7 +1333,8 @@ public class MainActivity extends Activity {
   icon.setBounds(0,0,dp(20),dp(20));button.setText(label);button.setContentDescription(label);button.setCompoundDrawables(null,icon,null,null);button.setCompoundDrawablePadding(dp(3));button.setGravity(Gravity.CENTER);button.setMinHeight(dp(52));button.setTextSize(12);
  }
  void saveReferenceSection(RouteSketch route,double from,double to,double ww,double dd,String type,boolean recut,double total,double leftCut,double rightCut)throws Exception{
-   if(!Double.isFinite(ww)||!Double.isFinite(dd)||!Double.isFinite(total)||ww<=0||dd<=0||total<ww)throw new IllegalArgumentException("Ungültige Maße");
+   if(!Double.isFinite(from)||!Double.isFinite(to)||from<0||to<=from||!Double.isFinite(ww)||!Double.isFinite(dd)||!Double.isFinite(total)||ww<=0||dd<=0||total<ww)throw new IllegalArgumentException("Ungültige Maße");
+   if(recut&&(!Double.isFinite(leftCut)||!Double.isFinite(rightCut)||leftCut<0||rightCut<0))throw new IllegalArgumentException("Ungültiger Rückschnitt");
    JSONArray next=new JSONArray(segments.toString());JSONObject row=null;for(int j=0;j<next.length();j++){JSONObject p=next.getJSONObject(j);double a=p.getDouble("from"),b=p.getDouble("to");if(a==from&&b==to)row=p;else if(from<b&&to>a)throw new IllegalArgumentException("Oberflächenabschnitte überlappen");}
    if(row==null){row=new JSONObject().put("from",from).put("to",to);next.put(row);}
    if(type.isEmpty())throw new IllegalArgumentException("Oberfläche eingeben");
