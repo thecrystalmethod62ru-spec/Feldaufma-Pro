@@ -1509,7 +1509,7 @@ public class MainActivity extends Activity {
    }
   });
   canvasFrame.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(restoreTools.getVisibility()==View.VISIBLE){restoreTools.setX(Math.max(0,Math.min(canvasFrame.getWidth()-restoreTools.getWidth(),restoreTools.getX())));restoreTools.setY(Math.max(0,Math.min(canvasFrame.getHeight()-restoreTools.getHeight(),restoreTools.getY())));}});
-  restoreTools.setOnClickListener(v->{immersive[0]=immersiveInitially;if(!immersive[0]&&full.getWindow()!=null)androidx.core.view.WindowCompat.getInsetsController(full.getWindow(),root).show(androidx.core.view.WindowInsetsCompat.Type.systemBars());for(View bar:new View[]{header,viewTabs,tools,save,sectionStrip})bar.setVisibility(View.VISIBLE);if(landscapeSections[0])layerPanel.setVisibility(View.VISIBLE);restoreTools.setVisibility(View.GONE);floatingSave.setVisibility(View.GONE);});
+  restoreTools.setOnClickListener(v->{immersive[0]=immersiveInitially;if(!immersive[0]&&full.getWindow()!=null)androidx.core.view.WindowCompat.getInsetsController(full.getWindow(),root).show(androidx.core.view.WindowInsetsCompat.Type.systemBars());for(View bar:new View[]{header,viewTabs,save,sectionStrip})bar.setVisibility(View.VISIBLE);tools.setVisibility(profilePage.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE);if(landscapeSections[0])layerPanel.setVisibility(View.VISIBLE);restoreTools.setVisibility(View.GONE);floatingSave.setVisibility(View.GONE);});
   full.setContentView(root);
   full.setOnDismissListener(d->{
    int maxX=Math.max(0,canvasFrame.getWidth()-floatingProfile.getWidth()),maxY=Math.max(0,canvasFrame.getHeight()-floatingProfile.getHeight());
