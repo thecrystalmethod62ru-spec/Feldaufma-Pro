@@ -2035,6 +2035,46 @@ public class MainActivity extends Activity {
   }
   dialog.show();
  }
+ void chooseFittingStation(String projectId,EditText field){
+  if(!projectId.equals(activeProject)){notice("Projekt wurde gewechselt.");return;}
+  double max;
+  try{max=Double.parseDouble(getPreferences(0).getString("length","").trim().replace(',','.'));}
+  catch(NumberFormatException ex){max=Double.NaN;}
+  if(!Double.isFinite(max)||max<=0){notice("Zuerst gültige Trassenlänge erfassen.");return;}
+  java.util.TreeMap<Double,String> stations=new java.util.TreeMap<>();
+  stations.put(0.0,"");stations.put(max,"");
+  org.json.JSONArray utilities=extraUtilities();
+  for(int j=0;j<utilities.length();j++){
+   org.json.JSONObject utility=utilities.optJSONObject(j);
+   if(utility==null)continue;
+   for(String key:new String[]{"routeFrom","routeTo"}){
+    double value=utility.optDouble(key);
+    if(Double.isFinite(value)&&value>=0&&value<=max)stations.put(value,"");
+   }
+  }
+  RouteSketch route=new RouteSketch(this,routeData());
+  java.math.BigDecimal distance=java.math.BigDecimal.ZERO;
+  for(int j=0;j<route.vertices.size();j++){
+   RouteSketch.Vertex point=route.vertices.get(j);
+   if(j>0){
+    if(!Double.isFinite(point.metres)||point.metres<=0)break;
+    distance=distance.add(java.math.BigDecimal.valueOf(point.metres));
+   }
+   double value=distance.doubleValue();
+   if(value>max)break;
+   String name=point.name.trim();
+   stations.put(value," · Punkt "+(j+1)+(name.isEmpty()?"":" · "+name));
+  }
+  java.util.List<Double> values=new java.util.ArrayList<>(stations.keySet());
+  String[] labels=new String[values.size()];
+  for(int j=0;j<labels.length;j++){
+   double value=values.get(j);
+   labels[j]=String.format(java.util.Locale.GERMANY,"Station %.3f m",value)+stations.get(value);
+  }
+  new android.app.AlertDialog.Builder(this).setTitle("Trassen- und Leitungsstationen")
+   .setItems(labels,(d,j)->field.setText(java.math.BigDecimal.valueOf(values.get(j)).stripTrailingZeros().toPlainString()))
+   .setNegativeButton("Abbrechen",null).show();
+ }
  void showMontageFitting(MontageCatalog.Fitting fitting, org.json.JSONObject original){
   showMontageFitting(fitting,original,null,null,null);
  }
@@ -2050,7 +2090,7 @@ public class MainActivity extends Activity {
   android.widget.CheckBox mirror=new android.widget.CheckBox(this);mirror.setText("Spiegeln");panel.addView(mirror);
   EditText station=new EditText(this);station.setHint("Station Tiefbau (m, optional)");station.setInputType(8194);panel.addView(station);
   Button pickStation=new Button(this);pickStation.setText("Station aus Projekt wählen");panel.addView(pickStation);
-  pickStation.setOnClickListener(v->{try{if(!projectId.equals(activeProject)){notice("Projekt wurde gewechselt.");return;}double max=Double.parseDouble(getPreferences(0).getString("length","").trim().replace(',','.'));if(!Double.isFinite(max)||max<=0)throw new IllegalArgumentException();java.util.TreeSet<Double> points=new java.util.TreeSet<>();points.add(0.0);points.add(max);org.json.JSONArray utilities=extraUtilities();for(int j=0;j<utilities.length();j++){org.json.JSONObject u=utilities.optJSONObject(j);if(u==null)continue;for(String key:new String[]{"routeFrom","routeTo"}){double value=u.optDouble(key);if(Double.isFinite(value)&&value>=0&&value<=max)points.add(value);}}java.util.List<Double> values=new java.util.ArrayList<>(points);String[] labels=new String[values.size()];for(int j=0;j<labels.length;j++)labels[j]=String.format(java.util.Locale.GERMANY,"Station %.3f m",values.get(j));new android.app.AlertDialog.Builder(this).setTitle("Trassen- und Leitungsstationen").setItems(labels,(dd,j)->station.setText(java.math.BigDecimal.valueOf(values.get(j)).stripTrailingZeros().toPlainString())).setNegativeButton("Abbrechen",null).show();}catch(Exception ex){notice("Zuerst gültige Trassenlänge erfassen.");}});
+  pickStation.setOnClickListener(v->chooseFittingStation(projectId,station));
   EditText offset=new EditText(this);offset.setHint("Seitlicher Versatz (m, + rechts / − links)");offset.setInputType(8194|4096);panel.addView(offset);
   android.widget.SeekBar offsetSlider=new android.widget.SeekBar(this);offsetSlider.setMax(1000);offsetSlider.setProgress(500);offsetSlider.setContentDescription("Seitlicher Versatz minus fünf bis plus fünf Meter");panel.addView(offsetSlider);
   TextView offsetRange=new TextView(this);offsetRange.setText("−5 m links · 0 m · +5 m rechts");panel.addView(offsetRange);

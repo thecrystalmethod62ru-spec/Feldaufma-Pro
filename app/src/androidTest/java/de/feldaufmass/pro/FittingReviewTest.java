@@ -24,7 +24,8 @@ public class FittingReviewTest {
                 scenario.onActivity(activity->{
                     original[0]=activity.activeProject;
                     activity.activeProject=id;
-                    assertTrue(activity.projectStorage(id).edit().putString("length","20").commit());
+                    assertTrue(activity.projectStorage(id).edit().putString("length","20")
+                        .putString("routeSketch","[[0,0],[1,0,6.25,\"p2\",[],null,null,null,\"Schacht\"],[2,0],[3,0,2]]").commit());
                     activity.reviewFittingText("Blatt A",bend+"\nMuffe");
                 });
                 onView(withText("Zeile 2 · Muffe")).perform(click());
@@ -33,6 +34,9 @@ public class FittingReviewTest {
                 onView(withText("Zum Projekt hinzufügen")).perform(click());
                 onView(withText("Zeile 1 · "+bend)).check(doesNotExist());
                 onView(withText("Zeile 2 · Muffe")).perform(click());
+                onView(withText("Station aus Projekt wählen")).perform(androidx.test.espresso.action.ViewActions.scrollTo(),click());
+                onView(withText("Station 8,250 m · Punkt 4")).check(doesNotExist());
+                onView(withText("Station 6,250 m · Punkt 2 · Schacht")).perform(click());
                 onView(withText("Zum Projekt hinzufügen")).perform(click());
                 scenario.onActivity(activity->{
                     try {
@@ -42,6 +46,7 @@ public class FittingReviewTest {
                         assertFalse(items.getJSONObject(0).getBoolean("installed"));
                         assertEquals(12.5,items.getJSONObject(0).getDouble("station"),0);
                         assertEquals("Blatt A",items.getJSONObject(0).getString("sourceName"));
+                        assertEquals(6.25,items.getJSONObject(1).getDouble("station"),0);
                         assertEquals(2,items.getJSONObject(1).getInt("sourceLineNumber"));
                         assertFalse(items.getJSONObject(1).getBoolean("installed"));
                     } catch (JSONException e) {throw new AssertionError(e);}
