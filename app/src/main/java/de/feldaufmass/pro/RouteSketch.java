@@ -760,7 +760,7 @@ final class RouteSketch extends View {
    if(!vertices.isEmpty()&&distance(vertices.get(vertices.size()-1).point,p)<.00001)continue;
    vertices.add(new Vertex(new PointF(p.x,p.y),Double.NaN));
   }
-  stroke.clear();if(changed!=null)changed.run();invalidate();
+  stroke.clear();if(vertices.size()>Math.max(1,before)){moving=true;dimensioning=false;}if(changed!=null)changed.run();invalidate();
   if(vertices.size()>Math.max(1,before)&&strokeAdded!=null){int first=Math.max(1,before);post(()->strokeAdded.select(first));}
  }
  private void finishStroke(){
@@ -770,7 +770,7 @@ final class RouteSketch extends View {
   if(original.size()==2&&distance(original.get(0),original.get(1))<.02){stroke.clear();return;}
   ArrayList<PointF> straight=simplifiedStroke(original,.023);
   if(straight.size()==original.size()){appendStroke(original);return;}
-  if(darkEditor){appendStroke(straight);return;}
+  if(editable){appendStroke(straight);return;}
   new android.app.AlertDialog.Builder(getContext())
    .setTitle("Freihandlinie begradigen?")
    .setMessage("Die Skizze kann vereinfacht werden. Vorhandene Punkte und Aufmaßwerte bleiben unverändert.")
@@ -784,7 +784,7 @@ final class RouteSketch extends View {
   if(!editable && pointSelected==null)return false;
   int action=event.getActionMasked();
   if(event.getPointerCount()>=2&&activeDimension!=null){restoreDimensionDrag();activeDimension=null;}
-  if(editable&&moving&&!placingObject&&!editingObjects&&action==MotionEvent.ACTION_DOWN){
+  if(editable&&moving&&!placingObject&&!editingObjects&&action==MotionEvent.ACTION_DOWN&&(!layerVisible(LAYER_ROUTE)||nearestPoint(event.getX(),event.getY())<0)){
    for(int i=dimensionHits.size()-1;i>=0;i--){
     DimensionHit hit=dimensionHits.get(i);
     if(hit.bounds.contains(event.getX(),event.getY())){
@@ -826,6 +826,7 @@ final class RouteSketch extends View {
    case MotionEvent.ACTION_DOWN:
     getParent().requestDisallowInterceptTouchEvent(true);
     stroke.clear();
+    if(moving&&!placingObject&&!editingObjects&&tappedPoint>=0){dragged=tappedPoint;highlight=dragged;invalidate();return true;}
     resizeAxis=0;if((editingObjects||moving)&&selectedResizeObject>=0&&layerVisible(LAYER_OBJECTS)){org.json.JSONObject o=stationObjects.optJSONObject(selectedResizeObject);if(o!=null){resizeAxis=resizeHandle(objectFootprint(o),(event.getX()-left())/scale(),(event.getY()-top())/scale());if(resizeAxis!=0){draggedObject=selectedResizeObject;objectBefore=o.toString();dragged=-1;return true;}}}
     if(editingObjects||moving){java.util.ArrayList<Integer> hits=objectCandidates((event.getX()-left())/scale(),(event.getY()-top())/scale(),12*getResources().getDisplayMetrics().density/scale());if(hits.size()==1){draggedObject=hits.get(0);org.json.JSONObject o=stationObjects.optJSONObject(draggedObject);ObjectFootprint f=objectFootprint(o);objectBefore=o.toString();objectGrabX=(event.getX()-left())/scale()-f.center.x;objectGrabY=(event.getY()-top())/scale()-f.center.y;dragged=-1;return true;}}
     if(placingObject||editingObjects){dragged=-1;return true;}
