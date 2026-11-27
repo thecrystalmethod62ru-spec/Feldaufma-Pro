@@ -1349,11 +1349,11 @@ public class MainActivity extends Activity {
   LinearLayout profilePage=new LinearLayout(this);profilePage.setOrientation(1);profilePage.setBackgroundColor(Color.BLACK);profilePage.setVisibility(View.GONE);
   TextView profilePageTitle=sheetText("Regelprofil",16,true);profilePageTitle.setTextColor(Color.WHITE);profilePage.addView(profilePageTitle);
   PipeLayoutView fullCross=new PipeLayoutView(this);profilePage.addView(fullCross,new LinearLayout.LayoutParams(-1,0,1));
-  Button editSectionProfile=new Button(this);styleEditorButton(editSectionProfile,false);compactToolIcon(editSectionProfile,"Abschnitt bearbeiten","settings");profilePage.addView(editSectionProfile,new LinearLayout.LayoutParams(-1,dp(54)));editSectionProfile.setOnClickListener(v->{if(sectionProfilePanel.getParent()!=null)return;openSectionProfilePicker();showProfilePanel("Abschnitte",sectionProfilePanel);});
+  Button editSectionProfile=new Button(this);styleEditorButton(editSectionProfile,false);compactToolIcon(editSectionProfile,"Abschnitt bearbeiten","settings");LinearLayout profileActions=new LinearLayout(this);profilePage.addView(profileActions,new LinearLayout.LayoutParams(-1,dp(40)));profileActions.addView(editSectionProfile,new LinearLayout.LayoutParams(0,-1,1));editSectionProfile.setOnClickListener(v->{if(sectionProfilePanel.getParent()!=null)return;openSectionProfilePicker();showProfilePanel("Abschnitte",sectionProfilePanel);});
   canvasFrame.addView(profilePage,new android.widget.FrameLayout.LayoutParams(-1,-1));
   Runnable refreshFullProfile=()->{profilePageTitle.setText(selectedSection[0]<0?"Regelprofil · Standardprofil":"Regelprofil · "+sectionPosition.getText());showBaseCross.accept(fullCross);if(selectedSection[0]<0||selectedSection[0]+1>=route.vertices.size())return;double start=0;for(int j=0;j<selectedSection[0];j++)start+=route.vertices.get(j+1).metres;double end=start+route.vertices.get(selectedSection[0]+1).metres;try{org.json.JSONArray rows=new PipeLayoutStore(getPreferences(0)).sections();for(int j=0;j<rows.length();j++){org.json.JSONObject p=rows.getJSONObject(j);if(Math.abs(p.optDouble("from")-start)>0.001||Math.abs(p.optDouble("to")-end)>0.001)continue;double w=p.optDouble("width"),d=p.optDouble("depth");if(w>0&&d>0){fullCross.setLayoutData(PipeLayoutStore.decode(p.getJSONArray("pipes").toString()),w,d);fullCross.setVisibility(View.VISIBLE);}break;}}catch(Exception ignored){}};
   Button baseSettings=new Button(this);styleEditorButton(baseSettings,false);compactToolIcon(baseSettings,"Standardprofil einstellen","settings");
-  profilePage.addView(baseSettings,new LinearLayout.LayoutParams(-1,dp(48)));
+  profileActions.addView(baseSettings,new LinearLayout.LayoutParams(0,-1,1));for(Button b:new Button[]{editSectionProfile,baseSettings}){android.graphics.drawable.Drawable icon=b.getCompoundDrawables()[1];b.setCompoundDrawables(icon,null,null,null);b.setMinHeight(0);b.setMinimumHeight(0);b.setTextSize(12);b.setPadding(dp(6),0,dp(6),0);}
   baseSettings.setOnClickListener(v->{
    LinearLayout fields=new LinearLayout(this);fields.setOrientation(1);fields.setPadding(dp(20),dp(8),dp(20),dp(8));
    EditText bw=new EditText(this),bd=new EditText(this);
@@ -1373,8 +1373,8 @@ public class MainActivity extends Activity {
     updateFloatingCross.run();refreshFullProfile.run();dialog.dismiss();
    }catch(Exception ex){bw.setError("Positive Maße eingeben");bd.setError("Positive Maße eingeben");}});
   });
-  drawingTab.setOnClickListener(v->{profilePage.setVisibility(View.GONE);route.setVisibility(View.VISIBLE);floatingProfile.setVisibility(View.VISIBLE);styleEditorButton(drawingTab,true);styleEditorButton(profileTab,false);});
-  profileTab.setOnClickListener(v->{route.setVisibility(View.GONE);floatingProfile.setVisibility(View.GONE);profilePage.setVisibility(View.VISIBLE);styleEditorButton(drawingTab,false);styleEditorButton(profileTab,true);refreshFullProfile.run();});
+  drawingTab.setOnClickListener(v->{profilePage.setVisibility(View.GONE);route.setVisibility(View.VISIBLE);floatingProfile.setVisibility(View.VISIBLE);controls.setVisibility(View.VISIBLE);historyBar.setVisibility(View.VISIBLE);tools.setVisibility(View.VISIBLE);styleEditorButton(drawingTab,true);styleEditorButton(profileTab,false);});
+  profileTab.setOnClickListener(v->{route.setVisibility(View.GONE);floatingProfile.setVisibility(View.GONE);controls.setVisibility(View.GONE);historyBar.setVisibility(View.GONE);tools.setVisibility(View.GONE);profilePage.setVisibility(View.VISIBLE);styleEditorButton(drawingTab,false);styleEditorButton(profileTab,true);refreshFullProfile.run();});
   sectionPosition.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){if(profilePage.getVisibility()==View.VISIBLE)refreshFullProfile.run();}public void afterTextChanged(android.text.Editable e){}});
   Button restoreTools=new Button(this);restoreTools.setText("☰");restoreTools.setContentDescription("Werkzeuge anzeigen");styleEditorButton(restoreTools,false);
   android.widget.FrameLayout.LayoutParams floating=new android.widget.FrameLayout.LayoutParams(dp(44),dp(44),Gravity.TOP|Gravity.RIGHT);floating.setMargins(dp(4),dp(4),dp(4),dp(4));canvasFrame.addView(restoreTools,floating);restoreTools.setVisibility(View.GONE);
@@ -1552,6 +1552,7 @@ public class MainActivity extends Activity {
   Button clearScale=new Button(this);clearScale.setAllCaps(false);clearScale.setText("Kalibrierung entfernen");form.addView(clearScale);
   LinearLayout list=page();form.addView(list);
   route.selected=i->showRouteSegmentMenu(route,i);
+  route.dimensionSelected=i->measureSegment(route,i);
   route.strokeAdded=first->{
    route.moving=true;route.dimensioning=false;route.placingObject=false;route.editingObjects=false;
    mode.setSelection(2);
