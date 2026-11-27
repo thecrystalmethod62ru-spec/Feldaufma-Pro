@@ -6194,32 +6194,32 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   }return true;
  }
  String m(double x){return String.format(java.util.Locale.GERMANY,"%.2f m",x);}
- void label(Canvas c,String s,float x,float y){p.setColor(Color.BLACK);p.setTextSize(12);c.drawText(s,x,y,p);}
- protected void onDraw(Canvas c){super.onDraw(c);utilityHits.clear();if(w<=0||d<=0)return;
+ void label(Canvas c,String s,float x,float y){p.setColor(0xffcbd6d5);p.setTextSize(12);c.drawText(s,x,y,p);}
+ protected void onDraw(Canvas c){super.onDraw(c);c.drawColor(0xff151717);utilityHits.clear();if(!Double.isFinite(w)||!Double.isFinite(d)||w<=0||d<=0)return;
  c.save();c.scale(getWidth()/360f,getHeight()/300f);
  double nl=Double.isFinite(left)?left:0,nr=Double.isFinite(right)?right:0;
  float scale=(float)Math.min(190/(w+nl+nr),155/d);
  float x=180-(float)(w*scale/2),z=180+(float)(w*scale/2),top=55,bottom=top+(float)(d*scale);
  profileLeft=x;profileTop=top;profileScale=scale;
- p.setColor(0xffb7a48a);c.drawRect(20,top,340,bottom,p);
- p.setColor(0xffeee2cc);c.drawRect(x,top,z,bottom,p);
+ p.setColor(0xff303a3b);c.drawRect(20,top,340,bottom,p);
+ p.setColor(0xff23423e);c.drawRect(x,top,z,bottom,p);
  float layerTop=top;
  if(Double.isFinite(topThickness)){
  RouteSketch style=new RouteSketch(MainActivity.this,"[]");style.bindDimensionProject(activeProject);
  org.json.JSONObject settings=style.legendSettings();
- p.setColor(style.configuredSurfaceColor(covering,settings));layerTop=top+(float)(topThickness*scale);c.drawRect(20,top,340,layerTop,p);
+ int material=style.configuredSurfaceColor(covering,settings);p.setColor(android.graphics.Color.rgb((android.graphics.Color.red(material)+100)/2,(android.graphics.Color.green(material)+110)/2,(android.graphics.Color.blue(material)+115)/2));layerTop=top+(float)(topThickness*scale);c.drawRect(20,top,340,layerTop,p);
  int hatch=style.configuredHatch(covering,settings);
  if(hatch>=0&&layerTop>top){c.save();c.clipRect(20,top,340,layerTop);float band=12*getResources().getDisplayMetrics().density;for(float yy=top+band/2;yy<layerTop+band/2;yy+=band){c.save();c.translate(20,yy);style.drawHatchBand(c,320,band/12,hatch);c.restore();}c.restore();}
  }
- if(Double.isFinite(base)){p.setColor(0xffa6a6a6);c.drawRect(20,layerTop,340,layerTop+(float)(base*scale),p);}
+ if(Double.isFinite(base)){p.setColor(0xff626253);c.drawRect(20,layerTop,340,layerTop+(float)(base*scale),p);}
  if(!covering.equals("Asphalt")&&!covering.equals("Unbekannt")&&!covering.equals("Unbefestigt")&&!covering.equals("Sonstiges")){p.setColor(0xff777777);c.drawLine(20,top,340,top,p);for(int i=20;i<340;i+=covering.contains("platten")||covering.contains("Platten")?28:12)c.drawLine(i,top-4,i,top,p);}
  double previewPipe=pipe;try{previewPipe=optional(pipeInput);}catch(Exception ignored){}
  org.json.JSONArray utilities=dragRows==null?extraUtilities():dragRows;
  int conflicts=utilityCollisionCount(utilities,Double.isFinite(l)&&l>0?l:Double.POSITIVE_INFINITY);
- if(conflicts>0){p.setColor(0xffb3261e);p.setTextSize(11);c.drawText("Achtung: "+conflicts+" mögliche Leitungskollision(en)",20,40,p);}
+ if(conflicts>0){p.setColor(0xffff927d);p.setTextSize(11);c.drawText("Achtung: "+conflicts+" mögliche Leitungskollision(en)",20,40,p);}
  int outside=0;
  for(int i=0;i<utilities.length();i++)if(utilityOutsideProfile(utilities.optJSONObject(i),w,d))outside++;
- if(outside>0){p.setColor(0xffb3261e);p.setTextSize(11);c.drawText("Profilgrenzen verletzt: "+outside+" Leitung(en)",20,52,p);}
+ if(outside>0){p.setColor(0xffff927d);p.setTextSize(11);c.drawText("Profilgrenzen verletzt: "+outside+" Leitung(en)",20,52,p);}
 
  if(utilities.length()==0){if(Double.isFinite(previewPipe)){float radius=(float)(previewPipe/2000*scale);p.setColor(0xff3686bc);c.drawCircle(180,bottom-radius,radius,p);}}
  else{
@@ -6233,11 +6233,11 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   }
  }
 
- p.setColor(Color.BLACK);p.setStrokeWidth(1);c.drawLine(x,top,x,bottom,p);c.drawLine(z,top,z,bottom,p);c.drawLine(x,bottom,z,bottom,p);
- c.drawLine(x,bottom+14,z,bottom+14,p);c.drawLine(x,bottom+8,x,bottom+20,p);c.drawLine(z,bottom+8,z,bottom+20,p);
- label(c,m(w),150,bottom+29);
- c.drawLine(z+12,top,z+12,bottom,p);label(c,m(d),z+16,(top+bottom)/2);
- if(Double.isFinite(left)&&Double.isFinite(right)){float a=x-(float)(nl*scale),b=z+(float)(nr*scale);c.drawLine(a,35,b,35,p);c.drawLine(a,30,a,45,p);c.drawLine(b,30,b,45,p);label(c,m(w+nl+nr),145,27);}
+ p.setColor(0xff94a7a5);p.setStrokeWidth(1);c.drawLine(x,top,x,bottom,p);c.drawLine(z,top,z,bottom,p);c.drawLine(x,bottom,z,bottom,p);
+ p.setColor(0xff4cdbb5);c.drawLine(x,bottom+14,z,bottom+14,p);c.drawLine(x,bottom+8,x,bottom+20,p);c.drawLine(z,bottom+8,z,bottom+20,p);
+ p.setTextSize(13);String widthLabel=m(w);c.drawText(widthLabel,(x+z-p.measureText(widthLabel))/2,bottom+29,p);
+ c.drawLine(z+12,top,z+12,bottom,p);c.drawLine(z+7,top,z+17,top,p);c.drawLine(z+7,bottom,z+17,bottom,p);c.drawText(m(d),z+18,(top+bottom)/2,p);
+ if(Double.isFinite(left)&&Double.isFinite(right)){float a=x-(float)(nl*scale),b=z+(float)(nr*scale);c.drawLine(a,35,b,35,p);c.drawLine(a,30,a,45,p);c.drawLine(b,30,b,45,p);p.setTextSize(13);String cutLabel=m(w+nl+nr);c.drawText(cutLabel,(a+b-p.measureText(cutLabel))/2,27,p);}
  else label(c,"Nachschnitt: nicht vollständig erfasst",20,27);
  label(c,"Oberfläche: "+covering,20,238);
  label(c,Double.isFinite(topThickness)?"Belagsstärke: "+m(topThickness):"Belagsstärke: nicht erfasst",20,252);
