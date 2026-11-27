@@ -342,6 +342,24 @@ public class MainActivity extends Activity {
   public void onProviderEnabled(String provider){}
   public void onStatusChanged(String provider,int status,android.os.Bundle extras){}
  };
+ void recordGpsRoute(RouteSketch route,android.app.Dialog editor){
+  if(!route.vertices.isEmpty()){notice("GPS-Aufzeichnung benötigt eine leere Trasse.");return;}
+  if(liveManager==null){notice("Bitte GPS aktivieren.");return;}
+  RouteSketch.GpsRecording recording=new RouteSketch.GpsRecording();
+  android.os.Handler handler=new android.os.Handler(android.os.Looper.getMainLooper());
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("GPS-Aufzeichnung").setMessage("Bitte entlang der Trasse gehen.").setNegativeButton("Abbrechen",null).setPositiveButton("Stopp",(d,w)->{
+   if(!editor.isShowing())return;
+   if(recording.apply(route))notice("GPS-Trasse übernommen. Maße bitte eintragen.");else notice("Zu wenige gültige GPS-Punkte oder Trasse nicht leer.");
+  }).create();
+  Runnable tick=new Runnable(){public void run(){
+   if(!dialog.isShowing()||!editor.isShowing()||isFinishing()||isDestroyed()){dialog.dismiss();return;}
+   recording.add(liveFix);
+   dialog.setMessage("Gültige Punkte: "+recording.samples.size()+"\n"+(liveFix!=null&&liveFix.hasAccuracy()?String.format(java.util.Locale.GERMANY,"Genauigkeit: ± %.1f m",liveFix.getAccuracy()):"GPS-Signal wird gesucht …")+"\nBitte entlang der Trasse gehen.");
+   dialog.getButton(-1).setEnabled(recording.samples.size()>=2);
+   handler.postDelayed(this,1000);
+  }};
+  dialog.setOnDismissListener(d->handler.removeCallbacks(tick));dialog.show();handler.post(tick);
+ }
  void startLiveGps(){
   if(liveManager!=null||checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=android.content.pm.PackageManager.PERMISSION_GRANTED)return;
   try{android.location.LocationManager m=(android.location.LocationManager)getSystemService(LOCATION_SERVICE);
@@ -781,7 +799,9 @@ public class MainActivity extends Activity {
    startLiveGps();
    android.location.Location fix=liveFix;
    String status=fix==null?"GPS-Signal wird gesucht …":fix.hasAccuracy()?String.format(java.util.Locale.GERMANY,"GPS-Genauigkeit: ± %.1f m",fix.getAccuracy()):"GPS-Genauigkeit unbekannt";
-   new android.app.AlertDialog.Builder(this).setTitle("GPS / Live-Position").setMessage(status+"\nGPS dient zur Orientierung. Aufmaßmaße bleiben unverändert.").setPositiveButton("OK",null).show();
+   android.app.AlertDialog.Builder menu=new android.app.AlertDialog.Builder(this).setTitle("GPS / Live-Position").setMessage(status+"\nGPS dient zur Orientierung. Aufmaßmaße bleiben unverändert.").setNegativeButton("Schließen",null);
+   if(route.vertices.isEmpty())menu.setPositiveButton("Aufzeichnung starten",(d,w)->recordGpsRoute(route,full));
+   menu.show();
   });
   styleEditorButton(save,true);LinearLayout.LayoutParams saveParams=new LinearLayout.LayoutParams(-1,dp(48));saveParams.setMargins(dp(10),dp(4),dp(10),dp(8));root.addView(save,saveParams);
   Button canvasToggle=new Button(this);canvasToggle.setText("⛶");canvasToggle.setContentDescription("Zeichenfläche maximieren");styleEditorButton(canvasToggle,false);
@@ -5011,6 +5031,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] results){
   super.onRequestPermissionsResult(requestCode,permissions,results);
   if(requestCode==703){java.util.function.DoubleConsumer next=pendingBleConsumer;pendingBleConsumer=null;boolean granted=results.length>0;for(int result:results)granted&=result==android.content.pm.PackageManager.PERMISSION_GRANTED;if(granted&&next!=null)openBleMeasure(next);else notice("Bluetooth-Berechtigung fehlt.");return;}
+  if(requestCode==703){if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==android.content.pm.PackageManager.PERMISSION_GRANTED){startLiveGps();notice("GPS erlaubt. Bitte GPS erneut öffnen.");}else notice("Genauer Standort erforderlich.");return;}
   if(requestCode==702){if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==android.content.pm.PackageManager.PERMISSION_GRANTED){startLiveGps();assignGps(selectedPoint);}else notice("Für GPS-Punkte ist der genaue Standort erforderlich.");}
  }
  void renamePoint(String id,String proposed){
