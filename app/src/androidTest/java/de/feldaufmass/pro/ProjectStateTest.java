@@ -323,6 +323,24 @@ public class ProjectStateTest {
    });
   }
  }
+ private org.json.JSONObject areaAnsatz(double from,double to,String mode,double quantity)throws Exception{
+  return new org.json.JSONObject().put("kind","segment").put("mode",mode).put("unit","m²").put("quantity",quantity)
+   .put("snapshot",new org.json.JSONObject().put("from",from).put("to",to).toString());
+ }
+ @Test public void overlappingTrenchAndReinstatementAreasAreNotAdded() throws Exception {
+  org.json.JSONObject trench=areaAnsatz(0,10,"area",10),cut=areaAnsatz(0,10,"cut",15);
+  org.json.JSONObject next=areaAnsatz(10,20,"cut",15),partial=areaAnsatz(9,12,"area",3);
+  assertTrue(MainActivity.duplicateSegmentArea(trench,cut));
+  assertTrue(MainActivity.duplicateSegmentArea(trench,partial));
+  assertFalse(MainActivity.duplicateSegmentArea(trench,next));
+  org.json.JSONObject position=new org.json.JSONObject().put("unit","m²");
+  position.put("ansatz",new org.json.JSONArray().put(trench).put(next));
+  assertEquals(25,MainActivity.sumAnsatz(position),0);
+  position.put("ansatz",new org.json.JSONArray().put(trench).put(cut));
+  assertTrue(Double.isNaN(MainActivity.sumAnsatz(position)));
+  position.put("ansatz",new org.json.JSONArray().put(trench).put(partial));
+  assertTrue(Double.isNaN(MainActivity.sumAnsatz(position)));
+ }
  @Test public void sectionProfileAndSurfaceSaveTogetherAndRejectOverlap() throws Exception {
   android.content.Context context=androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().getTargetContext();
   String name="test_section_atomic_"+java.util.UUID.randomUUID();
