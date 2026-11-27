@@ -1173,13 +1173,13 @@ public class MainActivity extends Activity {
   full.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
   final int previousOrientation=getRequestedOrientation();
   LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setBackgroundColor(Color.BLACK);
-  LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);root.addView(header);
+  LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);header.setPadding(dp(8),dp(4),dp(8),dp(4));root.addView(header);
   Button back=new Button(this),save=new Button(this);back.setAllCaps(false);save.setAllCaps(false);back.setText("‹");back.setContentDescription("Vollbild beenden");save.setText("Speichern");
   header.addView(back,new LinearLayout.LayoutParams(dp(48),dp(48)));
   LinearLayout heading=new LinearLayout(this);heading.setOrientation(1);heading.addView(sheetText("Feldaufmaß Pro",19,true));heading.addView(sheetText("Tiefbau · Zeichnungseditor",12,false));for(int k=0;k<heading.getChildCount();k++)if(heading.getChildAt(k) instanceof TextView)((TextView)heading.getChildAt(k)).setTextColor(0xffe9f2f1);header.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
   Spinner orientation=new Spinner(this);
-  orientation.setAdapter(new android.widget.ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Automatisch drehen","Querformat","Hochformat"}));
-  header.addView(orientation,new LinearLayout.LayoutParams(dp(100),dp(48)));
+  orientation.setAdapter(new android.widget.ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Auto","Quer","Hoch"}));
+  header.addView(orientation,new LinearLayout.LayoutParams(dp(76),dp(48)));
   orientation.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
    public void onItemSelected(android.widget.AdapterView<?> parent,View view,int position,long id){
     if(!full.isShowing())return;
@@ -1196,7 +1196,7 @@ public class MainActivity extends Activity {
   route.darkEditor=true;route.invalidate();root.addView(route,new LinearLayout.LayoutParams(-1,0,1));
   LinearLayout sectionStrip=new LinearLayout(this);sectionStrip.setOrientation(1);sectionStrip.setPadding(dp(6),dp(2),dp(6),dp(2));
   TextView sectionTitle=sheetText("Abschnitte",13,true);sectionStrip.addView(sectionTitle);
-  android.widget.HorizontalScrollView sectionScroll=new android.widget.HorizontalScrollView(this);sectionScroll.setHorizontalScrollBarEnabled(false);sectionStrip.addView(sectionScroll);
+  android.widget.HorizontalScrollView sectionScroll=new android.widget.HorizontalScrollView(this);sectionScroll.setHorizontalScrollBarEnabled(false);sectionStrip.addView(sectionScroll);sectionTitle.setText("Abschnitte ▾");sectionTitle.setOnClickListener(v->sectionScroll.setVisibility(sectionScroll.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE));
   LinearLayout sectionCards=new LinearLayout(this);sectionScroll.addView(sectionCards);
   ScrollView verticalSections=new ScrollView(this);verticalSections.setFillViewport(false);
   root.addView(sectionStrip,new LinearLayout.LayoutParams(-1,-2));
@@ -1204,12 +1204,12 @@ public class MainActivity extends Activity {
   final TextView sectionPosition=sheetText("Abschnitt auswählen",12,false);sectionPosition.setTextColor(0xff69d6b7);sectionStrip.addView(sectionPosition,1);
   Runnable refreshSections=()->{
    sectionCards.removeAllViews();int count=Math.max(0,route.vertices.size()-1);
-   sectionTitle.setText("Abschnitte ("+count+")");sectionPosition.setText(selectedSection[0]>=0?"Abschnitt "+(selectedSection[0]+1)+" / "+count:"Abschnitt auswählen");double station=0;
+   sectionTitle.setText("Abschnitte ("+count+") ▾");sectionPosition.setText(selectedSection[0]>=0?"Abschnitt "+(selectedSection[0]+1)+" / "+count:"Abschnitt auswählen");double station=0;
    for(int j=0;j<count;j++){
     final int index=j;double length=route.vertices.get(j+1).metres;double end=station+length;
     Button card=new Button(this);styleEditorButton(card,selectedSection[0]==j);
     card.setText(String.format(java.util.Locale.GERMANY,"A%02d",j+1)+"\n"+(Double.isFinite(end)?String.format(java.util.Locale.GERMANY,"%.2f – %.2f m",station,end):"Maß fehlt"));
-    LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(dp(112),dp(54));cp.setMargins(dp(2),0,dp(2),0);sectionCards.addView(card,cp);
+    LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(dp(104),dp(48));cp.setMargins(dp(2),0,dp(2),0);sectionCards.addView(card,cp);
     card.setOnClickListener(v->{selectedSection[0]=index;sectionPosition.setText("Abschnitt "+(index+1)+" / "+count);for(int k=0;k<sectionCards.getChildCount();k++)styleEditorButton((Button)sectionCards.getChildAt(k),k==index);});
     station=end;
    }
@@ -1219,7 +1219,7 @@ public class MainActivity extends Activity {
   route.changed=()->{if(originalRouteChanged!=null)originalRouteChanged.run();if(selectedSection[0]>=route.vertices.size()-1)selectedSection[0]=-1;refreshSections.run();};
   root.addView(historyBar,new LinearLayout.LayoutParams(-1,-2));
   for(int k=0;k<historyBar.getChildCount();k++)if(historyBar.getChildAt(k) instanceof Button)styleEditorButton((Button)historyBar.getChildAt(k),false);
-  LinearLayout tools=new LinearLayout(this);root.addView(tools);
+  LinearLayout tools=new LinearLayout(this);tools.setPadding(dp(6),dp(3),dp(6),dp(3));root.addView(tools);
   Button mic=new Button(this),measureList=new Button(this),resetZoom=new Button(this);
   mic.setAllCaps(false);mic.setText("🎙");mic.setContentDescription("Sprachassistent");measureList.setAllCaps(false);measureList.setText("↔\nMaße");resetZoom.setAllCaps(false);resetZoom.setText("⌖\nAnsicht");
   header.addView(mic,new LinearLayout.LayoutParams(dp(48),dp(48)));tools.addView(measureList,new LinearLayout.LayoutParams(0,-2,1));tools.addView(resetZoom,new LinearLayout.LayoutParams(0,-2,1));
