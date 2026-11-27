@@ -327,6 +327,26 @@ public class ProjectStateTest {
   return new org.json.JSONObject().put("kind","segment").put("mode",mode).put("unit","m²").put("quantity",quantity)
    .put("snapshot",new org.json.JSONObject().put("from",from).put("to",to).toString());
  }
+ @Test public void measuredPdfCopyMatchesMetricDxfWithoutChangingOriginal(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->{
+    RouteSketch original=new RouteSketch(activity,"[[0.1,0.2,null],[0.5,0.2,10],[0.5,0.6,20]]");
+    String before=original.encode();
+    assertFalse(Double.isFinite(original.uniformMetresPerUnit()));
+    RouteSketch scaled=activity.measuredExportRoute(original);
+    assertNotNull(scaled);assertEquals(before,original.encode());
+    double factor=scaled.uniformMetresPerUnit();assertTrue(Double.isFinite(factor));
+    DxfExport dxf=new DxfExport(new java.io.StringWriter(),original,true);
+    for(int i=1;i<scaled.vertices.size();i++){
+     android.graphics.PointF a=scaled.vertices.get(i-1).point,b=scaled.vertices.get(i).point;
+     double[] x=dxf.vertices.get(i-1),y=dxf.vertices.get(i);
+     assertEquals(y[0]-x[0],(b.x-a.x)*factor,0.0001);
+     assertEquals(y[1]-x[1],(a.y-b.y)*factor,0.0001);
+    }
+    assertNull(activity.measuredExportRoute(new RouteSketch(activity,"[[0.1,0.2,null],[0.5,0.2,null]]")));
+   });
+  }
+ }
  @Test public void surfaceReportsUseSameValuesInPdfAndDialogs(){
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    scenario.onActivity(activity->{
