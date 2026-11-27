@@ -327,6 +327,29 @@ public class ProjectStateTest {
   return new org.json.JSONObject().put("kind","segment").put("mode",mode).put("unit","m²").put("quantity",quantity)
    .put("snapshot",new org.json.JSONObject().put("from",from).put("to",to).toString());
  }
+ @Test public void shoringTotalsRemainOpenWhenSavedSectionsConflict(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->{
+    android.content.SharedPreferences prefs=activity.getPreferences(0);
+    String original=prefs.getString("metricVerbauSections",null);double oldLength=activity.l;
+    try{
+     activity.l=20;
+     assertTrue(prefs.edit().putString("metricVerbauSections","[[0,10,1,0],[5,15,0,2]]").commit());
+     assertTrue(activity.shoringReport().contains("gesamt: 30,00 m²"));
+     assertTrue(prefs.edit().putString("metricVerbauSections","[[0,10,1,0],[5,15,2,0]]").commit());
+     assertTrue(activity.shoringReport().contains("Gesamtmenge offen"));
+     assertFalse(activity.shoringReport().contains("gesamt:"));
+     activity.l=8;
+     assertTrue(activity.shoringReport().contains("Gesamtmenge offen"));
+    }finally{
+     activity.l=oldLength;
+     android.content.SharedPreferences.Editor restore=prefs.edit();
+     if(original==null)restore.remove("metricVerbauSections");else restore.putString("metricVerbauSections",original);
+     assertTrue(restore.commit());
+    }
+   });
+  }
+ }
  @Test public void reinstatementIntervalsRespectProfileWidthsAndExplicitCut() throws Exception {
   org.json.JSONArray profiles=new org.json.JSONArray().put(new org.json.JSONObject().put("from",5).put("to",10).put("width",2).put("depth",1));
   org.json.JSONArray surfaces=new org.json.JSONArray().put(new org.json.JSONObject().put("from",8).put("to",12).put("cutWidth",3));
