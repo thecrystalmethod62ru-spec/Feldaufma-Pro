@@ -34,7 +34,7 @@ public final class PipeLayoutView extends View {
     private PipeLayout.Pipe original;
     private boolean moving;
     public void setMove(Move move){this.move=move;}
-    public PipeLayoutView(Context context){super(context);setContentDescription("Rohrquerschnitt");}
+    public PipeLayoutView(Context context){super(context);setBackgroundColor(android.graphics.Color.BLACK);setContentDescription("Rohrquerschnitt");}
     public void setLayoutData(List<PipeLayout.Pipe> pipes,double width,double depth){
         if(!Double.isFinite(width)||width<=0||!Double.isFinite(depth)||depth<=0)throw new IllegalArgumentException("Ungültige Grabenmaße");
         this.pipes=new ArrayList<>(pipes);this.width=width;this.depth=depth;invalidate();
@@ -78,7 +78,7 @@ public final class PipeLayoutView extends View {
             }
             p.setColor(conflict?0xffd32f2f:colors[i%colors.length]);c.drawCircle(x,y,r,p);
             p.setColor(0xffeeeeee);c.drawCircle(x,y,r-(float)(pipe.wall*scale),p);
-            p.setColor(conflict?0xffd32f2f:0xff777777);String label=pipe.name+(pipe.fixed?" [fix]":"");c.drawText(label,x-p.measureText(label)/2,y-r-4,p);
+            String label=pipe.name+(pipe.fixed?" [fix]":"");drawLabel(c,label,x-p.measureText(label)/2,y-r-4,conflict?0xffff8a80:0xffeeeeee);
         }
         // Dimension the selected pipe while dragging, or the only pipe in the section.
         int selected=dragged>=0?dragged:(selectedPipe>=0?selectedPipe:(pipes.size()==1?0:-1));
@@ -101,7 +101,8 @@ public final class PipeLayoutView extends View {
         }
     }
     private void dimension(Canvas c,float x1,float y1,float x2,float y2,double metres){
-        p.setColor(metres<0?0xffd32f2f:0xff777777);
+        int color=metres<0?0xffff8a80:0xffdddddd;
+        p.setColor(color);
         p.setStrokeWidth(1.5f);
         c.drawLine(x1,y1,x2,y2,p);
         double length=Math.hypot(x2-x1,y2-y1);
@@ -111,7 +112,13 @@ public final class PipeLayoutView extends View {
             c.drawLine(x2-nx,y2-ny,x2+nx,y2+ny,p);
         }
         String label=String.format(java.util.Locale.GERMANY,"%.3f m",metres);
-        c.drawText(label,(x1+x2-p.measureText(label))/2,(y1+y2)/2-5,p);
+        drawLabel(c,label,(x1+x2-p.measureText(label))/2,(y1+y2)/2-5,color);
+    }
+    private void drawLabel(Canvas c,String label,float x,float y,int color){
+        Paint.Style previous=p.getStyle();float stroke=p.getStrokeWidth();
+        p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);p.setColor(0xff141414);c.drawText(label,x,y,p);
+        p.setStyle(Paint.Style.FILL);p.setColor(color);c.drawText(label,x,y,p);
+        p.setStyle(previous);p.setStrokeWidth(stroke);
     }
     private int hit(float x,float y){
         int best=-1;double distance=Double.POSITIVE_INFINITY;
