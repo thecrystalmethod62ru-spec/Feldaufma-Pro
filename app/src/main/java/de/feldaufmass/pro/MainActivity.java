@@ -955,7 +955,8 @@ public class MainActivity extends Activity {
   route.changed.run();
   android.app.AlertDialog editor=new android.app.AlertDialog.Builder(this).setTitle("Trasse skizzieren").setView(scroll)
    .setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
-  editor.setOnShowListener(ignored->editor.getButton(-1).setOnClickListener(v->{
+  editor.show();
+  editor.getButton(-1).setOnClickListener(v->{
    if(!initialSaved.equals(routeData())){notice("Trasse wurde zwischenzeitlich geändert. Editor neu öffnen.");return;}
    history.record(route.encode());
    if(!initialObjects.equals(draftObjects.toString())){double total=route.measuredLength();if(!initialObjects.equals(objects.toString())){notice("Objekte zwischenzeitlich geändert. Editor neu öffnen.");return;}for(int j=0;j<draftObjects.length();j++){org.json.JSONObject entry=draftObjects.optJSONObject(j);if(unchangedEditorObject(initialObjects,entry))continue;double st=entry.optDouble("station");if(!Double.isFinite(total)||!Double.isFinite(st)||st<0||st>total){notice("Objektstation außerhalb der bemaßten Trasse. Bitte korrigieren.");return;}}}
@@ -963,9 +964,8 @@ public class MainActivity extends Activity {
    if(persistEditorRoute(history,objectsToSave,getPreferences(0).edit().putString("sketchCalibration",calibration[0].toString()))){
     refreshRoute();editor.dismiss();notice("Trasse gespeichert.");
    }
-  }));
+  });
   fullscreen.setOnClickListener(v->showFullscreenRoute(editor,form,route,mode,angles,historyBar,openObjects));
-  editor.show();
   if(startFullscreen)fullscreen.performClick();
  }
 
