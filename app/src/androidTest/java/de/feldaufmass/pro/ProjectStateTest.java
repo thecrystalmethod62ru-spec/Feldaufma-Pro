@@ -362,10 +362,18 @@ public class ProjectStateTest {
       route.vertices.get(2).metres=6;
       route.changed.run();
       expectedRoute[0]=route.encode();
+      java.util.ArrayList<android.view.View> matches=new java.util.ArrayList<>();
+      route.getRootView().findViewsWithText(matches,"Speichern",android.view.View.FIND_VIEWS_WITH_TEXT);
+      android.widget.Button save=null;
+      for(android.view.View candidate:matches){
+       if(candidate instanceof android.widget.Button && candidate.isShown()){
+        assertNull("Mehrere sichtbare Speichern-Schaltflächen",save);
+        save=(android.widget.Button)candidate;
+       }
+      }
+      assertNotNull("Speichern im Vollbild",save);
+      assertTrue(save.performClick());
      });
-    androidx.test.espresso.Espresso.onView(org.hamcrest.Matchers.allOf(
-     androidx.test.espresso.matcher.ViewMatchers.withText("Speichern"),
-     androidx.test.espresso.matcher.ViewMatchers.isDisplayed())).perform(androidx.test.espresso.action.ViewActions.click());
     scenario.recreate();
     scenario.onActivity(activity->{
      assertEquals(projectId,activity.activeProject);
