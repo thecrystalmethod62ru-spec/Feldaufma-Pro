@@ -1284,6 +1284,7 @@ public class MainActivity extends Activity {
    }
   };
   refreshSections.run();
+  route.inspectorSelection=index->{selectedSection[0]=index;refreshSections.run();};
   final Runnable originalRouteChanged=route.changed;
   route.changed=()->{if(originalRouteChanged!=null)originalRouteChanged.run();if(selectedSection[0]>=route.vertices.size()-1)selectedSection[0]=-1;refreshSections.run();};
   root.addView(historyBar,new LinearLayout.LayoutParams(-1,-2));
@@ -1292,7 +1293,7 @@ public class MainActivity extends Activity {
   Button mic=new Button(this),measureList=new Button(this),resetZoom=new Button(this);
   mic.setAllCaps(false);mic.setText("🎙");mic.setContentDescription("Sprachassistent");measureList.setAllCaps(false);measureList.setText("↔\nMaße");resetZoom.setAllCaps(false);resetZoom.setText("⌖\nAnsicht");
   header.addView(mic,new LinearLayout.LayoutParams(dp(44),dp(44)));tools.addView(measureList,new LinearLayout.LayoutParams(0,-2,1));tools.addView(resetZoom,new LinearLayout.LayoutParams(0,-2,1));
-  mic.setOnClickListener(v->startEditorDictation(speech->applyEditorSpeech(speech,route,mode,historyBar,full)));
+  mic.setOnClickListener(v->startEditorDictation(speech->{route.selectionOnly=false;applyEditorSpeech(speech,route,mode,historyBar,full);}));
   measureList.setOnClickListener(v->showFullscreenMeasures(route));
   Button legendEdit=new Button(this);legendEdit.setAllCaps(false);legendEdit.setText("☷\nLegende");tools.addView(legendEdit,new LinearLayout.LayoutParams(0,-2,1));legendEdit.setOnClickListener(v->route.editLegend());
   resetZoom.setOnClickListener(v->{route.zoom=1;route.centerX=.5f;route.centerY=.5f;route.invalidate();});
@@ -1319,11 +1320,11 @@ public class MainActivity extends Activity {
   String[] modeLabels={"Auswählen","Zeichnen","Bearbeiten","Maße"},modeIcons={"cursor","pencil","nodes","measure"};
   int[] modeValues={2,0,2,1};
   java.util.function.IntConsumer highlightTool=active->{for(int k=0;k<modeTools.length;k++)styleEditorButton(modeTools[k],k==active);};
-  for(int k=0;k<modeTools.length;k++){final int index=k;Button tool=modeTools[k];styleEditorButton(tool,false);compactToolIcon(tool,modeLabels[k],modeIcons[k]);tools.addView(tool,new LinearLayout.LayoutParams(0,dp(54),1));tool.setOnClickListener(v->{mode.setSelection(modeValues[index]);highlightTool.accept(index);if(index==3)showFullscreenMeasures(route);});}
+  for(int k=0;k<modeTools.length;k++){final int index=k;Button tool=modeTools[k];styleEditorButton(tool,false);compactToolIcon(tool,modeLabels[k],modeIcons[k]);tools.addView(tool,new LinearLayout.LayoutParams(0,dp(54),1));tool.setOnClickListener(v->{route.selectionOnly=index==0;mode.setSelection(modeValues[index]);highlightTool.accept(index);if(index==3)showFullscreenMeasures(route);});}
   highlightTool.accept(mode.getSelectedItemPosition()==0?1:mode.getSelectedItemPosition()==1?3:2);
   for(Button tool:new Button[]{buildTool,docsTool,assistantTool})styleEditorButton(tool,false);
   compactToolIcon(buildTool,"Leitungsbau ▾","pipe");compactToolIcon(docsTool,"Unterlagen ▾","folder");compactToolIcon(assistantTool,"Assistent","mic");
-  buildTool.setOnClickListener(v->new android.app.AlertDialog.Builder(this).setTitle("Leitungsbau").setItems(new String[]{"Leitungen / Formstücke / Objekte","Objekt platzieren","Objekt bearbeiten","Einzelobjekt ohne Trasse"},(d,i)->{if(i==0)openObjects.run();else mode.setSelection(i+2);}).show());
+  buildTool.setOnClickListener(v->new android.app.AlertDialog.Builder(this).setTitle("Leitungsbau").setItems(new String[]{"Leitungen / Formstücke / Objekte","Objekt platzieren","Objekt bearbeiten","Einzelobjekt ohne Trasse"},(d,i)->{if(i==0)openObjects.run();else{route.selectionOnly=false;mode.setSelection(i+2);}}).show());
   docsTool.setOnClickListener(v->new android.app.AlertDialog.Builder(this).setTitle("Unterlagen").setItems(new String[]{"Schachtscheine","Ausführungsplan / Foto / Skizze","Legende","Zentrieren","Cloud"},(d,i)->{if(i==0)showUtilitySheets();else if(i==1){if(templateAction!=null)templateAction.performClick();else notice("Keine Zeichenvorlage verfügbar.");}else if(i==2)route.editLegend();else if(i==3)resetZoom.performClick();else openCloud();}).show());
   assistantTool.setOnClickListener(v->mic.performClick());
   for(Button tool:new Button[]{buildTool,docsTool,assistantTool})tools.addView(tool,new LinearLayout.LayoutParams(0,dp(54),tool==assistantTool?1:1.6f));
@@ -1501,7 +1502,7 @@ public class MainActivity extends Activity {
   full.setOnDismissListener(d->{
    int maxX=Math.max(0,canvasFrame.getWidth()-floatingProfile.getWidth()),maxY=Math.max(0,canvasFrame.getHeight()-floatingProfile.getHeight());
    floatingPrefs.edit().putInt("width",floatingProfile.getLayoutParams().width).putFloat("x",maxX>0?floatingProfile.getX()/maxX:0f).putFloat("y",maxY>0?floatingProfile.getY()/maxY:0f).apply();
-   pendingEditorSpeech=null;route.darkEditor=false;route.changed=originalRouteChanged;
+   pendingEditorSpeech=null;route.darkEditor=false;route.selectionOnly=false;route.inspectorSelection=null;route.changed=originalRouteChanged;
    setRequestedOrientation(previousOrientation);
    for(View view:views){android.view.ViewParent parent=view.getParent();if(parent instanceof android.view.ViewGroup)((android.view.ViewGroup)parent).removeView(view);}
    // Original positions are ascending; restore before other controls.
@@ -1594,6 +1595,7 @@ public class MainActivity extends Activity {
   angles.setVisibility(View.GONE);
   onChoice(angles,index->route.angle=index==0?-1:(index-1)*15);
   onChoice(mode,index->{
+   if(index!=2)route.selectionOnly=false;
    route.dimensioning=index==1;route.moving=index==2;route.placingObject=index==3;route.editingObjects=index==4;route.placingSingle=index==5;
    angles.setVisibility(route.moving?View.VISIBLE:View.GONE);
    hint.setText(new String[]{"Für ein Einzelobjekt einmal tippen. Für eine Trasse mit dem Finger zeichnen.","Abschnitt lange drücken. Freie Fläche ziehen zum Verschieben.","Punkte, Objekte und Maße ziehen. Freie Fläche verschiebt den Plan.","Trasse antippen, um ein Objekt an einer Station zu platzieren.","Objekt ziehen oder lange drücken für Einstellungen.","Position antippen und Objekttyp wählen."}[index]);
