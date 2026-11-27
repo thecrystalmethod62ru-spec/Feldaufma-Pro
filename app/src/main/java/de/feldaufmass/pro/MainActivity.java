@@ -5535,6 +5535,35 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     if(!pdfDepthValid){p.setColor(0xffb3261e);p.setTextSize(9);c.drawText("Tiefenabschnitte ungültig – Tiefenprüfung nicht möglich",36,height-98,p);}
     if(utilities.length()>0){p.setColor(INK);p.setTextSize(9);c.drawText(omitted?"Zusatzleitungen: ungültige Abschnitte rot markiert; fehlende Maße ggf. ausgelassen":"Zusatzleitungen: Profilversatz ab linker Kante; Verbindungen schematisch",36,height-110,p);}
    }
+   // Paper-space labels: never alter the measured geometry or drawing scale.
+   Paint dim=new Paint(Paint.ANTI_ALIAS_FLAG);dim.setTextSize(10);dim.setColor(INK);
+   java.util.ArrayList<android.graphics.RectF> occupied=new java.util.ArrayList<>();
+   int hiddenDimensions=0;
+   for(int i=1;i<route.vertices.size();i++){
+    RouteSketch.Vertex a=route.vertices.get(i-1),b=route.vertices.get(i);
+    if(!Double.isFinite(b.metres)||b.metres<=0)continue;
+    float ax=(float)(40+(a.point.x-minX)*unit),ay=(float)(85+(a.point.y-minY)*unit);
+    float bx=(float)(40+(b.point.x-minX)*unit),by2=(float)(85+(b.point.y-minY)*unit);
+    double n=Math.hypot(bx-ax,by2-ay);if(n<1e-6)continue;
+    float nx=(float)((by2-ay)/n),ny=(float)(-(bx-ax)/n),mx=(ax+bx)/2,my=(ay+by2)/2;
+    String label=String.format(java.util.Locale.GERMANY,"A%02d · %.2f m",i,b.metres);
+    float tw=dim.measureText(label),offset=(float)Math.max(14,margin*unit+12);
+    android.graphics.RectF chosen=null;
+    for(int k=0;k<8;k++){
+     float delta=(k%2==0?1:-1)*(offset+18*(k/2)),cx=mx+nx*delta,cy=my+ny*delta;
+     android.graphics.RectF rect=new android.graphics.RectF(cx-tw/2-4,cy-8,cx+tw/2+4,cy+8);
+     if(rect.left<30||rect.right>width-30||rect.top<79||rect.bottom>height-150)continue;
+     boolean collision=false;for(android.graphics.RectF other:occupied)if(android.graphics.RectF.intersects(other,rect)){collision=true;break;}
+     if(!collision){chosen=rect;break;}
+    }
+    if(chosen==null){hiddenDimensions++;continue;}
+    occupied.add(chosen);
+    dim.setColor(0xff65717a);dim.setStrokeWidth(.6f);
+    c.drawLine(mx,my,chosen.centerX(),chosen.centerY(),dim);
+    dim.setColor(android.graphics.Color.WHITE);c.drawRect(chosen,dim);
+    dim.setColor(INK);c.drawText(label,chosen.left+4,chosen.centerY()-(dim.ascent()+dim.descent())/2,dim);
+   }
+   if(hiddenDimensions>0){dim.setColor(INK);dim.setTextSize(9);c.drawText(hiddenDimensions+" Maßangabe(n) aus Platzgründen im Abschnittsplan nachlesen.",36,height-147,dim);}
    p.setColor(INK);p.setStrokeWidth(1);float bar=(float)(50*72/25.4);float by=height-47;c.drawLine(40,by,40+bar,by,p);c.drawLine(40,by-4,40,by+4,p);c.drawLine(40+bar,by-4,40+bar,by+4,p);p.setTextSize(10);c.drawText("50 mm Kontrollmaß",40,by+17,p);
    c.drawText("Entspricht "+reportMeasure(denominator*0.05)+" in der Örtlichkeit",40+bar+20,by+4,p);
    c.drawText("Blatt "+(pageNumber-1),width-85,height-30,p);
