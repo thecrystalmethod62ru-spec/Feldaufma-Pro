@@ -295,6 +295,58 @@ public class ProjectStateTest {
    });
   }
  }
+ @Test public void surfaceOptionsFollowMaterialAndOptionalCatalog(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->{
+    activity.enterProject();
+    activity.showPage(activity.measurePage);
+    activity.surface.setSelection(0);
+   });
+   androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+   scenario.onActivity(activity->{
+    assertTrue(activity.surface.isShown());
+    assertFalse(activity.belagsToggle.isShown());
+    assertFalse(activity.stoneLength.isShown());
+    assertFalse(activity.asphaltInput.isShown());
+    assertFalse(activity.handling.isShown());
+    android.widget.LinearLayout oldBelag=(android.widget.LinearLayout)activity.handling.getParent();
+    android.widget.LinearLayout catalog=(android.widget.LinearLayout)oldBelag.getParent();
+    expandFold(catalog);
+    assertFalse(activity.handling.isShown());
+    expandFold(oldBelag);
+    assertTrue(activity.underlying.isShown());
+    assertTrue(activity.handling.isShown());
+    expandFold(catalog);
+    assertFalse(activity.handling.isShown());
+    activity.surface.setSelection(2);
+   });
+   androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+   scenario.onActivity(activity->{
+    assertTrue(activity.belagsToggle.isShown());
+    assertTrue(activity.stoneLength.isShown());
+    assertFalse(activity.asphaltInput.isShown());
+    activity.stoneColor.setText("Grau");
+    activity.belagsToggle.performClick();
+    assertFalse(activity.stoneColor.isShown());
+    activity.openBelagsDetails();
+    assertTrue(activity.stoneColor.isShown());
+    assertEquals("Grau",activity.stoneColor.getText().toString());
+    activity.surface.setSelection(1);
+   });
+   androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+   scenario.onActivity(activity->{
+    assertTrue(activity.asphaltInput.isShown());
+    assertFalse(activity.belagsToggle.isShown());
+    assertFalse(activity.stoneColor.isShown());
+   });
+  }
+ }
+ private void expandFold(android.widget.LinearLayout content){
+  android.widget.LinearLayout parent=(android.widget.LinearLayout)content.getParent();
+  android.view.View toggle=parent.getChildAt(parent.indexOfChild(content)-1);
+  assertTrue(toggle instanceof android.widget.Button);
+  assertTrue(toggle.performClick());
+ }
  @Test public void detailHistoryAndExportUseSavedGeometry() throws Exception {
   try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
    scenario.onActivity(activity -> {
@@ -460,17 +512,8 @@ public class ProjectStateTest {
  private void verifyProjectState(MainActivity activity) throws Exception {
   activity.enterProject();
   activity.showPage(activity.measurePage);
-  assertFalse(activity.stoneLength.isShown());
+  activity.surface.setSelection(0);
   assertTrue(activity.surface.isShown());
-  assertTrue(activity.handling.isShown());
-  activity.belagsToggle.performClick();
-  assertTrue(activity.underlying.isShown());
-  activity.stoneColor.setText("Grau");
-  activity.belagsToggle.performClick();
-  assertFalse(activity.stoneColor.isShown());
-  activity.openBelagsDetails();
-  assertTrue(activity.stoneColor.isShown());
-  assertEquals("Grau",activity.stoneColor.getText().toString());
   activity.length.setText("20");
   activity.width.setText("1");
   activity.depth.setText("2");
