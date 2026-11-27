@@ -511,6 +511,27 @@ final class RouteSketch extends View {
    }
   }
  }
+ private void texturedBand(Canvas c,float ax,float ay,float bx,float by,float half,float density,String material,int seed){
+  float length=(float)Math.hypot(bx-ax,by-ay);if(length<1||half<density)return;
+  String name=material.toLowerCase(Locale.ROOT);
+  boolean paving=name.contains("pflaster")||name.contains("platten"),asphalt=name.contains("asphalt");
+  Paint grain=new Paint(Paint.ANTI_ALIAS_FLAG);
+  c.save();c.translate(ax,ay);c.rotate((float)Math.toDegrees(Math.atan2(by-ay,bx-ax)));c.clipRect(0,-half,length,half);
+  // Stable texture in segment coordinates; redraw does not flicker.
+  java.util.Random random=new java.util.Random(seed);
+  if(paving){
+   float cell=(name.contains("groß")||name.contains("platten")?10:6)*density;
+   int rows=Math.min(80,(int)Math.ceil(2*half/cell)),cols=Math.min(600,(int)Math.ceil(length/cell)+2);
+   for(int row=0;row<rows;row++)for(int col=0;col<cols;col++){
+    float x=(col-(row%2)*.5f)*cell,y=-half+row*cell;int shade=85+random.nextInt(45);
+    grain.setColor(Color.rgb(shade,shade,Math.max(0,shade-5)));c.drawRoundRect(x+.5f*density,y+.5f*density,x+cell-.5f*density,y+cell-.5f*density,.6f*density,.6f*density,grain);
+   }
+  }else{
+   int count=(int)Math.min(2500,Math.max(0,length*2*half/(density*density*(asphalt?8:15))));
+   for(int k=0;k<count;k++){float x=random.nextFloat()*length,y=(random.nextFloat()*2-1)*half;int tone=random.nextInt(3);grain.setColor(asphalt?(tone==0?0xff64696b:tone==1?0xff282d30:0xff474b4d):(tone==0?0xffa87949:tone==1?0xff49301e:0xff805832));float radius=(.35f+random.nextFloat()*.85f)*density;c.drawOval(x-radius,y-radius*.65f,x+radius,y+radius*.65f,grain);}
+  }
+  c.restore();
+ }
  void drawSurfaceSections(Canvas c,float density){
   if(!layerVisible(LAYER_SURFACES))return;
   org.json.JSONObject settings=legendSettings();
@@ -522,7 +543,19 @@ final class RouteSketch extends View {
    double start=0;
    for(int i=1;i<vertices.size();i++){
     double end=start+vertices.get(i).metres,lo=Math.max(from,start),hi=Math.min(to,end);
-    if(hi>lo){PointF a=stationPoint(lo),b=stationPoint(hi);if(a!=null&&b!=null){line(c,a,b);int hatch=configuredHatch(section.optString("surface"),settings);if(hatch>=0)surfaceHatch(c,a,b,density,hatch);}}
+    if(hi>lo){PointF a=stationPoint(lo),b=stationPoint(hi);if(a!=null&&b!=null){
+      if(darkEditor&&!printPlan&&layerVisible(LAYER_ROUTE)){
+       float ax=left()+scale()*a.x,ay=top()+scale()*a.y,bx=left()+scale()*b.x,by=top()+scale()*b.y;
+       double width=section.optDouble("width"),len=hi-lo;float px=(float)Math.hypot(bx-ax,by-ay);
+       if(Double.isFinite(width)&&width>0&&len>0&&px>1){
+        float half=(float)Math.min(Math.max(getWidth(),getHeight()),px*width/len/2);
+        String material=section.optString("surface"),name=material.toLowerCase(Locale.ROOT);float band=Math.max(2*density,Math.min(8*density,half*.45f));
+        float nx=(by-ay)/px,ny=(ax-bx)/px;
+        Paint edge=new Paint(Paint.ANTI_ALIAS_FLAG);edge.setStrokeWidth(band*2);edge.setStrokeCap(Paint.Cap.BUTT);edge.setColor(name.contains("asphalt")?0xff383c3f:name.contains("pflaster")||name.contains("platten")?0xff777771:0xff674323);
+        for(int side:new int[]{-1,1}){float off=side*(half+band+1.5f*density);float x1=ax+nx*off,y1=ay+ny*off,x2=bx+nx*off,y2=by+ny*off;c.drawLine(x1,y1,x2,y2,edge);texturedBand(c,x1,y1,x2,y2,band,density,material,i*101+j*17+side);}
+       }
+      }else{line(c,a,b);int hatch=configuredHatch(section.optString("surface"),settings);if(hatch>=0)surfaceHatch(c,a,b,density,hatch);}
+    }}
     start=end;
    }
   }
@@ -968,12 +1001,7 @@ final class RouteSketch extends View {
    if(pixels>1&&sw>=6*density){
     float nx=(float)((y2-y1)/pixels),ny=(float)((x1-x2)/pixels);
     Paint marks=new Paint(Paint.ANTI_ALIAS_FLAG);marks.setColor(0xff746451);marks.setStrokeWidth(density);
-    int count=Math.min(300,(int)(pixels/(12*density)));
-    for(int k=1;k<=count;k++){
-     float t=k/(float)(count+1),cx=x1+(x2-x1)*t,cy=y1+(y2-y1)*t;
-     float offset=(k%2==0?1:-1)*sw*0.28f;
-     c.drawLine(cx+nx*offset,cy+ny*offset,cx+nx*(offset+Math.min(3*density,sw*.12f)),cy+ny*(offset+Math.min(3*density,sw*.12f)),marks);
-    }
+    texturedBand(c,x1,y1,x2,y2,sw/2,density,"soil",i*137);
     if(layerVisible(LAYER_DIMENSIONS)&&pixels>80*density){
      float cx=x1+(x2-x1)*.28f,cy=y1+(y2-y1)*.28f,half=sw/2;
      marks.setColor(0xffa7c7c1);c.drawLine(cx-nx*half,cy-ny*half,cx+nx*half,cy+ny*half,marks);
