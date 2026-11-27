@@ -63,11 +63,11 @@ public final class PipeLayoutView extends View {
         float density=getResources().getDisplayMetrics().density;
         float pad=Math.min(42*density,Math.min(getWidth(),getHeight())*.20f);
         if(getWidth()<=0||getHeight()<=0)return;
-        double extent=width/2+Math.max(cutLeft,cutRight),above=depth;
-        for(PipeLayout.Pipe pipe:pipes){extent=Math.max(extent,Math.abs(pipe.offset)+pipe.diameter/2);above=Math.max(above,pipe.bedding+pipe.diameter);}
-        scale=(float)Math.min((getWidth()-2*pad)/(2*extent),(getHeight()-2*pad)/above);
+        double leftExtent=width/2+cutLeft,rightExtent=width/2+cutRight,above=depth;
+        for(PipeLayout.Pipe pipe:pipes){leftExtent=Math.max(leftExtent,-pipe.offset+pipe.diameter/2);rightExtent=Math.max(rightExtent,pipe.offset+pipe.diameter/2);above=Math.max(above,pipe.bedding+pipe.diameter);}
+        scale=(float)Math.min((getWidth()-2*pad)/(leftExtent+rightExtent),(getHeight()-2*pad)/above);
         if(dragged>=0&&dragScale>0){scale=dragScale;cx=dragCx;bottom=dragBottom;}
-        else{cx=getWidth()/2f;bottom=getHeight()-pad;}
+        else{cx=getWidth()/2f+(float)((leftExtent-rightExtent)*scale/2);bottom=getHeight()-pad;}
         if(!Float.isFinite(scale)||scale<=0)return;
         float left=cx-(float)(width*scale/2),right=cx+(float)(width*scale/2),top=bottom-(float)(depth*scale);
         texture(c,left,top,right,bottom,0xff674323,0xffa87949,false);
