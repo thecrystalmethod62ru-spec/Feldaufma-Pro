@@ -516,6 +516,44 @@ final class RouteSketch extends View {
   paint.setTextSize(13*density);
  }
  private android.location.Location liveFix;
+ static final class GpsRecording {
+  final ArrayList<android.location.Location> samples=new ArrayList<>();
+  boolean add(android.location.Location fix){
+   if(fix==null||!fix.hasAccuracy()||fix.getAccuracy()<=0||fix.getAccuracy()>5||!Double.isFinite(fix.getLatitude())||!Double.isFinite(fix.getLongitude())||Math.abs(fix.getLatitude())>85||Math.abs(fix.getLongitude())>180)return false;
+   if(android.os.SystemClock.elapsedRealtimeNanos()-fix.getElapsedRealtimeNanos()>10000000000L)return false;
+   if(!samples.isEmpty()){
+    android.location.Location last=samples.get(samples.size()-1);
+    if(fix.getElapsedRealtimeNanos()<=last.getElapsedRealtimeNanos()||last.distanceTo(fix)<Math.max(3,Math.max(last.getAccuracy(),fix.getAccuracy())))return false;
+   }
+   if(samples.size()>=10000)return false;
+   samples.add(new android.location.Location(fix));return true;
+  }
+  boolean apply(RouteSketch route){
+   if(!route.vertices.isEmpty()||samples.size()<2)return false;
+   android.location.Location origin=samples.get(0);
+   ArrayList<PointF> points=new ArrayList<>();
+   float minX=0,maxX=0,minY=0,maxY=0;
+   for(android.location.Location fix:samples){
+    float x=(float)(longitudeDelta(fix.getLongitude(),origin.getLongitude())*Math.cos(Math.toRadians(origin.getLatitude()))*111195);
+    float y=(float)(-(fix.getLatitude()-origin.getLatitude())*111195);
+    points.add(new PointF(x,y));minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);
+   }
+   float span=Math.max(maxX-minX,maxY-minY);if(span<3)return false;
+   boolean[] keep=new boolean[points.size()];keep[0]=keep[points.size()-1]=true;
+   java.util.ArrayDeque<int[]> pending=new java.util.ArrayDeque<>();pending.push(new int[]{0,points.size()-1});
+   while(!pending.isEmpty()){
+    int[] range=pending.pop();PointF a=points.get(range[0]),b=points.get(range[1]);double dx=b.x-a.x,dy=b.y-a.y,n=dx*dx+dy*dy,best=3;int split=-1;
+    for(int i=range[0]+1;i<range[1];i++){PointF p=points.get(i);double t=n==0?0:Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/n));double d=Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy);if(d>best){best=d;split=i;}}
+    if(split>=0){keep[split]=true;pending.push(new int[]{range[0],split});pending.push(new int[]{split,range[1]});}
+   }
+   for(int i=0;i<points.size();i++)if(keep[i]){
+    PointF p=points.get(i);android.location.Location fix=samples.get(i);
+    Vertex v=new Vertex(new PointF(.5f+.8f*(p.x-(minX+maxX)/2)/span,.5f+.8f*(p.y-(minY+maxY)/2)/span),Double.NaN);
+    v.latitude=fix.getLatitude();v.longitude=fix.getLongitude();v.accuracy=fix.getAccuracy();route.vertices.add(v);
+   }
+   if(route.changed!=null)route.changed.run();route.invalidate();return true;
+  }
+ }
  void setLiveFix(android.location.Location fix){liveFix=fix;invalidate();}
  float zoom=1,centerX=.5f,centerY=.5f;
  boolean moving,gesture;
