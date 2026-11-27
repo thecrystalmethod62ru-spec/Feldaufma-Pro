@@ -20,6 +20,12 @@ final class RouteSketch extends View {
  boolean layerVisible(int layer){return (visibleLayers&layer)!=0;}
  void setVisibleLayers(int layers){visibleLayers=layers&ALL_LAYERS;invalidate();}
  static final double GPS_MOVE_ACCURACY_METRES=0.5;
+ static int gpsQualityColor(double accuracy){
+  if(!Double.isFinite(accuracy)||accuracy<=0)return 0xff9299a3;
+  if(accuracy<=.5)return 0xff43ce80;
+  if(accuracy<=3)return 0xffffb74d;
+  return 0xffff6666;
+ }
  static boolean preciseGps(double accuracy){return Double.isFinite(accuracy)&&accuracy>0&&accuracy<=GPS_MOVE_ACCURACY_METRES;}
  static final class Vertex {
   final PointF point;
@@ -691,7 +697,7 @@ final class RouteSketch extends View {
    org.json.JSONObject o=stationObjects.optJSONObject(j);if(o!=null)entries.put(o.optString("type","Objekt"),0xffa65e19);
   }
   for(Vertex v:vertices){
-   if(layerVisible(LAYER_GPS)&&Double.isFinite(v.latitude)&&Double.isFinite(v.longitude))entries.put("GPS-Punkt",0xff4285ef);
+   if(layerVisible(LAYER_GPS)&&Double.isFinite(v.latitude)&&Double.isFinite(v.longitude))entries.put("GPS-Punkt (Genauigkeit)",gpsQualityColor(v.accuracy));
    if(layerVisible(LAYER_PHOTOS)&&v.photos.length()>0)entries.put("Foto",0xff536c80);
   }
   return entries;
@@ -802,7 +808,12 @@ final class RouteSketch extends View {
    }
    Vertex vertex=vertices.get(i);float px=left()+scale()*p.x,py=top()+scale()*p.y;
    if(layerVisible(LAYER_GPS)&&Double.isFinite(vertex.latitude)&&Double.isFinite(vertex.longitude)){
-    paint.setColor(0xff4285ef);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(2*density);c.drawCircle(px,py,8*density,paint);paint.setStyle(Paint.Style.FILL);
+    int quality=gpsQualityColor(vertex.accuracy);
+    paint.setColor(quality);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(2*density);c.drawCircle(px,py,8*density,paint);
+    paint.setStyle(Paint.Style.FILL);
+    paint.setTextSize(10*density);
+    String accuracy=Double.isFinite(vertex.accuracy)&&vertex.accuracy>0?String.format(Locale.GERMANY,"± %.1f m",vertex.accuracy):"GPS ?";
+    c.drawText(accuracy,px+10*density,py-10*density,paint);paint.setTextSize(13*density);
    }
    if(layerVisible(LAYER_PHOTOS)&&vertex.photos.length()>0){
     float x=px+8*density,y=py-15*density;paint.setColor(0xff536c80);c.drawRoundRect(x,y,x+22*density,y+12*density,3*density,3*density,paint);paint.setColor(Color.WHITE);paint.setTextSize(10*density);c.drawText("F"+vertex.photos.length(),x+3*density,y+10*density,paint);paint.setTextSize(13*density);
@@ -821,7 +832,7 @@ final class RouteSketch extends View {
    }
    String status=liveFix.hasAccuracy()?String.format(Locale.GERMANY,"GPS ± %.2f m",liveFix.getAccuracy()):"GPS: Genauigkeit unbekannt";
    if(gps==null)status+=" · keine Planposition";
-   paint.setColor(Color.WHITE);c.drawRect(0,0,getWidth(),25*density,paint);
+   paint.setColor(darkEditor?0xff101010:Color.WHITE);c.drawRect(0,0,getWidth(),25*density,paint);
    paint.setColor(darkEditor?0xffe3f0ed:0xff173c42);c.drawText(status,8*density,18*density,paint);
   }
   paint.setColor(0xff42799e);paint.setStrokeWidth(3);
