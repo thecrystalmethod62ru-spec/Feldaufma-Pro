@@ -222,6 +222,20 @@ public class ProjectStateTest {
    });
   }
  }
+ @Test public void routeHistoryDistinguishesRestorationFromNewEdits(){
+  MainActivity.RouteEditHistory history=new MainActivity.RouteEditHistory("a");
+  history.record("b");
+  assertFalse(history.restored);
+  assertEquals("a",history.step(false));
+  assertTrue(history.restored);
+  history.record("a");
+  assertTrue(history.restored);
+  assertEquals("b",history.step(true));
+  assertTrue(history.restored);
+  history.record("c");
+  assertFalse(history.restored);
+  assertTrue(history.redo.isEmpty());
+ }
  @Test public void routeEditorUndoRedoPreservesMetadata(){
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    scenario.onActivity(activity->{
