@@ -323,6 +323,25 @@ public class ProjectStateTest {
    });
   }
  }
+ @Test public void sectionProfileAndSurfaceSaveTogetherAndRejectOverlap() throws Exception {
+  android.content.Context context=androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().getTargetContext();
+  String name="test_section_atomic_"+java.util.UUID.randomUUID();
+  android.content.SharedPreferences prefs=context.getSharedPreferences(name,0);
+  try{
+   PipeLayoutStore store=new PipeLayoutStore(prefs);
+   org.json.JSONArray surfaces=new org.json.JSONArray("[{\"from\":0,\"to\":5,\"width\":1.2,\"surface\":\"Asphalt\"}]");
+   store.saveSectionWithSurfaces(0,5,1.2,1.5,java.util.Collections.emptyList(),surfaces);
+   String saved=store.sections().toString();
+   assertEquals(1.2,store.sections().getJSONObject(0).getDouble("width"),0);
+   assertEquals(surfaces.toString(),prefs.getString("segments",""));
+   try{
+    store.saveSectionWithSurfaces(3,8,2,2,java.util.Collections.emptyList(),new org.json.JSONArray());
+    fail("Overlapping profile must be rejected");
+   }catch(IllegalArgumentException expected){}
+   assertEquals(saved,store.sections().toString());
+   assertEquals(surfaces.toString(),prefs.getString("segments",""));
+  }finally{context.deleteSharedPreferences(name);}
+ }
  @Test public void inactiveMaterialFieldsDoNotBlockValidProfile(){
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    scenario.onActivity(activity->{
