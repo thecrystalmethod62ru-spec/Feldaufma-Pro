@@ -327,6 +327,21 @@ public class ProjectStateTest {
   return new org.json.JSONObject().put("kind","segment").put("mode",mode).put("unit","m²").put("quantity",quantity)
    .put("snapshot",new org.json.JSONObject().put("from",from).put("to",to).toString());
  }
+ @Test public void changingTrenchProfilesUseSameAreaVolumeAndRebDimensions() throws Exception {
+  org.json.JSONArray profiles=new org.json.JSONArray()
+   .put(new org.json.JSONObject().put("from",15).put("to",20).put("width",2).put("depth",1))
+   .put(new org.json.JSONObject().put("from",5).put("to",10).put("width",1.5).put("depth",2));
+  double[] quantities=MainActivity.mainTrenchQuantities(20,1,1,profiles);
+  assertEquals(27.5,quantities[0],0.000001);
+  assertEquals(35,quantities[1],0.000001);
+  assertEquals(java.util.Arrays.asList("5*1=","5*1,5=","5*1=","5*2="),
+   MainActivity.trenchRebFormulas(20,1,1,profiles,false));
+  assertEquals(java.util.Arrays.asList("5*1*1=","5*1,5*2=","5*1*1=","5*2*1="),
+   MainActivity.trenchRebFormulas(20,1,1,profiles,true));
+  profiles.put(new org.json.JSONObject().put("from",8).put("to",12).put("width",1).put("depth",1));
+  try{MainActivity.mainTrenchQuantities(20,1,1,profiles);fail("Overlapping profiles must not yield a total");}
+  catch(IllegalArgumentException expected){}
+ }
  @Test public void overlappingTrenchAndReinstatementAreasAreNotAdded() throws Exception {
   org.json.JSONObject trench=areaAnsatz(0,10,"area",10),cut=areaAnsatz(0,10,"cut",15);
   org.json.JSONObject next=areaAnsatz(10,20,"cut",15),partial=areaAnsatz(9,12,"area",3);
