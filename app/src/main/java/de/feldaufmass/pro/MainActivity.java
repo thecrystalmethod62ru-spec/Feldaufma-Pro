@@ -1256,7 +1256,7 @@ public class MainActivity extends Activity {
   Runnable refreshSectionEditor=()->{
    sectionEditor.removeAllViews();int index=selectedSection[0];if(index<0||index+1>=route.vertices.size()){sectionEditor.setVisibility(View.GONE);return;}
    sectionEditor.setVisibility(View.VISIBLE);sectionEditor.addView(sheetText("A"+(index+1)+"  Abschnitt bearbeiten",13,true));
-   double start=0;for(int j=0;j<index;j++)start+=route.vertices.get(j+1).metres;final double from=start,to=start+route.vertices.get(index+1).metres;
+   double start=0;for(int j=0;j<index;j++){double length=route.vertices.get(j+1).metres;if(!Double.isFinite(length)||length<=0){start=Double.NaN;break;}start+=length;}final double from=start,to=start+route.vertices.get(index+1).metres;
    SharedPreferences defaults=getSharedPreferences("base_profile_defaults",MODE_PRIVATE);
    double bw=defaults.getFloat("width",0.4f),bd=defaults.getFloat("depth",1f);
    try{double v=number(width);if(Double.isFinite(v)&&v>0)bw=v;}catch(Exception ignored){}
@@ -1293,7 +1293,7 @@ public class MainActivity extends Activity {
     card.setText(String.format(java.util.Locale.GERMANY,"A%d",j+1)+"  "+(Double.isFinite(length)&&length>0?(Double.isFinite(end)?String.format(java.util.Locale.GERMANY,"%.2f – %.2f m",station,end):"Station offen"):"Maß fehlt")+(Double.isFinite(length)&&length>0?String.format(java.util.Locale.GERMANY,"\n%.2f m",length):""));
     LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(sectionCards.getOrientation()==LinearLayout.VERTICAL?-1:dp(104),dp(48));cp.setMargins(dp(2),0,dp(2),0);sectionCards.addView(card,cp);
     card.setOnClickListener(v->{if(index+1>=route.vertices.size())return;selectedSection[0]=index;selectedSectionStart[0]=route.vertices.get(index).id;selectedSectionEnd[0]=route.vertices.get(index+1).id;sectionPosition.setText("Abschnitt "+(index+1)+" / "+count);for(int k=0;k<sectionCards.getChildCount();k++)styleEditorButton((Button)sectionCards.getChildAt(k),k==index);if(!Double.isFinite(route.vertices.get(index+1).metres)||route.vertices.get(index+1).metres<=0)measureSegment(route,index+1);});
-    station=Double.isFinite(length)&&length>0?end:Double.NaN;
+    station=Double.isFinite(length)&&length>0&&Double.isFinite(end)?end:Double.NaN;
    }
   };
   refreshSections.run();
