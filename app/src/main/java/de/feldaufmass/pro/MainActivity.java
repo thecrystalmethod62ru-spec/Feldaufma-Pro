@@ -4128,7 +4128,7 @@ public class MainActivity extends Activity {
  stoneDepth.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){if(syncingStone[0])return;syncingStone[0]=true;stoneExact.setText(s);syncingStone[0]=false;refreshProfileDraft();}public void afterTextChanged(android.text.Editable e){}});
  stoneExact.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){if(syncingStone[0])return;syncingStone[0]=true;stoneDepth.setText(s);syncingStone[0]=false;refreshProfileDraft();}public void afterTextChanged(android.text.Editable e){}});
  profileSlider(buildPanel,"Tragschicht",baseInput,0,200);
- Runnable updateSurfaceControls=()->{boolean asphaltSelected="Asphalt".equals(surface.getSelectedItem().toString());asphaltControls.setVisibility(asphaltSelected?View.VISIBLE:View.GONE);stoneControls.setVisibility(isStoneSurface(String.valueOf(surface.getSelectedItem()))?View.VISIBLE:View.GONE);};
+ Runnable updateSurfaceControls=()->{boolean asphaltSelected="Asphalt".equals(String.valueOf(surface.getSelectedItem()));asphaltControls.setVisibility(asphaltSelected?View.VISIBLE:View.GONE);stoneControls.setVisibility(isStoneSurface(String.valueOf(surface.getSelectedItem()))?View.VISIBLE:View.GONE);};
  buildPanel.getViewTreeObserver().addOnGlobalLayoutListener(()->updateSurfaceControls.run());
  updateSurfaceControls.run();
  LinearLayout pipeDetails=page();
@@ -4138,7 +4138,7 @@ public class MainActivity extends Activity {
  profilePage.removeView(legend);pipeDetails.addView(legend);
  profilePage.removeView(sectionProfilePanel);
  LinearLayout toolbar=new LinearLayout(this);profilePage.addView(toolbar);String[] names={"Aufbau","Leitungen","Maße","Abschnitte","Optionen"};String[] icons={"layers","pipe","ruler","sections","settings"};LinearLayout[] panels={buildPanel,pipeDetails,sizes,sectionProfilePanel,optionsPanel};
- for(int j=0;j<names.length;j++){final int index=j;Button tool=new Button(this);styleEditorButton(tool,false);compactToolIcon(tool,names[j],icons[j]);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(64),1);lp.setMargins(dp(2),dp(2),dp(2),dp(2));toolbar.addView(tool,lp);tool.setOnClickListener(v->{if(index==3)openSectionProfilePicker();showProfilePanel(names[index],panels[index]);});}
+ for(int j=0;j<names.length;j++){final int index=j;Button tool=new Button(this);styleEditorButton(tool,false);compactToolIcon(tool,names[j],icons[j]);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(54),1);lp.setMargins(dp(2),dp(2),dp(2),dp(2));toolbar.addView(tool,lp);tool.setOnClickListener(v->{if(index==3)openSectionProfilePicker();showProfilePanel(names[index],panels[index]);});}
 
  save.setOnClickListener(v->{if(calculate())showPage(planPage);});if(projectChosen&&length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);if(!projectChosen)showProjectStart();
  }
@@ -4175,6 +4175,7 @@ public class MainActivity extends Activity {
    }
    String[] labels=new String[rows.size()+1];labels[0]="Standardprofil";for(int i=0;i<rows.size();i++){org.json.JSONObject p=rows.get(i);labels[i+1]=String.format(java.util.Locale.GERMANY,"Abschnitt %02d · %.2f – %.2f m",i+1,p.getDouble("from"),p.getDouble("to"));}
    picker.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,labels));
+   actionButtonSingle(body,"Standardprofil",()->{picker.setSelection(0);for(int k=0;k<stationList.getChildCount();k++){View child=stationList.getChildAt(k);if(child instanceof LinearLayout)child.setBackground(editorShape(0xff202525,8));}});
    LinearLayout controls=page();body.addView(controls);PipeLayoutView view=new PipeLayoutView(this);controls.addView(view,new LinearLayout.LayoutParams(-1,dp(240)));
    EditText bw=new EditText(this),bd=new EditText(this);bw.setHint("Grabenbreite (m)");bd.setHint("Grabentiefe (m)");controls.addView(bw);utilitySlider(controls,bw,"Grabenbreite (m)",0.1,6,0.01,true);controls.addView(bd);utilitySlider(controls,bd,"Grabentiefe (m)",0.1,8,0.01,true);
    EditText cutL=new EditText(this),cutR=new EditText(this),topLayer=new EditText(this),baseLayer=new EditText(this);
