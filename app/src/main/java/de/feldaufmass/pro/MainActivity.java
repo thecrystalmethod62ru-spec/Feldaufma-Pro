@@ -492,6 +492,29 @@ public class MainActivity extends Activity {
   }));
   dialog.show();
  }
+ void editRouteSegment(RouteSketch route,int i){
+  if(i<=0||i>=route.vertices.size())return;
+  new android.app.AlertDialog.Builder(this).setTitle("Abschnitt "+i+" bearbeiten")
+   .setItems(new String[]{"Maß ändern","Winkel ändern","Waagerecht ausrichten","Senkrecht ausrichten"},(d,w)->{
+    if(i>=route.vertices.size())return;
+    if(w==0){measureSegment(route,i);return;}
+    if(w==1){String[] angles={"0°","15°","30°","45°","60°","75°","90°"};new android.app.AlertDialog.Builder(this).setTitle("Winkel zur Horizontalen").setItems(angles,(dd,ww)->alignRouteSegment(route,i,ww*15)).setNegativeButton("Abbrechen",null).show();}
+    else alignRouteSegment(route,i,w==2?0:90);
+   }).setNegativeButton("Schließen",null).show();
+ }
+ void alignRouteSegment(RouteSketch route,int i,int degrees){
+  if(i<=0||i>=route.vertices.size())return;
+  android.graphics.PointF a=route.vertices.get(i-1).point,b=route.vertices.get(i).point;
+  double length=Math.hypot(b.x-a.x,b.y-a.y);if(length<1e-6)return;
+  double rad=Math.toRadians(degrees),dx=Math.copySign(Math.cos(rad)*length,b.x-a.x),dy=Math.copySign(Math.sin(rad)*length,b.y-a.y);
+  float x=(float)(a.x+dx),y=(float)(a.y+dy);
+  if(x<0||x>1||y<0||y>1){notice("Ausrichtung liegt außerhalb der Zeichenfläche.");return;}
+  new android.app.AlertDialog.Builder(this).setTitle("Abschnitt ausrichten").setMessage("Nur die Zeichnungsgeometrie wird geändert. Eingetragene Maße bleiben erhalten. Die angrenzende Linie kann sich ändern.").setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",(d,w)->{
+   if(i>=route.vertices.size())return;
+   if(Double.isFinite(route.vertices.get(i).latitude)||Double.isFinite(route.vertices.get(i).longitude)){notice("GPS-Punkt zuerst von der GPS-Bindung lösen.");return;}
+   route.vertices.get(i).point.set(x,y);if(route.changed!=null)route.changed.run();route.invalidate();
+  }).show();
+ }
  void measureSegment(RouteSketch route,int i){
   EditText metres=new EditText(this);
   metres.setSingleLine(true);metres.setKeyListener(android.text.method.DigitsKeyListener.getInstance("0123456789,."));
@@ -956,7 +979,7 @@ public class MainActivity extends Activity {
   Button calibrate=new Button(this);calibrate.setAllCaps(false);calibrate.setText("Maßstab kalibrieren");form.addView(calibrate);
   Button clearScale=new Button(this);clearScale.setAllCaps(false);clearScale.setText("Kalibrierung entfernen");form.addView(clearScale);
   LinearLayout list=page();form.addView(list);
-  route.selected=i->measureSegment(route,i);
+  route.selected=i->editRouteSegment(route,i);
   route.strokeAdded=first->{
    if(route.darkEditor){
     route.highlight=first;route.invalidate();
