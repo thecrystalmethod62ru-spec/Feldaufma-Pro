@@ -341,6 +341,49 @@ public class ProjectStateTest {
    });
   }
  }
+ @Test public void fullscreenSaveReopensWithMeasuredRouteAndSurfaceBoundary(){
+  String projectId=java.util.UUID.randomUUID().toString();
+  String[] original=new String[1],expectedRoute=new String[1];
+  String surfaces="[{\"from\":0,\"to\":4,\"surface\":\"Asphalt\"},{\"from\":4,\"to\":10,\"surface\":\"Pflaster\"}]";
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   try{
+    scenario.onActivity(activity->{
+     original[0]=activity.activeProject;
+     assertTrue(activity.projectStorage(projectId).edit().putString("segments",surfaces)
+      .putString("routeSketch","[[0.1,0.1,null],[0.5,0.1,4],[0.5,0.7,null]]").commit());
+     assertTrue(activity.projectRegistry().edit().putString("active",projectId).commit());
+    });
+    scenario.recreate();
+    scenario.onActivity(activity->activity.editRoute(false,true));
+    androidx.test.espresso.Espresso.onView(androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom(RouteSketch.class))
+     .check((view,error)->{
+      if(error!=null)throw error;
+      RouteSketch route=(RouteSketch)view;
+      route.vertices.get(2).metres=6;
+      route.changed.run();
+      expectedRoute[0]=route.encode();
+     });
+    androidx.test.espresso.Espresso.onView(org.hamcrest.Matchers.allOf(
+     androidx.test.espresso.matcher.ViewMatchers.withText("Speichern"),
+     androidx.test.espresso.matcher.ViewMatchers.isDisplayed())).perform(androidx.test.espresso.action.ViewActions.click());
+    scenario.recreate();
+    scenario.onActivity(activity->{
+     assertEquals(projectId,activity.activeProject);
+     assertEquals(expectedRoute[0],activity.routeData());
+     assertEquals(10,new RouteSketch(activity,activity.routeData()).measuredLength(),0);
+     assertEquals(2,activity.segments.length());
+     assertEquals(4,activity.segments.optJSONObject(1).optDouble("from"),0);
+     assertEquals("Pflaster",activity.segments.optJSONObject(1).optString("surface"));
+    });
+   }finally{
+    scenario.onActivity(activity->{
+     if(original[0]!=null)activity.projectRegistry().edit().putString("active",original[0]).commit();
+    });
+    scenario.recreate();
+    scenario.onActivity(activity->activity.deleteSharedPreferences("project_"+projectId));
+   }
+  }
+ }
  @Test public void routePersistsAcrossActivityRecreation(){
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    final String[] expected=new String[1];

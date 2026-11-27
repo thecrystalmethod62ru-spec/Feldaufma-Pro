@@ -495,10 +495,11 @@ public class MainActivity extends Activity {
   }catch(Exception e){history.undo.clear();history.redo.clear();}
   return history;
  }
- boolean persistRouteHistory(RouteEditHistory history){
+ boolean persistRouteHistory(RouteEditHistory history){return persistRouteHistory(history,getPreferences(0).edit());}
+ boolean persistRouteHistory(RouteEditHistory history,SharedPreferences.Editor ed){
   try{
    String before=routeData();
-   SharedPreferences.Editor ed=getPreferences(0).edit().putString("routeSketch",history.current)
+   ed.putString("routeSketch",history.current)
     .putString("routeHistoryHead",history.current)
     .putString("routeUndo",new org.json.JSONArray(history.undo).toString())
     .putString("routeRedo",new org.json.JSONArray(history.redo).toString());
@@ -809,7 +810,10 @@ public class MainActivity extends Activity {
    route.invalidate();
   });
   back.setOnClickListener(v->full.dismiss());
-  save.setOnClickListener(v->{full.dismiss();if(editor.isShowing())editor.getButton(-1).performClick();});
+  save.setOnClickListener(v->{
+   if(editor.isShowing())editor.getButton(-1).performClick();
+   if(!editor.isShowing())full.dismiss();
+  });
   android.view.Window window=full.getWindow();
   if(window!=null){
    androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window,false);
@@ -955,7 +959,10 @@ public class MainActivity extends Activity {
    if(!initialSaved.equals(routeData())){notice("Trasse wurde zwischenzeitlich geändert. Editor neu öffnen.");return;}
    history.record(route.encode());
    if(!initialObjects.equals(draftObjects.toString())){double total=route.measuredLength();if(!initialObjects.equals(objects.toString())){notice("Objekte zwischenzeitlich geändert. Editor neu öffnen.");return;}for(int j=0;j<draftObjects.length();j++){org.json.JSONObject entry=draftObjects.optJSONObject(j);if(unchangedEditorObject(initialObjects,entry))continue;double st=entry.optDouble("station");if(!Double.isFinite(total)||!Double.isFinite(st)||st<0||st>total){notice("Objektstation außerhalb der bemaßten Trasse. Bitte korrigieren.");return;}}}
-   if(persistEditorRoute(history,draftObjects)){boolean saved=getPreferences(0).edit().putString("sketchCalibration",calibration[0].toString()).commit();refreshRoute();editor.dismiss();notice(saved?"Trasse gespeichert.":"Trasse gespeichert, Kalibrierung nicht gespeichert.");}
+   org.json.JSONArray objectsToSave=initialObjects.equals(draftObjects.toString())?objects:draftObjects;
+   if(persistEditorRoute(history,objectsToSave,getPreferences(0).edit().putString("sketchCalibration",calibration[0].toString()))){
+    refreshRoute();editor.dismiss();notice("Trasse gespeichert.");
+   }
   }));
   fullscreen.setOnClickListener(v->showFullscreenRoute(editor,form,route,mode,angles,historyBar,openObjects));
   editor.show();
@@ -967,12 +974,13 @@ public class MainActivity extends Activity {
   if(object==null)return false;org.json.JSONArray original=copyEditorObjects(initial);
   for(int j=0;j<original.length();j++){org.json.JSONObject old=original.optJSONObject(j);if(old!=null&&old.toString().equals(object.toString()))return true;}return false;
  }
- boolean persistEditorRoute(RouteEditHistory history,org.json.JSONArray draft){
-  if(draft.toString().equals(objects.toString()))return persistRouteHistory(history);
+ boolean persistEditorRoute(RouteEditHistory history,org.json.JSONArray draft){return persistEditorRoute(history,draft,getPreferences(0).edit());}
+ boolean persistEditorRoute(RouteEditHistory history,org.json.JSONArray draft,SharedPreferences.Editor ed){
+  if(draft.toString().equals(objects.toString()))return persistRouteHistory(history,ed);
   try{
    String before=routeData(),old=objects.toString();org.json.JSONArray merged=new org.json.JSONArray(draft.toString());
    java.util.ArrayDeque<String> nextUndo=new java.util.ArrayDeque<>(undoObjects);nextUndo.push(old);while(nextUndo.size()>HISTORY_LIMIT)nextUndo.removeLast();
-   if(!getPreferences(0).edit().putString("routeSketch",history.current).putString("routeHistoryHead",history.current).putString("routeUndo",new org.json.JSONArray(history.undo).toString()).putString("routeRedo",new org.json.JSONArray(history.redo).toString()).putString("objects",merged.toString()).putString("objectUndo",new org.json.JSONArray(nextUndo).toString()).putString("objectRedo","[]").commit()){notice("Trasse und Objekte konnten nicht gespeichert werden.");return false;}
+   if(!ed.putString("routeSketch",history.current).putString("routeHistoryHead",history.current).putString("routeUndo",new org.json.JSONArray(history.undo).toString()).putString("routeRedo",new org.json.JSONArray(history.redo).toString()).putString("objects",merged.toString()).putString("objectUndo",new org.json.JSONArray(nextUndo).toString()).putString("objectRedo","[]").commit()){notice("Trasse und Objekte konnten nicht gespeichert werden.");return false;}
    objects=merged;undoObjects.clear();undoObjects.addAll(nextUndo);redoObjects.clear();
    if(!before.equals(history.current))recordProjectEvent("Trasse geändert");recordProjectEvent("Objekte bearbeitet · "+draft.length());
    showObjects();refreshDetailQuantities();sketch.invalidate();updateHistoryButtons();return true;
