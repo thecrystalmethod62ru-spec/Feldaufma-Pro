@@ -261,10 +261,12 @@ public class MainActivity extends Activity {
   Button create=actionButtonSingle(start,"Neues Projekt erstellen",()->newProjectDialog());compactToolIcon(create,"Neues Projekt erstellen","objects");
   Button open=actionButtonSingle(start,"Bestehendes Projekt öffnen",()->showProjects());compactToolIcon(open,"Bestehendes Projekt öffnen","layers");
  }
- void enterProject(){projectChosen=true;setContentView(shell);fitSystemPanels(shell);showPage(planPage);}
+ void enterProject(){projectChosen=true;startLiveGps();setContentView(shell);fitSystemPanels(shell);showPage(planPage);}
  void showProjects(){
   java.util.ArrayList<String> ids=new java.util.ArrayList<>(projectRegistry().getStringSet("ids",java.util.Collections.emptySet()));
-  java.util.Collections.sort(ids);ids.remove(LEGACY_PROJECT);ids.add(0,LEGACY_PROJECT);
+  java.util.Collections.sort(ids);ids.remove(LEGACY_PROJECT);
+  if(!projectStorage(LEGACY_PROJECT).getString("project","").trim().isEmpty() || projectStorage(LEGACY_PROJECT).contains("routeSketch") || !projectStorage(LEGACY_PROJECT).getString("length","").trim().isEmpty() || projectStorage(LEGACY_PROJECT).contains("objects") || projectStorage(LEGACY_PROJECT).contains("segments"))ids.add(0,LEGACY_PROJECT);
+  if(ids.isEmpty()){new android.app.AlertDialog.Builder(this).setTitle("Projekte").setMessage("Noch keine Projekte vorhanden.").setPositiveButton("Neues Projekt erstellen",(d,w)->newProjectDialog()).setNegativeButton("Zurück",null).show();return;}
   String[] labels=new String[ids.size()];
   for(int j=0;j<ids.size();j++){String id=ids.get(j);String name=projectStorage(id).getString("project","");labels[j]=(id.equals(activeProject)?"● ":"")+ (name.trim().isEmpty()?"Bestandsprojekt":name);}
   new android.app.AlertDialog.Builder(this).setTitle("Projekte").setItems(labels,(d,w)->{String id=ids.get(w);if(!id.equals(activeProject)){if(!projectChosen){if(projectRegistry().edit().putString("active",id).commit())restartForProject();else notice("Projektwechsel fehlgeschlagen.");}else confirmProjectSwitch(id);}else if(!projectChosen)enterProject();}).setNeutralButton("Neues Projekt",(d,w)->newProjectDialog()).setNegativeButton("Schließen",null).show();
@@ -309,7 +311,7 @@ public class MainActivity extends Activity {
   }catch(Exception e){return false;}
  }
  boolean saveDraft(){
-  if(project==null||surface==null||handling==null)return false;
+  if(!projectChosen||project==null||surface==null||handling==null)return false;
   SharedPreferences prefs=getPreferences(0);SharedPreferences.Editor ed=prefs.edit();
   boolean valid=validProfileForAutosave();
   boolean confirmed=false;
@@ -357,7 +359,7 @@ public class MainActivity extends Activity {
    m.requestLocationUpdates(android.location.LocationManager.GPS_PROVIDER,1000L,0f,liveListener);liveManager=m;
   }catch(RuntimeException ignored){}
  }
- @Override protected void onResume(){super.onResume();startLiveGps();autosaveHandler.removeCallbacks(autosaveTick);autosaveHandler.postDelayed(autosaveTick,AUTOSAVE_INTERVAL_MS);}
+ @Override protected void onResume(){super.onResume();if(projectChosen)startLiveGps();autosaveHandler.removeCallbacks(autosaveTick);autosaveHandler.postDelayed(autosaveTick,AUTOSAVE_INTERVAL_MS);}
  @Override protected void onPause(){
   autosaveHandler.removeCallbacks(autosaveTick);saveDraft();
   if(liveManager!=null){liveManager.removeUpdates(liveListener);liveManager=null;}
@@ -3754,7 +3756,7 @@ public class MainActivity extends Activity {
   objectNote.append((objectNote.length()==0?"":"\n")+note);showPage(objectPage);
  });
  root=measurePage;
- project=field(root,"Projekt / Baustelle","project",false);
+ project=new EditText(this);project.setText(getPreferences(0).getString("project",""));
  length=field(root,"Trassenlänge (m)","length",true);
  Button adopt=new Button(this);adopt.setText("Bemaßte Skizzenlänge übernehmen");root.addView(adopt);
  adopt.setOnClickListener(v->{
@@ -4136,7 +4138,7 @@ public class MainActivity extends Activity {
  LinearLayout toolbar=new LinearLayout(this);profilePage.addView(toolbar);String[] names={"Aufbau","Leitungen","Maße","Abschnitte","Optionen"};String[] icons={"layers","pipe","ruler","sections","settings"};LinearLayout[] panels={buildPanel,pipeDetails,sizes,sectionProfilePanel,optionsPanel};
  for(int j=0;j<names.length;j++){final int index=j;Button tool=new Button(this);styleEditorButton(tool,false);compactToolIcon(tool,names[j],icons[j]);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(64),1);lp.setMargins(dp(2),dp(2),dp(2),dp(2));toolbar.addView(tool,lp);tool.setOnClickListener(v->{if(index==3)openSectionProfilePicker();showProfilePanel(names[index],panels[index]);});}
 
- save.setOnClickListener(v->{if(calculate())showPage(planPage);});if(length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);if(!projectChosen)showProjectStart();
+ save.setOnClickListener(v->{if(calculate())showPage(planPage);});if(projectChosen&&length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);if(!projectChosen)showProjectStart();
  }
  LinearLayout sectionProfilePanel;
  void showProfilePanel(String title,LinearLayout panel){
