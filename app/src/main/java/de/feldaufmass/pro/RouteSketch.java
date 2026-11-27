@@ -463,11 +463,13 @@ final class RouteSketch extends View {
   if(!layerVisible(LAYER_SURFACES))return;
   Paint cut=new Paint(Paint.ANTI_ALIAS_FLAG);cut.setStrokeWidth(1.5f*density);
   double total=measuredLength();if(!Double.isFinite(total)||total<=0)return;
+  JSONObject settings=legendSettings();
   for(int j=0;j<surfaceSections.length();j++){
    JSONObject row=surfaceSections.optJSONObject(j);if(row==null||!"Asphalt".equals(row.optString("surface")))continue;
    double from=row.optDouble("from"),to=row.optDouble("to"),width=row.optDouble("width");
    if(!Double.isFinite(from+to+width)||from<0||to<=from||to>total+1e-8||width<=0)continue;
    double start=0;
+   float[] lastX=new float[4],lastY=new float[4];double[] lastStation={Double.NaN,Double.NaN,Double.NaN,Double.NaN};
    for(int i=1;i<vertices.size();i++){
     Vertex a=vertices.get(i-1),b=vertices.get(i);
     double dx=b.point.x-a.point.x,dy=b.point.y-a.point.y,n=Math.hypot(dx,dy),len=b.metres,end=start+len;
@@ -482,11 +484,17 @@ final class RouteSketch extends View {
        double offset=(side==0?1:-1)*(width/2+(pass==1?extra:0))*unit;
        String key=pass==1?"Rückschnitt (zusätzlicher Asphaltschnitt)":"Asphaltschnitt";
        int color=pass==1?0xffe49a42:darkPalette()?0xffd5d9dc:0xff465968;
-       JSONObject item=legendSettings().optJSONObject(key);
+       JSONObject item=settings.optJSONObject(key);
        if(item!=null)try{color=Color.parseColor(item.optString("color"));}catch(Exception ignored){}
        cut.setColor(color);
        cut.setPathEffect(pass==1?new android.graphics.DashPathEffect(new float[]{5*density,3*density},0):null);
-       c.drawLine(left()+scale()*(float)(a.point.x+dx*t1+nx*offset),top()+scale()*(float)(a.point.y+dy*t1+ny*offset),left()+scale()*(float)(a.point.x+dx*t2+nx*offset),top()+scale()*(float)(a.point.y+dy*t2+ny*offset),cut);
+       float x1=left()+scale()*(float)(a.point.x+dx*t1+nx*offset),y1=top()+scale()*(float)(a.point.y+dy*t1+ny*offset);
+       float x2=left()+scale()*(float)(a.point.x+dx*t2+nx*offset),y2=top()+scale()*(float)(a.point.y+dy*t2+ny*offset);
+       int index=side*2+pass;
+       // Bevel join only at a shared station inside the same asphalt section.
+       if(Double.isFinite(lastStation[index])&&Math.abs(lastStation[index]-lo)<1e-8)c.drawLine(lastX[index],lastY[index],x1,y1,cut);
+       c.drawLine(x1,y1,x2,y2,cut);
+       lastX[index]=x2;lastY[index]=y2;lastStation[index]=hi;
       }
      }
     }
