@@ -757,9 +757,10 @@ public class MainActivity extends Activity {
  static final class RouteEditHistory{
   final java.util.ArrayDeque<String> undo=new java.util.ArrayDeque<>(),redo=new java.util.ArrayDeque<>();
   String current;
+  boolean restored;
   RouteEditHistory(String initial){current=initial;}
-  void record(String next){if(current.equals(next))return;undo.push(current);while(undo.size()>50)undo.removeLast();current=next;redo.clear();}
-  String step(boolean forward){java.util.ArrayDeque<String> from=forward?redo:undo,to=forward?undo:redo;if(from.isEmpty())return current;to.push(current);current=from.pop();return current;}
+  void record(String next){if(current.equals(next))return;restored=false;undo.push(current);while(undo.size()>50)undo.removeLast();current=next;redo.clear();}
+  String step(boolean forward){java.util.ArrayDeque<String> from=forward?redo:undo,to=forward?undo:redo;if(from.isEmpty())return current;to.push(current);current=from.pop();restored=true;return current;}
  }
  RouteEditHistory loadRouteHistory(String current){
   RouteEditHistory history=new RouteEditHistory(current);
@@ -830,7 +831,7 @@ public class MainActivity extends Activity {
   }
   return result;
  }
- JSONArray stageRouteProfileRemap(String before,String after,SharedPreferences.Editor ed)throws org.json.JSONException{
+ JSONArray stageRouteProfileRemap(String before,String after,SharedPreferences.Editor ed,boolean restoreHistory)throws org.json.JSONException{
   if(before.equals(after))return null;
   // Preserve profile state for geometry snapshots before destructive remapping.
   org.json.JSONArray snapshots=new org.json.JSONArray(getPreferences(0).getString("routeProfileSnapshots","[]"));
@@ -844,6 +845,17 @@ public class MainActivity extends Activity {
   for(int i=Math.max(0,nextSnapshots.length()-50);i<nextSnapshots.length();i++)bounded.put(nextSnapshots.getJSONObject(i));
   ed.putString("routeProfileSnapshots",bounded.toString());
 
+  if(restoreHistory){
+   for(int i=snapshots.length()-1;i>=0;i--){
+    org.json.JSONObject entry=snapshots.getJSONObject(i);
+    if(after.equals(entry.optString("geometry"))){
+     JSONArray surfaces=new JSONArray(entry.getJSONArray("surfaces").toString());
+     JSONArray profiles=new JSONArray(entry.getJSONArray("profiles").toString());
+     ed.putString("segments",surfaces.toString()).putString(PipeLayoutStore.SECTION_KEY,profiles.toString());
+     return surfaces;
+    }
+   }
+  }
   double[][] stations=matchingRouteStations(before,after);
   if(stations==null){
    // A deletion is the inverse of an insertion when surviving anchors retain their order.
@@ -908,7 +920,7 @@ public class MainActivity extends Activity {
  boolean persistRouteHistory(RouteEditHistory history,SharedPreferences.Editor ed){
   try{
    String before=routeData();
-   JSONArray remappedSurfaces=stageRouteProfileRemap(before,history.current,ed);
+   JSONArray remappedSurfaces=stageRouteProfileRemap(before,history.current,ed,history.restored);
    ed.putString("routeSketch",history.current)
     .putString("routeHistoryHead",history.current)
     .putString("routeUndo",new org.json.JSONArray(history.undo).toString())
@@ -1878,7 +1890,7 @@ public class MainActivity extends Activity {
   try{
    String before=routeData(),old=objects.toString();org.json.JSONArray merged=new org.json.JSONArray(draft.toString());
    java.util.ArrayDeque<String> nextUndo=new java.util.ArrayDeque<>(undoObjects);nextUndo.push(old);while(nextUndo.size()>HISTORY_LIMIT)nextUndo.removeLast();
-   JSONArray remappedSurfaces=stageRouteProfileRemap(before,history.current,ed);
+   JSONArray remappedSurfaces=stageRouteProfileRemap(before,history.current,ed,history.restored);
    if(!ed.putString("routeSketch",history.current).putString("routeHistoryHead",history.current).putString("routeUndo",new org.json.JSONArray(history.undo).toString()).putString("routeRedo",new org.json.JSONArray(history.redo).toString()).putString("objects",merged.toString()).putString("objectUndo",new org.json.JSONArray(nextUndo).toString()).putString("objectRedo","[]").commit()){notice("Trasse und Objekte konnten nicht gespeichert werden.");return false;}
    if(remappedSurfaces!=null){segments=remappedSurfaces;showSegments();refreshStationLayers();}
    objects=merged;undoObjects.clear();undoObjects.addAll(nextUndo);redoObjects.clear();
