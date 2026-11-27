@@ -413,7 +413,7 @@ public class MainActivity extends Activity {
     runOnUiThread(()->{if(isFinishing()||isDestroyed()||!project.equals(activeProject))return;
      new android.app.AlertDialog.Builder(this,android.R.style.Theme_Material_Dialog_Alert).setTitle("GPX-Vorschau").setMessage(rows.length()+" Punkte. Genauigkeit unbekannt. Import als separate Referenzdatei?").setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",(d,w)->{
       if(!project.equals(activeProject))return;
-      if(getPreferences(0).edit().putString("importedGpsReference",rows.toString()).commit())notice("GPX-Referenz gespeichert.");else notice("GPX konnte nicht gespeichert werden.");
+      if(getPreferences(0).edit().putString("importedGpsReference",rows.toString()).commit()){if(livePreview!=null)livePreview.setImportedGpsReference(rows);applyDrawingLayers(drawingLayers()|RouteSketch.LAYER_GPS_REFERENCE);notice("GPX-Referenz gespeichert.");}else notice("GPX konnte nicht gespeichert werden.");
      }).show();
     });
    }catch(Exception e){runOnUiThread(()->notice("GPX-Import fehlgeschlagen: "+e.getMessage()));}
@@ -477,6 +477,7 @@ public class MainActivity extends Activity {
   if(liveManager!=null){liveManager.removeUpdates(liveListener);liveManager=null;}
   liveFix=null;if(livePreview!=null)livePreview.setLiveFix(null);super.onPause();
  }
+ org.json.JSONArray importedGpsReference(){try{return new org.json.JSONArray(getPreferences(0).getString("importedGpsReference","[]"));}catch(org.json.JSONException e){return new org.json.JSONArray();}}
  int drawingLayers(){
   android.content.SharedPreferences prefs=getSharedPreferences("drawing_view",MODE_PRIVATE);
   int mask=prefs.getInt(activeProject,RouteSketch.ALL_LAYERS)&RouteSketch.ALL_LAYERS;
@@ -493,11 +494,12 @@ public class MainActivity extends Activity {
    mask&=~RouteSketch.LAYER_GPS_DEVIATIONS;
    prefs.edit().putInt(activeProject,mask).putBoolean("gpsDeviationLayerMigrated:"+activeProject,true).apply();
   }
+  if(!prefs.getBoolean("gpsReferenceLayerMigrated:"+activeProject,false)){mask|=RouteSketch.LAYER_GPS_REFERENCE;prefs.edit().putInt(activeProject,mask).putBoolean("gpsReferenceLayerMigrated:"+activeProject,true).apply();}
   return mask;
  }
  void showDrawingLayers(){
-  String[] labels={"Leitungsverlauf / Punkte","Bemaßung","Punktnamen","GPS / Standort","Fotodokumentation","Objekte","Oberflächen","Oberflächenbemaßung","GPS-Aufzeichnung","GPS-Abweichungen"};
-  int[] masks={RouteSketch.LAYER_ROUTE,RouteSketch.LAYER_DIMENSIONS,RouteSketch.LAYER_NAMES,RouteSketch.LAYER_GPS,RouteSketch.LAYER_PHOTOS,RouteSketch.LAYER_OBJECTS,RouteSketch.LAYER_SURFACES,RouteSketch.LAYER_SURFACE_DIMENSIONS,RouteSketch.LAYER_GPS_TRACK,RouteSketch.LAYER_GPS_DEVIATIONS};
+  String[] labels={"Leitungsverlauf / Punkte","Bemaßung","Punktnamen","GPS / Standort","Fotodokumentation","Objekte","Oberflächen","Oberflächenbemaßung","GPS-Aufzeichnung","GPS-Abweichungen","GPX-Referenz"};
+  int[] masks={RouteSketch.LAYER_ROUTE,RouteSketch.LAYER_DIMENSIONS,RouteSketch.LAYER_NAMES,RouteSketch.LAYER_GPS,RouteSketch.LAYER_PHOTOS,RouteSketch.LAYER_OBJECTS,RouteSketch.LAYER_SURFACES,RouteSketch.LAYER_SURFACE_DIMENSIONS,RouteSketch.LAYER_GPS_TRACK,RouteSketch.LAYER_GPS_DEVIATIONS,RouteSketch.LAYER_GPS_REFERENCE};
   boolean[] checked=new boolean[labels.length];int current=drawingLayers();
   for(int j=0;j<labels.length;j++)checked[j]=(current&masks[j])!=0;
   new android.app.AlertDialog.Builder(this).setTitle("Zeichnungsebenen")
@@ -534,7 +536,7 @@ public class MainActivity extends Activity {
  void refreshRoute(){
   routePreviewBox.removeAllViews();
   RouteSketch preview=new RouteSketch(this,routeData());preview.bindDimensionProject(activeProject);
-  livePreview=preview;preview.setVisibleLayers(drawingLayers());preview.setLiveFix(liveFix);preview.setIndependentGpsTrack(gpsTrack());
+  livePreview=preview;preview.setVisibleLayers(drawingLayers());preview.setLiveFix(liveFix);preview.setIndependentGpsTrack(gpsTrack());preview.setImportedGpsReference(importedGpsReference());
   preview.pointSelected=i->{selectedPoint=preview.vertices.get(i).id;refreshRoute();pointMenu();};
   preview.selected=i->measureSegment(preview,i);
   preview.changed=()->{saveRoute(preview);refreshRoute();};
@@ -1137,7 +1139,7 @@ public class MainActivity extends Activity {
  void editRoute(boolean measure,boolean startFullscreen){
   LinearLayout form=page();
   ScrollView scroll=new ScrollView(this);scroll.addView(form);
-  RouteSketch route=new RouteSketch(this,routeData());route.editable=true;route.bindDimensionProject(activeProject);route.setIndependentGpsTrack(gpsTrack());route.setVisibleLayers(drawingLayers());
+  RouteSketch route=new RouteSketch(this,routeData());route.editable=true;route.bindDimensionProject(activeProject);route.setIndependentGpsTrack(gpsTrack());route.setImportedGpsReference(importedGpsReference());route.setVisibleLayers(drawingLayers());
   TextView hint=sheetText("Trasse mit dem Finger zeichnen. Loslassen zum Bearbeiten.",15,false);
   form.addView(hint);
   Button fullscreen=new Button(this);fullscreen.setAllCaps(false);fullscreen.setText("⛶ Vollbild");form.addView(fullscreen);
