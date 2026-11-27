@@ -5032,8 +5032,20 @@ public class MainActivity extends Activity {
  String[] icons={"layers","pipe","settings","ruler"};
  LinearLayout contentPanel=new LinearLayout(this);contentPanel.setOrientation(1);contentPanel.setPadding(dp(8),dp(6),dp(8),dp(6));profilePage.addView(contentPanel);
  TextView layerTitle=sheetText("Schichten (von oben nach unten)",15,true);contentPanel.addView(layerTitle);
- contentPanel.addView(buildPanel);
- LinearLayout[] panels={buildPanel,pipeDetails,optionsPanel};
+ LinearLayout layerRows=new LinearLayout(this);layerRows.setOrientation(1);
+ Runnable refreshLayerRows=()->{
+  layerRows.removeAllViews();
+  String surfaceName=String.valueOf(surface.getSelectedItem());
+  EditText topField="Asphalt".equals(surfaceName)?asphaltInput:stoneDepth;
+  addTechnicalLayerRow(layerRows,"Oberfläche – "+surfaceName,topField,0xff55595b,()->openBelagsDetails());
+  addTechnicalLayerRow(layerRows,"Tragschicht",baseInput,0xff8a8172,()->showProfilePanel("Schichtaufbau",buildPanel));
+ };
+ refreshLayerRows.run();
+ android.text.TextWatcher layerWatcher=new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){refreshLayerRows.run();}public void afterTextChanged(android.text.Editable e){}};
+ for(EditText f:new EditText[]{asphaltInput,stoneDepth,baseInput})f.addTextChangedListener(layerWatcher);
+ contentPanel.addView(layerRows);
+ Button layerDetails=new Button(this);styleEditorButton(layerDetails,false);layerDetails.setText("Schichtaufbau bearbeiten");contentPanel.addView(layerDetails);layerDetails.setOnClickListener(v->showProfilePanel("Schichtaufbau",buildPanel));
+ LinearLayout[] panels={layerRows,pipeDetails,optionsPanel};
  Button[] profileTabs=new Button[names.length];
  for(int j=0;j<names.length;j++){final int index=j;Button tool=new Button(this);profileTabs[j]=tool;styleEditorButton(tool,j==0);tool.setText(names[j]);tool.setAllCaps(false);tool.setTextSize(12);tool.setMinHeight(0);tool.setMinimumHeight(0);tool.setPadding(dp(2),0,dp(2),0);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(44),1);lp.setMargins(dp(2),dp(2),dp(2),dp(2));toolbar.addView(tool,lp);
  tool.setOnClickListener(v->{if(index==3){if(length.length()>0)calculate();else notice("Bitte zuerst die Trassenlänge eingeben.");return;}contentPanel.removeAllViews();contentPanel.addView(sheetText(index==0?"Schichten (von oben nach unten)":names[index],15,true));LinearLayout panel=panels[index];if(panel.getParent() instanceof android.view.ViewGroup)((android.view.ViewGroup)panel.getParent()).removeView(panel);contentPanel.addView(panel);for(int k=0;k<profileTabs.length;k++)styleEditorButton(profileTabs[k],k==index);});}
@@ -5046,6 +5058,15 @@ public class MainActivity extends Activity {
  standard.setOnClickListener(v->manageStandardProfile());
  applyProfile.setOnClickListener(v->{if(length.length()>0){if(calculate())notice("Regelprofil übernommen.");}else{refreshProfileDraft();if(saveDraft())notice("Profilentwurf gespeichert.");}});
  save.setOnClickListener(v->{if(calculate())showPage(planPage);});if(projectChosen&&length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);if(!projectChosen)showProjectStart();
+ }
+ void addTechnicalLayerRow(LinearLayout parent,String name,EditText field,int color,Runnable edit){
+  LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(8),dp(4),dp(8),dp(4));
+  android.graphics.drawable.GradientDrawable frame=editorShape(0xff080e10,5);frame.setStroke(dp(1),0xff344749);row.setBackground(frame);
+  View swatch=new View(this);swatch.setBackgroundColor(color);row.addView(swatch,new LinearLayout.LayoutParams(dp(26),dp(26)));
+  TextView title=sheetText(name,13,true);title.setPadding(dp(8),0,dp(4),0);row.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+  TextView value=sheetText(field.getText().toString()+" cm",13,false);row.addView(value);
+  Button pencil=new Button(this);styleEditorButton(pencil,false);pencil.setText("✎");pencil.setContentDescription(name+" bearbeiten");pencil.setMinWidth(0);pencil.setMinimumWidth(0);pencil.setPadding(0,0,0,0);row.addView(pencil,new LinearLayout.LayoutParams(dp(42),dp(40)));pencil.setOnClickListener(v->edit.run());row.setOnClickListener(v->edit.run());
+  LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,dp(2),0,dp(2));parent.addView(row,lp);
  }
  void manageStandardProfile(){
   SharedPreferences defaults=getSharedPreferences("base_profile_defaults",MODE_PRIVATE);
