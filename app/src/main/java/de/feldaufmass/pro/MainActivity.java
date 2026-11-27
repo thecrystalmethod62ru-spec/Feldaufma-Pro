@@ -764,6 +764,7 @@ public class MainActivity extends Activity {
     c.save();c.translate(getBounds().left,getBounds().top);c.scale(getBounds().width()/24f,getBounds().height()/24f);
     p.setColor(Color.WHITE);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(1.7f);p.setStrokeCap(Paint.Cap.ROUND);p.setStrokeJoin(Paint.Join.ROUND);
     switch(kind){
+     case "mic":c.drawRoundRect(9,3,15,14,3,3,p);c.drawArc(6,7,18,18,0,180,false,p);c.drawLine(12,18,12,22,p);c.drawLine(8,22,16,22,p);break;
      case "ruler":c.save();c.rotate(-45,12,12);c.drawRect(8,3,16,21,p);for(int y=6;y<20;y+=3)c.drawLine(8,y,y%2==0?12:11,y,p);c.restore();break;
      case "view":for(int x:new int[]{4,20})for(int y:new int[]{4,20}){c.drawLine(x,y,x+(x==4?5:-5),y,p);c.drawLine(x,y,x,y+(y==4?5:-5),p);}break;
      case "legend":for(int y=6;y<=18;y+=6){c.drawCircle(5,y,1,p);c.drawLine(9,y,20,y,p);}break;
@@ -779,7 +780,7 @@ public class MainActivity extends Activity {
    @Override public void setColorFilter(android.graphics.ColorFilter f){p.setColorFilter(f);}
    @Override public int getOpacity(){return android.graphics.PixelFormat.TRANSLUCENT;}
   };
-  icon.setBounds(0,0,dp(22),dp(22));button.setText(label);button.setContentDescription(label);button.setCompoundDrawables(null,icon,null,null);button.setCompoundDrawablePadding(dp(3));button.setGravity(Gravity.CENTER);button.setMinHeight(dp(58));button.setTextSize(12);
+  icon.setBounds(0,0,dp(20),dp(20));button.setText(label);button.setContentDescription(label);button.setCompoundDrawables(null,icon,null,null);button.setCompoundDrawablePadding(dp(3));button.setGravity(Gravity.CENTER);button.setMinHeight(dp(52));button.setTextSize(12);
  }
  void showFullscreenRoute(android.app.AlertDialog editor,LinearLayout form,RouteSketch route,Spinner mode,Spinner angles,LinearLayout historyBar,Runnable openObjects,LinearLayout underlayControls){
   // Move the existing views, not a second sketch: unsaved data and undo history stay shared.
@@ -832,6 +833,7 @@ public class MainActivity extends Activity {
    });
   }
   for(Button b:new Button[]{back,mic,measureList,resetZoom,legendEdit,objectTools})styleEditorButton(b,false);
+  compactToolIcon(mic,"","mic");mic.setContentDescription("Sprachassistent");mic.setMinHeight(0);
   compactToolIcon(measureList,"Maße","ruler");compactToolIcon(resetZoom,"Ansicht","view");compactToolIcon(legendEdit,"Legende","legend");compactToolIcon(objectTools,"Objekte","objects");
   styleEditorButton(save,true);LinearLayout.LayoutParams saveParams=new LinearLayout.LayoutParams(-1,dp(48));saveParams.setMargins(dp(10),dp(4),dp(10),dp(8));root.addView(save,saveParams);
   Button canvasToggle=new Button(this);canvasToggle.setText("⛶");canvasToggle.setContentDescription("Zeichenfläche maximieren");styleEditorButton(canvasToggle,false);
