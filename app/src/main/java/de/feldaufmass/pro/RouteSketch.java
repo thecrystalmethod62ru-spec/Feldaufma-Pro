@@ -777,12 +777,15 @@ final class RouteSketch extends View {
   stroke.clear();if(vertices.size()>Math.max(1,before)){moving=true;dimensioning=false;}if(changed!=null)changed.run();invalidate();
   if(vertices.size()>Math.max(1,before)&&strokeAdded!=null){int first=Math.max(1,before);post(()->strokeAdded.select(first));}
  }
+ int smartDrawingMode=1;
  private void finishStroke(){
   if(stroke.size()<2)return;
   ArrayList<PointF> original=new ArrayList<>();
   for(PointF p:stroke)original.add(new PointF(p.x,p.y));
   if(original.size()==2&&distance(original.get(0),original.get(1))<.02){stroke.clear();return;}
   ArrayList<PointF> straight=simplifiedStroke(original,editable?Math.max(.023,Math.min(.08,18*getResources().getDisplayMetrics().density/scale())):.023);
+  if(editable&&smartDrawingMode==0){appendStroke(original);return;}
+  if(editable&&smartDrawingMode==2){for(int j=1;j<straight.size();j++){PointF anchor=straight.get(j-1),target=straight.get(j);double dx=target.x-anchor.x,dy=target.y-anchor.y;double rad=Math.round(Math.atan2(dy,dx)/Math.toRadians(15))*Math.toRadians(15);double len=Math.hypot(dx,dy),ux=Math.cos(rad),uy=Math.sin(rad);if(Math.abs(ux)>1e-8)len=Math.min(len,(ux>0?1-anchor.x:-anchor.x)/ux);if(Math.abs(uy)>1e-8)len=Math.min(len,(uy>0?1-anchor.y:-anchor.y)/uy);target.set((float)(anchor.x+len*ux),(float)(anchor.y+len*uy));}appendStroke(straight);return;}
   if(straight.size()==original.size()){appendStroke(original);return;}
   if(editable){appendStroke(straight);return;}
   new android.app.AlertDialog.Builder(getContext())
