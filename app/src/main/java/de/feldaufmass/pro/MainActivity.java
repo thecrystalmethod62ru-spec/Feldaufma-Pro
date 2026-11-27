@@ -730,6 +730,7 @@ public class MainActivity extends Activity {
   }});menu.show();
  }
  void measureSegment(RouteSketch route,int i){
+  if(i<=0||i>=route.vertices.size()){notice("Abschnitt nicht mehr vorhanden.");return;}
   EditText metres=new EditText(this);
   metres.setSingleLine(true);metres.setKeyListener(android.text.method.DigitsKeyListener.getInstance("0123456789,."));
   metres.setHint("Länge in m");
