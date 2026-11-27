@@ -736,13 +736,27 @@ public class MainActivity extends Activity {
  void loadUtilitySheets(RouteSketch route){
   if(route==null)return;
   java.util.List<RouteSketch.UtilitySheet> list=new java.util.ArrayList<>();
-  try{org.json.JSONArray rows=utilitySheets();for(int j=0;j<rows.length();j++){
-   org.json.JSONObject row=rows.getJSONObject(j);if(!row.optBoolean("visible",true))continue;
-   String name=row.getString("file");android.graphics.Bitmap bitmap=utilityBitmaps.get(name);
-   if(bitmap==null){bitmap=reportPhoto(name);if(bitmap!=null)utilityBitmaps.put(name,bitmap);}
-   if(bitmap!=null)list.add(new RouteSketch.UtilitySheet(bitmap,(float)row.optDouble("x",0),(float)row.optDouble("y",0),(float)row.optDouble("scale",1),(float)row.optDouble("rotation",0),row.optInt("alpha",140)));
-  }}catch(Exception e){notice("Schachtscheine konnten nicht vollständig geladen werden.");}
+  try{
+   org.json.JSONArray rows=utilitySheets();
+   for(int j=0;j<rows.length();j++){
+    org.json.JSONObject row=rows.getJSONObject(j);
+    if(row.optBoolean("visible",true)){
+     RouteSketch.UtilitySheet sheet=readUtilitySheet(row);
+     if(sheet!=null)list.add(sheet);
+    }
+   }
+  }catch(Exception e){notice("Schachtscheine konnten nicht vollständig geladen werden.");}
   route.setUtilitySheets(list);
+ }
+ RouteSketch.UtilitySheet readUtilitySheet(org.json.JSONObject row)throws org.json.JSONException{
+  String name=row.getString("file");
+  android.graphics.Bitmap bitmap=utilityBitmaps.get(name);
+  if(bitmap==null){
+   bitmap=reportPhoto(name);
+   if(bitmap==null)return null;
+   utilityBitmaps.put(name,bitmap);
+  }
+  return new RouteSketch.UtilitySheet(bitmap,(float)row.optDouble("x",0),(float)row.optDouble("y",0),(float)row.optDouble("scale",1),(float)row.optDouble("rotation",0),row.optInt("alpha",140));
  }
  void refreshUtilitySheets(){loadUtilitySheets(livePreview);loadUtilitySheets(activeRouteEditor);}
  boolean saveUtilitySheets(org.json.JSONArray rows){
@@ -770,12 +784,27 @@ public class MainActivity extends Activity {
   try{
    final String projectId=activeProject;org.json.JSONArray rows=utilitySheets();String original=rows.toString();org.json.JSONObject row=rows.getJSONObject(index);
    LinearLayout form=page();RouteSketch preview=new RouteSketch(this,activeRouteEditor==null?routeData():activeRouteEditor.encode());preview.darkPreview=true;preview.setVisibleLayers(RouteSketch.LAYER_ROUTE|RouteSketch.LAYER_SCHACHTSCHEINE);form.addView(preview,new LinearLayout.LayoutParams(-1,dp(240)));
-   android.graphics.Bitmap bitmap=reportPhoto(row.getString("file"));
-   if(bitmap==null){notice("Planblatt fehlt. Bitte neu importieren.");return;}
+   RouteSketch.UtilitySheet selected=readUtilitySheet(row);
+   if(selected==null){notice("Planblatt fehlt. Bitte neu importieren.");return;}
    CheckBox visible=new CheckBox(this);visible.setText("Planblatt anzeigen");visible.setChecked(row.optBoolean("visible",true));form.addView(visible);
    String[] keys={"x","y","scale","rotation","alpha"},labels={"Horizontal","Vertikal","Maßstab","Drehung","Deckkraft"};
    float[] mins={-2,-2,.1f,-180,0},maxs={2,2,5,180,255},values={(float)row.optDouble("x",0),(float)row.optDouble("y",0),(float)row.optDouble("scale",1),(float)row.optDouble("rotation",0),row.optInt("alpha",140)};
-   Runnable update=()->preview.setUtilitySheets(visible.isChecked()?java.util.Collections.singletonList(new RouteSketch.UtilitySheet(bitmap,values[0],values[1],values[2],values[3],Math.round(values[4]))):java.util.Collections.emptyList());
+   java.util.List<RouteSketch.UtilitySheet> neighbors=new java.util.ArrayList<>();
+   int insertionIndex=0;
+   for(int j=0;j<rows.length();j++){
+    if(j==index){insertionIndex=neighbors.size();continue;}
+    org.json.JSONObject other=rows.getJSONObject(j);
+    if(other.optBoolean("visible",true)){
+     RouteSketch.UtilitySheet sheet=readUtilitySheet(other);
+     if(sheet!=null)neighbors.add(sheet);
+    }
+   }
+   final int position=insertionIndex;
+   Runnable update=()->{
+    java.util.List<RouteSketch.UtilitySheet> layers=new java.util.ArrayList<>(neighbors);
+    if(visible.isChecked())layers.add(position,new RouteSketch.UtilitySheet(selected.bitmap,values[0],values[1],values[2],values[3],Math.round(values[4])));
+    preview.setUtilitySheets(layers);
+   };
    visible.setOnCheckedChangeListener((b,on)->update.run());
    for(int j=0;j<keys.length;j++){final int k=j;TextView label=sheetText(labels[j],14,false);form.addView(label);SeekBar bar=new SeekBar(this);bar.setMax(1000);bar.setProgress(Math.round((values[j]-mins[j])*1000/(maxs[j]-mins[j])));form.addView(bar);bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onStartTrackingTouch(SeekBar b){}public void onStopTrackingTouch(SeekBar b){}public void onProgressChanged(SeekBar b,int p,boolean user){if(user){values[k]=mins[k]+(maxs[k]-mins[k])*p/1000f;update.run();}}});}
    update.run();ScrollView scroll=new ScrollView(this);scroll.addView(form);
