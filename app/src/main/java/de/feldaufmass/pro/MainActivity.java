@@ -771,6 +771,18 @@ public class MainActivity extends Activity {
   resetZoom.setOnClickListener(v->{route.zoom=1;route.centerX=.5f;route.centerY=.5f;route.invalidate();});
   Button objectTools=new Button(this);objectTools.setAllCaps(false);objectTools.setText("□\nObjekte");tools.addView(objectTools,new LinearLayout.LayoutParams(0,-2,1));objectTools.setOnClickListener(v->openObjects.run());
   for(Button b:new Button[]{back,mic,measureList,resetZoom,legendEdit,objectTools})styleEditorButton(b,false);
+  Button gpsTools=new Button(this);gpsTools.setText("⌖\nGPS");gpsTools.setContentDescription("GPS und Live-Position");styleEditorButton(gpsTools,false);tools.addView(gpsTools,new LinearLayout.LayoutParams(0,-2,1));
+  final RouteSketch previousLivePreview=livePreview;
+  livePreview=route;route.setLiveFix(liveFix);startLiveGps();
+  gpsTools.setOnClickListener(v->{
+   if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=android.content.pm.PackageManager.PERMISSION_GRANTED){
+    requestPermissions(new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION,android.Manifest.permission.ACCESS_COARSE_LOCATION},703);return;
+   }
+   startLiveGps();
+   android.location.Location fix=liveFix;
+   String status=fix==null?"GPS-Signal wird gesucht …":fix.hasAccuracy()?String.format(java.util.Locale.GERMANY,"GPS-Genauigkeit: ± %.1f m",fix.getAccuracy()):"GPS-Genauigkeit unbekannt";
+   new android.app.AlertDialog.Builder(this).setTitle("GPS / Live-Position").setMessage(status+"\nGPS dient zur Orientierung. Aufmaßmaße bleiben unverändert.").setPositiveButton("OK",null).show();
+  });
   styleEditorButton(save,true);LinearLayout.LayoutParams saveParams=new LinearLayout.LayoutParams(-1,dp(48));saveParams.setMargins(dp(10),dp(4),dp(10),dp(8));root.addView(save,saveParams);
   Button canvasToggle=new Button(this);canvasToggle.setText("⛶");canvasToggle.setContentDescription("Zeichenfläche maximieren");styleEditorButton(canvasToggle,false);
   header.addView(canvasToggle,new LinearLayout.LayoutParams(dp(44),dp(48)));
@@ -801,7 +813,7 @@ public class MainActivity extends Activity {
   restoreTools.setOnClickListener(v->{for(View bar:new View[]{header,controls,historyBar,tools,save})bar.setVisibility(View.VISIBLE);restoreTools.setVisibility(View.GONE);floatingSave.setVisibility(View.GONE);});
   full.setContentView(root);
   full.setOnDismissListener(d->{
-   pendingEditorSpeech=null;route.darkEditor=false;
+   pendingEditorSpeech=null;route.darkEditor=false;if(livePreview==route){livePreview=previousLivePreview;if(livePreview!=null)livePreview.setLiveFix(liveFix);}
    setRequestedOrientation(previousOrientation);
    for(View view:views){android.view.ViewParent parent=view.getParent();if(parent instanceof android.view.ViewGroup)((android.view.ViewGroup)parent).removeView(view);}
    // Original positions are ascending; restore before other controls.
