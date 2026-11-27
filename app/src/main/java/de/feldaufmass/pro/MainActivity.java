@@ -4149,7 +4149,18 @@ public class MainActivity extends Activity {
    if(rows.isEmpty()){sectionProfilePanel.addView(sheetText("Keine Abschnitte vorhanden",15,false));return;}
    LinearLayout body=page();sectionProfilePanel.addView(body);
    body.addView(sheetText("Abschnitte der Trasse",16,true));
-   for(int j=0;j<rows.size();j++){org.json.JSONObject row=rows.get(j);body.addView(sheetText(String.format(java.util.Locale.GERMANY,"Abschnitt %02d   ·   %.2f – %.2f m",j+1,row.getDouble("from"),row.getDouble("to")),14,false));}Spinner picker=new Spinner(this);body.addView(picker);
+   Spinner picker=new Spinner(this);body.addView(picker);picker.setVisibility(View.GONE);
+   LinearLayout stationList=page();stationList.setBackground(editorShape(0xff202525,12));body.addView(stationList);
+   for(int j=0;j<rows.size();j++){
+    final int selection=j+1;org.json.JSONObject row=rows.get(j);
+    LinearLayout item=new LinearLayout(this);item.setGravity(Gravity.CENTER_VERTICAL);item.setPadding(dp(12),dp(10),dp(12),dp(10));item.setMinimumHeight(dp(60));stationList.addView(item);
+    Button marker=new Button(this);compactToolIcon(marker,"","sections");marker.setBackgroundColor(Color.TRANSPARENT);marker.setClickable(false);marker.setFocusable(false);marker.setCompoundDrawableTintList(android.content.res.ColorStateList.valueOf(0xff58c9b0));item.addView(marker,new LinearLayout.LayoutParams(dp(36),dp(44)));
+    LinearLayout labelsBox=new LinearLayout(this);labelsBox.setOrientation(1);item.addView(labelsBox,new LinearLayout.LayoutParams(0,-2,1));
+    labelsBox.addView(sheetText(String.format(java.util.Locale.GERMANY,"Abschnitt %02d",selection),15,true));
+    TextView range=sheetText(String.format(java.util.Locale.GERMANY,"%.2f – %.2f m",row.getDouble("from"),row.getDouble("to")),13,false);range.setTextColor(0xffaeb9b8);labelsBox.addView(range);
+    TextView arrow=sheetText("›",24,false);item.addView(arrow);item.setBackground(editorShape(0xff202525,8));item.setClickable(true);item.setFocusable(true);item.setOnClickListener(v->{picker.setSelection(selection);for(int k=0;k<stationList.getChildCount();k++){View child=stationList.getChildAt(k);if(child instanceof LinearLayout)child.setBackground(editorShape(child==item?0xff28564c:0xff202525,8));}});
+    if(j<rows.size()-1){View line=new View(this);line.setBackgroundColor(0xff414848);stationList.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));}
+   }
    String[] labels=new String[rows.size()+1];labels[0]="Standardprofil";for(int i=0;i<rows.size();i++){org.json.JSONObject p=rows.get(i);labels[i+1]=String.format(java.util.Locale.GERMANY,"Abschnitt %02d · %.2f – %.2f m",i+1,p.getDouble("from"),p.getDouble("to"));}
    picker.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,labels));
    LinearLayout controls=page();body.addView(controls);PipeLayoutView view=new PipeLayoutView(this);controls.addView(view,new LinearLayout.LayoutParams(-1,dp(240)));
