@@ -2945,7 +2945,7 @@ public class MainActivity extends Activity {
       from.setHint("Station von (m)");to.setHint("Station bis (m)");from.setInputType(8194);to.setInputType(8194);interval.addView(from);interval.addView(to);
       android.app.AlertDialog sectionDialog=new android.app.AlertDialog.Builder(this).setTitle("Regelprofil – Stationierung").setView(interval).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
       sectionDialog.setOnShowListener(dialog->sectionDialog.getButton(-1).setOnClickListener(save->{
-       try{multiPipeStore.saveSection(number(from),number(to),bw,bd,pipes);sectionDialog.dismiss();android.widget.Toast.makeText(this,"Abschnittsprofil gespeichert",android.widget.Toast.LENGTH_SHORT).show();}
+       try{multiPipeStore.saveSection(number(from),number(to),bw,bd,pipes);refreshMainQuantities();sectionDialog.dismiss();android.widget.Toast.makeText(this,"Abschnittsprofil gespeichert",android.widget.Toast.LENGTH_SHORT).show();}
        catch(Exception ex){to.setError(ex.getMessage());}
       }));sectionDialog.show();
      });
@@ -4314,7 +4314,7 @@ public class MainActivity extends Activity {
      ScrollView scroll=new ScrollView(this);scroll.addView(body);
      new android.app.AlertDialog.Builder(this).setTitle(labels[index]).setView(scroll).setPositiveButton("Schließen",null).setNeutralButton("Löschen",(preview,which)->{
       new android.app.AlertDialog.Builder(this).setTitle("Abschnittsprofil löschen?").setMessage(labels[index]).setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(confirm,choice)->{
-       try{new PipeLayoutStore(getPreferences(0)).deleteSection(p.getDouble("from"),p.getDouble("to"));if(sketch!=null)sketch.invalidate();notice("Abschnittsprofil gelöscht.");}
+       try{new PipeLayoutStore(getPreferences(0)).deleteSection(p.getDouble("from"),p.getDouble("to"));refreshMainQuantities();if(sketch!=null)sketch.invalidate();notice("Abschnittsprofil gelöscht.");}
        catch(Exception ex){notice(ex.getMessage());}
       }).show();
      }).setNegativeButton("Maße bearbeiten",(preview,which)->{
@@ -4331,7 +4331,7 @@ public class MainActivity extends Activity {
       newWidth.addTextChangedListener(draftWatcher);newDepth.addTextChangedListener(draftWatcher);updateDraft.run();
       android.app.AlertDialog editor=new android.app.AlertDialog.Builder(this).setTitle(labels[index]).setView(fields).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
       editor.setOnShowListener(open->editor.getButton(-1).setOnClickListener(saveButton->{
-       try{new PipeLayoutStore(getPreferences(0)).saveSection(p.getDouble("from"),p.getDouble("to"),number(newWidth),number(newDepth),pipes);if(sketch!=null)sketch.invalidate();editor.dismiss();notice("Abschnittsprofil aktualisiert.");}
+       try{new PipeLayoutStore(getPreferences(0)).saveSection(p.getDouble("from"),p.getDouble("to"),number(newWidth),number(newDepth),pipes);refreshMainQuantities();if(sketch!=null)sketch.invalidate();editor.dismiss();notice("Abschnittsprofil aktualisiert.");}
        catch(Exception ex){newDepth.setError(ex.getMessage());}
       }));editor.show();
      }).show();
@@ -4469,15 +4469,22 @@ public class MainActivity extends Activity {
     int i=picker.getSelectedItemPosition()-1;org.json.JSONObject p=rows.get(i);double ww=number(bw),dd=number(bd);
     double cl=optional(cutL),cr=optional(cutR),tl=optional(topLayer),bl=optional(baseLayer);
     if((Double.isFinite(tl)?tl:0)+(Double.isFinite(bl)?bl:0)>dd)throw new IllegalArgumentException("Schichtstärken überschreiten Grabentiefe");
-    org.json.JSONObject seg=findSurfaceSection(p);
-    if(seg==null){
-     for(int j=0;j<segments.length();j++){org.json.JSONObject other=segments.getJSONObject(j);if(p.getDouble("from")<other.getDouble("to")&&p.getDouble("to")>other.getDouble("from"))throw new IllegalArgumentException("Oberflächenabschnitt überlappt – Grenzen zuerst angleichen");}
-     seg=new org.json.JSONObject().put("from",p.getDouble("from")).put("to",p.getDouble("to")).put("surface",covering).put("width",ww);
+    org.json.JSONArray nextSurfaces=new org.json.JSONArray(segments.toString());
+    org.json.JSONObject seg=null;
+    double from=p.getDouble("from"),to=p.getDouble("to");
+    for(int j=0;j<nextSurfaces.length();j++){
+     org.json.JSONObject other=nextSurfaces.getJSONObject(j);
+     double a=other.getDouble("from"),b=other.getDouble("to");
+     if(from==a&&to==b){seg=other;continue;}
+     if(from<b&&to>a)throw new IllegalArgumentException("Oberflächenabschnitt überlappt – Grenzen zuerst angleichen");
     }
-    boolean newSurface=findSurfaceSection(p)==null;
-    if(l>0&&p.getDouble("to")>l)throw new IllegalArgumentException("Abschnitt außerhalb der Trasse");
-    new PipeLayoutStore(getPreferences(0)).saveSection(p.getDouble("from"),p.getDouble("to"),ww,dd,PipeLayoutStore.decode(p.getJSONArray("pipes").toString()));
-    if(seg!=null){if(newSurface)segments.put(seg);seg.put("width",ww);String[] keys={"left","right","topThickness","baseThickness"};double[] vals={cl,cr,tl,bl};for(int j=0;j<keys.length;j++){if(Double.isFinite(vals[j]))seg.put(keys[j],vals[j]);else seg.remove(keys[j]);}if(Double.isFinite(cl)&&Double.isFinite(cr))seg.put("cutWidth",ww+cl+cr);else seg.remove("cutWidth");persistSegments();}
+    if(seg==null){seg=new org.json.JSONObject().put("from",from).put("to",to).put("surface",covering);nextSurfaces.put(seg);}
+    if(l>0&&to>l)throw new IllegalArgumentException("Abschnitt außerhalb der Trasse");
+    seg.put("width",ww);String[] keys={"left","right","topThickness","baseThickness"};double[] vals={cl,cr,tl,bl};
+    for(int j=0;j<keys.length;j++){if(Double.isFinite(vals[j]))seg.put(keys[j],vals[j]);else seg.remove(keys[j]);}
+    if(Double.isFinite(cl)&&Double.isFinite(cr))seg.put("cutWidth",ww+cl+cr);else seg.remove("cutWidth");
+    new PipeLayoutStore(getPreferences(0)).saveSectionWithSurfaces(from,to,ww,dd,PipeLayoutStore.decode(p.getJSONArray("pipes").toString()),nextSurfaces);
+    segments=nextSurfaces;showSegments();refreshStationLayers();
     p.put("width",ww).put("depth",dd);if(sketch!=null)sketch.invalidate();refreshMainQuantities();refreshDetailQuantities();notice("Abschnittsprofil gespeichert.");
    }catch(Exception ex){notice("Abschnittsprofil: "+ex.getMessage());}});
    controls.addView(sheetText("Vor dem Wechsel Änderungen speichern. Standardprofil bleibt unverändert.",13,false));
