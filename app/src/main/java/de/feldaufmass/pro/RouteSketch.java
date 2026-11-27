@@ -464,12 +464,18 @@ final class RouteSketch extends View {
   Paint cut=new Paint(Paint.ANTI_ALIAS_FLAG);cut.setStrokeWidth(1.5f*density);
   double total=measuredLength();if(!Double.isFinite(total)||total<=0)return;
   JSONObject settings=legendSettings();
-  for(int j=0;j<surfaceSections.length();j++){
-   JSONObject row=surfaceSections.optJSONObject(j);if(row==null||!"Asphalt".equals(row.optString("surface")))continue;
+  java.util.ArrayList<org.json.JSONObject> cutRows=new java.util.ArrayList<>();
+   for(int j=0;j<surfaceSections.length();j++){org.json.JSONObject item=surfaceSections.optJSONObject(j);if(item!=null)cutRows.add(item);}
+   cutRows.sort((aa,bb)->Double.compare(aa.optDouble("from"),bb.optDouble("from")));
+   float[] lastX=new float[4],lastY=new float[4];double[] lastStation={Double.NaN,Double.NaN,Double.NaN,Double.NaN};
+   double previousEnd=Double.NaN;
+   for(org.json.JSONObject row:cutRows){if(!"Asphalt".equals(row.optString("surface"))){previousEnd=Double.NaN;continue;}
    double from=row.optDouble("from"),to=row.optDouble("to"),width=row.optDouble("width");
    if(!Double.isFinite(from+to+width)||from<0||to<=from||to>total+1e-8||width<=0)continue;
    double start=0;
-   float[] lastX=new float[4],lastY=new float[4];double[] lastStation={Double.NaN,Double.NaN,Double.NaN,Double.NaN};
+   if(!Double.isFinite(previousEnd)||Math.abs(previousEnd-from)>1e-8)java.util.Arrays.fill(lastStation,Double.NaN);
+    previousEnd=to;
+    for(int side=0;side<2;side++)if(!(row.optDouble(side==0?"left":"right")>0))lastStation[side*2+1]=Double.NaN;
    for(int i=1;i<vertices.size();i++){
     Vertex a=vertices.get(i-1),b=vertices.get(i);
     double dx=b.point.x-a.point.x,dy=b.point.y-a.point.y,n=Math.hypot(dx,dy),len=b.metres,end=start+len;
@@ -491,7 +497,7 @@ final class RouteSketch extends View {
        float x1=left()+scale()*(float)(a.point.x+dx*t1+nx*offset),y1=top()+scale()*(float)(a.point.y+dy*t1+ny*offset);
        float x2=left()+scale()*(float)(a.point.x+dx*t2+nx*offset),y2=top()+scale()*(float)(a.point.y+dy*t2+ny*offset);
        int index=side*2+pass;
-       // Bevel join only at a shared station inside the same asphalt section.
+       // Schematic join only at a shared station of contiguous asphalt sections.
        if(Double.isFinite(lastStation[index])&&Math.abs(lastStation[index]-lo)<1e-8)c.drawLine(lastX[index],lastY[index],x1,y1,cut);
        c.drawLine(x1,y1,x2,y2,cut);
        lastX[index]=x2;lastY[index]=y2;lastStation[index]=hi;
