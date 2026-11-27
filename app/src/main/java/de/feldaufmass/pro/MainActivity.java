@@ -574,6 +574,7 @@ public class MainActivity extends Activity {
   preview.highlight=findPoint(preview,selectedPoint);
   if(!preview.vertices.isEmpty() && !routeData().equals(preview.encode()))getPreferences(0).edit().putString("routeSketch",preview.encode()).remove("routeHistoryHead").remove("routeUndo").remove("routeRedo").commit();
   routePreviewBox.addView(preview,new LinearLayout.LayoutParams(-1,dp(300)));
+  refreshMainQuantities();
   double total=preview.measuredLength();
   if(preview.vertices.size()<2){routeSummary.setText("Trasse mit dem Finger zeichnen");refreshStationLayers();return;}
   routeSummary.setText((preview.vertices.size()-1)+" Abschnitte · "+
