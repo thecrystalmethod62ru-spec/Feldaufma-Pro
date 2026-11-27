@@ -1280,16 +1280,26 @@ public class MainActivity extends Activity {
   Button collapseProfile=new Button(this);styleEditorButton(collapseProfile,false);collapseProfile.setText("−");floatingHeader.addView(collapseProfile,new LinearLayout.LayoutParams(dp(32),dp(30)));
   TextView profilePlaceholder=sheetText("Abschnitt auswählen",12,false);profilePlaceholder.setTextColor(0xffaeb9b8);floatingProfile.addView(profilePlaceholder,new LinearLayout.LayoutParams(-1,dp(36)));
   PipeLayoutView floatingCross=new PipeLayoutView(this);floatingCross.setEnabled(false);floatingCross.setVisibility(View.GONE);floatingProfile.addView(floatingCross,new LinearLayout.LayoutParams(-1,dp(140)));
+  java.util.function.Consumer<PipeLayoutView> showBaseCross=cross->{
+   double w=0.4,d=1.0;
+   try{double v=number(width);if(Double.isFinite(v)&&v>0)w=v;}catch(Exception ignored){}
+   try{double v=number(depth);if(Double.isFinite(v)&&v>0)d=v;}catch(Exception ignored){}
+   java.util.List<PipeLayout.Pipe> pipes=new java.util.ArrayList<>();
+   try{pipes=new PipeLayoutStore(getPreferences(0)).load();}catch(Exception ignored){}
+   cross.setLayoutData(pipes,w,d);cross.setAsphaltProfile("Asphalt".equals(covering));
+   cross.setCivilProfile(0,0,0,0,route.configuredSurfaceColor(covering,route.legendSettings()));
+   cross.setVisibility(View.VISIBLE);
+  };
   Runnable updateFloatingCross=()->{
-   floatingCross.setVisibility(View.GONE);profilePlaceholder.setVisibility(View.VISIBLE);
-   if(selectedSection[0]<0){profilePlaceholder.setText("Abschnitt auswählen");return;}
+   showBaseCross.accept(floatingCross);profilePlaceholder.setVisibility(View.GONE);
+   if(selectedSection[0]<0||selectedSection[0]+1>=route.vertices.size())return;
    double from=0;for(int j=0;j<selectedSection[0];j++)from+=route.vertices.get(j+1).metres;
    double to=from+route.vertices.get(selectedSection[0]+1).metres;
-   if(!Double.isFinite(to)||to<=from){profilePlaceholder.setText("Maß fehlt");return;}
+   if(!Double.isFinite(from)||!Double.isFinite(to)||to<=from)return;
    try{
     org.json.JSONArray rows=new PipeLayoutStore(getPreferences(0)).sections();org.json.JSONObject match=null;
     for(int j=0;j<rows.length();j++){org.json.JSONObject p=rows.getJSONObject(j);if(Math.abs(p.optDouble("from")-from)<0.001&&Math.abs(p.optDouble("to")-to)<0.001){match=p;break;}}
-    if(match==null){profilePlaceholder.setText("Kein Abschnittsprofil gespeichert");return;}
+    if(match==null)return;
     double ww=match.optDouble("width"),dd=match.optDouble("depth");
     if(!Double.isFinite(ww)||!Double.isFinite(dd)||ww<=0||dd<=0){profilePlaceholder.setText("Profilmaße fehlen");return;}
     floatingCross.setLayoutData(PipeLayoutStore.decode(match.getJSONArray("pipes").toString()),ww,dd);
@@ -1339,7 +1349,7 @@ public class MainActivity extends Activity {
   PipeLayoutView fullCross=new PipeLayoutView(this);profilePage.addView(fullCross,new LinearLayout.LayoutParams(-1,0,1));
   Button editSectionProfile=new Button(this);styleEditorButton(editSectionProfile,false);compactToolIcon(editSectionProfile,"Abschnitt bearbeiten","settings");profilePage.addView(editSectionProfile,new LinearLayout.LayoutParams(-1,dp(54)));editSectionProfile.setOnClickListener(v->{if(sectionProfilePanel.getParent()!=null)return;openSectionProfilePicker();showProfilePanel("Abschnitte",sectionProfilePanel);});
   canvasFrame.addView(profilePage,new android.widget.FrameLayout.LayoutParams(-1,-1));
-  Runnable refreshFullProfile=()->{profilePageTitle.setText("Regelprofil · "+sectionPosition.getText());fullCross.setVisibility(View.GONE);if(selectedSection[0]<0||selectedSection[0]+1>=route.vertices.size())return;double start=0;for(int j=0;j<selectedSection[0];j++)start+=route.vertices.get(j+1).metres;double end=start+route.vertices.get(selectedSection[0]+1).metres;try{org.json.JSONArray rows=new PipeLayoutStore(getPreferences(0)).sections();for(int j=0;j<rows.length();j++){org.json.JSONObject p=rows.getJSONObject(j);if(Math.abs(p.optDouble("from")-start)>0.001||Math.abs(p.optDouble("to")-end)>0.001)continue;double w=p.optDouble("width"),d=p.optDouble("depth");if(w>0&&d>0){fullCross.setLayoutData(PipeLayoutStore.decode(p.getJSONArray("pipes").toString()),w,d);fullCross.setVisibility(View.VISIBLE);}break;}}catch(Exception ignored){}};
+  Runnable refreshFullProfile=()->{profilePageTitle.setText(selectedSection[0]<0?"Regelprofil · Standardprofil":"Regelprofil · "+sectionPosition.getText());showBaseCross.accept(fullCross);if(selectedSection[0]<0||selectedSection[0]+1>=route.vertices.size())return;double start=0;for(int j=0;j<selectedSection[0];j++)start+=route.vertices.get(j+1).metres;double end=start+route.vertices.get(selectedSection[0]+1).metres;try{org.json.JSONArray rows=new PipeLayoutStore(getPreferences(0)).sections();for(int j=0;j<rows.length();j++){org.json.JSONObject p=rows.getJSONObject(j);if(Math.abs(p.optDouble("from")-start)>0.001||Math.abs(p.optDouble("to")-end)>0.001)continue;double w=p.optDouble("width"),d=p.optDouble("depth");if(w>0&&d>0){fullCross.setLayoutData(PipeLayoutStore.decode(p.getJSONArray("pipes").toString()),w,d);fullCross.setVisibility(View.VISIBLE);}break;}}catch(Exception ignored){}};
   drawingTab.setOnClickListener(v->{profilePage.setVisibility(View.GONE);route.setVisibility(View.VISIBLE);floatingProfile.setVisibility(View.VISIBLE);styleEditorButton(drawingTab,true);styleEditorButton(profileTab,false);});
   profileTab.setOnClickListener(v->{route.setVisibility(View.GONE);floatingProfile.setVisibility(View.GONE);profilePage.setVisibility(View.VISIBLE);styleEditorButton(drawingTab,false);styleEditorButton(profileTab,true);refreshFullProfile.run();});
   sectionPosition.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){if(profilePage.getVisibility()==View.VISIBLE)refreshFullProfile.run();}public void afterTextChanged(android.text.Editable e){}});
