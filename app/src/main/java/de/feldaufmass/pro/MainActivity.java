@@ -5436,7 +5436,13 @@ public class MainActivity extends Activity {
   org.json.JSONArray widths;try{widths=new org.json.JSONArray(getPreferences(0).getString("metricWidthSections","[]"));}catch(Exception e){widths=new org.json.JSONArray();}
   double margin=(trenchWidth/2+Math.max(cutL,cutR))/factor;
   for(int j=0;j<widths.length();j++){org.json.JSONObject row=widths.optJSONObject(j);if(row==null)continue;double bw=row.optDouble("width"),cl=row.optDouble("left",cutL),cr=row.optDouble("right",cutR);if(Double.isFinite(bw)&&bw>0&&Double.isFinite(cl)&&cl>=0&&Double.isFinite(cr)&&cr>=0)margin=Math.max(margin,(bw/2+Math.max(cl,cr))/factor);}
-minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
+for(int j=0;j<route.surfaceSections.length();j++){
+   org.json.JSONObject row=route.surfaceSections.optJSONObject(j);if(row==null||!"Asphalt".equals(row.optString("surface")))continue;
+   double bw=row.optDouble("width");if(!Double.isFinite(bw)||bw<=0)continue;
+   double cl=row.optDouble("left",0),cr=row.optDouble("right",0);
+   margin=Math.max(margin,(bw/2+Math.max(Double.isFinite(cl)?Math.max(0,cl):0,Double.isFinite(cr)?Math.max(0,cr):0))/factor);
+  }
+  minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
   int denominator=0,width=595,height=842,format=4;double unit=0;
   int[][] formats={{595,842},{842,1191},{1191,1684},{1684,2384},{2384,3370}};
   search:for(int candidate:new int[]{100,200,500,1000,2000,5000}){
@@ -5605,6 +5611,39 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     }
     if(!pdfDepthValid){p.setColor(0xffb3261e);p.setTextSize(9);c.drawText("Tiefenabschnitte ungültig – Tiefenprüfung nicht möglich",36,height-98,p);}
     if(utilities.length()>0){p.setColor(INK);p.setTextSize(9);c.drawText(omitted?"Zusatzleitungen: ungültige Abschnitte rot markiert; fehlende Maße ggf. ausgelassen":"Zusatzleitungen: Profilversatz ab linker Kante; Verbindungen schematisch",36,height-110,p);}
+   }
+   // Longitudinal asphalt cuts, separate from the excavation outline.
+   Paint asphaltPen=new Paint(Paint.ANTI_ALIAS_FLAG);asphaltPen.setStrokeWidth(.8f);
+   boolean originalCuts=false,recutCuts=false;
+   for(int j=0;j<route.surfaceSections.length();j++){
+    org.json.JSONObject row=route.surfaceSections.optJSONObject(j);
+    if(row==null||!"Asphalt".equals(row.optString("surface")))continue;
+    double from=row.optDouble("from"),to=row.optDouble("to"),bw=row.optDouble("width");
+    if(!Double.isFinite(from+to+bw)||from<0||to<=from||to>route.measuredLength()+1e-8||bw<=0)continue;
+    double st=0;
+    for(int i=1;i<route.vertices.size();i++){
+     RouteSketch.Vertex aa=route.vertices.get(i-1),bb=route.vertices.get(i);
+     double len=bb.metres,dx=bb.point.x-aa.point.x,dy=bb.point.y-aa.point.y,n=Math.hypot(dx,dy);
+     double lo=Math.max(st,from),hi=Math.min(st+len,to);
+     if(hi>lo&&n>0&&len>0){
+      for(int side=0;side<2;side++)for(int pass=0;pass<2;pass++){
+       double extra=row.optDouble(side==0?"left":"right");
+       if(pass==1&&(!Double.isFinite(extra)||extra<=0))continue;
+       double offset=(side==0?1:-1)*(bw/2+(pass==1?extra:0))/factor,nx=dy/n*offset,ny=-dx/n*offset;
+       double t1=(lo-st)/len,t2=(hi-st)/len;
+       asphaltPen.setColor(pass==1?0xffb66b16:0xff465968);
+       asphaltPen.setPathEffect(pass==1?new android.graphics.DashPathEffect(new float[]{4,3},0):null);
+       c.drawLine((float)(40+(aa.point.x+dx*t1+nx-minX)*unit),(float)(85+(aa.point.y+dy*t1+ny-minY)*unit),(float)(40+(aa.point.x+dx*t2+nx-minX)*unit),(float)(85+(aa.point.y+dy*t2+ny-minY)*unit),asphaltPen);
+       if(pass==1)recutCuts=true;else originalCuts=true;
+      }
+     }
+     st+=len;
+    }
+   }
+   if(originalCuts){
+    asphaltPen.setPathEffect(null);asphaltPen.setColor(0xff465968);asphaltPen.setTextSize(9);
+    c.drawLine(40,height-158,58,height-158,asphaltPen);c.drawText("Asphaltschnitt",64,height-155,asphaltPen);
+    if(recutCuts){asphaltPen.setColor(0xffb66b16);asphaltPen.setPathEffect(new android.graphics.DashPathEffect(new float[]{4,3},0));c.drawLine(180,height-158,198,height-158,asphaltPen);asphaltPen.setPathEffect(null);c.drawText("Rückschnitt (zusätzlich)",204,height-155,asphaltPen);}
    }
    // Paper-space labels: never alter the measured geometry or drawing scale.
    Paint dim=new Paint(Paint.ANTI_ALIAS_FLAG);dim.setTextSize(10);dim.setColor(INK);
