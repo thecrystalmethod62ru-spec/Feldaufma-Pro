@@ -14,7 +14,7 @@ final class ProfileResponsiveLayout {
    if(availableWidth<=0||availableHeight<=0)return;
    boolean wide=availableWidth>=dp(profileWork,560)||(landscape&&availableWidth>=dp(profileWork,320));
    int profileOrientation=wide?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL;
-   int panelSize=wide?Math.min(dp(profileWork,280),Math.round(availableWidth*.40f)):Math.min(dp(profileWork,220),Math.round(availableHeight*.40f));
+   int panelSize=wide?Math.min(dp(profileWork,280),Math.round(availableWidth*.30f)):Math.min(dp(profileWork,220),Math.round(availableHeight*.30f));
    LinearLayout.LayoutParams info=(LinearLayout.LayoutParams)profileInfoScroll.getLayoutParams();
    if(profileWork.getOrientation()==profileOrientation&&info.weight==0&&(wide?info.width:info.height)==panelSize)return;
    profileWork.setOrientation(profileOrientation);
