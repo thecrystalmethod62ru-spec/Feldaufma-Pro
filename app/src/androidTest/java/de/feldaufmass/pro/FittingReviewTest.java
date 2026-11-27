@@ -29,16 +29,16 @@ public class FittingReviewTest {
                         .putString("routeSketch","[[0,0],[1,0,6.25,\"p2\",[],null,null,null,\"Schacht\"],[2,0],[3,0,2]]").commit());
                     activity.reviewFittingText("Blatt A",bend+"\nMuffe");
                 });
-                onView(withText("Zeile 2 · Muffe")).perform(click());
-                onView(withText("Zurück")).perform(click());
-                onView(withText("Zeile 1 · "+bend)).perform(click());
-                onView(withText("Zum Projekt hinzufügen")).perform(click());
+                onView(withText("Zeile 2 · Muffe")).inRoot(isDialog()).perform(click());
+                onView(withText("Zurück")).inRoot(isDialog()).perform(click());
+                onView(withText("Zeile 1 · "+bend)).inRoot(isDialog()).perform(click());
+                onView(withText("Zum Projekt hinzufügen")).inRoot(isDialog()).perform(click());
                 onView(withText("Zeile 1 · "+bend)).check(doesNotExist());
-                onView(withText("Zeile 2 · Muffe")).perform(click());
-                onView(withText("Station aus Projekt wählen")).perform(androidx.test.espresso.action.ViewActions.scrollTo(),click());
+                onView(withText("Zeile 2 · Muffe")).inRoot(isDialog()).perform(click());
+                onView(withText("Station aus Projekt wählen")).inRoot(isDialog()).perform(androidx.test.espresso.action.ViewActions.scrollTo(),click());
                 onView(withText("Station 8,250 m · Punkt 4")).check(doesNotExist());
-                onView(withText("Station 6,250 m · Punkt 2 · Schacht")).perform(click());
-                onView(withText("Zum Projekt hinzufügen")).perform(click());
+                onView(withText("Station 6,250 m · Punkt 2 · Schacht")).inRoot(isDialog()).perform(click());
+                onView(withText("Zum Projekt hinzufügen")).inRoot(isDialog()).perform(click());
                 scenario.onActivity(activity->{
                     try {
                         JSONArray items=new JSONArray(activity.projectStorage(id).getString("montageFittings","[]"));
