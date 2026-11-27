@@ -1528,6 +1528,8 @@ public class MainActivity extends Activity {
   android.content.SharedPreferences baseProfilePrefs=getSharedPreferences("base_profile_defaults",MODE_PRIVATE);
   java.util.function.Consumer<PipeLayoutView> showBaseCross=cross->{
    double w=baseProfilePrefs.getFloat("width",0.4f),d=baseProfilePrefs.getFloat("depth",1.0f);
+   if(!Double.isFinite(w)||w<=0)w=0.4;
+   if(!Double.isFinite(d)||d<=0)d=1.0;
    try{double v=number(width);if(Double.isFinite(v)&&v>0)w=v;}catch(Exception ignored){}
    try{double v=number(depth);if(Double.isFinite(v)&&v>0)d=v;}catch(Exception ignored){}
    java.util.List<PipeLayout.Pipe> pipes=new java.util.ArrayList<>();
