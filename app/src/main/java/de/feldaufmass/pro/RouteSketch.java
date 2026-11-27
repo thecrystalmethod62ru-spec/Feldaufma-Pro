@@ -1,5 +1,7 @@
 package de.feldaufmass.pro;
 
+import org.json.JSONObject;
+
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
