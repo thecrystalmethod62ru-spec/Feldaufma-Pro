@@ -747,6 +747,27 @@ public class MainActivity extends Activity {
   b.setAllCaps(false);b.setTextSize(primary?15:12);b.setTextColor(Color.WHITE);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(dp(4),dp(4),dp(4),dp(4));b.setBackgroundTintList(null);
   b.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x3312665f),editorShape(primary?TEAL:0xff202827,12),null));
  }
+ void compactToolIcon(Button button,String label,String kind){
+  android.graphics.drawable.Drawable icon=new android.graphics.drawable.Drawable(){
+   final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
+   @Override public void draw(Canvas c){
+    c.save();c.translate(getBounds().left,getBounds().top);c.scale(getBounds().width()/24f,getBounds().height()/24f);
+    p.setColor(Color.WHITE);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(1.7f);p.setStrokeCap(Paint.Cap.ROUND);p.setStrokeJoin(Paint.Join.ROUND);
+    switch(kind){
+     case "ruler":c.save();c.rotate(-45,12,12);c.drawRect(8,3,16,21,p);for(int y=6;y<20;y+=3)c.drawLine(8,y,y%2==0?12:11,y,p);c.restore();break;
+     case "view":for(int x:new int[]{4,20})for(int y:new int[]{4,20}){c.drawLine(x,y,x+(x==4?5:-5),y,p);c.drawLine(x,y,x,y+(y==4?5:-5),p);}break;
+     case "legend":for(int y=6;y<=18;y+=6){c.drawCircle(5,y,1,p);c.drawLine(9,y,20,y,p);}break;
+     case "objects":c.drawRoundRect(5,5,19,19,2,2,p);c.drawLine(9,12,15,12,p);c.drawLine(12,9,12,15,p);break;
+     case "layers":c.drawLine(4,8,12,3,p);c.drawLine(12,3,20,8,p);c.drawLine(20,8,12,13,p);c.drawLine(12,13,4,8,p);c.drawLine(4,13,12,18,p);c.drawLine(12,18,20,13,p);c.drawLine(4,18,12,22,p);c.drawLine(12,22,20,18,p);break;
+     default:for(int y=6;y<=18;y+=6)c.drawLine(4,y,20,y,p);
+    }c.restore();
+   }
+   @Override public void setAlpha(int a){p.setAlpha(a);}
+   @Override public void setColorFilter(android.graphics.ColorFilter f){p.setColorFilter(f);}
+   @Override public int getOpacity(){return android.graphics.PixelFormat.TRANSLUCENT;}
+  };
+  icon.setBounds(0,0,dp(22),dp(22));button.setText(label);button.setContentDescription(label);button.setCompoundDrawables(null,icon,null,null);button.setCompoundDrawablePadding(dp(3));button.setGravity(Gravity.CENTER);button.setMinHeight(dp(58));button.setTextSize(12);
+ }
  void showFullscreenRoute(android.app.AlertDialog editor,LinearLayout form,RouteSketch route,Spinner mode,Spinner angles,LinearLayout historyBar,Runnable openObjects,LinearLayout underlayControls){
   // Move the existing views, not a second sketch: unsaved data and undo history stay shared.
   View[] views={route,mode,angles,historyBar};
@@ -788,7 +809,7 @@ public class MainActivity extends Activity {
   resetZoom.setOnClickListener(v->{route.zoom=1;route.centerX=.5f;route.centerY=.5f;route.invalidate();});
   Button objectTools=new Button(this);objectTools.setAllCaps(false);objectTools.setText("□\nObjekte");tools.addView(objectTools,new LinearLayout.LayoutParams(0,-2,1));objectTools.setOnClickListener(v->openObjects.run());
   if(underlayControls!=null){
-   Button underlay=new Button(this);underlay.setAllCaps(false);underlay.setText("▧\nVorlage");tools.addView(underlay,new LinearLayout.LayoutParams(0,-2,1));styleEditorButton(underlay,false);
+   Button underlay=new Button(this);underlay.setAllCaps(false);underlay.setText("▧\nVorlage");tools.addView(underlay,new LinearLayout.LayoutParams(0,-2,1));styleEditorButton(underlay,false);compactToolIcon(underlay,"Vorlage","layers");
    underlay.setOnClickListener(v->{
     if(underlayControls.getParent()!=form)return;
     int position=form.indexOfChild(underlayControls);android.view.ViewGroup.LayoutParams originalParams=underlayControls.getLayoutParams();
@@ -798,6 +819,7 @@ public class MainActivity extends Activity {
    });
   }
   for(Button b:new Button[]{back,mic,measureList,resetZoom,legendEdit,objectTools})styleEditorButton(b,false);
+  compactToolIcon(measureList,"Maße","ruler");compactToolIcon(resetZoom,"Ansicht","view");compactToolIcon(legendEdit,"Legende","legend");compactToolIcon(objectTools,"Objekte","objects");
   styleEditorButton(save,true);LinearLayout.LayoutParams saveParams=new LinearLayout.LayoutParams(-1,dp(48));saveParams.setMargins(dp(10),dp(4),dp(10),dp(8));root.addView(save,saveParams);
   Button canvasToggle=new Button(this);canvasToggle.setText("⛶");canvasToggle.setContentDescription("Zeichenfläche maximieren");styleEditorButton(canvasToggle,false);
   header.addView(canvasToggle,new LinearLayout.LayoutParams(dp(44),dp(48)));
@@ -3658,7 +3680,7 @@ public class MainActivity extends Activity {
  header.addView(projectHeader,new LinearLayout.LayoutParams(0,-2,1));
  toolsMenu=new Button(this);
  toolsMenu.setAllCaps(false);
- toolsMenu.setText("Werkzeuge");styleEditorButton(toolsMenu,false);
+ toolsMenu.setText("Werkzeuge");styleEditorButton(toolsMenu,false);compactToolIcon(toolsMenu,"Werkzeuge","menu");
  header.addView(toolsMenu);
  toolsMenu.setOnClickListener(v->showTools());
  LinearLayout tabs=new LinearLayout(this);shell.addView(tabs);
