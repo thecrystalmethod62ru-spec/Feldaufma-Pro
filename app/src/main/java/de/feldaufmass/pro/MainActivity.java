@@ -1751,8 +1751,8 @@ public class MainActivity extends Activity {
   else if("manual".equals(source))value=o.optDouble("quantity");
   else if(l>0&&w>0&&d>0){
    if("length".equals(source)&&"m".equals(o.optString("unit")))value=l;
-   if("area".equals(source)&&"m²".equals(o.optString("unit")))value=l*w;
-   if("volume".equals(source)&&"m³".equals(o.optString("unit")))value=l*w*d;
+   if("area".equals(source)&&"m²".equals(o.optString("unit")))value=currentTrenchQuantities()[0];
+   if("volume".equals(source)&&"m³".equals(o.optString("unit")))value=currentTrenchQuantities()[1];
    if("cut".equals(source)&&"m²".equals(o.optString("unit"))&&Double.isFinite(left)&&Double.isFinite(right))value=l*(w+left+right);
   }
   return Double.isFinite(value)&&value>=0?value:Double.NaN;
@@ -4773,7 +4773,7 @@ public class MainActivity extends Activity {
      out.append(RebExport.record(oz,formula,address++)).append("\r\n");
     }
    }else{
-    String formula="length".equals(source)?RebExport.product(l):"area".equals(source)?RebExport.product(l,w):"volume".equals(source)?RebExport.product(l,w,d):"cut".equals(source)?RebExport.product(l,w+left+right):RebExport.product(qty);
+    String formula="length".equals(source)?RebExport.product(l):"area".equals(source)?RebExport.product(qty):"volume".equals(source)?RebExport.product(qty):"cut".equals(source)?RebExport.product(l,w+left+right):RebExport.product(qty);
     out.append(RebExport.record(oz,formula,address++)).append("\r\n");
    }
   }
@@ -4830,8 +4830,11 @@ public class MainActivity extends Activity {
  void writeCsvData(java.io.Writer out)throws java.io.IOException{
   final double n=Double.NaN;String name=projectHeader.getText().toString();
   out.write('\ufeff');out.write("Projekt;Gruppe;Bezeichnung;Station von (m);Station bis (m);Länge (m);Breite (m);Tiefe (m);Menge;Einheit;Hinweis\r\n");
-  csvRow(out,name,"Haupttrasse","Aushub – geometrisch",0,l,l,w,d,l*w*d,"m³","Gesamtquader; keine Abzüge");
-  csvRow(out,name,"Haupttrasse","Grundfläche",0,l,l,w,n,l*w,"m²","Bezugsfläche, nicht zu anderen Flächen addieren");
+  double[] trench=currentTrenchQuantities();
+  boolean sectional=true;try{sectional=new PipeLayoutStore(getPreferences(0)).sections().length()>0;}catch(Exception ignored){}
+  String basis=Double.isFinite(trench[0])?(sectional?"Abschnittsprofile berücksichtigt; keine Abzüge":"Standardprofil; keine Abzüge"):"Abschnittsprofile prüfen – Menge offen";
+  csvRow(out,name,"Haupttrasse","Aushub – geometrisch",0,l,l,sectional?n:w,sectional?n:d,trench[1],"m³",basis);
+  csvRow(out,name,"Haupttrasse","Grundfläche",0,l,l,sectional?n:w,n,trench[0],"m²",basis+"; Bezugsfläche, nicht addieren");
   if(Double.isFinite(left)&&Double.isFinite(right))csvRow(out,name,"Haupttrasse","Fläche mit Nachschnitt",0,l,l,w+left+right,n,l*(w+left+right),"m²","Alternative Bezugsfläche, nicht zusätzlich zur Grundfläche");
   for(int j=0;j<segments.length();j++){
    org.json.JSONObject o=segments.optJSONObject(j);if(o==null)continue;double a=o.optDouble("from"),b=o.optDouble("to"),width=o.optDouble("width"),len=b-a;
@@ -5049,24 +5052,31 @@ public class MainActivity extends Activity {
   }catch(Exception ex){return "Verbaudaten konnten nicht vollständig ausgewertet werden.\n\n";}
   return report.toString();
  }
+ static double[] mainTrenchQuantities(double l,double w,double d,org.json.JSONArray profiles)throws org.json.JSONException{
+  if(!Double.isFinite(l*w*d)||l<=0||w<=0||d<=0)throw new IllegalArgumentException("Trassenmaße fehlen");
+  double volume=l*w*d,area=l*w;
+  for(int i=0;i<profiles.length();i++){
+   org.json.JSONObject p=profiles.getJSONObject(i);double a=p.getDouble("from"),b=p.getDouble("to"),bw=p.getDouble("width"),bd=p.getDouble("depth");
+   if(a<0||b<=a||b>l||bw<=0||bd<=0||!Double.isFinite(a+b+bw+bd))throw new IllegalArgumentException("Abschnitt außerhalb der Trasse oder ungültig");
+   for(int j=0;j<i;j++){org.json.JSONObject q=profiles.getJSONObject(j);if(a<q.getDouble("to")&&b>q.getDouble("from"))throw new IllegalArgumentException("Abschnittsprofile überlappen");}
+   volume+=(b-a)*(bw*bd-w*d);area+=(b-a)*(bw-w);
+  }
+  if(!Double.isFinite(volume)||!Double.isFinite(area)||volume<=0||area<=0)throw new IllegalArgumentException("Ungültige Mengen");
+  return new double[]{area,volume};
+ }
+ double[] currentTrenchQuantities(){
+  try{return mainTrenchQuantities(l,w,d,new PipeLayoutStore(getPreferences(0)).sections());}
+  catch(Exception e){return new double[]{Double.NaN,Double.NaN};}
+ }
  void refreshMainQuantities(){
   if(result==null)return;
   String basic="Trassenmaße fehlen";
   if(l>0&&w>0&&d>0){
-   double volume=l*w*d,area=l*w;
-   try{
-    org.json.JSONArray profiles=new PipeLayoutStore(getPreferences(0)).sections();
-    for(int i=0;i<profiles.length();i++){
-     org.json.JSONObject p=profiles.getJSONObject(i);double a=p.getDouble("from"),b=p.getDouble("to"),bw=p.getDouble("width"),bd=p.getDouble("depth");
-     if(a<0||b<=a||b>l||bw<=0||bd<=0||!Double.isFinite(a+b+bw+bd))throw new IllegalArgumentException();
-     for(int j=0;j<i;j++){org.json.JSONObject q=profiles.getJSONObject(j);if(a<q.getDouble("to")&&b>q.getDouble("from"))throw new IllegalArgumentException();}
-     volume+=(b-a)*(bw*bd-w*d);area+=(b-a)*(bw-w);
-    }
-    basic=String.format(java.util.Locale.GERMANY,"Aushub: %.2f m³\nGrundfläche: %.2f m²",volume,area);
-   }catch(Exception ex){basic="Abschnittsprofile prüfen – Mengen nicht eindeutig";}
+   double[] q=currentTrenchQuantities();
+   basic=Double.isFinite(q[0])?String.format(java.util.Locale.GERMANY,"Aushub: %.2f m³\nGrundfläche: %.2f m²",q[1],q[0]):"Abschnittsprofile prüfen – Mengen nicht eindeutig";
   }
   double measured=new RouteSketch(this,routeData()).measuredLength();
-   result.setText(basic+routeLengthWarning(measured));
+  result.setText(basic+routeLengthWarning(measured));
   if(shoringQuantities!=null)shoringQuantities.setText(shoringReport());
  }
  int appendScaledRoutePdf(android.graphics.pdf.PdfDocument pdf,int pageNumber,RouteSketch route){
