@@ -432,6 +432,30 @@ public class MainActivity extends Activity {
   }};
   dialog.setOnDismissListener(d->handler.removeCallbacks(tick));dialog.show();handler.post(tick);
  }
+ void showGnssDiagnosis(){
+  if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=android.content.pm.PackageManager.PERMISSION_GRANTED){notice("Genauer Standort erforderlich.");return;}
+  android.location.LocationManager manager=(android.location.LocationManager)getSystemService(LOCATION_SERVICE);
+  if(manager==null){notice("GNSS nicht verfügbar.");return;}
+  TextView info=new TextView(this);info.setPadding(dp(20),dp(12),dp(20),dp(12));info.setText("Warte auf Satellitensignal …");
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("GNSS-Diagnose").setView(info).setPositiveButton("Schließen",null).create();
+  android.location.GnssStatus.Callback callback=new android.location.GnssStatus.Callback(){
+   @Override public void onSatelliteStatusChanged(android.location.GnssStatus status){
+    if(!dialog.isShowing())return;
+    java.util.TreeMap<String,Integer> systems=new java.util.TreeMap<>();
+    java.util.TreeSet<String> bands=new java.util.TreeSet<>();
+    int used=0;double cn=0;
+    for(int i=0;i<status.getSatelliteCount();i++){
+     String name;switch(status.getConstellationType(i)){case 1:name="GPS";break;case 2:name="SBAS";break;case 3:name="GLONASS";break;case 4:name="QZSS";break;case 5:name="BeiDou";break;case 6:name="Galileo";break;case 7:name="NavIC";break;default:name="Andere";}
+     systems.put(name,systems.containsKey(name)?systems.get(name)+1:1);
+     if(status.usedInFix(i)){used++;cn+=status.getCn0DbHz(i);}
+     if(android.os.Build.VERSION.SDK_INT>=26&&status.hasCarrierFrequencyHz(i))bands.add(String.format(java.util.Locale.GERMANY,"%.0f MHz",status.getCarrierFrequencyHz(i)/1000000.0));
+    }
+    info.setText("Satelliten sichtbar: "+status.getSatelliteCount()+"\nIn Positionslösung: "+used+"\nSysteme: "+systems+"\nBeobachtete Frequenzen: "+(bands.isEmpty()?"Unbekannt":bands)+"\nSignal (Mittel, verwendet): "+(used==0?"—":String.format(java.util.Locale.GERMANY,"%.1f dB-Hz",cn/used))+"\nGPS-Genauigkeit: "+(liveFix!=null&&liveFix.hasAccuracy()?String.format(java.util.Locale.GERMANY,"± %.1f m",liveFix.getAccuracy()):"Unbekannt")+"\n\nNur beobachtete Signale; keine Garantie für Mehrfrequenz-Positionslösung.");
+   }
+  };
+  dialog.setOnDismissListener(d->manager.unregisterGnssStatusCallback(callback));dialog.show();
+  try{if(!manager.registerGnssStatusCallback(callback,new android.os.Handler(android.os.Looper.getMainLooper())))info.setText("GNSS-Status nicht verfügbar.");}catch(RuntimeException e){info.setText("GNSS-Status nicht verfügbar.");}
+ }
  void startLiveGps(){
   if(liveManager!=null||checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=android.content.pm.PackageManager.PERMISSION_GRANTED)return;
   try{android.location.LocationManager m=(android.location.LocationManager)getSystemService(LOCATION_SERVICE);
@@ -897,7 +921,11 @@ public class MainActivity extends Activity {
    android.app.AlertDialog.Builder menu=new android.app.AlertDialog.Builder(this).setTitle("GPS / Live-Position").setMessage(status+"\nGPS dient zur Orientierung. Aufmaßmaße bleiben unverändert.").setNegativeButton("Schließen",null);
    menu.setPositiveButton("GPS-Ebene aufnehmen",(d,w)->{if(!getPreferences(0).getString("gpsRouteLayer","[]").equals("[]"))new android.app.AlertDialog.Builder(this).setTitle("GPS-Ebene ersetzen?").setMessage("Die manuelle Trasse bleibt unverändert.").setNegativeButton("Abbrechen",null).setPositiveButton("Neu aufnehmen",(dd,ww)->recordGpsRoute(route,full)).show();else recordGpsRoute(route,full);});
    if(!getPreferences(0).getString("gpsRouteLayer","[]").equals("[]"))menu.setNeutralButton("GPS-Ebene",(d,w)->showGpsLayerOptions(route));
-   menu.show();
+   android.app.AlertDialog gpsDialog=menu.create();
+   LinearLayout diagnosisBox=new LinearLayout(this);diagnosisBox.setOrientation(1);
+   Button diagnosis=new Button(this);diagnosis.setText("GNSS-Diagnose");diagnosisBox.addView(diagnosis);
+   diagnosis.setOnClickListener(vv->{gpsDialog.dismiss();showGnssDiagnosis();});
+   gpsDialog.setView(diagnosisBox);gpsDialog.show();
   });
   styleEditorButton(save,true);LinearLayout.LayoutParams saveParams=new LinearLayout.LayoutParams(-1,dp(48));saveParams.setMargins(dp(10),dp(4),dp(10),dp(8));root.addView(save,saveParams);
   Button canvasToggle=new Button(this);canvasToggle.setText("⛶");canvasToggle.setContentDescription("Zeichenfläche maximieren");styleEditorButton(canvasToggle,false);
