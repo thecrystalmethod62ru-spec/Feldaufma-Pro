@@ -344,7 +344,9 @@ public class MainActivity extends Activity {
  };
  void showGpsLayerOptions(RouteSketch route){
   boolean approximate=getPreferences(0).getBoolean("gpsEndpointAlignment",false);
-  new android.app.AlertDialog.Builder(this).setTitle("GPS-Ebene").setItems(new String[]{"GPS als Vorlage übernehmen","Start- und Endpunkt ausrichten"+(approximate?" (aktiv)":""),"GPS-Referenzpunkte verwenden"+(!approximate?" (aktiv)":"")},(d,w)->{
+  new android.app.AlertDialog.Builder(this).setTitle("GPS-Ebene").setItems(new String[]{"GPS als Vorlage übernehmen","Start- und Endpunkt ausrichten"+(approximate?" (aktiv)":""),"GPS-Referenzpunkte verwenden"+(!approximate?" (aktiv)":""),"Aufnahmerichtung umkehren","Transparenz einstellen"},(d,w)->{
+   if(w==3){if(!approximate){notice("Nur für schematische Ausrichtung erforderlich.");return;}getPreferences(0).edit().putBoolean("gpsLayerReverse",!getPreferences(0).getBoolean("gpsLayerReverse",false)).apply();route.invalidate();return;}
+   if(w==4){android.widget.SeekBar slider=new android.widget.SeekBar(this);slider.setMax(230);slider.setProgress(Math.max(0,Math.min(230,getPreferences(0).getInt("gpsLayerAlpha",255)-25)));new android.app.AlertDialog.Builder(this).setTitle("GPS-Deckkraft").setView(slider).setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",(dd,ww)->{getPreferences(0).edit().putInt("gpsLayerAlpha",slider.getProgress()+25).apply();route.invalidate();}).show();return;}
    if(w==0){openSavedGpsTemplate(route);return;}
    if(w==2){getPreferences(0).edit().putBoolean("gpsEndpointAlignment",false).apply();route.invalidate();return;}
    RouteSketch.GpsLayer layer=new RouteSketch.GpsLayer(getPreferences(0).getString("gpsRouteLayer","[]"));
@@ -394,7 +396,7 @@ public class MainActivity extends Activity {
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("GPS-Aufzeichnung").setView(previewBox).setMessage("Bitte entlang der Trasse gehen.").setNegativeButton("Abbrechen",null).setPositiveButton("Stopp",(d,w)->{
    if(!editor.isShowing())return;
    if(recording.samples.size()<2){notice("Zu wenige gültige GPS-Punkte.");return;}
-   if(!getPreferences(0).edit().putString("gpsRouteLayer",recording.snapshot().encode()).remove("gpsEndpointAlignment").commit()){notice("GPS-Ebene konnte nicht gespeichert werden.");return;}
+   if(!getPreferences(0).edit().putString("gpsRouteLayer",recording.snapshot().encode()).remove("gpsEndpointAlignment").remove("gpsLayerReverse").commit()){notice("GPS-Ebene konnte nicht gespeichert werden.");return;}
    if(route.vertices.isEmpty())new android.app.AlertDialog.Builder(this).setTitle("GPS-Ebene gespeichert").setMessage("GPS als Vorlage für eine neue manuelle Trasse übernehmen?").setNegativeButton("Nur GPS-Ebene",null).setPositiveButton("Übernehmen",(dd,ww)->{if(!recording.apply(route))notice("GPS-Trasse konnte nicht übernommen werden.");}).show();
    else notice("GPS-Ebene gespeichert. Manuelle Trasse unverändert.");
    route.setVisibleLayers(route.visibleLayers|RouteSketch.LAYER_GPS_ROUTE);route.invalidate();
