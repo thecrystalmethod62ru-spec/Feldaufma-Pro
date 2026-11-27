@@ -358,7 +358,7 @@ public class MainActivity extends Activity {
     if(fix.getTime()<=last.optLong("time")||distance[0]<Math.max(2,fix.getAccuracy()))return;}
   }
   try{org.json.JSONObject row=new org.json.JSONObject();row.put("lat",fix.getLatitude());row.put("lon",fix.getLongitude());row.put("accuracy",fix.getAccuracy());row.put("time",fix.getTime());rows.put(row);
-   if(!getPreferences(0).edit().putString("independentGpsTrack",rows.toString()).commit()){recordingGpsTrack=false;notice("GPS-Aufzeichnung konnte nicht gespeichert werden.");}
+   if(!getPreferences(0).edit().putString("independentGpsTrack",rows.toString()).commit()){recordingGpsTrack=false;notice("GPS-Aufzeichnung konnte nicht gespeichert werden.");}else if(livePreview!=null)livePreview.setIndependentGpsTrack(rows);
   }catch(org.json.JSONException e){recordingGpsTrack=false;notice("Ungültiger GPS-Punkt.");}
  }
  void showGpsTrackComparison(){
@@ -390,7 +390,7 @@ public class MainActivity extends Activity {
 
  android.location.LocationManager liveManager;
  final android.location.LocationListener liveListener=new android.location.LocationListener(){
-  public void onLocationChanged(android.location.Location fix){liveFix=fix;appendGpsTrack(fix);if(livePreview!=null)livePreview.setLiveFix(fix);if(livePreview!=null&&recordingGpsTrack)livePreview.setIndependentGpsTrack(gpsTrack());}
+  public void onLocationChanged(android.location.Location fix){liveFix=fix;appendGpsTrack(fix);if(livePreview!=null)livePreview.setLiveFix(fix);}
   public void onProviderDisabled(String provider){liveFix=null;if(livePreview!=null)livePreview.setLiveFix(null);}
   public void onProviderEnabled(String provider){}
   public void onStatusChanged(String provider,int status,android.os.Bundle extras){}
