@@ -224,6 +224,34 @@ public class ProjectStateTest {
    }
   }
  }
+ @Test public void drawingLayersAreIndependentOfSavedRouteGeometry(){
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   scenario.onActivity(activity->{
+    int original=activity.drawingLayers();
+    String savedRoute=activity.routeData();
+    String savedGps=activity.gpsTrack().toString();
+    String savedReference=activity.importedGpsReference().toString();
+    RouteSketch route=new RouteSketch(activity,"[[0.2,0.5,null],[0.8,0.5,20]]");
+    String geometry=route.encode();
+    int mask=RouteSketch.LAYER_GPS_TRACK|RouteSketch.LAYER_GPS_REFERENCE;
+    try{
+     assertTrue(activity.applyDrawingLayers(mask));
+     assertEquals(mask,activity.drawingLayers());
+     assertEquals(mask,activity.livePreview.visibleLayers);
+     assertFalse(activity.livePreview.layerVisible(RouteSketch.LAYER_ROUTE));
+     assertTrue(activity.livePreview.layerVisible(RouteSketch.LAYER_GPS_TRACK));
+     assertTrue(activity.livePreview.layerVisible(RouteSketch.LAYER_GPS_REFERENCE));
+     route.setVisibleLayers(mask);
+     route.darkPreview=true;
+     assertEquals(geometry,route.encode());
+     assertEquals(20,route.measuredLength(),0);
+     assertEquals(savedRoute,activity.routeData());
+     assertEquals(savedGps,activity.gpsTrack().toString());
+     assertEquals(savedReference,activity.importedGpsReference().toString());
+    }finally{assertTrue(activity.applyDrawingLayers(original));}
+   });
+  }
+ }
  @Test public void gpsUndoPreservesLaterMetadata(){
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    scenario.onActivity(activity->{
