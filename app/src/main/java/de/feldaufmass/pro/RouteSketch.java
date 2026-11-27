@@ -955,7 +955,7 @@ final class RouteSketch extends View {
    if(layerVisible(LAYER_ROUTE)){paint.setColor(printPlan?0xff174dcc:darkPalette()?0xff55c7b5:0xff13665f);paint.setStrokeWidth(4);line(c,a,b);}
    if(!layerVisible(LAYER_DIMENSIONS))continue;
    double metres=vertices.get(i).metres;
-   String label=Double.isFinite(metres)?String.format(Locale.GERMANY,"%.2f m",metres):"Maß fehlt";
+   String label=Double.isFinite(metres)&&metres>0?String.format(Locale.GERMANY,"%.2f m",metres):"Maß fehlt";
    if(printPlan)label=String.format(Locale.GERMANY,"A%02d · %s",i,label);
    float tx=left()+(a.x+b.x)*scale()/2,ty=top()+(a.y+b.y)*scale()/2-6*density;
    String key="route:"+i;tx+=density*dimensionOffsets.getOrDefault(key+":x",0f);ty+=density*dimensionOffsets.getOrDefault(key+":y",0f);
@@ -1084,7 +1084,10 @@ final class RouteSketch extends View {
   if(editable&&!placingObject&&!editingObjects&&action==MotionEvent.ACTION_DOWN){
    for(int i=dimensionHits.size()-1;i>=0;i--){
     DimensionHit hit=dimensionHits.get(i);
-    if((moving||hit.key.startsWith("route:"))&&hit.bounds.contains(event.getX(),event.getY())){
+    boolean routeLabel=hit.key.startsWith("route:");
+    android.graphics.RectF touchBounds=new android.graphics.RectF(hit.bounds);
+    if(routeLabel){float d=getResources().getDisplayMetrics().density;touchBounds.inset(-Math.max(0,(48*d-touchBounds.width())/2),-Math.max(0,(48*d-touchBounds.height())/2));}
+    if((moving||routeLabel)&&touchBounds.contains(event.getX(),event.getY())){
      activeDimension=hit;previousDimensionOffset=dimensionOffsets.get(hit.key);previousRouteX=dimensionOffsets.get(hit.key+":x");previousRouteY=dimensionOffsets.get(hit.key+":y");dimensionStartX=event.getX();dimensionStartY=event.getY();dimensionDownTime=event.getEventTime();dimensionMoved=false;getParent().requestDisallowInterceptTouchEvent(true);return true;
     }
    }
