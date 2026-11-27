@@ -1614,7 +1614,7 @@ public class MainActivity extends Activity {
   collapseProfile.setOnClickListener(v->{boolean hide=resizeProfile.getVisibility()==View.VISIBLE;if(hide){profilePlaceholder.setVisibility(View.GONE);floatingCross.setVisibility(View.GONE);}else updateFloatingCross.run();resizeProfile.setVisibility(hide?View.GONE:View.VISIBLE);collapseProfile.setText(hide?"+":"−");});
   sectionPosition.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){floatingTitle.setText(selectedSection[0]<0?"Regelprofil":String.format(java.util.Locale.GERMANY,"Regelprofil · A%02d",selectedSection[0]+1));if(resizeProfile.getVisibility()==View.VISIBLE)updateFloatingCross.run();}public void afterTextChanged(android.text.Editable e){}});
 
-  LinearLayout profilePage=new LinearLayout(this);profilePage.setOrientation(1);profilePage.setBackgroundColor(Color.BLACK);profilePage.setVisibility(View.GONE);
+  LinearLayout profilePage=new LinearLayout(this);profilePage.setOrientation(1);profilePage.setPadding(dp(6),dp(4),dp(6),dp(4));profilePage.setBackgroundColor(Color.BLACK);profilePage.setVisibility(View.GONE);
   TextView profilePageTitle=sheetText("Regelprofil",16,true);profilePageTitle.setTextColor(Color.WHITE);profilePage.addView(profilePageTitle);
   PipeLayoutView fullCross=new PipeLayoutView(this);
   ScrollView profileInfoScroll=new ScrollView(this);
@@ -1622,7 +1622,7 @@ public class MainActivity extends Activity {
    @Override protected void onMeasure(int widthSpec,int heightSpec){
     boolean wide=View.MeasureSpec.getSize(widthSpec)>=dp(560);
     int orientation=wide?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL;
-    if(getOrientation()!=orientation){
+    if(getOrientation()!=orientation||((LinearLayout.LayoutParams)fullCross.getLayoutParams()).width!=(wide?0:-1)){
      setOrientation(orientation);
      fullCross.setLayoutParams(wide?new LinearLayout.LayoutParams(0,-1,3):new LinearLayout.LayoutParams(-1,0,3));
      profileInfoScroll.setLayoutParams(wide?new LinearLayout.LayoutParams(0,-1,2):new LinearLayout.LayoutParams(-1,0,2));
@@ -1632,12 +1632,12 @@ public class MainActivity extends Activity {
   };
   profilePage.addView(profileWork,new LinearLayout.LayoutParams(-1,0,1));
   profileWork.addView(fullCross,new LinearLayout.LayoutParams(0,-1,3));
-  LinearLayout profileInfo=new LinearLayout(this);profileInfo.setOrientation(1);profileInfo.setPadding(dp(8),dp(8),dp(8),dp(8));profileInfo.setBackgroundColor(0xff101c1e);
+  LinearLayout profileInfo=new LinearLayout(this);profileInfo.setOrientation(1);profileInfo.setPadding(dp(8),dp(8),dp(8),dp(8));android.graphics.drawable.GradientDrawable parameterFrame=editorShape(0xff041012,8);parameterFrame.setStroke(dp(1),0xff008b93);profileInfo.setBackground(parameterFrame);
   profileInfoScroll.addView(profileInfo);profileWork.addView(profileInfoScroll,new LinearLayout.LayoutParams(0,-1,2));
-  TextView profileDimensions=sheetText("",14,true);profileDimensions.setTextColor(0xff28d5c7);profileInfo.addView(sheetText("Profilparameter",14,true));profileInfo.addView(profileDimensions);
+  TextView profileDimensions=sheetText("",14,true);profileDimensions.setTextColor(0xff28d5c7);profileInfo.addView(sheetText("Parameter",14,true));profileInfo.addView(profileDimensions);
   TextView profileMaterial=sheetText("",12,false);profileMaterial.setTextColor(0xffcbd6d5);profileInfo.addView(profileMaterial);
-  Button profileEdit=new Button(this);profileEdit.setText("Maße bearbeiten");styleEditorButton(profileEdit,false);profileInfo.addView(profileEdit);
-  Button editSectionProfile=new Button(this);styleEditorButton(editSectionProfile,false);compactToolIcon(editSectionProfile,"Abschnitt bearbeiten","settings");LinearLayout profileActions=new LinearLayout(this);profilePage.addView(profileActions,new LinearLayout.LayoutParams(-1,dp(40)));profileActions.addView(editSectionProfile,new LinearLayout.LayoutParams(0,-1,1));editSectionProfile.setOnClickListener(v->{if(sectionProfilePanel.getParent()!=null)return;openSectionProfilePicker();showProfilePanel("Abschnitte",sectionProfilePanel);});
+  Button profileEdit=new Button(this);profileEdit.setText("Parameter bearbeiten");styleEditorButton(profileEdit,false);profileInfo.addView(profileEdit);
+  Button editSectionProfile=new Button(this);styleEditorButton(editSectionProfile,false);compactToolIcon(editSectionProfile,"Abschnitt bearbeiten","settings");LinearLayout profileActions=new LinearLayout(this);profilePage.addView(profileActions,new LinearLayout.LayoutParams(-1,dp(48)));profileActions.addView(editSectionProfile,new LinearLayout.LayoutParams(0,-1,1));editSectionProfile.setOnClickListener(v->{if(sectionProfilePanel.getParent()!=null)return;openSectionProfilePicker();showProfilePanel("Abschnitte",sectionProfilePanel);});
   canvasFrame.addView(profilePage,new android.widget.FrameLayout.LayoutParams(-1,-1));
   Runnable refreshFullProfile=()->{profilePageTitle.setText(selectedSection[0]<0?"Regelprofil · Standardprofil":"Regelprofil · "+sectionPosition.getText());showBaseCross.accept(fullCross);profileDimensions.setText(fullCross.dimensionSummary());profileMaterial.setText("Oberfläche: "+covering);if(selectedSection[0]<0||selectedSection[0]+1>=route.vertices.size())return;double start=0;for(int j=0;j<selectedSection[0];j++){double len=route.vertices.get(j+1).metres;if(!Double.isFinite(len)||len<=0)return;start+=len;}double end=start+route.vertices.get(selectedSection[0]+1).metres;if(!Double.isFinite(start)||!Double.isFinite(end)||end<=start)return;try{org.json.JSONArray rows=new PipeLayoutStore(getPreferences(0)).sections();for(int j=0;j<rows.length();j++){org.json.JSONObject p=rows.getJSONObject(j);if(!(Math.abs(p.optDouble("from")-start)<0.001&&Math.abs(p.optDouble("to")-end)<0.001))continue;double w=p.optDouble("width"),d=p.optDouble("depth");if(Double.isFinite(w)&&Double.isFinite(d)&&w>0&&d>0){fullCross.setLayoutData(PipeLayoutStore.decode(p.getJSONArray("pipes").toString()),w,d);org.json.JSONObject seg=findSurfaceSection(p);String type=seg==null?covering:seg.optString("surface",covering);fullCross.setAsphaltProfile("Asphalt".equals(type));fullCross.setCivilProfile(seg==null?0:seg.optDouble("left",0),seg==null?0:seg.optDouble("right",0),seg==null?0:seg.optDouble("topThickness",0),seg==null?0:seg.optDouble("baseThickness",0),route.configuredSurfaceColor(type,route.legendSettings()));profileMaterial.setText("Oberfläche: "+type);fullCross.setVisibility(View.VISIBLE);profileDimensions.setText(fullCross.dimensionSummary());}break;}}catch(Exception ignored){}};
   Button baseSettings=new Button(this);styleEditorButton(baseSettings,false);compactToolIcon(baseSettings,"Standard-Profil verwalten","settings");
