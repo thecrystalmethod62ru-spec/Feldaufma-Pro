@@ -5553,17 +5553,29 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  }
  void pointMenu(){
   RouteSketch route=new RouteSketch(this,routeData());int index=findPoint(route,selectedPoint);
-  if(index<0)return;
-  org.json.JSONArray photos=route.vertices.get(index).photos;
-  boolean canUndo=route.vertices.get(index).gpsUndo!=null;int photoStart=canUndo?5:4;
-  String[] labels=new String[photoStart+photos.length()];labels[0]="Foto aufnehmen";labels[1]="GPS-Punkt zuordnen";labels[2]="Punkt umbenennen";
-  labels[3]="GNSS / RTK – NMEA importieren";if(canUndo)labels[4]="GPS-Verschiebung rückgängig machen";
-  for(int i=0;i<photos.length();i++)labels[i+photoStart]="Foto "+(i+1)+" · Details";
-  new android.app.AlertDialog.Builder(this).setTitle(route.vertices.get(index).name.isEmpty()?"Trassenpunkt "+(index+1):route.vertices.get(index).name).setItems(labels,(dialog,i)->{
-   if(i==0)capturePhoto();else if(i==1)assignGps(route.vertices.get(index).id);else if(i==2)renamePoint(route.vertices.get(index).id,null);else if(i==3)importNmeaPoint(route.vertices.get(index).id);else if(canUndo&&i==4)undoGps(route.vertices.get(index).id);else {
-    showPhotoDetails(route.vertices.get(index).id,photos.optString(i-photoStart));
-   }
-  }).show();
+  if(index<0||livePreview==null)return;
+  RouteSketch.Vertex point=route.vertices.get(index);
+  final String id=point.id;
+  android.widget.PopupMenu menu=new android.widget.PopupMenu(this,livePreview);
+  menu.getMenu().add(0,0,0,point.name.isEmpty()?"Trassenpunkt "+(index+1):point.name).setEnabled(false);
+  if(Double.isFinite(point.latitude)&&Double.isFinite(point.longitude)){
+   menu.getMenu().add(0,10,1,String.format(java.util.Locale.GERMANY,"%.7f° / %.7f°",point.latitude,point.longitude)).setEnabled(false);
+   menu.getMenu().add(0,11,2,Double.isFinite(point.accuracy)?String.format(java.util.Locale.GERMANY,"GPS ± %.2f m",point.accuracy):"GPS: Genauigkeit unbekannt").setEnabled(false);
+  }else menu.getMenu().add(0,10,1,"Keine GPS-Koordinaten").setEnabled(false);
+  menu.getMenu().add(0,1,3,"GPS-Punkt zuordnen");
+  menu.getMenu().add(0,2,4,"Foto aufnehmen");
+  menu.getMenu().add(0,3,5,"Punkt umbenennen");
+  menu.getMenu().add(0,4,6,"GNSS / RTK – NMEA importieren");
+  if(point.gpsUndo!=null)menu.getMenu().add(0,5,7,"GPS-Verschiebung rückgängig machen");
+  for(int i=0;i<point.photos.length();i++)menu.getMenu().add(0,100+i,8+i,"Foto "+(i+1)+" · Details");
+  menu.setOnMenuItemClickListener(item->{switch(item.getItemId()){
+   case 1:assignGps(id);return true;
+   case 2:selectedPoint=id;capturePhoto();return true;
+   case 3:renamePoint(id,null);return true;
+   case 4:importNmeaPoint(id);return true;
+   case 5:undoGps(id);return true;
+   default:int i=item.getItemId()-100;if(i>=0&&i<point.photos.length()){showPhotoDetails(id,point.photos.optString(i));return true;}return false;
+  }});menu.show();
  }
  android.net.Uri photoUri(String file){
   return androidx.core.content.FileProvider.getUriForFile(this,getPackageName()+".photos",new java.io.File(getFilesDir(),"photos/"+file));
