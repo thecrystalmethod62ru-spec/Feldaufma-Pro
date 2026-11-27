@@ -308,10 +308,11 @@ public class MainActivity extends Activity {
   try{
    double len=number(length),wid=number(width),dep=number(depth);
    if(!Double.isFinite(len*wid*dep)||len<=0||wid<=0||dep<=0)return false;
-   optional(stoneLength);optional(stoneWidth);
-   double stone=optional(stoneDepth)/100,baseValue=optional(baseInput),pipeValue=optional(pipeInput);
-   double asphaltValue=optional(asphaltInput);optional(leftInput);optional(rightInput);
-   double top="Asphalt".equals(surface.getSelectedItem().toString())?asphaltValue:stone;
+   String material=String.valueOf(surface.getSelectedItem());boolean stoneSelected=isStoneSurface(material);
+   if(stoneSelected){optional(stoneLength);optional(stoneWidth);}
+   double baseValue=optional(baseInput),pipeValue=optional(pipeInput);
+   optional(leftInput);optional(rightInput);
+   double top="Asphalt".equals(material)?optional(asphaltInput):stoneSelected?optional(stoneDepth)/100:Double.NaN;
    return (!Double.isFinite(pipeValue)||(pipeValue>0&&pipeValue/1000<=wid&&pipeValue/1000<=dep))
     &&(!Double.isFinite(top)||top<=dep)&&(!Double.isFinite(baseValue)||baseValue+(Double.isFinite(top)?top:0)<=dep);
   }catch(Exception e){return false;}
@@ -550,12 +551,18 @@ public class MainActivity extends Activity {
    int omitted=0;
    for(int j=0;j<obj.length();j++){org.json.JSONObject o=obj.optJSONObject(j);if(o==null||livePreview.stationPoint(o.optDouble("station"))==null)omitted++;}
    for(int j=0;j<sections.length();j++){org.json.JSONObject o=sections.optJSONObject(j);if(o==null||o.optDouble("from")>=o.optDouble("to")||livePreview.stationPoint(o.optDouble("from"))==null||livePreview.stationPoint(o.optDouble("to"))==null)omitted++;}
-   if(omitted>0)label+=" · "+omitted+" Stationseinträge ohne Planposition";
+   label+=routeLengthWarning(total);
+    if(omitted>0)label+=" · "+omitted+" Stationseinträge ohne Planposition";
    if(obj.length()>0)label+="\n* Ohne Abstand: schematisch angrenzend. Skizze nicht maßstabsgetreu." ;
    routeSummary.setText(label);
   }else if(livePreview.vertices.size()>=2){
-   double total=livePreview.measuredLength();routeSummary.setText((livePreview.vertices.size()-1)+" Abschnitte · "+(Double.isFinite(total)?"Bemaßte Länge: "+reportMeasure(total):"Bemaßung unvollständig"));
+   double total=livePreview.measuredLength();routeSummary.setText((livePreview.vertices.size()-1)+" Abschnitte · "+(Double.isFinite(total)?"Bemaßte Länge: "+reportMeasure(total):"Bemaßung unvollständig")+routeLengthWarning(total));
   }
+ }
+ String routeLengthWarning(double measured){
+  if(!Double.isFinite(measured)||measured<=0)return "";
+  try{double confirmed=Double.parseDouble(getPreferences(0).getString("length","").replace(',','.'));if(Double.isFinite(confirmed)&&confirmed>0&&Math.abs(confirmed-measured)>0.001)return "\nAbweichung: Berechnungslänge "+reportMeasure(confirmed)+" · Skizzenlänge "+reportMeasure(measured)+". Unter Maße prüfen / übernehmen.";}catch(NumberFormatException ignored){}
+  return "";
  }
  void refreshRoute(){
   routePreviewBox.removeAllViews();
@@ -4029,7 +4036,7 @@ public class MainActivity extends Activity {
  Button adopt=new Button(this);adopt.setText("Bemaßte Skizzenlänge übernehmen");root.addView(adopt);
  adopt.setOnClickListener(v->{
   double total=new RouteSketch(this,routeData()).measuredLength();
-  if(Double.isFinite(total))length.setText(java.math.BigDecimal.valueOf(total).stripTrailingZeros().toPlainString());
+  if(Double.isFinite(total)&&total>0){length.setText(java.math.BigDecimal.valueOf(total).stripTrailingZeros().toPlainString());notice("Skizzenlänge übernommen. Maße prüfen und speichern.");}
   else Toast.makeText(this,"Zuerst alle Skizzenabschnitte bemaßen.",Toast.LENGTH_LONG).show();
  });
  width=field(root,"Grabenbreite (m)","width",true);
@@ -4521,7 +4528,7 @@ public class MainActivity extends Activity {
    if(!Double.isFinite(bw)||!Double.isFinite(bd)||bw<=0||bd<=0)return;
    double nl=optional(leftInput),nr=optional(rightInput),nb=optional(baseInput);
    String cover=surface.getSelectedItem().toString();
-   double na=optional(asphaltInput),nt="Asphalt".equals(cover)?na:optional(stoneDepth)/100;
+   double na="Asphalt".equals(cover)?optional(asphaltInput):Double.NaN,nt="Asphalt".equals(cover)?na:isStoneSurface(cover)?optional(stoneDepth)/100:Double.NaN;
    if((Double.isFinite(nt)&&nt>bd)||(Double.isFinite(nb)&&nb+(Double.isFinite(nt)?nt:0)>bd))return;
    w=bw;d=bd;left=nl;right=nr;base=nb;asphalt=na;topThickness=nt;covering=cover;
    if(profile!=null)profile.invalidate();
@@ -5034,7 +5041,8 @@ public class MainActivity extends Activity {
     basic=String.format(java.util.Locale.GERMANY,"Aushub: %.2f m³\nGrundfläche: %.2f m²",volume,area);
    }catch(Exception ex){basic="Abschnittsprofile prüfen – Mengen nicht eindeutig";}
   }
-  result.setText(basic);
+  double measured=new RouteSketch(this,routeData()).measuredLength();
+   result.setText(basic+routeLengthWarning(measured));
   if(shoringQuantities!=null)shoringQuantities.setText(shoringReport());
  }
  int appendScaledRoutePdf(android.graphics.pdf.PdfDocument pdf,int pageNumber,RouteSketch route){
