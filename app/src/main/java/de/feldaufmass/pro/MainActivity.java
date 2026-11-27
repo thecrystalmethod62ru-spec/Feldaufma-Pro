@@ -4245,63 +4245,15 @@ public class MainActivity extends Activity {
  });
  actionButtonSingle(surfaceWorkCatalog,"Schichtvolumen berechnen",()->{
   try{
-   if(segments.length()==0){notice("Keine Oberflächenabschnitte vorhanden.");return;}
-   StringBuilder report=new StringBuilder("Vorberechnung – abschnittsbezogene Schichtstärken\n\n");
-   java.util.TreeMap<String,Double> totals=new java.util.TreeMap<>();
-   for(int i=0;i<segments.length();i++){
-    org.json.JSONObject row=segments.getJSONObject(i);
-    double from=row.getDouble("from"),to=row.getDouble("to"),bw=row.getDouble("width");
-    if(!Double.isFinite(from+to+bw)||from<0||to<=from||bw<=0||(l>0&&to>l))throw new IllegalArgumentException("Ungültige Abschnittsmaße");
-    for(int j=0;j<i;j++){org.json.JSONObject prev=segments.getJSONObject(j);if(from<prev.getDouble("to")&&to>prev.getDouble("from"))throw new IllegalArgumentException("Überlappende Abschnitte");}
-    String type=row.optString("surface","Unbekannt");
-    double cut=row.optDouble("cutWidth",bw);
-    if(!Double.isFinite(cut)||cut<bw)throw new IllegalArgumentException("Ungültige Nachschnittbreite");
-    report.append(String.format(java.util.Locale.GERMANY,"%.2f – %.2f m | %s\n",from,to,type));
-    boolean asphaltLayer=type.equals("Asphalt"),stoneLayer=isStoneSurface(type);
-    boolean sameMaterial=type.equals(covering);
-    if(asphaltLayer||stoneLayer){
-     double thickness=row.has("topThickness")?row.optDouble("topThickness"):sameMaterial?topThickness:Double.NaN;
-     if(Double.isFinite(thickness)&&thickness>0){
-      double volume=CivilGeometry.rectangularVolume(to-from,cut,thickness);
-      totals.put(type,totals.getOrDefault(type,0.0)+volume);
-      report.append(String.format(java.util.Locale.GERMANY,"Deckschicht: %.3f m³%s%s\n",volume,row.has("cutWidth")?"":" (nur Graben; Nachschnitt unbekannt)",row.has("topThickness")?"":" · Standardprofil"));
-     }else report.append("Deckschichtstärke fehlt\n");
-    }else report.append("Deckschicht nicht berechnet\n");
-    double baseThickness=row.has("baseThickness")?row.optDouble("baseThickness"):sameMaterial?base:Double.NaN;
-    if(Double.isFinite(baseThickness)&&baseThickness>0&&(asphaltLayer||stoneLayer)){
-     double volume=CivilGeometry.rectangularVolume(to-from,bw,baseThickness);totals.put("Tragschicht",totals.getOrDefault("Tragschicht",0.0)+volume);
-     report.append(String.format(java.util.Locale.GERMANY,"Tragschicht (Grabenbreite): %.3f m³\n",volume));
-    }else report.append("Tragschicht nicht berechnet\n");
-   }
-   report.append("\nTeilsummen (nur erfasste Schichten)\n");
-   for(java.util.Map.Entry<String,Double> entry:totals.entrySet())report.append(String.format(java.util.Locale.GERMANY,"%s: %.3f m³\n",entry.getKey(),entry.getValue()));
-   report.append("\nStandardstärken nur bei gleicher Oberfläche. Fehlende Schichten bleiben offen. Bettung und Altbelag nicht berechnet. Nicht zusätzlich zum Bruttoaushub addieren.");
-   TextView resultText=new TextView(this);resultText.setPadding(dp(16),dp(12),dp(16),dp(12));resultText.setText(report.toString());ScrollView scroll=new ScrollView(this);scroll.addView(resultText);
+   String report=surfaceVolumeReport();
+   TextView resultText=new TextView(this);resultText.setPadding(dp(16),dp(12),dp(16),dp(12));resultText.setText(report);ScrollView scroll=new ScrollView(this);scroll.addView(resultText);
    new android.app.AlertDialog.Builder(this).setTitle("Oberflächenaufbau – Schichtvolumen").setView(scroll).setPositiveButton("Schließen",null).show();
   }catch(Exception ex){notice("Schichtvolumen: "+ex.getMessage());}
  });
  actionButtonSingle(surfaceWorkCatalog,"Oberflächenmengen nach Abschnitt",()->{
   try{
-   java.util.TreeMap<String,double[]> totals=new java.util.TreeMap<>();
-   StringBuilder report=new StringBuilder();double covered=0;
-   for(int i=0;i<segments.length();i++){
-    org.json.JSONObject row=segments.getJSONObject(i);
-    double from=row.getDouble("from"),to=row.getDouble("to"),bw=row.getDouble("width");
-    if(!Double.isFinite(from+to+bw)||from<0||to<=from||bw<=0||(l>0&&to>l))throw new IllegalArgumentException("Ungültige Abschnittsmaße");
-    for(int j=0;j<i;j++){org.json.JSONObject prev=segments.getJSONObject(j);if(from<prev.getDouble("to")&&to>prev.getDouble("from"))throw new IllegalArgumentException("Überlappende Oberflächenabschnitte");}
-    String type=row.optString("surface","Unbekannt");double len=to-from,area=len*bw;covered+=len;
-    double[] sum=totals.computeIfAbsent(type,k->new double[3]);sum[0]+=area;
-    report.append(String.format(java.util.Locale.GERMANY,"%.2f – %.2f m | %s\nAufbruch (Graben): %.3f m²\n",from,to,type,area));
-    if(row.has("cutWidth")){
-     double cut=row.getDouble("cutWidth");if(!Double.isFinite(cut)||cut<bw)throw new IllegalArgumentException("Ungültige Nachschnittbreite");
-     double extra=len*(cut-bw);sum[1]+=extra;
-     report.append(String.format(java.util.Locale.GERMANY,"Nachschnitt zusätzlich: %.3f m² | Gesamt: %.3f m²\n",extra,area+extra));
-    }else{sum[2]+=len;report.append("Nachschnitt nicht erfasst\n");}
-   }
-   report.append("\nSummen nach Oberfläche\n");
-   for(java.util.Map.Entry<String,double[]> entry:totals.entrySet()){double[] v=entry.getValue();report.append(String.format(java.util.Locale.GERMANY,"%s: %.3f m² Graben + %.3f m² Nachschnitt%s\n",entry.getKey(),v[0],v[1],v[2]>0?" (unvollständig)":""));}
-   if(l>0)report.append(String.format(java.util.Locale.GERMANY,"\nNicht erfasste Trassenlänge: %.2f m",Math.max(0,l-covered)));
-   TextView resultText=new TextView(this);resultText.setPadding(dp(16),dp(12),dp(16),dp(12));resultText.setText(report.toString());ScrollView scroll=new ScrollView(this);scroll.addView(resultText);
+   String report=surfaceAreaReport();
+   TextView resultText=new TextView(this);resultText.setPadding(dp(16),dp(12),dp(16),dp(12));resultText.setText(report);ScrollView scroll=new ScrollView(this);scroll.addView(resultText);
    new android.app.AlertDialog.Builder(this).setTitle("Oberflächenmengen").setView(scroll).setPositiveButton("Schließen",null).show();
   }catch(Exception ex){notice("Oberflächenmengen: "+ex.getMessage());}
  });
@@ -5352,6 +5304,70 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
   }finally{pdf.finishPage(page);}
   return pageNumber;
  }
+ String surfaceVolumeReport()throws Exception{
+  if(segments.length()==0)return "Keine Oberflächenabschnitte vorhanden.";
+   StringBuilder report=new StringBuilder("Vorberechnung – abschnittsbezogene Schichtstärken\n\n");
+   java.util.TreeMap<String,Double> totals=new java.util.TreeMap<>();
+   for(int i=0;i<segments.length();i++){
+    org.json.JSONObject row=segments.getJSONObject(i);
+    double from=row.getDouble("from"),to=row.getDouble("to"),bw=row.getDouble("width");
+    if(!Double.isFinite(from+to+bw)||from<0||to<=from||bw<=0||(!Double.isFinite(l)||l<=0||to>l))throw new IllegalArgumentException("Ungültige Abschnittsmaße");
+    for(int j=0;j<i;j++){org.json.JSONObject prev=segments.getJSONObject(j);if(from<prev.getDouble("to")&&to>prev.getDouble("from"))throw new IllegalArgumentException("Überlappende Abschnitte");}
+    String type=row.optString("surface","Unbekannt");
+    double cut=row.optDouble("cutWidth",bw);
+    if(!Double.isFinite(cut)||cut<bw)throw new IllegalArgumentException("Ungültige Nachschnittbreite");
+    report.append(String.format(java.util.Locale.GERMANY,"%.2f – %.2f m | %s\n",from,to,type));
+    boolean asphaltLayer=type.equals("Asphalt"),stoneLayer=isStoneSurface(type);
+    boolean sameMaterial=type.equals(covering);
+    if(asphaltLayer||stoneLayer){
+     double thickness=row.has("topThickness")?row.optDouble("topThickness"):sameMaterial?topThickness:Double.NaN;
+     if(Double.isFinite(thickness)&&thickness>0){
+      double volume=CivilGeometry.rectangularVolume(to-from,cut,thickness);
+      totals.put(type,totals.getOrDefault(type,0.0)+volume);
+      report.append(String.format(java.util.Locale.GERMANY,"Deckschicht: %.3f m³%s%s\n",volume,row.has("cutWidth")?"":" (nur Graben; Nachschnitt unbekannt)",row.has("topThickness")?"":" · Standardprofil"));
+     }else report.append("Deckschichtstärke fehlt\n");
+    }else report.append("Deckschicht nicht berechnet\n");
+    double baseThickness=row.has("baseThickness")?row.optDouble("baseThickness"):sameMaterial?base:Double.NaN;
+    if(Double.isFinite(baseThickness)&&baseThickness>0&&(asphaltLayer||stoneLayer)){
+     double volume=CivilGeometry.rectangularVolume(to-from,bw,baseThickness);totals.put("Tragschicht",totals.getOrDefault("Tragschicht",0.0)+volume);
+     report.append(String.format(java.util.Locale.GERMANY,"Tragschicht (Grabenbreite): %.3f m³\n",volume));
+    }else report.append("Tragschicht nicht berechnet\n");
+   }
+   report.append("\nTeilsummen (nur erfasste Schichten)\n");
+   for(java.util.Map.Entry<String,Double> entry:totals.entrySet())report.append(String.format(java.util.Locale.GERMANY,"%s: %.3f m³\n",entry.getKey(),entry.getValue()));
+   report.append("\nStandardstärken nur bei gleicher Oberfläche. Fehlende Schichten bleiben offen. Bettung und Altbelag nicht berechnet. Nicht zusätzlich zum Bruttoaushub addieren.");
+  return report.toString();
+ }
+ String surfaceAreaReport()throws Exception{
+  java.util.TreeMap<String,double[]> totals=new java.util.TreeMap<>();
+   StringBuilder report=new StringBuilder();double covered=0;
+   for(int i=0;i<segments.length();i++){
+    org.json.JSONObject row=segments.getJSONObject(i);
+    double from=row.getDouble("from"),to=row.getDouble("to"),bw=row.getDouble("width");
+    if(!Double.isFinite(from+to+bw)||from<0||to<=from||bw<=0||(!Double.isFinite(l)||l<=0||to>l))throw new IllegalArgumentException("Ungültige Abschnittsmaße");
+    for(int j=0;j<i;j++){org.json.JSONObject prev=segments.getJSONObject(j);if(from<prev.getDouble("to")&&to>prev.getDouble("from"))throw new IllegalArgumentException("Überlappende Oberflächenabschnitte");}
+    String type=row.optString("surface","Unbekannt");double len=to-from,area=len*bw;covered+=len;
+    double[] sum=totals.computeIfAbsent(type,k->new double[3]);sum[0]+=area;
+    report.append(String.format(java.util.Locale.GERMANY,"%.2f – %.2f m | %s\nAufbruch (Graben): %.3f m²\n",from,to,type,area));
+    if(row.has("cutWidth")){
+     double cut=row.getDouble("cutWidth");if(!Double.isFinite(cut)||cut<bw)throw new IllegalArgumentException("Ungültige Nachschnittbreite");
+     double extra=len*(cut-bw);sum[1]+=extra;
+     report.append(String.format(java.util.Locale.GERMANY,"Nachschnitt zusätzlich: %.3f m² | Gesamt: %.3f m²\n",extra,area+extra));
+    }else{sum[2]+=len;report.append("Nachschnitt nicht erfasst\n");}
+   }
+   report.append("\nSummen nach Oberfläche\n");
+   for(java.util.Map.Entry<String,double[]> entry:totals.entrySet()){double[] v=entry.getValue();report.append(String.format(java.util.Locale.GERMANY,"%s: %.3f m² Graben + %.3f m² Nachschnitt%s\n",entry.getKey(),v[0],v[1],v[2]>0?" (unvollständig)":""));}
+   if(l>0)report.append(String.format(java.util.Locale.GERMANY,"\nNicht erfasste Trassenlänge: %.2f m",Math.max(0,l-covered)));
+  return report.toString();
+ }
+ String surfaceReportForExport(){
+  if(segments.length()==0)return "";
+  StringBuilder report=new StringBuilder("\n\nOberflächenmengen – abschnittsbezogen\n");
+  try{report.append(surfaceAreaReport());}catch(Exception e){report.append("Mengen offen – Abschnittsgrenzen / Maße prüfen.");}
+  report.append("\n\nSchichtvolumen – Vorberechnung\n");
+  try{report.append(surfaceVolumeReport());}catch(Exception e){report.append("Schichtmengen offen – Abschnittsmaße prüfen.");}
+  return report.toString();
+ }
  void writePdf(android.net.Uri uri) {
   android.graphics.pdf.PdfDocument pdf=new android.graphics.pdf.PdfDocument();
   try(java.io.OutputStream out=getContentResolver().openOutputStream(uri,"wt")) {
@@ -5374,7 +5390,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
    String report=(route.vertices.size()>1?"Trassenskizze – Abschnittsmaße\n"+route.measurements()+"\n\n":"")+"Oberflächenaufbau\n"+surfaceLayers.getText()+"\n\n"+result.getText()+"\n"+legend.getText()+"\n"+
     "Nachschnitt links: "+reportMeasure(left)+" | rechts: "+reportMeasure(right)+"\n"+
     "Asphaltstärke: "+reportMeasure(asphalt)+"\nTragschicht: "+reportMeasure(base)+"\n\n"+
-    "Trassenobjekte\n"+objectList.getText()+detailQuantities.getText()+"\n\n"+segmentsView.getText()+"\n\n"+shoringReport();
+    "Trassenobjekte\n"+objectList.getText()+detailQuantities.getText()+"\n\n"+segmentsView.getText()+"\n\n"+shoringReport()+surfaceReportForExport();
    android.text.TextPaint textPaint=new android.text.TextPaint(Paint.ANTI_ALIAS_FLAG);
    textPaint.setTextSize(12);
    android.text.StaticLayout layout=android.text.StaticLayout.Builder.obtain(report,0,report.length(),textPaint,523).build();
