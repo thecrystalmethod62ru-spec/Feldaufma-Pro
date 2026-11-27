@@ -19,12 +19,17 @@ final class FittingTextParser {
 
     private static final Pattern RANGE_END=Pattern.compile("\\s*(?:[-–—/]|bis\\b|und\\b|oder\\b)\\s*\\d",FLAGS);
 
+    private static final Pattern MATERIAL_LABEL=Pattern.compile("\\b(?:Werkstoff|Material)\\b",FLAGS);
+    private static final Pattern MATERIAL_VALUE=Pattern.compile(
+            "\\s*[:=]?\\s*("+PlanTextParser.MATERIAL_NAME+")\\b\\s*(?=$|(?:[;,]\\s*)?(?:Station\\b|Stat\\.|DN\\s*\\d))",FLAGS);
+
     static final class Candidate {
         final MontageCatalog.Fitting type;
-        final String dn,station,evidence;
+        final String dn,station,evidence,material;
         final int line;
         Candidate(MontageCatalog.Fitting type,String dn,String station,String evidence,int line){
             this.type=type;this.dn=dn;this.station=station;this.evidence=evidence;this.line=line;
+            this.material=labelledMaterial(evidence);
         }
     }
 
@@ -72,6 +77,14 @@ final class FittingTextParser {
     }
 
     private static String normalize(String label){return label.replace("-","").replace(" ","");}
+    private static String labelledMaterial(String line){
+        Matcher label=MATERIAL_LABEL.matcher(line);
+        if(!label.find())return "";
+        int start=label.end();
+        if(label.find())return "";
+        Matcher value=MATERIAL_VALUE.matcher(line).region(start,line.length());
+        return value.lookingAt()?value.group(1):"";
+    }
     private static String diameter(String line){
         Matcher label=DN_LABEL.matcher(line);
         if(!label.find())return "";

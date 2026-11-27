@@ -26,6 +26,15 @@ public class FittingTextParserTest {
         assertEquals("80",FittingTextParser.parse("Muffe DN: 80").get(0).dn);
     }
 
+    @Test public void onlyCompleteLabelledMaterialsAreSuggested() {
+        assertEquals("PE 100-RC",FittingTextParser.parse("Muffe Werkstoff: PE 100-RC, Station 2 m").get(0).material);
+        assertEquals("Guss",FittingTextParser.parse("Muffe DN80 Material=Guss").get(0).material);
+        for(String note:new String[]{"Rohr aus Stahl","Material: PVC-C","Material: Stahl / Guss",
+                "Werkstoff: PP oder PVC","Material: PP; Werkstoff: Guss"}){
+            assertEquals("",FittingTextParser.parse("Muffe "+note).get(0).material);
+        }
+    }
+
     private String station(String source) {
         return FittingTextParser.parse("Muffe DN 80 " + source).get(0).station;
     }

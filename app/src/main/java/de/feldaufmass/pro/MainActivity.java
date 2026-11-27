@@ -2076,6 +2076,7 @@ public class MainActivity extends Activity {
    installed.setChecked(original.optBoolean("installed",false));
   }
   if(suggestion!=null){
+   material.setText(suggestion.material);
    dn.setText(suggestion.dn);station.setText(suggestion.station.replace(',','.'));
    panel.addView(sheetText("Quelle: "+source+" · Zeile "+suggestion.line+"\n"+suggestion.evidence,14,false));
   }else if(original!=null&&original.has("sourceLine")){

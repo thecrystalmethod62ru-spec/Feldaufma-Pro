@@ -19,7 +19,7 @@ public class FittingReviewTest {
         try (ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
             String id=UUID.randomUUID().toString();
             String[] original=new String[1];
-            String bend="45°-Bogen DN 80 Station 0+012,5";
+            String bend="45°-Bogen DN 80 Werkstoff: PE 100-RC, Station 0+012,5";
             try {
                 scenario.onActivity(activity->{
                     original[0]=activity.activeProject;
@@ -38,6 +38,8 @@ public class FittingReviewTest {
                     try {
                         JSONArray items=new JSONArray(activity.projectStorage(id).getString("montageFittings","[]"));
                         assertEquals(2,items.length());
+                        assertEquals("PE 100-RC",items.getJSONObject(0).getString("material"));
+                        assertFalse(items.getJSONObject(0).getBoolean("installed"));
                         assertEquals(12.5,items.getJSONObject(0).getDouble("station"),0);
                         assertEquals("Blatt A",items.getJSONObject(0).getString("sourceName"));
                         assertEquals(2,items.getJSONObject(1).getInt("sourceLineNumber"));

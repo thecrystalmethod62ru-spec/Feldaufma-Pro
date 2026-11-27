@@ -11,7 +11,8 @@ public final class PlanTextParser {
     private static final String[] TYPES = {"Trinkwasser","Gas","Strom","Fernwärme","Telekommunikation","Schmutzwasser","Regenwasser"};
     private static final String[] ALIASES = {"Trinkwasser|Wasserleitung","Gasleitung|Gas","Stromkabel|Strom","Fernwärme","Telekommunikation|Glasfaser|LWL","Schmutzwasser","Regenwasser"};
     private static final Pattern DN = Pattern.compile("\\bDN\\s*([0-9]{1,4})\\b", Pattern.CASE_INSENSITIVE);
-    private static final Pattern MATERIAL = Pattern.compile("\\b(PE\\s*100(?:-RC)?|PVC(?:-U)?|PP|Stahl|Guss|Beton)\\b", Pattern.CASE_INSENSITIVE);
+    static final String MATERIAL_NAME = "PE\\s*100(?:-RC)?|PVC(?:-U)?|PP|Stahl|Guss|Beton";
+    private static final Pattern MATERIAL = Pattern.compile("\\b("+MATERIAL_NAME+")\\b", Pattern.CASE_INSENSITIVE);
     public static final class Candidate {
         public final String type, nominalDiameter, material, sourceLine;
         public final int lineNumber;
