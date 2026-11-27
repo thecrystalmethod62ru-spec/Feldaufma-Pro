@@ -7238,14 +7238,18 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  }
  String m(double x){return String.format(java.util.Locale.GERMANY,"%.2f m",x);}
  void label(Canvas c,String s,float x,float y){p.setColor(0xffcbd6d5);p.setTextSize(12);c.drawText(s,x,y,p);}
+ void soil(Canvas c,float a,float t,float b,float end,int fill,int grain){
+ if(b<=a||end<=t)return; p.setStyle(Paint.Style.FILL);p.setColor(fill);c.drawRect(a,t,b,end,p);c.save();c.clipRect(a,t,b,end);p.setColor(grain);p.setStrokeWidth(0.65f);for(int row=0;row<(end-t)/7+1;row++){for(float xx=a+3+(row%2)*4;xx<b;xx+=9){float yy=t+3+row*7;c.drawLine(xx,yy,xx+2,yy-1,p);}}c.restore();
+ }
+ void pipeSymbol(Canvas c,float cx,float cy,float radius){int color=p.getColor();p.setStyle(Paint.Style.FILL);c.drawCircle(cx,cy,radius,p);p.setColor(0xff101719);c.drawCircle(cx,cy,radius*0.70f,p);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(0.8f);p.setColor(color);c.drawCircle(cx,cy,radius,p);p.setStyle(Paint.Style.FILL);}
  protected void onDraw(Canvas c){super.onDraw(c);c.drawColor(Color.BLACK);utilityHits.clear();if(!Double.isFinite(w)||!Double.isFinite(d)||w<=0||d<=0)return;
  c.save();c.scale(getWidth()/360f,getHeight()/300f);
  double nl=Double.isFinite(left)?left:0,nr=Double.isFinite(right)?right:0;
  float scale=(float)Math.min(190/(w+nl+nr),155/d);
  float x=180-(float)(w*scale/2),z=180+(float)(w*scale/2),top=55,bottom=top+(float)(d*scale);
  profileLeft=x;profileTop=top;profileScale=scale;
- p.setColor(0xff303a3b);c.drawRect(20,top,340,bottom,p);
- p.setColor(0xff23423e);c.drawRect(x,top,z,bottom,p);
+ soil(c,20,top,x,bottom,0xff302922,0xff78634d);soil(c,z,top,340,bottom,0xff302922,0xff78634d);
+ soil(c,x,top,z,bottom,0xff303b35,0xff64766a);
  float layerTop=top;
  if(Double.isFinite(topThickness)){
  RouteSketch style=new RouteSketch(MainActivity.this,"[]");style.bindDimensionProject(activeProject);
@@ -7254,7 +7258,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  int hatch=style.configuredHatch(covering,settings);
  if(hatch>=0&&layerTop>top){c.save();c.clipRect(20,top,340,layerTop);float band=12*getResources().getDisplayMetrics().density;for(float yy=top+band/2;yy<layerTop+band/2;yy+=band){c.save();c.translate(20,yy);style.drawHatchBand(c,320,band/12,hatch);c.restore();}c.restore();}
  }
- if(Double.isFinite(base)){p.setColor(0xff626253);c.drawRect(20,layerTop,340,layerTop+(float)(base*scale),p);}
+ if(Double.isFinite(base)){soil(c,20,layerTop,340,Math.min(bottom,layerTop+(float)(base*scale)),0xff666052,0xffa39a83);}
  if(!covering.equals("Asphalt")&&!covering.equals("Unbekannt")&&!covering.equals("Unbefestigt")&&!covering.equals("Sonstiges")){p.setColor(0xff777777);c.drawLine(20,top,340,top,p);for(int i=20;i<340;i+=covering.contains("platten")||covering.contains("Platten")?28:12)c.drawLine(i,top-4,i,top,p);}
  if("Asphalt".equals(covering)){
   // Original cut edges and additional recut edges are distinct.
@@ -7276,20 +7280,20 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  for(int i=0;i<utilities.length();i++)if(utilityOutsideProfile(utilities.optJSONObject(i),w,d))outside++;
  if(outside>0){p.setColor(0xffff927d);p.setTextSize(11);c.drawText("Profilgrenzen verletzt: "+outside+" Leitung(en)",20,52,p);}
 
- if(utilities.length()==0){if(Double.isFinite(previewPipe)){float radius=(float)(previewPipe/2000*scale);p.setColor(0xff3686bc);c.drawCircle(180,bottom-radius,radius,p);}}
+ if(utilities.length()==0){if(Double.isFinite(previewPipe)){float radius=(float)(previewPipe/2000*scale);p.setColor(0xff3686bc);pipeSymbol(c,180,bottom-radius,radius);}}
  else{
   double sum=Double.isFinite(previewPipe)?previewPipe/1000:0;for(int i=0;i<utilities.length();i++)sum+=utilities.optJSONObject(i).optDouble("diameter",0)/1000;
   int count=utilities.length()+(Double.isFinite(previewPipe)?1:0);
   float gap=(float)((w-sum)*scale/(count+1)),cursor=x+gap;
   if(gap<0){gap=0;cursor=x;label(c,"Leitungsanordnung prüfen",20,224);}
   {
-   if(Double.isFinite(previewPipe)){float radius=(float)(previewPipe/2000*scale);p.setColor(0xff3686bc);c.drawCircle(cursor+radius,bottom-radius,radius,p);cursor+=2*radius+gap;}
-   for(int i=0;i<utilities.length();i++){org.json.JSONObject o=utilities.optJSONObject(i);float radius=(float)(o.optDouble("diameter",0)/2000*scale);String type=o.optString("type");p.setColor(type.equals("Gas")?0xffe9b63c:type.equals("Trinkwasser")?0xff3686bc:0xffc66d56);if(radius*2<=bottom-top&&radius*2<=z-x){float cx=(float)(x+o.optDouble("offset",(cursor+radius-x)/scale)*scale),cy=(float)(top+o.optDouble("axisDepth",(bottom-radius-top)/scale)*scale);cx=Math.max(x+radius,Math.min(z-radius,cx));cy=Math.max(top+radius,Math.min(bottom-radius,cy));c.drawCircle(cx,cy,radius,p);utilityHits.add(new android.graphics.RectF(cx-radius,cy-radius,cx+radius,cy+radius));}else{utilityHits.add(null);label(c,"Leitungstiefe prüfen",20,224);}cursor+=2*radius+gap;}
+   if(Double.isFinite(previewPipe)){float radius=(float)(previewPipe/2000*scale);p.setColor(0xff3686bc);pipeSymbol(c,cursor+radius,bottom-radius,radius);cursor+=2*radius+gap;}
+   for(int i=0;i<utilities.length();i++){org.json.JSONObject o=utilities.optJSONObject(i);float radius=(float)(o.optDouble("diameter",0)/2000*scale);String type=o.optString("type");p.setColor(type.equals("Gas")?0xffe9b63c:type.equals("Trinkwasser")?0xff3686bc:0xffc66d56);if(radius*2<=bottom-top&&radius*2<=z-x){float cx=(float)(x+o.optDouble("offset",(cursor+radius-x)/scale)*scale),cy=(float)(top+o.optDouble("axisDepth",(bottom-radius-top)/scale)*scale);cx=Math.max(x+radius,Math.min(z-radius,cx));cy=Math.max(top+radius,Math.min(bottom-radius,cy));pipeSymbol(c,cx,cy,radius);utilityHits.add(new android.graphics.RectF(cx-radius,cy-radius,cx+radius,cy+radius));}else{utilityHits.add(null);label(c,"Leitungstiefe prüfen",20,224);}cursor+=2*radius+gap;}
   }
  }
 
- p.setColor(0xff94a7a5);p.setStrokeWidth(1);c.drawLine(x,top,x,bottom,p);c.drawLine(z,top,z,bottom,p);c.drawLine(x,bottom,z,bottom,p);
- p.setColor(0xff4cdbb5);c.drawLine(x,bottom+14,z,bottom+14,p);c.drawLine(x,bottom+8,x,bottom+20,p);c.drawLine(z,bottom+8,z,bottom+20,p);
+ p.setColor(0xffd0dedb);p.setStrokeWidth(1.2f);c.drawLine(x,top,x,bottom,p);c.drawLine(z,top,z,bottom,p);c.drawLine(x,bottom,z,bottom,p);
+ p.setColor(0xff28d5c7);c.drawLine(x,bottom+14,z,bottom+14,p);c.drawLine(x,bottom+8,x,bottom+20,p);c.drawLine(z,bottom+8,z,bottom+20,p);
  p.setTextSize(13);String widthLabel=m(w);c.drawText(widthLabel,(x+z-p.measureText(widthLabel))/2,bottom+29,p);
  c.drawLine(z+12,top,z+12,bottom,p);c.drawLine(z+7,top,z+17,top,p);c.drawLine(z+7,bottom,z+17,bottom,p);c.drawText(m(d),z+18,(top+bottom)/2,p);
  if(Double.isFinite(left)&&Double.isFinite(right)&&(nl+nr)>0){float a=x-(float)(nl*scale),b=z+(float)(nr*scale);c.drawLine(a,35,b,35,p);c.drawLine(a,30,a,45,p);c.drawLine(b,30,b,45,p);p.setTextSize(13);String cutLabel=m(w+nl+nr);c.drawText(cutLabel,(a+b-p.measureText(cutLabel))/2,27,p);}
