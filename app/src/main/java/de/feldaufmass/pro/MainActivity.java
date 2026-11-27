@@ -1391,7 +1391,6 @@ public class MainActivity extends Activity {
   android.widget.HorizontalScrollView sectionScroll=new android.widget.HorizontalScrollView(this);sectionScroll.setHorizontalScrollBarEnabled(false);sectionStrip.addView(sectionScroll);sectionTitle.setText("Abschnitte ▴");final boolean[] sectionsCollapsed={false};sectionScroll.setVisibility(View.VISIBLE);
   LinearLayout sectionCards=new LinearLayout(this);sectionScroll.addView(sectionCards);
   ScrollView verticalSections=new ScrollView(this);verticalSections.setFillViewport(false);verticalSections.setVisibility(View.GONE);
-  sectionTitle.setOnClickListener(v->{sectionsCollapsed[0]=!sectionsCollapsed[0];int visibility=sectionsCollapsed[0]?View.GONE:View.VISIBLE;sectionScroll.setVisibility(sectionScroll.getParent()==sectionStrip?visibility:View.GONE);verticalSections.setVisibility(verticalSections.getParent()==sectionStrip?visibility:View.GONE);String label=sectionTitle.getText().toString();if(label.endsWith("▾")||label.endsWith("▴"))label=label.substring(0,label.length()-1).trim();sectionTitle.setText(label+" "+(sectionsCollapsed[0]?"▾":"▴"));});
   root.addView(sectionStrip,new LinearLayout.LayoutParams(-1,-2));
   final int[] selectedSection={-1};
   final String[] selectedSectionStart={null},selectedSectionEnd={null};
@@ -1399,7 +1398,7 @@ public class MainActivity extends Activity {
   LinearLayout sectionEditor=new LinearLayout(this);sectionEditor.setOrientation(1);sectionEditor.setPadding(dp(4),dp(4),dp(4),dp(4));sectionEditor.setBackground(proButtonShape(false));
   sectionStrip.addView(sectionEditor,new LinearLayout.LayoutParams(-1,-2));sectionEditor.setVisibility(View.GONE);
   Runnable refreshSectionEditor=()->{
-   sectionEditor.removeAllViews();int index=selectedSection[0];if(index<0||index+1>=route.vertices.size()){sectionEditor.setVisibility(View.GONE);return;}
+   sectionEditor.removeAllViews();int index=selectedSection[0];if(sectionsCollapsed[0]||index<0||index+1>=route.vertices.size()){sectionEditor.setVisibility(View.GONE);return;}
    sectionEditor.setVisibility(View.VISIBLE);sectionEditor.addView(sheetText("A"+(index+1)+"  Abschnitt bearbeiten",13,true));
    double start=0;for(int j=0;j<index;j++){double length=route.vertices.get(j+1).metres;if(!Double.isFinite(length)||length<=0){start=Double.NaN;break;}start+=length;}final double from=start,to=start+route.vertices.get(index+1).metres;
    SharedPreferences defaults=getSharedPreferences("base_profile_defaults",MODE_PRIVATE);
@@ -1426,6 +1425,7 @@ public class MainActivity extends Activity {
    apply.setOnClickListener(v->{try{if(index+1>=route.vertices.size()||!java.util.Objects.equals(selectedSectionStart[0],route.vertices.get(index).id)||!java.util.Objects.equals(selectedSectionEnd[0],route.vertices.get(index+1).id))throw new IllegalArgumentException("Abschnitt erneut auswählen.");if(!Double.isFinite(from)||!Double.isFinite(to)||to<=from)throw new IllegalArgumentException("Zuerst Abschnitt bemaßen.");double currentFrom=0;for(int k=1;k<=index;k++){double len=route.vertices.get(k).metres;if(!Double.isFinite(len)||len<=0)throw new IllegalArgumentException("Zuerst Abschnitt bemaßen.");currentFrom+=len;}double currentTo=currentFrom+route.vertices.get(index+1).metres;if(Double.compare(currentFrom,from)!=0||Double.compare(currentTo,to)!=0)throw new IllegalArgumentException("Abschnitt erneut auswählen.");double ww=number(widthField),dd=number(depthField),total=recut.isChecked()?number(cutField):ww;saveReferenceSection(route,from,to,ww,dd,selectedMaterial[0],recut.isChecked(),total,leftCut,rightCut);notice("Abschnitt gespeichert.");}catch(Exception ex){notice("Abschnitt: "+ex.getMessage());}});
 
   };
+  sectionTitle.setOnClickListener(v->{sectionsCollapsed[0]=!sectionsCollapsed[0];int visibility=sectionsCollapsed[0]?View.GONE:View.VISIBLE;sectionScroll.setVisibility(sectionScroll.getParent()==sectionStrip?visibility:View.GONE);verticalSections.setVisibility(verticalSections.getParent()==sectionStrip?visibility:View.GONE);refreshSectionEditor.run();String label=sectionTitle.getText().toString();if(label.endsWith("▾")||label.endsWith("▴"))label=label.substring(0,label.length()-1).trim();sectionTitle.setText(label+" "+(sectionsCollapsed[0]?"▾":"▴"));});
   sectionPosition.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){refreshSectionEditor.run();}public void afterTextChanged(android.text.Editable e){}});
   Runnable refreshSections=()->{
    sectionCards.removeAllViews();int count=Math.max(0,route.vertices.size()-1);
