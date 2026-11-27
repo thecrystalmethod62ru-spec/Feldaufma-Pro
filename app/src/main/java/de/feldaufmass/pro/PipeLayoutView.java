@@ -75,12 +75,12 @@ public final class PipeLayoutView extends View {
         else{cx=getWidth()/2f+(float)((leftExtent-rightExtent)*scale/2);bottom=getHeight()-pad;}
         if(!Float.isFinite(scale)||scale<=0)return;
         float left=cx-(float)(width*scale/2),right=cx+(float)(width*scale/2),top=bottom-(float)(depth*scale);
-        texture(c,left,top,right,bottom,0xff674323,0xffa87949,false);
+        texture(c,left,top,right,bottom,0xff503a29,0xffb18a62,false);
         p.setColor(0xff00e5ee);p.setStrokeWidth(1.5f);c.drawLine(left,top,right,top,p);
         p.setColor(0xff00e5ee);c.drawLine(left,top,left,bottom,p);c.drawLine(right,top,right,bottom,p);c.drawLine(left,bottom,right,bottom,p);
         if(civilProfile){
             float a=left-(float)(cutLeft*scale),b=right+(float)(cutRight*scale);
-            texture(c,0,top,left,bottom,0xff302922,0xff78634d,false);texture(c,right,top,getWidth(),bottom,0xff302922,0xff78634d,false);
+            texture(c,0,top,left,bottom,0xff292520,0xff82705c,false);texture(c,right,top,getWidth(),bottom,0xff302922,0xff78634d,false);
             float deckBottom=top+(float)(Math.min(depth,deck)*scale),baseBottom=top+(float)(Math.min(depth,deck+base)*scale);
             texture(c,0,top,a,deckBottom,asphaltProfile?0xff383c3f:surfaceColor,asphaltProfile?0xff777b7e:0xff96938a, !asphaltProfile);texture(c,b,top,getWidth(),deckBottom,asphaltProfile?0xff383c3f:surfaceColor,asphaltProfile?0xff777b7e:0xff96938a,!asphaltProfile);
             texture(c,0,deckBottom,left,baseBottom,0xff666052,0xffa39a83,true);texture(c,right,deckBottom,getWidth(),baseBottom,0xff666052,0xffa39a83,true);
