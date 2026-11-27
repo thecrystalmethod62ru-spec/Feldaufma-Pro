@@ -1419,6 +1419,13 @@ public class MainActivity extends Activity {
   }
  }
 
+ void overviewAction(LinearLayout parent,String label,String kind,Runnable action){
+  Button button=actionButtonSingle(parent,label,action);compactToolIcon(button,label,kind);
+  android.graphics.drawable.Drawable icon=button.getCompoundDrawables()[1];
+  button.setCompoundDrawables(icon,null,null,null);button.setCompoundDrawablePadding(dp(10));
+  button.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);button.setTextSize(14);button.setMinHeight(dp(48));button.setPadding(dp(12),dp(6),dp(12),dp(6));
+  LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(4);button.setLayoutParams(lp);
+ }
  void addSheetTab(LinearLayout bar,String name,LinearLayout sheet){
   Button tab=new Button(this);
   styleEditorButton(tab,false);tab.setTextSize(14);
@@ -3954,11 +3961,13 @@ public class MainActivity extends Activity {
  assistant.setOnLongClickListener(v->{showPage(voicePage);return true;});
  Button persistentSave=actionButtonSingle(dock,"Speichern",()->{if(calculate())Toast.makeText(this,"Gespeichert",Toast.LENGTH_SHORT).show();});
  compactToolIcon(persistentSave,"Speichern","save");
+ android.graphics.drawable.Drawable saveIcon=persistentSave.getCompoundDrawables()[1];
+ persistentSave.setCompoundDrawables(saveIcon,null,null,null);persistentSave.setCompoundDrawablePadding(dp(6));persistentSave.setMinHeight(dp(48));
  persistentSave.setLayoutParams(new LinearLayout.LayoutParams(dp(124),dp(48)));
- actionButtonSingle(planPage,"Zeichnungsebenen",()->showDrawingLayers());
- actionButtonSingle(planPage,"GPS-Aufzeichnung",()->showGpsTrackControls());
- actionButtonSingle(planPage,"Trassenvergleich",()->showGpsTrackComparison());
- actionButtonSingle(planPage,"Zeichnungsunterlage – PDF / Foto",()->chooseRouteUnderlay());
+ overviewAction(planPage,"Zeichnungsebenen","layers",()->showDrawingLayers());
+ overviewAction(planPage,"GPS-Aufzeichnung","center",()->showGpsTrackControls());
+ overviewAction(planPage,"Trassenvergleich","sections",()->showGpsTrackComparison());
+ overviewAction(planPage,"Zeichnungsunterlage – PDF / Foto","image",()->chooseRouteUnderlay());
  routePreviewBox=page();planPage.addView(routePreviewBox);
  routeSummary=sheetText("",15,false);planPage.addView(routeSummary);
  LinearLayout actions=new LinearLayout(this);planPage.addView(actions);
