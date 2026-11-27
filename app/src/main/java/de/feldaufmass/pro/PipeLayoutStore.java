@@ -47,7 +47,7 @@ public final class PipeLayoutStore {
         for(int i=0;i<old.length();i++){
             JSONObject row=old.getJSONObject(i);
             double a=row.getDouble("from"),b=row.getDouble("to");
-            if(a==from&&b==to)continue;
+            if(Math.abs(a-from)<1e-6&&Math.abs(b-to)<1e-6)continue;
             if(from<b&&to>a)throw new IllegalArgumentException("Abschnitt überschneidet vorhandenes Rohrprofil");
             next.put(row);
         }
@@ -58,7 +58,7 @@ public final class PipeLayoutStore {
     }
     public void deleteSection(double from,double to) throws JSONException {
         JSONArray rows=sections(),next=new JSONArray();boolean found=false;
-        for(int i=0;i<rows.length();i++){JSONObject row=rows.getJSONObject(i);if(row.getDouble("from")==from&&row.getDouble("to")==to){found=true;continue;}next.put(row);}
+        for(int i=0;i<rows.length();i++){JSONObject row=rows.getJSONObject(i);if(Math.abs(row.getDouble("from")-from)<1e-6&&Math.abs(row.getDouble("to")-to)<1e-6){found=true;continue;}next.put(row);}
         if(!found)throw new IllegalArgumentException("Abschnitt nicht gefunden");
         if(!prefs.edit().putString(SECTION_KEY,next.toString()).commit())throw new IllegalStateException("Löschen fehlgeschlagen");
     }
