@@ -49,12 +49,17 @@ public final class PipeLayoutView extends View {
         if(r<=l||b<=t)return;
         p.setStyle(Paint.Style.FILL);p.setColor(fill);c.drawRect(l,t,r,b,p);
         c.save();c.clipRect(l,t,r,b);p.setColor(grain);p.setStrokeWidth(1);
-        float step=6*getResources().getDisplayMetrics().density;
-        for(int row=0;row<(b-t)/step+1;row++)for(float x=l+step/3+(row%2)*step/2;x<r;x+=step){
-            float y=t+step/3+row*step;
-            if(gravel){p.setStyle(Paint.Style.STROKE);c.drawOval(x,y,x+step/3,y+step/4,p);}
-            else {p.setStyle(Paint.Style.FILL);float k=(float)(.65+.35*Math.sin(x*1.7+y*.8));c.drawOval(x,y,x+step*.38f*k,y+step*.22f,p);}
+        float density=getResources().getDisplayMetrics().density;
+        float step=(gravel?8:5)*density;
+        java.util.Random random=new java.util.Random(731);
+        for(float yy=t;yy<b;yy+=step)for(float xx=l;xx<r;xx+=step){
+            float x=xx+random.nextFloat()*step,y=yy+random.nextFloat()*step;
+            float w=step*(.18f+random.nextFloat()*.48f),h=w*(.35f+random.nextFloat()*.45f);
+            p.setColor(grain);p.setAlpha(65+random.nextInt(105));
+            if(gravel){p.setStyle(Paint.Style.STROKE);c.drawOval(x,y,x+w,y+h,p);}
+            else{p.setStyle(Paint.Style.FILL);c.drawOval(x,y,x+w,y+h,p);}
         }
+        p.setAlpha(255);
         p.setStyle(Paint.Style.FILL);c.restore();
     }
     @Override protected void onDraw(Canvas c){
