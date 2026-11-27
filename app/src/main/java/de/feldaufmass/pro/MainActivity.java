@@ -4547,6 +4547,7 @@ public class MainActivity extends Activity {
  sync.run();
  }
  void refreshProfileDraft(){
+  if(!projectChosen)return;
   try{
    double bw=number(width),bd=number(depth);
    if(!Double.isFinite(bw)||!Double.isFinite(bd)||bw<=0||bd<=0)return;
@@ -5039,7 +5040,7 @@ public class MainActivity extends Activity {
  }
  TextView shoringQuantities;
  String shoringReport(){
-  StringBuilder report=new StringBuilder();double leftArea=0,rightArea=0;
+  StringBuilder report=new StringBuilder();double leftArea=0,rightArea=0;boolean invalid=false;
   try{
    org.json.JSONArray rows=new org.json.JSONArray(getPreferences(0).getString("metricVerbauSections","[]"));
    if(rows.length()==0)return "";
@@ -5047,14 +5048,15 @@ public class MainActivity extends Activity {
    java.util.ArrayList<double[]> accepted=new java.util.ArrayList<>();
    for(int i=0;i<rows.length();i++){
     org.json.JSONArray row=rows.getJSONArray(i);double from=row.getDouble(0),to=row.getDouble(1),lh=row.getDouble(2),rh=row.getDouble(3);
-    if(!Double.isFinite(from)||!Double.isFinite(to)||!Double.isFinite(lh)||!Double.isFinite(rh)||from<0||to<=from||lh<0||rh<0||(l>0&&to>l)){report.append("Abschnitt "+(i+1)+": Stationsgrenzen / Maße prüfen\n");continue;}
+    if(!Double.isFinite(from)||!Double.isFinite(to)||!Double.isFinite(lh)||!Double.isFinite(rh)||from<0||to<=from||lh<0||rh<0||!Double.isFinite(l)||l<=0||to>l||lh+rh<=0){invalid=true;report.append("Abschnitt "+(i+1)+": Stationsgrenzen / Maße prüfen\n");continue;}
     boolean overlap=false;for(double[] prior:accepted)if(from<prior[1]&&to>prior[0]&&((lh>0&&prior[2]>0)||(rh>0&&prior[3]>0))){overlap=true;break;}
-    if(overlap){report.append("Abschnitt "+(i+1)+": Überlappung auf derselben Seite – nicht summiert\n");continue;}
-    double la=(to-from)*lh,ra=(to-from)*rh;if(!Double.isFinite(la+ra+leftArea+rightArea)){report.append("Abschnitt "+(i+1)+": Fläche außerhalb des Zahlenbereichs\n");continue;}
+    if(overlap){invalid=true;report.append("Abschnitt "+(i+1)+": Überlappung auf derselben Seite – nicht summiert\n");continue;}
+    double la=(to-from)*lh,ra=(to-from)*rh;if(!Double.isFinite(la+ra+leftArea+rightArea)){invalid=true;report.append("Abschnitt "+(i+1)+": Fläche außerhalb des Zahlenbereichs\n");continue;}
     accepted.add(new double[]{from,to,lh,rh});leftArea+=la;rightArea+=ra;
     report.append(String.format(java.util.Locale.GERMANY,"%.2f – %.2f m | Höhe L/R %.2f / %.2f m | Fläche L/R %.2f / %.2f m²\n",from,to,lh,rh,la,ra));
    }
-   report.append(String.format(java.util.Locale.GERMANY,"Verbau links: %.2f m² | rechts: %.2f m² | gesamt: %.2f m²\n\n",leftArea,rightArea,leftArea+rightArea));
+   if(invalid)report.append("Verbau-Gesamtmenge offen – alle Abschnitte prüfen.\n\n");
+   else report.append(String.format(java.util.Locale.GERMANY,"Verbau links: %.2f m² | rechts: %.2f m² | gesamt: %.2f m²\n\n",leftArea,rightArea,leftArea+rightArea));
   }catch(Exception ex){return "Verbaudaten konnten nicht vollständig ausgewertet werden.\n\n";}
   return report.toString();
  }
