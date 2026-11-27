@@ -758,6 +758,8 @@ public class MainActivity extends Activity {
      case "view":for(int x:new int[]{4,20})for(int y:new int[]{4,20}){c.drawLine(x,y,x+(x==4?5:-5),y,p);c.drawLine(x,y,x,y+(y==4?5:-5),p);}break;
      case "legend":for(int y=6;y<=18;y+=6){c.drawCircle(5,y,1,p);c.drawLine(9,y,20,y,p);}break;
      case "objects":c.drawRoundRect(5,5,19,19,2,2,p);c.drawLine(9,12,15,12,p);c.drawLine(12,9,12,15,p);break;
+     case "pipe":c.drawCircle(12,12,8,p);c.drawCircle(12,12,5,p);break;
+     case "settings":c.drawCircle(12,12,7,p);c.drawCircle(12,12,3,p);for(int k=0;k<8;k++){c.save();c.rotate(k*45,12,12);c.drawLine(12,2,12,5,p);c.restore();}break;
      case "layers":c.drawLine(4,8,12,3,p);c.drawLine(12,3,20,8,p);c.drawLine(20,8,12,13,p);c.drawLine(12,13,4,8,p);c.drawLine(4,13,12,18,p);c.drawLine(12,18,20,13,p);c.drawLine(4,18,12,22,p);c.drawLine(12,22,20,18,p);break;
      default:for(int y=6;y<=18;y+=6)c.drawLine(4,y,20,y,p);
     }c.restore();
@@ -3641,7 +3643,7 @@ public class MainActivity extends Activity {
    tab.setBackground(editorShape(selected?0xff28564c:0xff1b1b1b,10));
    tab.setTextColor(selected?Color.WHITE:0xffb5b5b5);
   }
-  if(p==profilePage&&sectionProfilePanel!=null)openSectionProfilePicker();if(p==documentsPage)compareSoll();if(p==quantityPage)refreshDetailQuantities();body.removeAllViews();ScrollView sc=new ScrollView(this);sc.setFillViewport(true);if(p.getParent()!=null)((android.view.ViewGroup)p.getParent()).removeView(p);sc.addView(p);body.addView(sc,new LinearLayout.LayoutParams(-1,-1));}
+  if(p==profilePage&&profile!=null)profile.invalidate();if(p==documentsPage)compareSoll();if(p==quantityPage)refreshDetailQuantities();body.removeAllViews();ScrollView sc=new ScrollView(this);sc.setFillViewport(true);if(p.getParent()!=null)((android.view.ViewGroup)p.getParent()).removeView(p);sc.addView(p);body.addView(sc,new LinearLayout.LayoutParams(-1,-1));}
  private void fitSystemPanels(LinearLayout root){
   Window window=getWindow();
   androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window,false);
@@ -4088,44 +4090,51 @@ public class MainActivity extends Activity {
  objectList=new TextView(this);root.addView(objectList);showObjects();
  Button undo=new Button(this);undo.setText("Letztes Objekt entfernen");root.addView(undo);undo.setOnClickListener(v->{if(objects.length()>0){objects.remove(objects.length()-1);saveObjects();}});
  root=profilePage;
- profile=new Profile();root.addView(profile,1,new LinearLayout.LayoutParams(-1,(int)(300*getResources().getDisplayMetrics().density)));
+ profile=new Profile();root.addView(profile,new LinearLayout.LayoutParams(-1,(int)(300*getResources().getDisplayMetrics().density)));
  sectionProfilePanel=page();profilePage.addView(sectionProfilePanel,0);
 
- actionButtonSingle(profilePage,"Verbau – Profilstation wählen",()->{
+ LinearLayout optionsPanel=page();
+ actionButtonSingle(optionsPanel,"Verbau – Profilstation wählen",()->{
   EditText station=new EditText(this);station.setInputType(8194);station.setText(String.valueOf(profileShoringStation));
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Profilstation (m)").setView(station).setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",null).create();
   dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(btn->{try{double value=number(station);if(!Double.isFinite(value)||value<0||l<=0||value>l){station.setError("Station innerhalb der Trasse eingeben");return;}profileShoringStation=value;profile.invalidate();dialog.dismiss();}catch(Exception ex){station.setError("Ungültige Station");}}));dialog.show();
  });
 
- LinearLayout sizes=page();profilePage.addView(sizes,2);
+ LinearLayout sizes=page();
  sizes.addView(sheetText("Grabenmaße – direkt bearbeiten",16,true));
  profileSlider(sizes,"Grabenbreite",width,10,600);
  profileSlider(sizes,"Grabentiefe",depth,10,800);
  profileSlider(sizes,"Nachschnitt links",leftInput,0,200);
  profileSlider(sizes,"Nachschnitt rechts",rightInput,0,200);
  LinearLayout asphaltControls=page(),stoneControls=page();
- sizes.addView(asphaltControls);sizes.addView(stoneControls);
+ LinearLayout buildPanel=page();actionButtonSingle(buildPanel,"Oberfläche / Belagsdetails",()->openBelagsDetails());buildPanel.addView(asphaltControls);buildPanel.addView(stoneControls);
  profileSlider(asphaltControls,"Asphaltstärke",asphaltInput,0,100);
  utilitySlider(stoneControls,stoneDepth,"Belagsstärke (cm)",0,100,1,true);
  EditText stoneExact=new EditText(this);stoneExact.setSingleLine(true);stoneExact.setInputType(8194);stoneExact.setText(stoneDepth.getText());stoneControls.addView(stoneExact);
  final boolean[] syncingStone={false};
  stoneDepth.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){if(syncingStone[0])return;syncingStone[0]=true;stoneExact.setText(s);syncingStone[0]=false;refreshProfileDraft();}public void afterTextChanged(android.text.Editable e){}});
  stoneExact.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){if(syncingStone[0])return;syncingStone[0]=true;stoneDepth.setText(s);syncingStone[0]=false;refreshProfileDraft();}public void afterTextChanged(android.text.Editable e){}});
- profileSlider(sizes,"Tragschicht",baseInput,0,200);
+ profileSlider(buildPanel,"Tragschicht",baseInput,0,200);
  Runnable updateSurfaceControls=()->{boolean asphaltSelected="Asphalt".equals(surface.getSelectedItem().toString());asphaltControls.setVisibility(asphaltSelected?View.VISIBLE:View.GONE);stoneControls.setVisibility(isStoneSurface(String.valueOf(surface.getSelectedItem()))?View.VISIBLE:View.GONE);};
- sizes.getViewTreeObserver().addOnGlobalLayoutListener(()->updateSurfaceControls.run());
+ buildPanel.getViewTreeObserver().addOnGlobalLayoutListener(()->updateSurfaceControls.run());
  updateSurfaceControls.run();
- LinearLayout pipeDetails=fold(profilePage,"Rohr und Bettung",false);
+ LinearLayout pipeDetails=page();
  utilitySlider(pipeDetails,pipeInput,"Rohr-Außendurchmesser (mm)",1,2000,1,true);
  pipeInput.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){if(profile!=null)profile.invalidate();}public void afterTextChanged(android.text.Editable e){}});
  actionButtonSingle(pipeDetails,"Weitere Leitungen / Kabel",()->editUtilities());
  profilePage.removeView(legend);pipeDetails.addView(legend);
+ profilePage.removeView(sectionProfilePanel);optionsPanel.addView(sectionProfilePanel);
+ LinearLayout toolbar=new LinearLayout(this);profilePage.addView(toolbar);String[] names={"Aufbau","Leitungen","Maße","Optionen"};String[] icons={"layers","pipe","ruler","settings"};LinearLayout[] panels={buildPanel,pipeDetails,sizes,optionsPanel};
+ for(int j=0;j<names.length;j++){final int index=j;Button tool=new Button(this);styleEditorButton(tool,false);compactToolIcon(tool,names[j],icons[j]);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(64),1);lp.setMargins(dp(2),dp(2),dp(2),dp(2));toolbar.addView(tool,lp);tool.setOnClickListener(v->{if(index==3)openSectionProfilePicker();showProfilePanel(names[index],panels[index]);});}
 
  save.setOnClickListener(v->{if(calculate())showPage(planPage);});if(length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);
  }
  LinearLayout sectionProfilePanel;
+ void showProfilePanel(String title,LinearLayout panel){
+  if(panel.getParent()!=null)return;ScrollView scroll=new ScrollView(this);scroll.addView(panel);android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle(title).setView(scroll).setPositiveButton("Fertig",null).create();dialog.setOnDismissListener(v->{scroll.removeView(panel);refreshProfileDraft();if(profile!=null)profile.invalidate();});dialog.show();
+ }
  void openSectionProfilePicker(){
-  sectionProfilePanel.removeAllViews();for(int j=0;j<profilePage.getChildCount();j++)profilePage.getChildAt(j).setVisibility(View.VISIBLE);
+  sectionProfilePanel.removeAllViews();
   try{
    org.json.JSONArray stored=new PipeLayoutStore(getPreferences(0)).sections();
    java.util.ArrayList<org.json.JSONObject> rows=new java.util.ArrayList<>();
@@ -4154,7 +4163,7 @@ public class MainActivity extends Activity {
     quantity.setText(String.format(java.util.Locale.GERMANY,"Aushub (brutto): %.3f m³",(p.getDouble("to")-p.getDouble("from"))*ww*dd));}catch(Exception ignored){}};
    android.text.TextWatcher watcher=new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){preview.run();}public void afterTextChanged(android.text.Editable e){}};
    bw.addTextChangedListener(watcher);bd.addTextChangedListener(watcher);for(EditText field:extras)field.addTextChangedListener(watcher);
-   java.util.function.IntConsumer load=i->{boolean standard=i==0;controls.setVisibility(standard?View.GONE:View.VISIBLE);for(int j=0;j<profilePage.getChildCount();j++){View child=profilePage.getChildAt(j);if(child!=sectionProfilePanel)child.setVisibility(standard?View.VISIBLE:View.GONE);}if(standard)return;org.json.JSONObject p=rows.get(i-1);loading[0]=true;bw.setText(String.valueOf(p.optDouble("width")));bd.setText(p.optDouble("depth")>0?String.valueOf(p.optDouble("depth")):"");org.json.JSONObject seg=findSurfaceSection(p);String[] keys={"left","right","topThickness","baseThickness"};for(int j=0;j<extras.length;j++)extras[j].setText(seg==null?"":seg.optString(keys[j],""));loading[0]=false;preview.run();};
+   java.util.function.IntConsumer load=i->{boolean standard=i==0;controls.setVisibility(standard?View.GONE:View.VISIBLE);if(standard)return;org.json.JSONObject p=rows.get(i-1);loading[0]=true;bw.setText(String.valueOf(p.optDouble("width")));bd.setText(p.optDouble("depth")>0?String.valueOf(p.optDouble("depth")):"");org.json.JSONObject seg=findSurfaceSection(p);String[] keys={"left","right","topThickness","baseThickness"};for(int j=0;j<extras.length;j++)extras[j].setText(seg==null?"":seg.optString(keys[j],""));loading[0]=false;preview.run();};
    onChoice(picker,load);load.accept(0);
    actionButtonSingle(controls,"Abschnitt speichern",()->{try{
     int i=picker.getSelectedItemPosition()-1;org.json.JSONObject p=rows.get(i);double ww=number(bw),dd=number(bd);
