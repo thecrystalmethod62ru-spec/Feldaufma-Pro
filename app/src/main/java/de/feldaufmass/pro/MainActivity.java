@@ -5365,6 +5365,7 @@ public class MainActivity extends Activity {
    basic=Double.isFinite(q[0])?String.format(java.util.Locale.GERMANY,"Aushub: %.2f m³\nGrundfläche: %.2f m²",q[1],q[0]):"Abschnittsprofile prüfen – Mengen nicht eindeutig";
   }
   double cutArea=currentCutArea();double groundArea=currentTrenchQuantities()[0];if(Double.isFinite(cutArea)&&Double.isFinite(groundArea)&&cutArea>groundArea+1e-9)basic+=String.format(java.util.Locale.GERMANY,"\nFläche mit Nachschnitt: %.2f m² (alternativ)",cutArea);
+  if(segments.length()==0&&"Asphalt".equals(covering)&&l>0)basic+="\n"+asphaltCutReport(l,w,Double.isFinite(left)&&Double.isFinite(right)?w+left+right:Double.NaN,left,right);
   RouteSketch route=new RouteSketch(this,routeData());double measured=route.measuredLength();
   String overlap=mainOverlapNotice(route);
   result.setText(basic+routeLengthWarning(measured)+(overlap.isEmpty()?"":"\n"+overlap));
@@ -5627,6 +5628,19 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
    report.append("\nStandardstärken nur bei gleicher Oberfläche. Fehlende Schichten bleiben offen. Bettung und Altbelag nicht berechnet. Nicht zusätzlich zum Bruttoaushub addieren.");
   return report.toString();
  }
+ // Geometric longitudinal cutting estimate; actual cuts and transverse ends are not inferred.
+ static String asphaltCutReport(double length,double width,double cutWidth,double left,double right){
+  if(!Double.isFinite(length)||length<=0)return "";
+  StringBuilder out=new StringBuilder(String.format(java.util.Locale.GERMANY,"Asphaltschnitt längs (beidseitig, rechnerisch): %.2f lfm\n",2*length));
+  boolean leftKnown=Double.isFinite(left)&&left>=0,rightKnown=Double.isFinite(right)&&right>=0;
+  if(Double.isFinite(width)&&Double.isFinite(cutWidth)&&Math.abs(cutWidth-width)<1e-9){
+   if(!leftKnown&&!rightKnown)return out.toString();
+  }
+  int sides=(leftKnown&&left>0?1:0)+(rightKnown&&right>0?1:0);
+  if(sides>0)out.append(String.format(java.util.Locale.GERMANY,"Zusätzlicher Asphaltschnitt (Rückschnitt%s): %.2f lfm\n",leftKnown&&rightKnown?"":"; bekannte Seiten",length*sides));
+  if(!leftKnown||!rightKnown)out.append("Weitere Rückschnitt-Schnittlänge offen – Seitenmaße prüfen.\n");
+  return out.toString();
+ }
  String surfaceAreaReport()throws Exception{
   java.util.TreeMap<String,double[]> totals=new java.util.TreeMap<>();
    StringBuilder report=new StringBuilder();double covered=0;
@@ -5638,6 +5652,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     String type=row.optString("surface","Unbekannt");double len=to-from,area=len*bw;covered+=len;
     double[] sum=totals.computeIfAbsent(type,k->new double[3]);sum[0]+=area;
     report.append(String.format(java.util.Locale.GERMANY,"%.2f – %.2f m | %s\nAufbruch (Graben): %.3f m²\n",from,to,type,area));
+    if("Asphalt".equals(type))report.append(asphaltCutReport(len,bw,row.optDouble("cutWidth"),row.optDouble("left"),row.optDouble("right")));
     if(row.has("cutWidth")){
      double cut=row.getDouble("cutWidth");if(!Double.isFinite(cut)||cut<bw)throw new IllegalArgumentException("Ungültige Nachschnittbreite");
      double extra=len*(cut-bw);sum[1]+=extra;
@@ -6549,6 +6564,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  double a=optional(leftInput),b=optional(rightInput);
  for(int i=0;i<segments.length();i++){org.json.JSONObject old=segments.getJSONObject(i);if(start<old.getDouble("to")&&end>old.getDouble("from")){Toast.makeText(this,"Abschnitte dürfen sich nicht überschneiden.",Toast.LENGTH_LONG).show();return;}}
  org.json.JSONObject item=new org.json.JSONObject();item.put("from",start);item.put("to",end);item.put("surface",surface.getSelectedItem().toString());item.put("width",gw);
+ if(Double.isFinite(a))item.put("left",a);if(Double.isFinite(b))item.put("right",b);
  if(Double.isFinite(a)&&Double.isFinite(b))item.put("cutWidth",gw+a+b);
  segments.put(item);persistSegments();
  }catch(Exception e){Toast.makeText(this,"Bitte gültige Stationsgrenzen und Breite eingeben.",Toast.LENGTH_LONG).show();}}
@@ -6557,6 +6573,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  for(int i=0;i<segments.length();i++){org.json.JSONObject o=segments.optJSONObject(i);if(o==null)continue;double a=o.optDouble("from"),b=o.optDouble("to"),area=(b-a)*o.optDouble("width");String type=o.optString("surface");
  out.append(String.format(java.util.Locale.GERMANY,"RP %02d | %.2f–%.2f m | %s | %.2f m² (Graben)\n",i+1,a,b,type,area));
  if(o.optDouble("cutWidth")>o.optDouble("width")+1e-9)out.append(String.format(java.util.Locale.GERMANY,"Mit Nachschnitt: %.2f m²\n",(b-a)*o.optDouble("cutWidth")));
+ if("Asphalt".equals(type))out.append(asphaltCutReport(b-a,o.optDouble("width"),o.optDouble("cutWidth"),o.optDouble("left"),o.optDouble("right")));
  totals.put(type,totals.getOrDefault(type,0.0)+area);}
  for(java.util.Map.Entry<String,Double> e:totals.entrySet())out.append(String.format(java.util.Locale.GERMANY,"%s gesamt: %.2f m² (Graben)\n",e.getKey(),e.getValue()));
  segmentsView.setText(out.toString());}
