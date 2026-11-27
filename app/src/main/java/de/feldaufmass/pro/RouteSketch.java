@@ -628,8 +628,8 @@ final class RouteSketch extends View {
      for(int j=1;j<to.size();j++){
       PointF a=to.get(j-1),b=to.get(j);double dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;
       double t=den==0?0:Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/den));
-      PointF q=new PointF((float)(a.x+t*dx),(float)(a.y+t*dy));double d=distance(p,q);
-      if(d<best){best=d;nearest=q;}
+      double qx=a.x+t*dx,qy=a.y+t*dy;double d=Math.hypot(p.x-qx,p.y-qy);
+      if(d<best){best=d;nearest=new PointF((float)qx,(float)qy);}
      }
      if(nearest!=null){double m=best*factor;deviationCache.add(new GpsDeviationLine(p,nearest,m<=1?0xff69cdbb:m<=3?0xffe9b63c:0xffef5350,reverse));}
      next+=step;count++;
@@ -870,7 +870,7 @@ final class RouteSketch extends View {
    }
    String status=liveFix.hasAccuracy()?String.format(Locale.GERMANY,"GPS ± %.2f m",liveFix.getAccuracy()):"GPS: Genauigkeit unbekannt";
    if(gps==null)status+=" · keine Planposition";
-   paint.setColor(Color.WHITE);c.drawRect(0,0,getWidth(),25*density,paint);
+   paint.setColor(darkEditor?0xff101010:Color.WHITE);c.drawRect(0,0,getWidth(),25*density,paint);
    paint.setColor(darkEditor?0xffe3f0ed:0xff173c42);c.drawText(status,8*density,18*density,paint);
   }
   paint.setColor(0xff42799e);paint.setStrokeWidth(3);
