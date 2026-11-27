@@ -830,7 +830,8 @@ public class MainActivity extends Activity {
    }
   };
   refreshSections.run();
-  sectionStrip.addOnLayoutChangeListener((v,ll,tt,rr,bb,ol,ot,orr,ob)->{if(sectionCards.getChildCount()!=Math.max(0,route.vertices.size()-1))refreshSections.run();});
+  final Runnable originalRouteChanged=route.changed;
+  route.changed=()->{if(originalRouteChanged!=null)originalRouteChanged.run();if(selectedSection[0]>=route.vertices.size()-1)selectedSection[0]=-1;refreshSections.run();};
   root.addView(historyBar,new LinearLayout.LayoutParams(-1,-2));
   for(int k=0;k<historyBar.getChildCount();k++)if(historyBar.getChildAt(k) instanceof Button)styleEditorButton((Button)historyBar.getChildAt(k),false);
   LinearLayout tools=new LinearLayout(this);root.addView(tools);
@@ -885,7 +886,7 @@ public class MainActivity extends Activity {
   restoreTools.setOnClickListener(v->{for(View bar:new View[]{header,controls,historyBar,tools,save,sectionStrip})bar.setVisibility(View.VISIBLE);restoreTools.setVisibility(View.GONE);floatingSave.setVisibility(View.GONE);});
   full.setContentView(root);
   full.setOnDismissListener(d->{
-   pendingEditorSpeech=null;route.darkEditor=false;
+   pendingEditorSpeech=null;route.darkEditor=false;route.changed=originalRouteChanged;
    setRequestedOrientation(previousOrientation);
    for(View view:views){android.view.ViewParent parent=view.getParent();if(parent instanceof android.view.ViewGroup)((android.view.ViewGroup)parent).removeView(view);}
    // Original positions are ascending; restore before other controls.
