@@ -1437,7 +1437,7 @@ public class MainActivity extends Activity {
     Button card=new Button(this);styleEditorButton(card,selectedSection[0]==j);
     card.setText(String.format(java.util.Locale.GERMANY,"A%d",j+1)+"  "+(Double.isFinite(length)&&length>0?(Double.isFinite(end)?String.format(java.util.Locale.GERMANY,"%.2f – %.2f m",station,end):"Station offen"):"Maß fehlt")+(Double.isFinite(length)&&length>0?String.format(java.util.Locale.GERMANY,"\n%.2f m",length):""));
     LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(sectionCards.getOrientation()==LinearLayout.VERTICAL?-1:dp(104),dp(48));cp.setMargins(dp(2),0,dp(2),0);sectionCards.addView(card,cp);
-    card.setOnClickListener(v->{if(index+1>=route.vertices.size())return;selectedSection[0]=index;selectedSectionStart[0]=route.vertices.get(index).id;selectedSectionEnd[0]=route.vertices.get(index+1).id;sectionPosition.setText("Abschnitt "+(index+1)+" / "+count);for(int k=0;k<sectionCards.getChildCount();k++)styleEditorButton((Button)sectionCards.getChildAt(k),k==index);if(!Double.isFinite(route.vertices.get(index+1).metres)||route.vertices.get(index+1).metres<=0)measureSegment(route,index+1);});
+    card.setOnClickListener(v->{if(index+1>=route.vertices.size())return;selectedSection[0]=index;selectedSectionStart[0]=route.vertices.get(index).id;selectedSectionEnd[0]=route.vertices.get(index+1).id;route.highlight=index+1;route.invalidate();sectionPosition.setText("Abschnitt "+(index+1)+" / "+count);for(int k=0;k<sectionCards.getChildCount();k++)styleEditorButton((Button)sectionCards.getChildAt(k),k==index);if(!Double.isFinite(route.vertices.get(index+1).metres)||route.vertices.get(index+1).metres<=0)measureSegment(route,index+1);});
     station=Double.isFinite(length)&&length>0&&Double.isFinite(end)?end:Double.NaN;
    }
   };
@@ -1853,10 +1853,11 @@ public class MainActivity extends Activity {
   refreshCalibration[0]=refreshEditor;
   calibrate.setOnClickListener(v->calibrateSketch(route,data->{calibration[0]=data;refreshEditor.run();}));
   clearScale.setOnClickListener(v->{calibration[0]=new org.json.JSONObject();refreshEditor.run();});
-  route.changed=()->{history.record(route.encode());refreshEditor.run();};
+  final boolean[] restoringHistory={false};
+  route.changed=()->{if(!restoringHistory[0])history.record(route.encode());refreshEditor.run();};
   java.util.function.Consumer<Boolean> restore=forward->{
    String snapshot=history.step(forward);RouteSketch parsed=new RouteSketch(this,snapshot);
-   route.vertices.clear();route.vertices.addAll(parsed.vertices);route.singleObjects.clear();route.singleObjects.addAll(parsed.singleObjects);route.highlight=-1;route.dragged=-1;refreshObjects.run();refreshEditor.run();
+   route.vertices.clear();route.vertices.addAll(parsed.vertices);route.singleObjects.clear();route.singleObjects.addAll(parsed.singleObjects);route.highlight=-1;route.dragged=-1;refreshObjects.run();restoringHistory[0]=true;try{if(route.changed!=null)route.changed.run();else refreshEditor.run();}finally{restoringHistory[0]=false;}
   };
   undo.setOnClickListener(v->restore.accept(false));redo.setOnClickListener(v->restore.accept(true));
   remove.setOnClickListener(v->{
