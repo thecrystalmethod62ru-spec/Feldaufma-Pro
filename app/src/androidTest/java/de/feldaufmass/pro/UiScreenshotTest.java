@@ -13,6 +13,18 @@ import static org.junit.Assert.*;
 
 @RunWith(AndroidJUnit4.class)
 public class UiScreenshotTest {
+ private void seedPreview(MainActivity a){
+  // This fixture exists only in the instrumentation APK, never in the production app.
+  a.activeProject="ui-preview-fixture";
+  a.getPreferences(0).edit().clear()
+   .putString("project","NB-2025-017")
+   .putString("routeSketch","[[0.32,0.12,null,\"preview-a\"],[0.20,0.40,18.4,\"preview-b\"],[0.42,0.63,12.6,\"preview-c\"],[0.84,0.76,21.2,\"preview-d\"]]")
+   .putString("width","0.40").putString("depth","1.00").putString("length","52.20")
+   .putString(PipeLayoutStore.KEY,"[{\"name\":\"DN 150\",\"offset\":0.2,\"diameter\":0.15,\"wall\":0.006,\"bedding\":0.1}]").commit();
+  a.project.setText("NB-2025-017");a.width.setText("0,40");a.depth.setText("1,00");a.length.setText("52,20");
+  if(a.surface!=null)for(int i=0;i<a.surface.getCount();i++){if("Asphalt".equals(String.valueOf(a.surface.getItemAtPosition(i)))){a.surface.setSelection(i);break;}}
+  a.covering="Asphalt";
+ }
  private void capture(String name) throws Exception {
   android.app.Instrumentation inst=InstrumentationRegistry.getInstrumentation();
   inst.waitForIdleSync();
@@ -35,7 +47,7 @@ public class UiScreenshotTest {
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    scenario.onActivity(a->{
     a.setRequestedOrientation(landscape?ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE:ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-    a.enterProject();
+    seedPreview(a);a.enterProject();
    });
    android.os.SystemClock.sleep(1000);
    scenario.onActivity(a->a.editRoute(false,full));
@@ -66,7 +78,7 @@ public class UiScreenshotTest {
  @Test public void regelprofilLandscape() throws Exception { profile(true,"07-regelprofil-landscape"); }
  private void profile(boolean landscape,String name) throws Exception {
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
-   scenario.onActivity(a->{a.setRequestedOrientation(landscape?ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE:ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);a.enterProject();});
+   scenario.onActivity(a->{a.setRequestedOrientation(landscape?ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE:ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);seedPreview(a);a.enterProject();});
    android.os.SystemClock.sleep(1000);
    scenario.onActivity(a->a.editRoute(false,true));
    boolean[] opened={false};
@@ -80,8 +92,6 @@ public class UiScreenshotTest {
     });
     if(!opened[0])android.os.SystemClock.sleep(250);
    }
-   // Preserve the actual screen even when navigation or visibility fails.
-   capture(name);
    assertTrue("Regelprofil tab not visible",opened[0]);
    boolean[] visible={false};
    for(int attempt=0;attempt<20&&!visible[0];attempt++){
@@ -93,8 +103,8 @@ public class UiScreenshotTest {
     });
     if(!visible[0])android.os.SystemClock.sleep(250);
    }
-   capture(name);
    assertTrue("Regelprofil content not visible after switching tabs",visible[0]);
+   capture(name);
   }
  }
 }
