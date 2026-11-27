@@ -963,6 +963,27 @@ final class RouteSketch extends View {
    float x1=left()+a.point.x*scale(),y1=top()+a.point.y*scale(),x2=left()+b.point.x*scale(),y2=top()+b.point.y*scale();
    p.setColor(0xff78918a);p.setStrokeWidth(sw+2*density);c.drawLine(x1,y1,x2,y2,p);
    p.setColor(0xff443b30);p.setStrokeWidth(sw);c.drawLine(x1,y1,x2,y2,p);
+   if(pixels>1&&sw>=6*density){
+    float nx=(float)((y2-y1)/pixels),ny=(float)((x1-x2)/pixels);
+    Paint marks=new Paint(Paint.ANTI_ALIAS_FLAG);marks.setColor(0xff746451);marks.setStrokeWidth(density);
+    int count=Math.min(300,(int)(pixels/(12*density)));
+    for(int k=1;k<=count;k++){
+     float t=k/(float)(count+1),cx=x1+(x2-x1)*t,cy=y1+(y2-y1)*t;
+     float offset=(k%2==0?1:-1)*sw*0.28f;
+     c.drawLine(cx+nx*offset,cy+ny*offset,cx+nx*(offset+Math.min(3*density,sw*.12f)),cy+ny*(offset+Math.min(3*density,sw*.12f)),marks);
+    }
+    if(layerVisible(LAYER_DIMENSIONS)&&pixels>80*density){
+     float cx=x1+(x2-x1)*.28f,cy=y1+(y2-y1)*.28f,half=sw/2;
+     marks.setColor(0xffa7c7c1);c.drawLine(cx-nx*half,cy-ny*half,cx+nx*half,cy+ny*half,marks);
+     float ux=-ny,uy=nx;
+     for(int sign:new int[]{-1,1}){float ex=cx+sign*nx*half,ey=cy+sign*ny*half;c.drawLine(ex-ux*4*density,ey-uy*4*density,ex+ux*4*density,ey+uy*4*density,marks);}
+     marks.setTextSize(11*density);String label=String.format(Locale.GERMANY,"B = %.2f m",w);
+     float tx=cx+nx*(half+8*density),ty=cy+ny*(half+8*density);
+     tx=Math.max(4*density,Math.min(tx,getWidth()-marks.measureText(label)-4*density));ty=Math.max(14*density,Math.min(ty,getHeight()-4*density));
+     marks.setColor(0xff142b2b);c.drawRoundRect(tx-3*density,ty-12*density,tx+marks.measureText(label)+3*density,ty+3*density,3*density,3*density,marks);
+     marks.setColor(0xff5eead4);c.drawText(label,tx,ty,marks);
+    }
+   }
    station=measured?end:Double.NaN;
   }
  }
