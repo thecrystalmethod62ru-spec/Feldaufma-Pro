@@ -29,7 +29,8 @@ jobs:
           name: JVM-test-reports
           path: app/build/test-results/testDebugUnitTest/
           if-no-files-found: warn
-      - run: gradle :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
+      - id: apk_build
+        run: gradle :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
       - uses: actions/upload-artifact@v4
         with:
           name: Feldaufmass-Pro-v0.1
@@ -47,6 +48,7 @@ jobs:
           arch: x86_64
           script: gradle :app:connectedDebugAndroidTest --stacktrace
       - name: Check Android 16 with three-button navigation
+        if: ${{ !cancelled() && steps.apk_build.outcome == 'success' }}
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 36
@@ -55,21 +57,31 @@ jobs:
           arch: x86_64
           script: |
             adb shell cmd overlay enable-exclusive --user current --category com.android.internal.systemui.navbar.threebutton
-            gradle :app:connectedDebugAndroidTest --rerun-tasks --stacktrace
+            test_status=0
+            gradle :app:connectedDebugAndroidTest --rerun-tasks --stacktrace || test_status=$?
             adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-            adb shell am instrument -w -r -e class de.feldaufmass.pro.UiScreenshotTest de.feldaufmass.pro.test/androidx.test.runner.AndroidJUnitRunner > screenshot-test.log
+            adb shell am instrument -w -r -e class de.feldaufmass.pro.UiScreenshotTest de.feldaufmass.pro.test/androidx.test.runner.AndroidJUnitRunner > screenshot-test.log || test_status=1
             cat screenshot-test.log
-            grep -F 'OK (6 tests)' screenshot-test.log
+            grep -F 'OK (6 tests)' screenshot-test.log || test_status=1
             mkdir -p ui-screenshots
-            adb shell run-as de.feldaufmass.pro ls files/ui-screenshots
-            for name in 01-start-menu 02-normal-portrait 03-normal-landscape 04-full-portrait 05-full-landscape 06-regelprofil; do adb exec-out run-as de.feldaufmass.pro cat files/ui-screenshots/$name.png > ui-screenshots/$name.png && test -s ui-screenshots/$name.png || exit 1; done
+            adb shell run-as de.feldaufmass.pro ls files/ui-screenshots || true
+            for name in 01-start-menu 02-normal-portrait 03-normal-landscape 04-full-portrait 05-full-landscape 06-regelprofil; do
+              if ! adb exec-out run-as de.feldaufmass.pro cat files/ui-screenshots/$name.png > ui-screenshots/$name.png || ! test -s ui-screenshots/$name.png; then
+                rm -f ui-screenshots/$name.png
+                test_status=1
+              fi
+            done
+            exit "$test_status"
       - name: Upload real UI screenshots
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Android-16-UI-screenshots
-          path: ui-screenshots/*.png
-          if-no-files-found: error
+          path: |
+            ui-screenshots/*.png
+            screenshot-test.log
+          if-no-files-found: warn
       - name: Report Android test failures
         if: failure()
         shell: python
