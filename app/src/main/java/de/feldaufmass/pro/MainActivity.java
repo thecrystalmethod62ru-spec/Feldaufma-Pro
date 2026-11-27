@@ -360,7 +360,8 @@ public class MainActivity extends Activity {
   create.setOnClickListener(b->{
    String title=name.getText().toString().trim();if(title.isEmpty()){name.setError("Projektname erforderlich");return;}
    String id=java.util.UUID.randomUUID().toString();
-   if(!projectStorage(id).edit().putString("project",title).putString("projectSite",site.getText().toString().trim()).putString("projectClient",client.getText().toString().trim()).putString("projectType",typeNames[Math.max(0,types.getCheckedRadioButtonId()-1)]).putInt("dictationLanguage",getPreferences(0).getInt("dictationLanguage",1)).commit()){notice("Projekt konnte nicht erstellt werden.");return;}
+   SharedPreferences defaults=getSharedPreferences("base_profile_defaults",MODE_PRIVATE);
+   if(!projectStorage(id).edit().putString("width",String.format(java.util.Locale.GERMANY,"%.2f",defaults.getFloat("width",0.4f))).putString("depth",String.format(java.util.Locale.GERMANY,"%.2f",defaults.getFloat("depth",1.0f))).putString("project",title).putString("projectSite",site.getText().toString().trim()).putString("projectClient",client.getText().toString().trim()).putString("projectType",typeNames[Math.max(0,types.getCheckedRadioButtonId()-1)]).putInt("dictationLanguage",getPreferences(0).getInt("dictationLanguage",1)).commit()){notice("Projekt konnte nicht erstellt werden.");return;}
    java.util.Set<String> ids=new java.util.HashSet<>(projectRegistry().getStringSet("ids",java.util.Collections.emptySet()));ids.add(id);
    if(!projectRegistry().edit().putStringSet("ids",ids).putString("active",id).commit()){notice("Projekt konnte nicht aktiviert werden.");return;}
    dialog.dismiss();restartForProject();
@@ -4768,7 +4769,31 @@ public class MainActivity extends Activity {
  LinearLayout toolbar=new LinearLayout(this);profilePage.addView(toolbar,1);String[] names={"Aufbau","Leitungen","Maße","Abschnitte","Optionen"};String[] icons={"layers","pipe","ruler","sections","settings"};LinearLayout[] panels={buildPanel,pipeDetails,sizes,sectionProfilePanel,optionsPanel};
  for(int j=0;j<names.length;j++){final int index=j;Button tool=new Button(this);styleEditorButton(tool,false);compactToolIcon(tool,names[j],icons[j]);tool.setSingleLine(true);if(android.os.Build.VERSION.SDK_INT>=26)tool.setAutoSizeTextTypeUniformWithConfiguration(9,12,1,android.util.TypedValue.COMPLEX_UNIT_SP);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(54),1);lp.setMargins(dp(2),dp(2),dp(2),dp(2));toolbar.addView(tool,lp);tool.setOnClickListener(v->{if(index==2){sizes.requestFocus();return;}if(index==3)openSectionProfilePicker();showProfilePanel(names[index],panels[index]);});}
 
+ LinearLayout profileFooter=new LinearLayout(this);profilePage.addView(profileFooter);
+ Button standard=new Button(this),applyProfile=new Button(this);
+ styleEditorButton(standard,false);styleEditorButton(applyProfile,true);
+ standard.setText("Standard-Profil verwalten");applyProfile.setText("Übernehmen");
+ profileFooter.addView(standard,new LinearLayout.LayoutParams(0,dp(52),1));profileFooter.addView(applyProfile,new LinearLayout.LayoutParams(0,dp(52),1));
+ standard.setOnClickListener(v->manageStandardProfile());
+ applyProfile.setOnClickListener(v->{if(length.length()>0){if(calculate())notice("Regelprofil übernommen.");}else{refreshProfileDraft();if(saveDraft())notice("Profilentwurf gespeichert.");}});
  save.setOnClickListener(v->{if(calculate())showPage(planPage);});if(projectChosen&&length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);if(!projectChosen)showProjectStart();
+ }
+ void manageStandardProfile(){
+  SharedPreferences defaults=getSharedPreferences("base_profile_defaults",MODE_PRIVATE);
+  LinearLayout fields=page();
+  EditText bw=projectFormField(fields,"Grabenbreite (m)"),bd=projectFormField(fields,"Grabentiefe (m)");
+  for(EditText f:new EditText[]{bw,bd})f.setInputType(8194);
+  bw.setText(String.format(java.util.Locale.GERMANY,"%.2f",defaults.getFloat("width",0.4f)));
+  bd.setText(String.format(java.util.Locale.GERMANY,"%.2f",defaults.getFloat("depth",1.0f)));
+  fields.addView(sheetText("Gilt für neue Projekte. Bestehende Profile bleiben unverändert.",13,false));
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Standard-Profil verwalten").setView(fields).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
+  dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(btn->{try{
+   double ww=number(bw),dd=number(bd);
+   if(!Double.isFinite(ww)||ww<0.1||ww>6){bw.setError("0,10 – 6,00 m");return;}
+   if(!Double.isFinite(dd)||dd<0.1||dd>8){bd.setError("0,10 – 8,00 m");return;}
+   if(!defaults.edit().putFloat("width",(float)ww).putFloat("depth",(float)dd).commit()){notice("Speichern fehlgeschlagen.");return;}
+   dialog.dismiss();
+  }catch(Exception e){bw.setError("Gültige Maße eingeben");}}));dialog.show();
  }
  LinearLayout sectionProfilePanel;
  void showProfilePanel(String title,LinearLayout panel){
