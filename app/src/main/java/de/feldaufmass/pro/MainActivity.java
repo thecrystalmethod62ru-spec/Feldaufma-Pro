@@ -758,6 +758,7 @@ public class MainActivity extends Activity {
      case "view":for(int x:new int[]{4,20})for(int y:new int[]{4,20}){c.drawLine(x,y,x+(x==4?5:-5),y,p);c.drawLine(x,y,x,y+(y==4?5:-5),p);}break;
      case "legend":for(int y=6;y<=18;y+=6){c.drawCircle(5,y,1,p);c.drawLine(9,y,20,y,p);}break;
      case "objects":c.drawRoundRect(5,5,19,19,2,2,p);c.drawLine(9,12,15,12,p);c.drawLine(12,9,12,15,p);break;
+     case "sections":c.drawLine(3,12,21,12,p);for(int x:new int[]{3,9,15,21}){c.drawLine(x,7,x,17,p);}break;
      case "pipe":c.drawCircle(12,12,8,p);c.drawCircle(12,12,5,p);break;
      case "settings":c.drawCircle(12,12,7,p);c.drawCircle(12,12,3,p);for(int k=0;k<8;k++){c.save();c.rotate(k*45,12,12);c.drawLine(12,2,12,5,p);c.restore();}break;
      case "layers":c.drawLine(4,8,12,3,p);c.drawLine(12,3,20,8,p);c.drawLine(20,8,12,13,p);c.drawLine(12,13,4,8,p);c.drawLine(4,13,12,18,p);c.drawLine(12,18,20,13,p);c.drawLine(4,18,12,22,p);c.drawLine(12,22,20,18,p);break;
@@ -4123,8 +4124,8 @@ public class MainActivity extends Activity {
  pipeInput.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){if(profile!=null)profile.invalidate();}public void afterTextChanged(android.text.Editable e){}});
  actionButtonSingle(pipeDetails,"Weitere Leitungen / Kabel",()->editUtilities());
  profilePage.removeView(legend);pipeDetails.addView(legend);
- profilePage.removeView(sectionProfilePanel);optionsPanel.addView(sectionProfilePanel);
- LinearLayout toolbar=new LinearLayout(this);profilePage.addView(toolbar);String[] names={"Aufbau","Leitungen","Maße","Optionen"};String[] icons={"layers","pipe","ruler","settings"};LinearLayout[] panels={buildPanel,pipeDetails,sizes,optionsPanel};
+ profilePage.removeView(sectionProfilePanel);
+ LinearLayout toolbar=new LinearLayout(this);profilePage.addView(toolbar);String[] names={"Aufbau","Leitungen","Maße","Abschnitte","Optionen"};String[] icons={"layers","pipe","ruler","sections","settings"};LinearLayout[] panels={buildPanel,pipeDetails,sizes,sectionProfilePanel,optionsPanel};
  for(int j=0;j<names.length;j++){final int index=j;Button tool=new Button(this);styleEditorButton(tool,false);compactToolIcon(tool,names[j],icons[j]);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(64),1);lp.setMargins(dp(2),dp(2),dp(2),dp(2));toolbar.addView(tool,lp);tool.setOnClickListener(v->{if(index==3)openSectionProfilePicker();showProfilePanel(names[index],panels[index]);});}
 
  save.setOnClickListener(v->{if(calculate())showPage(planPage);});if(length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);
@@ -4145,8 +4146,10 @@ public class MainActivity extends Activity {
     if(!overlap)rows.add(new org.json.JSONObject().put("from",a).put("to",b).put("width",seg.getDouble("width")).put("depth",d>0?d:0).put("pipes",new org.json.JSONArray()));
    }
    rows.sort((a,b)->Double.compare(a.optDouble("from"),b.optDouble("from")));
-   if(rows.isEmpty())return;
-   LinearLayout body=page();sectionProfilePanel.addView(body);Spinner picker=new Spinner(this);body.addView(picker);
+   if(rows.isEmpty()){sectionProfilePanel.addView(sheetText("Keine Abschnitte vorhanden",15,false));return;}
+   LinearLayout body=page();sectionProfilePanel.addView(body);
+   body.addView(sheetText("Abschnitte der Trasse",16,true));
+   for(int j=0;j<rows.size();j++){org.json.JSONObject row=rows.get(j);body.addView(sheetText(String.format(java.util.Locale.GERMANY,"Abschnitt %02d   ·   %.2f – %.2f m",j+1,row.getDouble("from"),row.getDouble("to")),14,false));}Spinner picker=new Spinner(this);body.addView(picker);
    String[] labels=new String[rows.size()+1];labels[0]="Standardprofil";for(int i=0;i<rows.size();i++){org.json.JSONObject p=rows.get(i);labels[i+1]=String.format(java.util.Locale.GERMANY,"Abschnitt %02d · %.2f – %.2f m",i+1,p.getDouble("from"),p.getDouble("to"));}
    picker.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,labels));
    LinearLayout controls=page();body.addView(controls);PipeLayoutView view=new PipeLayoutView(this);controls.addView(view,new LinearLayout.LayoutParams(-1,dp(240)));
