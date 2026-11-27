@@ -77,16 +77,21 @@ public class UiScreenshotTest {
     });
     if(!opened[0])android.os.SystemClock.sleep(250);
    }
-   assertTrue("Regelprofil tab not visible",opened[0]);
-   InstrumentationRegistry.getInstrumentation().waitForIdleSync();
-   scenario.onActivity(a->{
-    boolean visible=false;
-    for(android.view.View root:android.view.inspector.WindowInspector.getGlobalWindowViews()){
-     if(visibleButton(root,"Maße bearbeiten")!=null){visible=true;break;}
-    }
-    assertTrue("Regelprofil content not visible after switching tabs",visible);
-   });
+   // Preserve the actual screen even when navigation or visibility fails.
    capture("06-regelprofil");
+   assertTrue("Regelprofil tab not visible",opened[0]);
+   boolean[] visible={false};
+   for(int attempt=0;attempt<20&&!visible[0];attempt++){
+    InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+    scenario.onActivity(a->{
+     for(android.view.View root:android.view.inspector.WindowInspector.getGlobalWindowViews()){
+      if(visibleButton(root,"Maße bearbeiten")!=null){visible[0]=true;break;}
+     }
+    });
+    if(!visible[0])android.os.SystemClock.sleep(250);
+   }
+   capture("06-regelprofil");
+   assertTrue("Regelprofil content not visible after switching tabs",visible[0]);
   }
  }
 }
