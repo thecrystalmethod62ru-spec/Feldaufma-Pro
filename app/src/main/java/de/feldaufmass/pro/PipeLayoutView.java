@@ -17,6 +17,13 @@ public final class PipeLayoutView extends View {
         PipeLayout.warnings(pipes,width,depth,gap,cover);
         minGap=gap;minCover=cover;invalidate();
     }
+    private double cutLeft,cutRight,deck,base;
+    private int surfaceColor=0xff777777;
+    private boolean civilProfile;
+    public void setCivilProfile(double left,double right,double deck,double base,int color){
+        civilProfile=true;cutLeft=Double.isFinite(left)?Math.max(0,left):0;cutRight=Double.isFinite(right)?Math.max(0,right):0;
+        this.deck=Double.isFinite(deck)?Math.max(0,deck):0;this.base=Double.isFinite(base)?Math.max(0,base):0;surfaceColor=color;invalidate();
+    }
     private float scale,cx,bottom;
     private Selection selection;
     public interface Move { void move(int index,double offset,double bedding); }
@@ -36,7 +43,7 @@ public final class PipeLayoutView extends View {
     @Override protected void onDraw(Canvas c){
         super.onDraw(c);
         float pad=24*getResources().getDisplayMetrics().density;
-        double extent=width/2,above=depth;
+        double extent=width/2+Math.max(cutLeft,cutRight),above=depth;
         for(PipeLayout.Pipe pipe:pipes){extent=Math.max(extent,Math.abs(pipe.offset)+pipe.diameter/2);above=Math.max(above,pipe.bedding+pipe.diameter);}
         scale=(float)Math.min((getWidth()-2*pad)/(2*extent),(getHeight()-2*pad)/above);
         if(dragged>=0&&dragScale>0){scale=dragScale;cx=dragCx;bottom=dragBottom;}
@@ -46,6 +53,17 @@ public final class PipeLayoutView extends View {
         p.setColor(0x33b79b70);c.drawRect(left,top,right,bottom,p);
         p.setColor(0xff68945d);p.setStrokeWidth(3);c.drawLine(left,top,right,top,p);
         p.setColor(0xffb79b70);c.drawLine(left,top,left,bottom,p);c.drawLine(right,top,right,bottom,p);c.drawLine(left,bottom,right,bottom,p);
+        if(civilProfile){
+            float a=left-(float)(cutLeft*scale),b=right+(float)(cutRight*scale);
+            p.setColor(0xffb7a48a);c.drawRect(0,top,left,bottom,p);c.drawRect(right,top,getWidth(),bottom,p);
+            float deckBottom=top+(float)(Math.min(depth,deck)*scale),baseBottom=top+(float)(Math.min(depth,deck+base)*scale);
+            p.setColor(surfaceColor);c.drawRect(0,top,a,deckBottom,p);c.drawRect(b,top,getWidth(),deckBottom,p);
+            p.setColor(0xff969696);c.drawRect(0,deckBottom,left,baseBottom,p);c.drawRect(right,deckBottom,getWidth(),baseBottom,p);
+            p.setTextSize(11*getResources().getDisplayMetrics().scaledDensity);
+            dimension(c,left,bottom+pad/2,right,bottom+pad/2,width);
+            dimension(c,right+pad/3,top,right+pad/3,bottom,depth);
+            if(cutLeft+cutRight>0)dimension(c,a,top-pad/2,b,top-pad/2,width+cutLeft+cutRight);
+        }
         int[] colors={0xff397db5,0xffd4ab35,0xff398b75,0xff9567b8};
         p.setTextSize(12*getResources().getDisplayMetrics().scaledDensity);
         for(int i=0;i<pipes.size();i++){
