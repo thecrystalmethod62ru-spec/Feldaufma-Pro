@@ -15,7 +15,7 @@ import java.util.Locale;
 
 /** Coordinates describe a schematic only. Metres are entered in the field. */
 final class RouteSketch extends View {
- static final int LAYER_ROUTE=1,LAYER_DIMENSIONS=2,LAYER_NAMES=4,LAYER_GPS=8,LAYER_PHOTOS=16,LAYER_OBJECTS=32,LAYER_SURFACES=64,LAYER_SURFACE_DIMENSIONS=128,LAYER_GPS_TRACK=256,LAYER_GPS_DEVIATIONS=512,ALL_LAYERS=1023;
+ static final int LAYER_ROUTE=1,LAYER_DIMENSIONS=2,LAYER_NAMES=4,LAYER_GPS=8,LAYER_PHOTOS=16,LAYER_OBJECTS=32,LAYER_SURFACES=64,LAYER_SURFACE_DIMENSIONS=128,LAYER_GPS_TRACK=256,LAYER_GPS_DEVIATIONS=512,LAYER_GPS_REFERENCE=1024,ALL_LAYERS=2047;
  int visibleLayers=ALL_LAYERS;
  boolean layerVisible(int layer){return (visibleLayers&layer)!=0;}
  void setVisibleLayers(int layers){visibleLayers=layers&ALL_LAYERS;invalidate();}
@@ -639,6 +639,22 @@ final class RouteSketch extends View {
  }
  private String projectedGpsKey=null;
  private final java.util.ArrayList<PointF> projectedGpsCache=new java.util.ArrayList<>();
+ private JSONArray importedGpsReference=new JSONArray();
+ private String referenceGpsKey=null;
+ private final java.util.ArrayList<PointF> referenceGpsCache=new java.util.ArrayList<>();
+ void setImportedGpsReference(JSONArray rows){importedGpsReference=rows==null?new JSONArray():rows;referenceGpsKey=null;invalidate();}
+ void drawImportedGpsReference(Canvas c,float density){
+  if(!layerVisible(LAYER_GPS_REFERENCE)||importedGpsReference.length()==0)return;
+  String key=gpsGeometryKey();
+  if(!key.equals(referenceGpsKey)){
+   referenceGpsCache.clear();GpsTransform transform=gpsTransform(-1);
+   if(transform!=null)for(int i=0;i<importedGpsReference.length();i++){org.json.JSONObject row=importedGpsReference.optJSONObject(i);referenceGpsCache.add(row==null?null:transform.project(row.optDouble("lat"),row.optDouble("lon")));}
+   referenceGpsKey=key;
+  }
+  PointF previous=null;paint.setColor(0xffeab54d);paint.setStrokeWidth(2.5f*density);
+  android.graphics.PathEffect old=paint.getPathEffect();paint.setPathEffect(new android.graphics.DashPathEffect(new float[]{7*density,4*density},0));
+  try{for(PointF p:referenceGpsCache){if(p!=null&&previous!=null)line(c,previous,p);previous=p;}}finally{paint.setPathEffect(old);}
+ }
  void drawIndependentGpsTrack(Canvas c,float density){
   if(!layerVisible(LAYER_GPS_TRACK)||independentGpsTrack.length()==0)return;
   String key=gpsGeometryKey();
@@ -859,6 +875,7 @@ final class RouteSketch extends View {
   drawSurfaceDimensions(c,density);
   drawStationObjects(c,density);
   drawIndependentGpsTrack(c,density);
+  drawImportedGpsReference(c,density);
   drawGpsDeviations(c,density);
   if(layerVisible(LAYER_GPS)&&liveFix!=null){
    PointF gps=gpsPosition(liveFix.getLatitude(),liveFix.getLongitude(),-1);
