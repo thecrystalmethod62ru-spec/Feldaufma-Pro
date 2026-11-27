@@ -3949,7 +3949,7 @@ public class MainActivity extends Activity {
  toolsMenu.setOnClickListener(v->showTools());
  LinearLayout tabs=new LinearLayout(this);shell.addView(tabs);
  addSheetTab(tabs,"Trasse",planPage);
- addSheetTab(tabs,"Profile",profilePage);
+ addSheetTab(tabs,"Regelprofil",profilePage);
  addSheetTab(tabs,"Mengen",quantityPage);
  body=new LinearLayout(this);shell.addView(body,new LinearLayout.LayoutParams(-1,0,1));
  LinearLayout dock=new LinearLayout(this);dock.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);
@@ -4324,12 +4324,10 @@ public class MainActivity extends Activity {
  stationRows.setOrientation(LinearLayout.VERTICAL);
  planPage.addView(stationRows);
  root=profilePage;
- actionButtonSingle(root,"Längsschnitt anzeigen",()->showLongitudinalProfile());
- TextView heading=new TextView(this);heading.setText("Regelprofil – Grabenquerschnitt");heading.setTextSize(20);root.addView(heading);
+ sheetHeading(root,"Regelprofil");
  LinearLayout layers=fold(root,"Oberflächenaufbau",true);
  surfaceLayers=sheetText("",16,false);surfaceLayers.setLineSpacing(dp(6),1);layers.addView(surfaceLayers);showSurfaceLayers();
- Button editLayers=new Button(this);editLayers.setText("Oberflächenaufbau bearbeiten");layers.addView(editLayers);
- editLayers.setOnClickListener(v->openBelagsDetails());
+ overviewAction(layers,"Oberflächenaufbau bearbeiten","layers",()->openBelagsDetails());
  legend=new TextView(this);legend.setTextSize(14);root.addView(legend);
  root=segmentPage;
  Button editSurface=new Button(this);editSurface.setText("Belagsdetails bearbeiten");root.addView(editSurface);editSurface.setOnClickListener(v->openBelagsDetails());
@@ -4361,6 +4359,7 @@ public class MainActivity extends Activity {
  sectionProfilePanel=page();profilePage.addView(sectionProfilePanel,0);
 
  LinearLayout optionsPanel=page();
+ overviewAction(optionsPanel,"Längsschnitt anzeigen","sections",()->showLongitudinalProfile());
  actionButtonSingle(optionsPanel,"Verbau – Profilstation wählen",()->{
   EditText station=new EditText(this);station.setInputType(8194);station.setText(String.valueOf(profileShoringStation));
   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Profilstation (m)").setView(station).setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",null).create();
@@ -4374,7 +4373,7 @@ public class MainActivity extends Activity {
  profileSlider(sizes,"Nachschnitt links",leftInput,0,200);
  profileSlider(sizes,"Nachschnitt rechts",rightInput,0,200);
  LinearLayout asphaltControls=page(),stoneControls=page();
- LinearLayout buildPanel=page();actionButtonSingle(buildPanel,"Oberfläche / Belagsdetails",()->openBelagsDetails());buildPanel.addView(asphaltControls);buildPanel.addView(stoneControls);
+ LinearLayout buildPanel=page();overviewAction(buildPanel,"Oberfläche / Belagsdetails","layers",()->openBelagsDetails());buildPanel.addView(asphaltControls);buildPanel.addView(stoneControls);
  profileSlider(asphaltControls,"Asphaltstärke",asphaltInput,0,100);
  utilitySlider(stoneControls,stoneDepth,"Belagsstärke (cm)",0,100,1,true);
  EditText stoneExact=new EditText(this);stoneExact.setSingleLine(true);stoneExact.setInputType(8194);stoneExact.setText(stoneDepth.getText());stoneControls.addView(stoneExact);
@@ -4388,11 +4387,11 @@ public class MainActivity extends Activity {
  LinearLayout pipeDetails=page();
  utilitySlider(pipeDetails,pipeInput,"Rohr-Außendurchmesser (mm)",1,2000,1,true);
  pipeInput.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int d){}public void onTextChanged(CharSequence s,int a,int b,int c){if(profile!=null)profile.invalidate();}public void afterTextChanged(android.text.Editable e){}});
- actionButtonSingle(pipeDetails,"Weitere Leitungen / Kabel",()->editUtilities());
+ overviewAction(pipeDetails,"Weitere Leitungen / Kabel","pipe",()->editUtilities());
  profilePage.removeView(legend);pipeDetails.addView(legend);
  profilePage.removeView(sectionProfilePanel);
  LinearLayout toolbar=new LinearLayout(this);profilePage.addView(toolbar);String[] names={"Aufbau","Leitungen","Maße","Abschnitte","Optionen"};String[] icons={"layers","pipe","ruler","sections","settings"};LinearLayout[] panels={buildPanel,pipeDetails,sizes,sectionProfilePanel,optionsPanel};
- for(int j=0;j<names.length;j++){final int index=j;Button tool=new Button(this);styleEditorButton(tool,false);compactToolIcon(tool,names[j],icons[j]);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(54),1);lp.setMargins(dp(2),dp(2),dp(2),dp(2));toolbar.addView(tool,lp);tool.setOnClickListener(v->{if(index==3)openSectionProfilePicker();showProfilePanel(names[index],panels[index]);});}
+ for(int j=0;j<names.length;j++){final int index=j;Button tool=new Button(this);styleEditorButton(tool,false);compactToolIcon(tool,names[j],icons[j]);tool.setSingleLine(true);if(android.os.Build.VERSION.SDK_INT>=26)tool.setAutoSizeTextTypeUniformWithConfiguration(9,12,1,android.util.TypedValue.COMPLEX_UNIT_SP);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(54),1);lp.setMargins(dp(2),dp(2),dp(2),dp(2));toolbar.addView(tool,lp);tool.setOnClickListener(v->{if(index==3)openSectionProfilePicker();showProfilePanel(names[index],panels[index]);});}
 
  save.setOnClickListener(v->{if(calculate())showPage(planPage);});if(projectChosen&&length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);if(!projectChosen)showProjectStart();
  }
