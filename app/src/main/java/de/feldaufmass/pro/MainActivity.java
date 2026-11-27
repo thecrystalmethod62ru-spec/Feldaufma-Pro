@@ -1770,7 +1770,15 @@ public class MainActivity extends Activity {
   try{
    String before=routeData(),old=objects.toString();org.json.JSONArray merged=new org.json.JSONArray(draft.toString());
    java.util.ArrayDeque<String> nextUndo=new java.util.ArrayDeque<>(undoObjects);nextUndo.push(old);while(nextUndo.size()>HISTORY_LIMIT)nextUndo.removeLast();
+   JSONArray remappedSurfaces=null;
+   double[][] stations=matchingRouteStations(before,history.current);
+   if(stations!=null&&!java.util.Arrays.equals(stations[0],stations[1])){
+    remappedSurfaces=PipeLayoutStore.remapSections(segments,stations[0],stations[1]);
+    JSONArray remappedProfiles=PipeLayoutStore.remapSections(new PipeLayoutStore(getPreferences(0)).sections(),stations[0],stations[1]);
+    ed.putString("segments",remappedSurfaces.toString()).putString(PipeLayoutStore.SECTION_KEY,remappedProfiles.toString());
+   }
    if(!ed.putString("routeSketch",history.current).putString("routeHistoryHead",history.current).putString("routeUndo",new org.json.JSONArray(history.undo).toString()).putString("routeRedo",new org.json.JSONArray(history.redo).toString()).putString("objects",merged.toString()).putString("objectUndo",new org.json.JSONArray(nextUndo).toString()).putString("objectRedo","[]").commit()){notice("Trasse und Objekte konnten nicht gespeichert werden.");return false;}
+   if(remappedSurfaces!=null){segments=remappedSurfaces;showSegments();refreshStationLayers();}
    objects=merged;undoObjects.clear();undoObjects.addAll(nextUndo);redoObjects.clear();
    if(!before.equals(history.current))recordProjectEvent("Trasse geändert");recordProjectEvent("Objekte bearbeitet · "+draft.length());
    showObjects();refreshDetailQuantities();sketch.invalidate();updateHistoryButtons();return true;
