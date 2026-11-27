@@ -4206,12 +4206,13 @@ public class MainActivity extends Activity {
     androidx.core.view.WindowCompat.getInsetsController(window,root);
   controller.setAppearanceLightStatusBars(false);
   controller.setAppearanceLightNavigationBars(false);
+  final int baseLeft=root.getPaddingLeft(),baseTop=root.getPaddingTop(),baseRight=root.getPaddingRight(),baseBottom=root.getPaddingBottom();
   androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root,(view,insets)->{
    int types=androidx.core.view.WindowInsetsCompat.Type.systemBars()
       |androidx.core.view.WindowInsetsCompat.Type.displayCutout()
       |androidx.core.view.WindowInsetsCompat.Type.ime();
    androidx.core.graphics.Insets safe=insets.getInsets(types);
-   view.setPadding(safe.left,safe.top,safe.right,safe.bottom);
+   view.setPadding(baseLeft+safe.left,baseTop+safe.top,baseRight+safe.right,baseBottom+safe.bottom);
    return insets;
   });
   androidx.core.view.ViewCompat.requestApplyInsets(root);
