@@ -11,7 +11,7 @@ import java.util.List;
 public final class PipeLayoutView extends View {
     public interface Selection { void select(int index); }
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final List<android.graphics.RectF> dimensionLabels=new ArrayList<>();
+    private final ProfileDimensionRenderer annotations=new ProfileDimensionRenderer(p);
     private List<PipeLayout.Pipe> pipes=new ArrayList<>();
     private double width=1,depth=1, minGap=0,minCover=0;
     public void setRequirements(double gap,double cover){
@@ -49,7 +49,7 @@ public final class PipeLayoutView extends View {
     }
     @Override protected void onDraw(Canvas c){
         super.onDraw(c);
-        dimensionLabels.clear();
+        annotations.begin(getWidth(),getHeight(),getResources().getDisplayMetrics().density);
         float density=getResources().getDisplayMetrics().density;
         float pad=Math.min(64*density,Math.min(getWidth(),getHeight())*.25f);
         if(getWidth()<=0||getHeight()<=0)return;
@@ -73,7 +73,7 @@ public final class PipeLayoutView extends View {
             p.setColor(0xffeeeeee);p.setStrokeWidth(1.5f);c.drawLine(left,top,left,bottom,p);c.drawLine(right,top,right,bottom,p);c.drawLine(left,bottom,right,bottom,p);
             p.setTextSize(11*getResources().getDisplayMetrics().scaledDensity);
 
-            if(cutLeft+cutRight>0)dimension(c,a,top-pad*.80f,b,top-pad*.80f,width+cutLeft+cutRight);
+            if(cutLeft+cutRight>0)annotations.dimension(c,a,top-pad*.80f,b,top-pad*.80f,width+cutLeft+cutRight);
             if(asphaltProfile&&deck>0){
                 float cutBottom=deckBottom;
                 p.setColor(0xffd5d9dc);p.setStrokeWidth(1.5f);
@@ -87,8 +87,8 @@ public final class PipeLayoutView extends View {
             }
         }
         p.setTextSize(11*getResources().getDisplayMetrics().scaledDensity);
-        dimension(c,left,top-pad*.28f,right,top-pad*.28f,width);
-        dimension(c,left-pad*.55f,top,left-pad*.55f,bottom,depth);
+        annotations.dimension(c,left,top-pad*.28f,right,top-pad*.28f,width);
+        annotations.dimension(c,left-pad*.55f,top,left-pad*.55f,bottom,depth);
         int[] colors={0xff397db5,0xffd4ab35,0xff398b75,0xff9567b8};
         p.setTextSize(12*getResources().getDisplayMetrics().scaledDensity);
         for(int i=0;i<pipes.size();i++){
@@ -103,7 +103,7 @@ public final class PipeLayoutView extends View {
             }
             p.setColor(conflict?0xffd32f2f:colors[i%colors.length]);c.drawCircle(x,y,r,p);
             p.setColor(0xff101719);c.drawCircle(x,y,Math.max(0,r-(float)(pipe.wall*scale)),p);
-            String label=pipe.name+(pipe.fixed?" [fix]":"");drawLabel(c,label,x-p.measureText(label)/2,y-r-4,conflict?0xffff8a80:0xffeeeeee);
+            String label=pipe.name+(pipe.fixed?" [fix]":"");annotations.drawLabel(c,label,x-p.measureText(label)/2,y-r-4,conflict?0xffff8a80:0xffeeeeee);
         }
         // Dimension the selected pipe while dragging, or the only pipe in the section.
         int selected=dragged>=0?dragged:(selectedPipe>=0?selectedPipe:(pipes.size()==1?0:-1));
@@ -111,9 +111,9 @@ public final class PipeLayoutView extends View {
             PipeLayout.Pipe a=pipes.get(selected);
             float x=cx+(float)(a.offset*scale),y=bottom-(float)(a.centerHeight()*scale),r=(float)(a.diameter*scale/2);
             p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2);p.setColor(0xff55c7b5);c.drawCircle(x,y,r+4,p);p.setStyle(Paint.Style.FILL);
-            dimension(c,left,y,x-r,y,width/2+a.offset-a.diameter/2);
-            dimension(c,x+r,y,right,y,width/2-a.offset-a.diameter/2);
-            dimension(c,x,top,x,y-r,depth-a.bedding-a.diameter);
+            annotations.dimension(c,left,y,x-r,y,width/2+a.offset-a.diameter/2);
+            annotations.dimension(c,x+r,y,right,y,width/2-a.offset-a.diameter/2);
+            annotations.dimension(c,x,top,x,y-r,depth-a.bedding-a.diameter);
             for(int j=0;j<pipes.size();j++){
                 if(j==selected)continue;
                 PipeLayout.Pipe b=pipes.get(j);
@@ -121,73 +121,9 @@ public final class PipeLayoutView extends View {
                 if(d==0)continue;
                 float ux=(float)(dx/d),uy=(float)(-dy/d);
                 float bx=cx+(float)(b.offset*scale),by=bottom-(float)(b.centerHeight()*scale),br=(float)(b.diameter*scale/2);
-                dimension(c,x+ux*r,y+uy*r,bx-ux*br,by-uy*br,d-(a.diameter+b.diameter)/2);
+                annotations.dimension(c,x+ux*r,y+uy*r,bx-ux*br,by-uy*br,d-(a.diameter+b.diameter)/2);
             }
         }
-    }
-    private void dimension(Canvas c,float x1,float y1,float x2,float y2,double metres){
-        int color=metres<0?0xffff8a80:0xffeeeeee;
-        float d=getResources().getDisplayMetrics().density;
-        p.setColor(color);
-        p.setStrokeWidth(1.5f*d);
-        c.drawLine(x1,y1,x2,y2,p);
-        double length=Math.hypot(x2-x1,y2-y1);
-        if(length>0){
-            float tick=(float)Math.min(4*d,length/4);
-            float nx=(float)(-(y2-y1)/length*tick),ny=(float)((x2-x1)/length*tick);
-            c.drawLine(x1-nx,y1-ny,x1+nx,y1+ny,p);
-            c.drawLine(x2-nx,y2-ny,x2+nx,y2+ny,p);
-            float arrow=(float)Math.min(6*d,length/3);
-            float ux=(float)((x2-x1)/length*arrow),uy=(float)((y2-y1)/length*arrow);
-            c.drawLine(x1,y1,x1+ux+nx,y1+uy+ny,p);c.drawLine(x1,y1,x1+ux-nx,y1+uy-ny,p);
-            c.drawLine(x2,y2,x2-ux+nx,y2-uy+ny,p);c.drawLine(x2,y2,x2-ux-nx,y2-uy-ny,p);
-        }
-        String label=String.format(java.util.Locale.GERMANY,"%.3f m",metres);
-        float x=(x1+x2-p.measureText(label))/2,y=(y1+y2)/2-5*d;
-        x=Math.max(4*d,Math.min(x,getWidth()-p.measureText(label)-4*d));y=Math.max(p.getTextSize()+4*d,Math.min(y,getHeight()-4*d));
-        float textWidth=p.measureText(label), textHeight=p.getTextSize();
-        android.graphics.RectF bounds=new android.graphics.RectF();
-        float originalX=x,originalY=y;
-        boolean placed=false;
-        for(int i=0;i<25;i++){
-            int ring=(i+1)/2;
-            float offset=(i%2==1?-1:1)*ring*(textHeight+8*d);
-            x=originalX;
-            y=Math.max(textHeight+4*d,Math.min(originalY+offset,getHeight()-4*d));
-            bounds.set(x-3*d,y-textHeight,x+textWidth+3*d,y+3*d);
-            boolean overlaps=false;
-            for(android.graphics.RectF other:dimensionLabels){
-                if(android.graphics.RectF.intersects(bounds,other)){overlaps=true;break;}
-            }
-            if(!overlaps){placed=true;break;}
-        }
-        if(!placed){x=originalX;y=originalY;bounds.set(x-3*d,y-textHeight,x+textWidth+3*d,y+3*d);}
-        dimensionLabels.add(new android.graphics.RectF(bounds));
-        if(placed&&Math.abs(y-originalY)>d){
-            p.setColor(color);p.setStrokeWidth(d);
-            c.drawLine((x1+x2)/2,(y1+y2)/2,x+textWidth/2,y-textHeight/2,p);
-        }
-        p.setStyle(Paint.Style.FILL);p.setColor(0xff000000);c.drawRoundRect(x-3*d,y-p.getTextSize(),x+p.measureText(label)+3*d,y+3*d,3*d,3*d,p);
-        p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(d);p.setColor(color);c.drawRoundRect(x-3*d,y-p.getTextSize(),x+p.measureText(label)+3*d,y+3*d,3*d,3*d,p);p.setStyle(Paint.Style.FILL);c.drawText(label,x,y,p);
-    }
-    private void drawLabel(Canvas c,String label,float x,float y,int color){
-        float d=getResources().getDisplayMetrics().density,w=p.measureText(label),h=p.getTextSize();
-        x=Math.max(4*d,Math.min(x,getWidth()-w-4*d));
-        float originalY=y;
-        android.graphics.RectF bounds=new android.graphics.RectF();
-        for(int i=0;i<25;i++){
-            int ring=(i+1)/2;
-            y=Math.max(h+4*d,Math.min(originalY+(i%2==1?-1:1)*ring*(h+8*d),getHeight()-4*d));
-            bounds.set(x-3*d,y-h,x+w+3*d,y+3*d);
-            boolean overlap=false;
-            for(android.graphics.RectF other:dimensionLabels){if(android.graphics.RectF.intersects(bounds,other)){overlap=true;break;}}
-            if(!overlap)break;
-        }
-        dimensionLabels.add(new android.graphics.RectF(bounds));
-        Paint.Style previous=p.getStyle();float stroke=p.getStrokeWidth();
-        p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);p.setColor(0xff141414);c.drawText(label,x,y,p);
-        p.setStyle(Paint.Style.FILL);p.setColor(color);c.drawText(label,x,y,p);
-        p.setStyle(previous);p.setStrokeWidth(stroke);
     }
     private int hit(float x,float y){
         int best=-1;double distance=Double.POSITIVE_INFINITY;
