@@ -961,6 +961,23 @@ final class RouteSketch extends View {
    float angle=dimensionOffsets.getOrDefault(key+":angle",0f);
    android.graphics.RectF bounds=new android.graphics.RectF(-4*density,-16*density,paint.measureText(label)+4*density,5*density);
    android.graphics.Matrix transform=new android.graphics.Matrix();transform.setRotate(angle);transform.postTranslate(tx,ty);transform.mapRect(bounds);
+   if(!printPlan&&!dimensionOffsets.containsKey(key+":x")&&!dimensionOffsets.containsKey(key+":y")){
+    float originalX=tx,originalY=ty;
+    android.graphics.RectF original=new android.graphics.RectF(bounds);
+    boolean placed=false;
+    for(int attempt=0;attempt<25;attempt++){
+     int lane=(attempt+1)/2;
+     float dy=attempt==0?0:(attempt%2==1?-1:1)*lane*23*density;
+     float dx=Math.max(0,6*density-original.left)-Math.max(0,original.right-getWidth()+6*density);
+     bounds.set(original);bounds.offset(dx,dy);
+     if(bounds.top<4*density||bounds.bottom>getHeight()-4*density)continue;
+     boolean overlap=false;
+     for(DimensionHit hit:dimensionHits){if(android.graphics.RectF.intersects(bounds,hit.bounds)){overlap=true;break;}}
+     if(!overlap){tx=originalX+dx;ty=originalY+dy;placed=true;break;}
+    }
+    if(!placed){bounds.set(original);tx=originalX;ty=originalY;}
+    if(placed&&Math.abs(ty-originalY)>density){paint.setColor(darkPalette()?0xff657773:0xff879391);paint.setStrokeWidth(density);c.drawLine(originalX,originalY,tx,ty,paint);}
+   }
    dimensionHits.add(new DimensionHit(key,bounds,0,0,0));
    c.save();c.translate(tx,ty);c.rotate(angle);
    paint.setColor(Double.isFinite(metres)?(darkPalette()?0xff202827:Color.WHITE):0xffffcf73);
