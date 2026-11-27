@@ -803,6 +803,22 @@ public class MainActivity extends Activity {
  JSONArray stageRouteProfileRemap(String before,String after,SharedPreferences.Editor ed)throws org.json.JSONException{
   if(before.equals(after))return null;
   double[][] stations=matchingRouteStations(before,after);
+  if(stations==null){
+   // A deletion is the inverse of an insertion when surviving anchors retain their order.
+   double[][] reverse=matchingRouteStations(after,before);
+   if(reverse!=null){
+    RouteSketch oldGeometry=new RouteSketch(this,before);
+    double total=0;
+    for(int i=1;i<oldGeometry.vertices.size();i++){
+     double length=oldGeometry.vertices.get(i).metres;
+     if(!Double.isFinite(length)||length<=0){total=Double.NaN;break;}
+     total+=length;
+    }
+    // Do not extrapolate ranges when a terminal vertex was removed.
+    if(Double.isFinite(total)&&Math.abs(total-reverse[1][reverse[1].length-1])<1e-8)
+     stations=new double[][]{reverse[1],reverse[0]};
+   }
+  }
   if(stations==null)return null;
   RouteSketch oldRoute=new RouteSketch(this,before),newRoute=new RouteSketch(this,after);
   boolean inserted=newRoute.vertices.size()>oldRoute.vertices.size();
