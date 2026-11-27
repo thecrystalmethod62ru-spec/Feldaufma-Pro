@@ -1594,10 +1594,10 @@ public class MainActivity extends Activity {
   sectionPosition.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){floatingTitle.setText(selectedSection[0]<0?"Regelprofil":String.format(java.util.Locale.GERMANY,"Regelprofil · A%02d",selectedSection[0]+1));if(resizeProfile.getVisibility()==View.VISIBLE)updateFloatingCross.run();}public void afterTextChanged(android.text.Editable e){}});
 
   LinearLayout profilePage=new LinearLayout(this);profilePage.setOrientation(1);profilePage.setBackgroundColor(Color.BLACK);profilePage.setVisibility(View.GONE);
-  TextView profilePageTitle=sheetText("Regelprofil",16,true);profilePageTitle.setTextColor(Color.WHITE);profilePage.addView(profilePageTitle);
-  LinearLayout profileWork=new LinearLayout(this);profileWork.setOrientation(0);profilePage.addView(profileWork,new LinearLayout.LayoutParams(-1,0,1));
+  TextView profilePageTitle=sheetText("Regelprofil",16,true);profilePageTitle.setTextColor(Color.WHITE);profilePageTitle.setPadding(dp(8),dp(6),dp(8),dp(6));profilePage.addView(profilePageTitle);
+  LinearLayout profileWork=new LinearLayout(this);profileWork.setOrientation(0);profilePage.addView(profileWork,new LinearLayout.LayoutParams(-1,0,1));profileWork.setPadding(dp(6),dp(4),dp(6),dp(4));
   PipeLayoutView fullCross=new PipeLayoutView(this);profileWork.addView(fullCross,new LinearLayout.LayoutParams(0,-1,3));
-  LinearLayout profileInfo=new LinearLayout(this);profileInfo.setOrientation(1);profileInfo.setPadding(dp(8),dp(8),dp(8),dp(8));profileInfo.setBackgroundColor(0xff101c1e);
+  LinearLayout profileInfo=new LinearLayout(this);profileInfo.setOrientation(1);profileInfo.setPadding(dp(8),dp(8),dp(8),dp(8));android.graphics.drawable.GradientDrawable parameterFrame=editorShape(0xff041012,8);parameterFrame.setStroke(dp(1),0xff008b93);profileInfo.setBackground(parameterFrame);
   ScrollView profileInfoScroll=new ScrollView(this);profileInfoScroll.addView(profileInfo);profileWork.addView(profileInfoScroll,new LinearLayout.LayoutParams(0,-1,2));
   profileWork.addOnLayoutChangeListener((view,left,top,right,bottom,oldLeft,oldTop,oldRight,oldBottom)->{
    if(right<=left||bottom<=top)return;
@@ -1608,7 +1608,7 @@ public class MainActivity extends Activity {
    fullCross.setLayoutParams(wide?new LinearLayout.LayoutParams(0,-1,3):new LinearLayout.LayoutParams(-1,0,3));
    profileInfoScroll.setLayoutParams(wide?new LinearLayout.LayoutParams(0,-1,2):new LinearLayout.LayoutParams(-1,0,1));
   });
-  TextView profileDimensions=sheetText("",14,true);profileDimensions.setTextColor(0xff28d5c7);profileInfo.addView(sheetText("Profilparameter",14,true));profileInfo.addView(profileDimensions);
+  TextView profileDimensions=sheetText("",14,true);profileDimensions.setTextColor(0xff28d5c7);profileInfo.addView(sheetText("Parameter",14,true));profileInfo.addView(profileDimensions);
   TextView profileMaterial=sheetText("",12,false);profileMaterial.setTextColor(0xffcbd6d5);profileInfo.addView(profileMaterial);
   Button profileEdit=new Button(this);profileEdit.setText("Maße bearbeiten");styleEditorButton(profileEdit,false);profileInfo.addView(profileEdit);
   Button editSectionProfile=new Button(this);styleEditorButton(editSectionProfile,false);compactToolIcon(editSectionProfile,"Abschnitt bearbeiten","settings");LinearLayout profileActions=new LinearLayout(this);profilePage.addView(profileActions,new LinearLayout.LayoutParams(-1,dp(40)));profileActions.addView(editSectionProfile,new LinearLayout.LayoutParams(0,-1,1));editSectionProfile.setOnClickListener(v->{if(sectionProfilePanel.getParent()!=null)return;openSectionProfilePicker();showProfilePanel("Abschnitte",sectionProfilePanel);});
