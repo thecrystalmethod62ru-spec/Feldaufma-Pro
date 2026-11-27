@@ -871,8 +871,8 @@ final class RouteSketch extends View {
     if(moving || !editable){
      if(dragged>=0){
       if(moving&&touchMoved){movePoint(dragged,p);if(changed!=null)changed.run();}
-      if(!editable&&pointSelected!=null)pointSelected.select(dragged);
-     }else if(!touchMoved&&selected!=null&&layerVisible(LAYER_ROUTE)&&(!editable||event.getEventTime()-touchStartTime>=POINT_CONTEXT_HOLD_MS))selectSegment(p);
+      if(!editable&&!touchMoved&&pointSelected!=null&&event.getEventTime()-touchStartTime>=POINT_CONTEXT_HOLD_MS)pointSelected.select(dragged);
+     }else if(!touchMoved&&selected!=null&&layerVisible(LAYER_ROUTE)&&event.getEventTime()-touchStartTime>=POINT_CONTEXT_HOLD_MS)selectSegment(p);
      dragged=-1;
     }else if(dimensioning){
      if(!touchMoved&&event.getEventTime()-touchStartTime>=POINT_CONTEXT_HOLD_MS)selectSegment(p);
