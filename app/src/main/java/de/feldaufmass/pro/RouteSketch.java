@@ -19,6 +19,7 @@ final class RouteSketch extends View {
  int visibleLayers=ALL_LAYERS;
  boolean layerVisible(int layer){return (visibleLayers&layer)!=0;}
  void setVisibleLayers(int layers){visibleLayers=layers&ALL_LAYERS;invalidate();}
+ static final long POINT_CONTEXT_HOLD_MS=2000L;
  static final double GPS_MOVE_ACCURACY_METRES=0.5;
  static boolean preciseGps(double accuracy){return Double.isFinite(accuracy)&&accuracy>0&&accuracy<=GPS_MOVE_ACCURACY_METRES;}
  static final class Vertex {
@@ -865,16 +866,16 @@ final class RouteSketch extends View {
     if(editingObjects){if(!touchMoved&&objectSelected!=null&&event.getEventTime()-touchStartTime>=android.view.ViewConfiguration.getLongPressTimeout()){double tolerance=20*getResources().getDisplayMetrics().density/scale();objectSelected.accept(objectCandidates((event.getX()-left())/scale(),(event.getY()-top())/scale(),tolerance));}performClick();invalidate();return true;}
     if(placingObject){if(!touchMoved&&stationSelected!=null){double tolerance=24*getResources().getDisplayMetrics().density/scale();stationSelected.accept(stationCandidates((event.getX()-left())/scale(),(event.getY()-top())/scale(),tolerance));}performClick();invalidate();return true;}
     if(editable&&tappedPoint>=0&&!touchMoved&&pointSelected!=null){
-     stroke.clear();dragged=-1;highlight=tappedPoint;if(event.getEventTime()-touchStartTime>=android.view.ViewConfiguration.getLongPressTimeout())pointSelected.select(tappedPoint);tappedPoint=-1;performClick();invalidate();return true;
+     stroke.clear();dragged=-1;highlight=tappedPoint;if(event.getEventTime()-touchStartTime>=POINT_CONTEXT_HOLD_MS)pointSelected.select(tappedPoint);tappedPoint=-1;performClick();invalidate();return true;
     }
     if(moving || !editable){
      if(dragged>=0){
       if(moving&&touchMoved){movePoint(dragged,p);if(changed!=null)changed.run();}
       if(!editable&&pointSelected!=null)pointSelected.select(dragged);
-     }else if(!touchMoved&&selected!=null&&layerVisible(LAYER_ROUTE)&&(!editable||event.getEventTime()-touchStartTime>=android.view.ViewConfiguration.getLongPressTimeout()))selectSegment(p);
+     }else if(!touchMoved&&selected!=null&&layerVisible(LAYER_ROUTE)&&(!editable||event.getEventTime()-touchStartTime>=POINT_CONTEXT_HOLD_MS))selectSegment(p);
      dragged=-1;
     }else if(dimensioning){
-     if(!touchMoved&&event.getEventTime()-touchStartTime>=android.view.ViewConfiguration.getLongPressTimeout())selectSegment(p);
+     if(!touchMoved&&event.getEventTime()-touchStartTime>=POINT_CONTEXT_HOLD_MS)selectSegment(p);
     }else if(!stroke.isEmpty()){
      stroke.add(p);finishStroke();
     }
