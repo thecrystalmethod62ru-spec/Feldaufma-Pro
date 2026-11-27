@@ -11,6 +11,7 @@ import java.util.List;
 public final class PipeLayoutView extends View {
     public interface Selection { void select(int index); }
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final List<android.graphics.RectF> dimensionLabels=new ArrayList<>();
     private List<PipeLayout.Pipe> pipes=new ArrayList<>();
     private double width=1,depth=1, minGap=0,minCover=0;
     public void setRequirements(double gap,double cover){
@@ -57,6 +58,7 @@ public final class PipeLayoutView extends View {
     }
     @Override protected void onDraw(Canvas c){
         super.onDraw(c);
+        dimensionLabels.clear();
         float pad=42*getResources().getDisplayMetrics().density;
         double extent=width/2+Math.max(cutLeft,cutRight),above=depth;
         for(PipeLayout.Pipe pipe:pipes){extent=Math.max(extent,Math.abs(pipe.offset)+pipe.diameter/2);above=Math.max(above,pipe.bedding+pipe.diameter);}
@@ -149,6 +151,28 @@ public final class PipeLayoutView extends View {
         String label=String.format(java.util.Locale.GERMANY,"%.3f m",metres);
         float x=(x1+x2-p.measureText(label))/2,y=(y1+y2)/2-5*d;
         x=Math.max(4*d,Math.min(x,getWidth()-p.measureText(label)-4*d));y=Math.max(p.getTextSize()+4*d,Math.min(y,getHeight()-4*d));
+        float textWidth=p.measureText(label), textHeight=p.getTextSize();
+        android.graphics.RectF bounds=new android.graphics.RectF();
+        float originalX=x,originalY=y;
+        boolean placed=false;
+        for(int i=0;i<25;i++){
+            int ring=(i+1)/2;
+            float offset=(i%2==1?-1:1)*ring*(textHeight+8*d);
+            x=originalX;
+            y=Math.max(textHeight+4*d,Math.min(originalY+offset,getHeight()-4*d));
+            bounds.set(x-3*d,y-textHeight,x+textWidth+3*d,y+3*d);
+            boolean overlaps=false;
+            for(android.graphics.RectF other:dimensionLabels){
+                if(android.graphics.RectF.intersects(bounds,other)){overlaps=true;break;}
+            }
+            if(!overlaps){placed=true;break;}
+        }
+        if(!placed){x=originalX;y=originalY;bounds.set(x-3*d,y-textHeight,x+textWidth+3*d,y+3*d);}
+        dimensionLabels.add(new android.graphics.RectF(bounds));
+        if(placed&&Math.abs(y-originalY)>d){
+            p.setColor(color);p.setStrokeWidth(d);
+            c.drawLine((x1+x2)/2,(y1+y2)/2,x+textWidth/2,y-textHeight/2,p);
+        }
         p.setStyle(Paint.Style.FILL);p.setColor(0xff041012);c.drawRoundRect(x-3*d,y-p.getTextSize(),x+p.measureText(label)+3*d,y+3*d,3*d,3*d,p);
         p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(d);p.setColor(color);c.drawRoundRect(x-3*d,y-p.getTextSize(),x+p.measureText(label)+3*d,y+3*d,3*d,3*d,p);p.setStyle(Paint.Style.FILL);c.drawText(label,x,y,p);
     }
