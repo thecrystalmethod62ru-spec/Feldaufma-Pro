@@ -1958,7 +1958,7 @@ public class MainActivity extends Activity {
       for(double[] b:boxes){float x=pad+(float)(b[0]/total*w),y=pad+(float)((1-(b[1]-base)/range)*h),bottom=pad+(float)((1-(b[2]-base)/range)*h),half=(float)(b[3]/total*w/2);if(half>0&&bottom>y)c.drawRect(x-half,y,x+half,bottom,p);else c.drawCircle(x,y,4,p);}
      }
     };
-    longitudinalView.setBackgroundColor(0xff111111);
+    longitudinalView.setBackgroundColor(Color.BLACK);
     panel.addView(longitudinalView,new android.widget.LinearLayout.LayoutParams(-1,(int)(220*getResources().getDisplayMetrics().density)));
     panel.addView(sheetText("Darstellbare Formstücke: "+boxes.size()+" / "+linked.size()+". Fehlende Abmessungen als Punkt.",13,false));
    }
@@ -5928,7 +5928,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     if(len>0){float tx=(float)(-dy/len*dp(3)),ty=(float)(dx/len*dp(3));c.drawLine(ax-tx,ay-ty,ax+tx,ay+ty,pen);c.drawLine(bx-tx,by-ty,bx+tx,by+ty,pen);}
     String label=String.format(java.util.Locale.GERMANY,"%.2f m",value);float lx=Math.max(dp(2),Math.min(getWidth()-pen.measureText(label)-dp(2),(ax+bx)/2-pen.measureText(label)/2)),ly=Math.max(dp(12),(ay+by)/2-dp(4));float tw=pen.measureText(label),th=dp(12);android.graphics.RectF bounds=null;
     for(int attempt=0;attempt<25;attempt++){int shift=attempt==0?0:((attempt+1)/2)*(attempt%2==1?-1:1);float yy=ly+shift*dp(14);android.graphics.RectF candidate=new android.graphics.RectF(lx-dp(2),yy-th,lx+tw+dp(2),yy+dp(3));if(candidate.left<0||candidate.right>getWidth()||candidate.top<dp(28)||candidate.bottom>getHeight()-dp(16))continue;boolean occupied=false;for(android.graphics.RectF other:dimensionLabels)if(android.graphics.RectF.intersects(candidate,other)){occupied=true;break;}if(!occupied){bounds=candidate;ly=yy;break;}}
-    if(bounds!=null){dimensionLabels.add(bounds);int color=pen.getColor();pen.setColor(0xff171717);c.drawRect(bounds,pen);pen.setColor(color);c.drawText(label,lx,ly,pen);if(Math.abs(ly-((ay+by)/2-dp(4)))>dp(14)||Math.abs(lx+tw/2-(ax+bx)/2)>dp(14)){pen.setColor(0xffaaaaaa);c.drawLine((ax+bx)/2,(ay+by)/2,lx+tw/2,ly+dp(3),pen);}}else hiddenDimensions++;
+    if(bounds!=null){dimensionLabels.add(bounds);int color=pen.getColor();pen.setColor(Color.BLACK);c.drawRect(bounds,pen);pen.setColor(color);c.drawText(label,lx,ly,pen);if(Math.abs(ly-((ay+by)/2-dp(4)))>dp(14)||Math.abs(lx+tw/2-(ax+bx)/2)>dp(14)){pen.setColor(0xffaaaaaa);c.drawLine((ax+bx)/2,(ay+by)/2,lx+tw/2,ly+dp(3),pen);}}else hiddenDimensions++;
    }
    @Override protected void onDraw(Canvas c){
     super.onDraw(c);
@@ -5941,7 +5941,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     try{double value=Double.parseDouble(prefs.getString("metricPipeMinCover","0").replace(',','.'));if(Double.isFinite(value)&&value>=0)cover=value;}catch(Exception ignored){}
 
     if(zoomReset[0]!=0){profileZoom=1;panX=0;panY=0;zoomReset[0]=0;}
-    dragScale=0;c.drawColor(0xff171717);
+    dragScale=0;c.drawColor(Color.BLACK);
     if(!Double.isFinite(width)||!Double.isFinite(height)||width<=0||height<=0)return;
     double scale=Math.min((getWidth()-dp(32))/width,(getHeight()-dp(32))/height)*profileZoom;if(scale<=0)return;
     float left=(float)((getWidth()-width*scale)/2+panX),top=(float)(dp(12)+panY);
