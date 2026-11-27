@@ -45,6 +45,7 @@ public final class PipeLayoutView extends View {
     public String dimensionSummary(){return String.format(java.util.Locale.GERMANY,"Breite: %.2f m\nTiefe: %.2f m",width,depth);}
     public void setSelection(Selection selection){this.selection=selection;}
     private void texture(Canvas c,float l,float t,float r,float b,int fill,int grain,boolean gravel){
+        l=Math.max(0,l);t=Math.max(0,t);r=Math.min(getWidth(),r);b=Math.min(getHeight(),b);
         if(r<=l||b<=t)return;
         p.setStyle(Paint.Style.FILL);p.setColor(fill);c.drawRect(l,t,r,b,p);
         c.save();c.clipRect(l,t,r,b);p.setColor(grain);p.setStrokeWidth(1);
