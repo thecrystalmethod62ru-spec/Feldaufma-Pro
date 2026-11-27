@@ -361,6 +361,23 @@ public class MainActivity extends Activity {
    if(!getPreferences(0).edit().putString("independentGpsTrack",rows.toString()).commit()){recordingGpsTrack=false;notice("GPS-Aufzeichnung konnte nicht gespeichert werden.");}
   }catch(org.json.JSONException e){recordingGpsTrack=false;notice("Ungültiger GPS-Punkt.");}
  }
+ void showGpsTrackComparison(){
+  final String project=activeProject;
+  final RouteSketch snapshot=new RouteSketch(this,routeData());
+  snapshot.setIndependentGpsTrack(gpsTrack());
+  final android.app.ProgressDialog progress=new android.app.ProgressDialog(this);
+  progress.setMessage("Trassen werden verglichen …");progress.setCancelable(false);progress.show();
+  new Thread(()->{
+   String result;
+   try{result=snapshot.gpsTrackComparison();}catch(RuntimeException e){result="Trassenvergleich fehlgeschlagen.";}
+   final String message=result;
+   runOnUiThread(()->{
+    if(isDestroyed()||isFinishing())return;
+    progress.dismiss();if(!project.equals(activeProject))return;
+    new android.app.AlertDialog.Builder(this).setTitle("Trassenvergleich").setMessage(message).setPositiveButton("Schließen",null).show();
+   });
+  }).start();
+ }
  void showGpsTrackControls(){
   org.json.JSONArray rows=gpsTrack();
   new android.app.AlertDialog.Builder(this).setTitle("GPS-Aufzeichnung").setMessage((recordingGpsTrack?"Aufzeichnung aktiv":"Aufzeichnung gestoppt")+" · "+rows.length()+" Punkte\nUnabhängig von der manuellen Trasse.")
@@ -3847,6 +3864,8 @@ public class MainActivity extends Activity {
  Button persistentSave=actionButtonSingle(dock,"Speichern",()->{if(calculate())Toast.makeText(this,"Gespeichert",Toast.LENGTH_SHORT).show();});
  persistentSave.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(52)));
  actionButtonSingle(planPage,"Zeichnungsebenen",()->showDrawingLayers());
+ actionButtonSingle(planPage,"GPS-Aufzeichnung",()->showGpsTrackControls());
+ actionButtonSingle(planPage,"Trassenvergleich",()->showGpsTrackComparison());
  actionButtonSingle(planPage,"Zeichnungsunterlage – PDF / Foto",()->chooseRouteUnderlay());
  routePreviewBox=page();planPage.addView(routePreviewBox);
  routeSummary=sheetText("",15,false);planPage.addView(routeSummary);
