@@ -316,15 +316,26 @@ public class MainActivity extends Activity {
  }
  void newProjectDialog(){
   EditText name=new EditText(this);name.setSingleLine(true);name.setHint("Projektname");
-  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Neues Projekt").setMessage("Aktuelle Eingaben werden automatisch als Entwurf gespeichert.").setView(name).setNegativeButton("Abbrechen",null).setPositiveButton("Erstellen",null).create();
-  dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(b->{
+  android.app.Dialog dialog=new android.app.Dialog(this);
+  LinearLayout root=page();root.setPadding(dp(20),dp(16),dp(20),dp(16));
+  ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.addView(root);
+  root.addView(sheetText("Neues Projekt",24,true));
+  root.addView(sheetText("Projektdaten",14,false));
+  name.setTextColor(Color.WHITE);name.setHintTextColor(0xff9aabaa);name.setPadding(dp(12),dp(10),dp(12),dp(10));name.setBackground(editorShape(0xff202827,10));root.addView(name,new LinearLayout.LayoutParams(-1,-2));
+  root.addView(sheetText("Aktuelle Eingaben werden automatisch als Entwurf gespeichert.",13,false));
+  overviewAction(root,"Abbrechen","back",()->dialog.dismiss());
+  Button create=actionButtonSingle(root,"Projekt erstellen",()->{});
+  styleEditorButton(create,true);create.setMinHeight(dp(48));
+  dialog.setContentView(scroll);
+  create.setOnClickListener(b->{
    String title=name.getText().toString().trim();if(title.isEmpty()){name.setError("Projektname erforderlich");return;}
    String id=java.util.UUID.randomUUID().toString();
    if(!projectStorage(id).edit().putString("project",title).putInt("dictationLanguage",getPreferences(0).getInt("dictationLanguage",1)).commit()){notice("Projekt konnte nicht erstellt werden.");return;}
    java.util.Set<String> ids=new java.util.HashSet<>(projectRegistry().getStringSet("ids",java.util.Collections.emptySet()));ids.add(id);
    if(!projectRegistry().edit().putStringSet("ids",ids).putString("active",id).commit()){notice("Projekt konnte nicht aktiviert werden.");return;}
    dialog.dismiss();restartForProject();
-  }));dialog.show();
+  });dialog.show();
+  if(dialog.getWindow()!=null){dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.BLACK));dialog.getWindow().setLayout(-1,-2);dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);}
  }
  void confirmProjectSwitch(String id){
   new android.app.AlertDialog.Builder(this).setTitle("Projekt wechseln").setMessage("Aktuelle Eingaben werden automatisch als Entwurf gespeichert.").setNegativeButton("Abbrechen",null).setPositiveButton("Wechseln",(d,w)->{
