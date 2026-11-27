@@ -302,6 +302,20 @@ public class MainActivity extends Activity {
   Button create=(Button)content.getChildAt(content.getChildCount()-1);
   create.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x33ffffff),editorShape(TEAL,10),null));
   overviewAction(content,"Bestehendes Projekt öffnen","layers",()->showProjects());
+  TextView recent=sheetText("Vorhandene Projekte",18,true);recent.setPadding(0,dp(20),0,dp(8));content.addView(recent);
+  java.util.ArrayList<String> ids=new java.util.ArrayList<>(projectRegistry().getStringSet("ids",java.util.Collections.emptySet()));
+  ids.remove(LEGACY_PROJECT);
+  java.util.Collections.sort(ids,(a,b)->projectStorage(a).getString("project","").compareToIgnoreCase(projectStorage(b).getString("project","")));
+  if(!projectStorage(LEGACY_PROJECT).getString("project","").trim().isEmpty()||projectStorage(LEGACY_PROJECT).contains("routeSketch")||projectStorage(LEGACY_PROJECT).contains("segments")||projectStorage(LEGACY_PROJECT).contains("objects")||!projectStorage(LEGACY_PROJECT).getString("length","").trim().isEmpty())ids.add(LEGACY_PROJECT);
+  if(ids.remove(activeProject))ids.add(0,activeProject);
+  if(ids.isEmpty())content.addView(sheetText("Noch keine Projekte vorhanden.",14,false));
+  for(String id:ids){
+   String name=projectStorage(id).getString("project","").trim();
+   overviewAction(content,name.isEmpty()?"Bestandsprojekt":name,"layers",()->{
+    if(id.equals(activeProject)){enterProject();return;}
+    if(projectRegistry().edit().putString("active",id).commit())restartForProject();else notice("Projektwechsel fehlgeschlagen.");
+   });
+  }
   overviewAction(start,"Cloud","cloud",()->openCloud());
  }
  void enterProject(){projectChosen=true;startLiveGps();setContentView(shell);fitSystemPanels(shell);if(length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);}
