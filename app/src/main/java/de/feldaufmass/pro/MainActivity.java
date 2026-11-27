@@ -869,6 +869,8 @@ public class MainActivity extends Activity {
   form.addView(hint);
   Button fullscreen=new Button(this);fullscreen.setAllCaps(false);fullscreen.setText("⛶ Vollbild");form.addView(fullscreen);
   form.addView(route,new LinearLayout.LayoutParams(-1,dp(260)));
+  final org.json.JSONObject[] calibration={savedSketchCalibration()};
+  final Runnable[] refreshCalibration={()->{}};
   String template=getPreferences(0).getString("routeUnderlay","");
   if(!template.isEmpty()){
    android.graphics.Bitmap image=reportPhoto(template);
@@ -878,13 +880,14 @@ public class MainActivity extends Activity {
     CheckBox lock=new CheckBox(this);lock.setText("Unterlage sperren");lock.setChecked(true);transform.addView(lock);
     String transformKey="routeUnderlayTransform";
     float[] vals={0,0,1,0};
-    try{org.json.JSONArray saved=new org.json.JSONArray(getPreferences(0).getString(transformKey,"[]"));for(int k=0;k<4;k++)vals[k]=(float)saved.optDouble(k,vals[k]);}catch(Exception ignored){}
+    try{org.json.JSONArray saved=new org.json.JSONArray(getPreferences(0).getString(transformKey,"[]"));for(int k=0;k<4;k++){double value=saved.optDouble(k,vals[k]);if(Double.isFinite(value))vals[k]=(float)value;}}catch(Exception ignored){}
+    vals[0]=Math.max(-2,Math.min(2,vals[0]));vals[1]=Math.max(-2,Math.min(2,vals[1]));vals[2]=Math.max(.1f,Math.min(5,vals[2]));vals[3]=Math.max(-180,Math.min(180,vals[3]));
     route.setUnderlayTransform(vals[0],vals[1],vals[2],vals[3]);
     String[] names={"Horizontal verschieben","Vertikal verschieben","Maßstab der Unterlage","Drehung"};
     float[] mins={-2,-2,.1f,-180},maxs={2,2,5,180};
     java.util.ArrayList<SeekBar> bars=new java.util.ArrayList<>();
     for(int k=0;k<4;k++){final int index=k;TextView label=sheetText(names[k],14,false);transform.addView(label);SeekBar bar=new SeekBar(this);bar.setMax(1000);bar.setProgress(Math.round(1000*(vals[k]-mins[k])/(maxs[k]-mins[k])));bar.setEnabled(false);transform.addView(bar);bars.add(bar);
-     bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onStartTrackingTouch(SeekBar b){}public void onStopTrackingTouch(SeekBar b){try{org.json.JSONArray data=new org.json.JSONArray();for(float value:vals)data.put((double)value);getPreferences(0).edit().putString(transformKey,data.toString()).remove("sketchCalibration").apply();}catch(Exception ignored){}}public void onProgressChanged(SeekBar b,int progress,boolean user){if(user&&!lock.isChecked()){vals[index]=mins[index]+(maxs[index]-mins[index])*progress/1000f;route.setUnderlayTransform(vals[0],vals[1],vals[2],vals[3]);}}});
+     bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onStartTrackingTouch(SeekBar b){}public void onStopTrackingTouch(SeekBar b){try{org.json.JSONArray data=new org.json.JSONArray();for(float value:vals)data.put((double)value);getPreferences(0).edit().putString(transformKey,data.toString()).remove("sketchCalibration").apply();calibration[0]=new org.json.JSONObject();refreshCalibration[0].run();}catch(Exception ignored){}}public void onProgressChanged(SeekBar b,int progress,boolean user){if(user&&!lock.isChecked()){vals[index]=mins[index]+(maxs[index]-mins[index])*progress/1000f;route.setUnderlayTransform(vals[0],vals[1],vals[2],vals[3]);}}});
     }
     lock.setOnCheckedChangeListener((b,checked)->{for(SeekBar bar:bars)bar.setEnabled(!checked);});
 
@@ -895,7 +898,7 @@ public class MainActivity extends Activity {
     opacity.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(android.widget.SeekBar bar,int progress,boolean user){route.setUnderlayAlpha(progress);if(user)getPreferences(0).edit().putInt("routeUnderlayAlpha",progress).apply();}public void onStartTrackingTouch(android.widget.SeekBar bar){}public void onStopTrackingTouch(android.widget.SeekBar bar){}});
     Button removeTemplate=new Button(this);removeTemplate.setAllCaps(false);removeTemplate.setText("Vorlage aus Projekt entfernen");form.addView(removeTemplate);
     removeTemplate.setOnClickListener(v->new android.app.AlertDialog.Builder(this).setTitle("Zeichenvorlage entfernen?").setMessage("Die gezeichnete Trasse und Maße bleiben erhalten.").setNegativeButton("Abbrechen",null).setPositiveButton("Entfernen",(d,w)->{
-     if(template.equals(getPreferences(0).getString("routeUnderlay",""))&&getPreferences(0).edit().remove("routeUnderlay").remove("routeUnderlayTransform").remove("routeUnderlayAlpha").remove("routeUnderlayHidden").remove("sketchCalibration").commit()){route.setUnderlay(null);lock.setEnabled(false);for(SeekBar bar:bars)bar.setEnabled(false);showTemplate.setEnabled(false);opacity.setEnabled(false);removeTemplate.setEnabled(false);recordProjectEvent("Zeichenvorlage entfernt");}else notice("Vorlage konnte nicht entfernt werden.");
+     if(template.equals(getPreferences(0).getString("routeUnderlay",""))&&getPreferences(0).edit().remove("routeUnderlay").remove("routeUnderlayTransform").remove("routeUnderlayAlpha").remove("routeUnderlayHidden").remove("sketchCalibration").commit()){route.setUnderlay(null);calibration[0]=new org.json.JSONObject();refreshCalibration[0].run();lock.setEnabled(false);for(SeekBar bar:bars)bar.setEnabled(false);showTemplate.setEnabled(false);opacity.setEnabled(false);removeTemplate.setEnabled(false);recordProjectEvent("Zeichenvorlage entfernt");}else notice("Vorlage konnte nicht entfernt werden.");
     }).show());
    }else form.addView(sheetText("Zeichenvorlage fehlt oder ist nicht lesbar.",13,false));
   }
@@ -925,13 +928,12 @@ public class MainActivity extends Activity {
   Button proportional=new Button(this);proportional.setAllCaps(false);proportional.setText("Maßstab");proportional.setContentDescription("Trasse proportional nach Abschnittsmaßen neu zeichnen");historyBar.addView(proportional,new LinearLayout.LayoutParams(0,-2,1));
   proportional.setOnClickListener(v->{
    for(RouteSketch.Vertex vertex:route.vertices)if(Double.isFinite(vertex.latitude)&&Double.isFinite(vertex.longitude)){notice("GPS-gebundene Trasse: proportionale Umformung nicht verfügbar.");return;}
-   if(!getPreferences(0).getString("routeUnderlay","").isEmpty()||savedSketchCalibration().length()>0){notice("Zeichenvorlage oder Kalibrierung vorhanden. Umformung nicht verfügbar.");return;}
+   if(!getPreferences(0).getString("routeUnderlay","").isEmpty()||calibration[0].length()>0){notice("Zeichenvorlage oder Kalibrierung vorhanden. Umformung nicht verfügbar.");return;}
    if(!route.rebuildMeasuredGeometry())notice("Alle Abschnittsmaße und eindeutige Segmentrichtungen erforderlich.");
   });
   Button resetDimensions=new Button(this);resetDimensions.setAllCaps(false);resetDimensions.setText("Maße ↺");resetDimensions.setContentDescription("Maßpositionen zurücksetzen");historyBar.addView(resetDimensions,new LinearLayout.LayoutParams(0,-2,1));resetDimensions.setOnClickListener(v->route.resetDimensionLayout());
   Button deletePoint=new Button(this);deletePoint.setAllCaps(false);deletePoint.setText("Punkt −");deletePoint.setContentDescription("Punkt löschen");historyBar.addView(deletePoint,new LinearLayout.LayoutParams(0,-2,1));deletePoint.setOnClickListener(v->deleteRoutePoint(route));
   Button remove=new Button(this);remove.setText("Letzten Abschnitt entfernen");form.addView(remove);
-  final org.json.JSONObject[] calibration={savedSketchCalibration()};
   TextView scaleStatus=sheetText("",13,false);form.addView(scaleStatus);
   Button calibrate=new Button(this);calibrate.setAllCaps(false);calibrate.setText("Maßstab kalibrieren");form.addView(calibrate);
   Button clearScale=new Button(this);clearScale.setAllCaps(false);clearScale.setText("Kalibrierung entfernen");form.addView(clearScale);
@@ -968,6 +970,7 @@ public class MainActivity extends Activity {
     measureButton.setOnClickListener(v->measureSegment(route,index));list.addView(measureButton);
    }
   };
+  refreshCalibration[0]=refreshEditor;
   calibrate.setOnClickListener(v->calibrateSketch(route,data->{calibration[0]=data;refreshEditor.run();}));
   clearScale.setOnClickListener(v->{calibration[0]=new org.json.JSONObject();refreshEditor.run();});
   route.changed=()->{history.record(route.encode());refreshEditor.run();};
