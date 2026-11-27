@@ -575,7 +575,7 @@ final class RouteSketch extends View {
   }
   return new double[]{count==0?0:sum/count,max};
  }
- void setIndependentGpsTrack(JSONArray rows){independentGpsTrack=rows==null?new JSONArray():rows;deviationKey=null;invalidate();}
+ void setIndependentGpsTrack(JSONArray rows){independentGpsTrack=rows==null?new JSONArray():rows;deviationKey=null;projectedGpsKey=null;invalidate();}
  private static final class GpsDeviationLine{
   final PointF a,b;final int color;final boolean reverse;
   GpsDeviationLine(PointF a,PointF b,int color,boolean reverse){this.a=a;this.b=b;this.color=color;this.reverse=reverse;}
@@ -637,14 +637,22 @@ final class RouteSketch extends View {
     offset+=len;
    }
  }
+ private String projectedGpsKey=null;
+ private final java.util.ArrayList<PointF> projectedGpsCache=new java.util.ArrayList<>();
  void drawIndependentGpsTrack(Canvas c,float density){
   if(!layerVisible(LAYER_GPS_TRACK)||independentGpsTrack.length()==0)return;
+  String key=gpsGeometryKey();
+  if(!key.equals(projectedGpsKey)){
+   projectedGpsCache.clear();
+   GpsTransform transform=gpsTransform(-1);
+   if(transform!=null)for(int i=0;i<independentGpsTrack.length();i++){
+    org.json.JSONObject row=independentGpsTrack.optJSONObject(i);
+    projectedGpsCache.add(row==null?null:transform.project(row.optDouble("lat"),row.optDouble("lon")));
+   }
+   projectedGpsKey=key;
+  }
   PointF previous=null;paint.setColor(0xff35b9ff);paint.setStrokeWidth(3*density);
-  GpsTransform transform=gpsTransform(-1);
-  if(transform==null)return;
-  for(int i=0;i<independentGpsTrack.length();i++){
-   org.json.JSONObject row=independentGpsTrack.optJSONObject(i);
-   PointF p=row==null?null:transform.project(row.optDouble("lat"),row.optDouble("lon"));
+  for(PointF p:projectedGpsCache){
    if(p!=null){if(previous!=null)line(c,previous,p);c.drawCircle(left()+scale()*p.x,top()+scale()*p.y,3*density,paint);}
    previous=p;
   }
