@@ -654,6 +654,22 @@ final class RouteSketch extends View {
   paint.setPathEffect(new android.graphics.DashPathEffect(new float[]{12,8},0));
   for(int i=1;i<pts.size();i++)line(c,pts.get(i-1),pts.get(i));
   paint.setPathEffect(null);paint.setAlpha(255);
+  if(prefs.getBoolean("gpsShowDeviations",false)&&vertices.size()>1){
+   paint.setColor(0xffffb74d);paint.setStrokeWidth(1.5f*getResources().getDisplayMetrics().density);
+   int stride=Math.max(1,(pts.size()+99)/100);
+   for(int i=0;i<pts.size();i+=stride){
+    PointF p=pts.get(i),nearest=null;double best=Double.POSITIVE_INFINITY;
+    for(int j=1;j<vertices.size();j++){
+     PointF a=vertices.get(j-1).point,b=vertices.get(j).point;
+     double dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;
+     double t=den==0?0:Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/den));
+     PointF q=new PointF((float)(a.x+t*dx),(float)(a.y+t*dy));
+     double dist=Math.hypot(p.x-q.x,p.y-q.y);
+     if(dist<best){best=dist;nearest=q;}
+    }
+    if(nearest!=null)line(c,p,nearest);
+   }
+  }
  }
  void drawUnderlay(Canvas c){
   if(underlay==null||underlay.isRecycled()||!underlayVisible)return;
