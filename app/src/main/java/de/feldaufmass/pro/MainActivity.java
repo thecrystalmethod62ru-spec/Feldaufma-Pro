@@ -793,11 +793,20 @@ public class MainActivity extends Activity {
  boolean persistRouteHistory(RouteEditHistory history,SharedPreferences.Editor ed){
   try{
    String before=routeData();
+   JSONArray remappedSurfaces=null;
+   double[][] stations=matchingRouteStations(before,history.current);
+   if(stations!=null&&!java.util.Arrays.equals(stations[0],stations[1])){
+    JSONArray profiles=new PipeLayoutStore(getPreferences(0)).sections();
+    remappedSurfaces=PipeLayoutStore.remapSections(segments,stations[0],stations[1]);
+    JSONArray remappedProfiles=PipeLayoutStore.remapSections(profiles,stations[0],stations[1]);
+    ed.putString("segments",remappedSurfaces.toString()).putString(PipeLayoutStore.SECTION_KEY,remappedProfiles.toString());
+   }
    ed.putString("routeSketch",history.current)
     .putString("routeHistoryHead",history.current)
     .putString("routeUndo",new org.json.JSONArray(history.undo).toString())
     .putString("routeRedo",new org.json.JSONArray(history.redo).toString());
    if(ed.commit()){
+    if(remappedSurfaces!=null){segments=remappedSurfaces;showSegments();refreshStationLayers();}
     if(!before.equals(history.current))recordProjectEvent("Trasse geändert · "+new org.json.JSONArray(history.current).length()+" Punkte");
     return true;
    }
