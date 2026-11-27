@@ -162,7 +162,7 @@ public class MainActivity extends Activity {
       org.json.JSONArray items=row.optJSONArray(4);if(items==null)continue;
       for(int k=0;k<items.length();k++){String old=items.getString(k),replacement=photos.get(old);if(replacement==null)throw new java.io.IOException("Foto fehlt");used.add(old);items.put(k,replacement);org.json.JSONObject meta=row.optJSONObject(10);if(meta!=null&&meta.has(old)){Object photoMeta=meta.remove(old);meta.put(replacement,photoMeta);}}
      }v=rows.toString();
-    }else if(key.equals(UTILITY_SHEETS_KEY)){org.json.JSONArray sheets=new org.json.JSONArray(v);if(sheets.length()>MAX_UTILITY_SHEETS)throw new java.io.IOException("Zu viele Planblätter");for(int j=0;j<sheets.length();j++){org.json.JSONObject row=sheets.getJSONObject(j);String old=row.getString("file"),replacement=photos.get(old);if(replacement==null)throw new java.io.IOException("Planblatt fehlt");used.add(old);row.put("file",replacement);for(String field:new String[]{"x","y","scale","rotation","alpha"}){double value=row.getDouble(field);if(!Double.isFinite(value)||("scale".equals(field)&&(value<.1||value>5))||("alpha".equals(field)&&(value<0||value>255))||(("x".equals(field)||"y".equals(field))&&Math.abs(value)>2)||("rotation".equals(field)&&Math.abs(value)>180))throw new java.io.IOException("Ungültige Planblatt-Ausrichtung");}}v=sheets.toString();
+    }else if(key.equals(UTILITY_SHEETS_KEY)){org.json.JSONArray sheets=new org.json.JSONArray(v);if(sheets.length()>MAX_UTILITY_SHEETS)throw new java.io.IOException("Zu viele Planblätter");for(int j=0;j<sheets.length();j++){org.json.JSONObject row=sheets.getJSONObject(j);String old=row.getString("file"),replacement=photos.get(old);if(replacement==null)throw new java.io.IOException("Planblatt fehlt");used.add(old);row.put("file",replacement);for(String dimensionKey:new String[]{"x","y","scale","rotation","alpha"}){double dimensionValue=row.getDouble(dimensionKey);if(!Double.isFinite(dimensionValue)||("scale".equals(dimensionKey)&&(dimensionValue<.1||dimensionValue>5))||("alpha".equals(dimensionKey)&&(dimensionValue<0||dimensionValue>255))||(("x".equals(dimensionKey)||"y".equals(dimensionKey))&&Math.abs(dimensionValue)>2)||("rotation".equals(dimensionKey)&&Math.abs(dimensionValue)>180))throw new java.io.IOException("Ungültige Planblatt-Ausrichtung");}}v=sheets.toString();
     }else if(key.equals("routeUnderlay")){if(!v.isEmpty()){String replacement=photos.get(v);if(replacement==null)throw new java.io.IOException("Zeichenvorlage fehlt");used.add(v);v=replacement;}}
     else if(key.equals("documents")){
      org.json.JSONArray docs=new org.json.JSONArray(v);for(int j=0;j<docs.length();j++){org.json.JSONObject doc=docs.getJSONObject(j);doc.remove("uri");doc.put("name",doc.optString("name")+" (neu verknüpfen)");}v=docs.toString();
@@ -555,10 +555,19 @@ public class MainActivity extends Activity {
   boolean[] checked=new boolean[labels.length];int current=drawingLayers();
   java.util.function.IntConsumer apply=mask->{if(!project.equals(activeProject)){notice("Projekt geändert. Ebenen erneut öffnen.");return;}if(applyDrawingLayers(mask)&&editorRoute!=null)editorRoute.setVisibleLayers(mask);};
   for(int j=0;j<labels.length;j++)checked[j]=(current&masks[j])!=0;
-  new android.app.AlertDialog.Builder(this).setTitle("Zeichnungsebenen")
-   .setMultiChoiceItems(labels,checked,(d,j,on)->checked[j]=on)
+  LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(dp(16),dp(8),dp(16),dp(8));panel.setBackgroundColor(Color.BLACK);
+  final android.app.AlertDialog[] dialog={null};
+  overviewAction(panel,"Schachtscheine","map",()->{
+   if(!project.equals(activeProject)){notice("Projekt geändert.");return;}
+   int mask=0;for(int j=0;j<checked.length;j++)if(checked[j])mask|=masks[j];apply.accept(mask);
+   dialog[0].dismiss();showUtilitySheets();
+  });
+  ScrollView scroll=new ScrollView(this);LinearLayout choices=new LinearLayout(this);choices.setOrientation(1);scroll.addView(choices);panel.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+  for(int j=0;j<labels.length;j++){final int index=j;CheckBox check=new CheckBox(this);check.setText(labels[j]);check.setTextColor(Color.WHITE);check.setChecked(checked[j]);check.setOnCheckedChangeListener((b,on)->checked[index]=on);choices.addView(check,new LinearLayout.LayoutParams(-1,dp(48)));}
+  dialog[0]=new android.app.AlertDialog.Builder(this).setTitle("Zeichnungsebenen").setView(panel)
    .setNegativeButton("Abbrechen",null).setNeutralButton("Alle anzeigen",(d,w)->apply.accept(RouteSketch.ALL_LAYERS))
-   .setPositiveButton("Übernehmen",(d,w)->{int mask=0;for(int j=0;j<checked.length;j++)if(checked[j])mask|=masks[j];apply.accept(mask);}).show();
+   .setPositiveButton("Übernehmen",(d,w)->{int mask=0;for(int j=0;j<checked.length;j++)if(checked[j])mask|=masks[j];apply.accept(mask);}).create();
+  dialog[0].show();scroll.getLayoutParams().height=Math.min(dp(432),Math.max(dp(120),getResources().getDisplayMetrics().heightPixels-dp(250)));((LinearLayout.LayoutParams)scroll.getLayoutParams()).weight=0;scroll.requestLayout();
  }
  boolean applyDrawingLayers(int mask){
   if(!getSharedPreferences("drawing_view",MODE_PRIVATE).edit().putInt(activeProject,mask).commit()){notice("Ebenen konnten nicht gespeichert werden.");return false;}
@@ -1054,6 +1063,7 @@ public class MainActivity extends Activity {
     switch(kind){
      case "save":c.drawRoundRect(4,3,20,21,2,2,p);c.drawRect(8,3,16,9,p);c.drawRect(8,13,16,21,p);break;
      case "back":c.drawLine(15,5,8,12,p);c.drawLine(8,12,15,19,p);break;
+     case "map":{android.graphics.Path map=new android.graphics.Path();map.moveTo(3,5);map.lineTo(9,3);map.lineTo(15,6);map.lineTo(21,3);map.lineTo(21,19);map.lineTo(15,22);map.lineTo(9,19);map.lineTo(3,21);map.close();c.drawPath(map,p);c.drawLine(9,3,9,19,p);c.drawLine(15,6,15,22,p);break;}
      case "image":c.drawRoundRect(3,4,21,20,2,2,p);c.drawCircle(8,9,2,p);c.drawLine(4,18,11,12,p);c.drawLine(11,12,16,17,p);break;
      case "mic":c.drawRoundRect(9,3,15,14,3,3,p);c.drawArc(6,7,18,18,0,180,false,p);c.drawLine(12,18,12,22,p);c.drawLine(8,22,16,22,p);break;
      case "ruler":c.save();c.rotate(-45,12,12);c.drawRect(8,3,16,21,p);for(int y=6;y<20;y+=3)c.drawLine(8,y,y%2==0?12:11,y,p);c.restore();break;
@@ -4127,7 +4137,7 @@ public class MainActivity extends Activity {
  overviewAction(planPage,"GPS-Aufzeichnung","center",()->showGpsTrackControls());
  overviewAction(planPage,"Trassenvergleich","sections",()->showGpsTrackComparison());
  overviewAction(planPage,"Zeichnungsunterlage – PDF / Foto","image",()->chooseRouteUnderlay());
- overviewAction(planPage,"Schachtscheine","layers",()->showUtilitySheets());
+ overviewAction(planPage,"Schachtscheine","map",()->showUtilitySheets());
  routePreviewBox=page();planPage.addView(routePreviewBox);
  routeSummary=sheetText("",15,false);planPage.addView(routeSummary);
  LinearLayout actions=new LinearLayout(this);planPage.addView(actions);
