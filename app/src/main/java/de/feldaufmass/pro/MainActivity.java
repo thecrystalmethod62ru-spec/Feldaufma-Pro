@@ -819,6 +819,7 @@ public class MainActivity extends Activity {
   TextView sectionTitle=sheetText("Abschnitte",13,true);sectionStrip.addView(sectionTitle);
   android.widget.HorizontalScrollView sectionScroll=new android.widget.HorizontalScrollView(this);sectionScroll.setHorizontalScrollBarEnabled(false);sectionStrip.addView(sectionScroll);
   LinearLayout sectionCards=new LinearLayout(this);sectionScroll.addView(sectionCards);
+  ScrollView verticalSections=new ScrollView(this);verticalSections.setFillViewport(false);
   root.addView(sectionStrip,new LinearLayout.LayoutParams(-1,-2));
   final int[] selectedSection={-1};
   final TextView sectionPosition=sheetText("Abschnitt auswählen",12,false);sectionPosition.setTextColor(0xff69d6b7);sectionStrip.addView(sectionPosition,1);
@@ -867,6 +868,9 @@ public class MainActivity extends Activity {
   android.widget.FrameLayout canvasFrame=new android.widget.FrameLayout(this);
   int canvasIndex=root.indexOfChild(route);root.removeView(route);root.addView(canvasFrame,canvasIndex,new LinearLayout.LayoutParams(-1,0,1));
   canvasFrame.addView(route,new android.widget.FrameLayout.LayoutParams(-1,-1));
+  LinearLayout workspace=new LinearLayout(this);workspace.setOrientation(LinearLayout.VERTICAL);root.removeView(canvasFrame);root.removeView(sectionStrip);root.addView(workspace,canvasIndex,new LinearLayout.LayoutParams(-1,0,1));workspace.addView(canvasFrame,new LinearLayout.LayoutParams(-1,0,1));workspace.addView(sectionStrip,new LinearLayout.LayoutParams(-1,-2));
+  final boolean[] landscapeSections={false};
+  root.addOnLayoutChangeListener((v,l,t,rr,bb,ol,ot,orr,ob)->{boolean landscape=rr-l>bb-t;if(landscape==landscapeSections[0])return;landscapeSections[0]=landscape;workspace.setOrientation(landscape?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL);canvasFrame.setLayoutParams(landscape?new LinearLayout.LayoutParams(0,-1,1):new LinearLayout.LayoutParams(-1,0,1));sectionStrip.setLayoutParams(landscape?new LinearLayout.LayoutParams(dp(140),-1):new LinearLayout.LayoutParams(-1,-2));if(landscape){sectionScroll.removeView(sectionCards);sectionStrip.removeView(sectionScroll);sectionCards.setOrientation(LinearLayout.VERTICAL);verticalSections.addView(sectionCards);sectionStrip.addView(verticalSections,new LinearLayout.LayoutParams(-1,0,1));}else{verticalSections.removeView(sectionCards);sectionStrip.removeView(verticalSections);sectionCards.setOrientation(LinearLayout.HORIZONTAL);sectionScroll.addView(sectionCards);sectionStrip.addView(sectionScroll);}refreshSections.run();});
   LinearLayout floatingProfile=new LinearLayout(this);floatingProfile.setOrientation(1);floatingProfile.setPadding(dp(6),dp(4),dp(6),dp(4));floatingProfile.setBackground(editorShape(0xff151b1a,10));
   LinearLayout floatingHeader=new LinearLayout(this);floatingHeader.setGravity(Gravity.CENTER_VERTICAL);floatingProfile.addView(floatingHeader);
   TextView floatingTitle=sheetText("Regelprofil",12,true);floatingTitle.setTextColor(Color.WHITE);floatingHeader.addView(floatingTitle,new LinearLayout.LayoutParams(0,dp(36),1));
