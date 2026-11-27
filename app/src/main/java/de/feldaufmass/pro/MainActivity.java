@@ -1446,7 +1446,7 @@ public class MainActivity extends Activity {
   final Runnable originalRouteChanged=route.changed;
   route.changed=()->{if(originalRouteChanged!=null)originalRouteChanged.run();if(selectedSection[0]>=route.vertices.size()-1)selectedSection[0]=-1;refreshSections.run();};
   root.addView(historyBar,new LinearLayout.LayoutParams(-1,-2));historyBar.setVisibility(View.GONE);
-  for(int j=0;j<Math.min(2,historyBar.getChildCount());j++){final View action=historyBar.getChildAt(j);Button shortcut=new Button(this);styleEditorButton(shortcut,false);compactToolIcon(shortcut,"",j==0?"undo":"redo");shortcut.setContentDescription(j==0?"Rückgängig":"Wiederholen");shortcut.setMinHeight(0);header.addView(shortcut,new LinearLayout.LayoutParams(dp(40),dp(40)));shortcut.setOnClickListener(v->action.performClick());}
+  for(int j=0;j<Math.min(2,historyBar.getChildCount());j++){final View action=historyBar.getChildAt(j);Button shortcut=new Button(this);styleEditorButton(shortcut,false);compactToolIcon(shortcut,"",j==0?"undo":"redo");shortcut.setContentDescription(j==0?"Rückgängig":"Wiederholen");shortcut.setMinHeight(0);header.addView(shortcut,new LinearLayout.LayoutParams(dp(40),dp(40)));shortcut.setOnClickListener(v->{if(action.isEnabled())action.performClick();});}
   settingsTool.setOnLongClickListener(v->{historyBar.setVisibility(historyBar.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE);return true;});
   for(int k=0;k<historyBar.getChildCount();k++)if(historyBar.getChildAt(k) instanceof Button)styleEditorButton((Button)historyBar.getChildAt(k),false);
   LinearLayout tools=new LinearLayout(this);tools.setPadding(dp(6),dp(3),dp(6),dp(3));root.addView(tools);
