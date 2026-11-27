@@ -1967,7 +1967,10 @@ public class MainActivity extends Activity {
   if("ansatz".equals(source))value=sumAnsatz(o);
   else if("manual".equals(source))value=o.optDouble("quantity");
   else if("asphaltLong".equals(source)||"asphaltRecut".equals(source)){
-   if("m".equals(o.optString("unit"))||"lfm".equals(o.optString("unit")))value=asphaltLongitudinalQuantity("asphaltRecut".equals(source));
+   if("m".equals(o.optString("unit"))||"lfm".equals(o.optString("unit"))){
+    value=asphaltLongitudinalQuantity("asphaltRecut".equals(source));
+    double extra=o.optDouble("transverseCuts",0);if(!Double.isFinite(extra)||extra<0)value=Double.NaN;else value+=extra;
+   }
   }
   else if(l>0&&w>0&&d>0){
    if("length".equals(source)&&"m".equals(o.optString("unit")))value=l;
@@ -2030,7 +2033,13 @@ public class MainActivity extends Activity {
   for(int j=0;j<fields.length;j++){form.addView(sheetText(hints[j],14,false));fields[j]=new EditText(this);fields[j].setSingleLine(true);if(j>=3)fields[j].setInputType(8194);if(old!=null)fields[j].setText(old.optString(keys[j],""));form.addView(fields[j]);}
   String[] sources={"manual","length","area","volume","cut","ansatz","asphaltLong","asphaltRecut"};String[] sourceLabels={"Manuelle Istmenge","Trassenlänge (m)","Grundfläche (m²)","Aushub – geometrisch (m³)","Fläche mit Nachschnitt (m²)","Mengenansätze","Asphaltschnitt längs – rechnerisch (m)","Rückschnitt längs – rechnerisch (m)"};
   form.addView(sheetText("Mengenquelle",14,false));Spinner source=choices(form,sourceLabels);source.setSelection(Math.max(0,java.util.Arrays.asList(sources).indexOf(old==null?"manual":old.optString("source"))));
-  form.addView(sheetText("Automatische Quellen verwenden gespeicherte Maße, keine LV-spezifischen Abzugsregeln. Asphaltschnitt: rechnerische Längsschnitte, Quer- und Endschnitte separat manuell erfassen. Ausführung prüfen.",13,false));
+  LinearLayout crossFields=page();form.addView(crossFields);
+  crossFields.addView(sheetText("Ausgeführte Quer- und Endschnitte (m)",14,true));
+  EditText crossLength=new EditText(this);crossLength.setSingleLine(true);crossLength.setInputType(8194);crossLength.setHint("Gesamtlänge zusätzlich, leer = 0");if(old!=null)crossLength.setText(old.optString("transverseCuts",""));crossFields.addView(crossLength);
+  crossFields.addView(sheetText("Nur tatsächlich ausgeführte Schnitte dieser LV-Position. Nicht nochmals separat abrechnen.",13,false));
+  java.util.function.IntConsumer crossVisibility=i->crossFields.setVisibility(i>=0&&i<sources.length&&("asphaltLong".equals(sources[i])||"asphaltRecut".equals(sources[i]))?View.VISIBLE:View.GONE);
+  onChoice(source,crossVisibility);crossVisibility.accept(source.getSelectedItemPosition());
+  form.addView(sheetText("Automatische Quellen verwenden gespeicherte Maße, keine LV-spezifischen Abzugsregeln. Längsschnitte rechnerisch; Quer- und Endschnitte nur nach Eingabe. Ausführung prüfen.",13,false));
   android.app.AlertDialog.Builder builder=new android.app.AlertDialog.Builder(this).setTitle("LV-Position").setView(scroll).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null);
   if(old!=null&&!old.optString("gaebLongText").isEmpty())form.addView(sheetText("GAEB-Langtext\n"+old.optString("gaebLongText"),13,false));
   if(old!=null)builder.setNeutralButton("Löschen",(a,b)->new android.app.AlertDialog.Builder(this).setTitle("LV-Position löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(x,y)->{org.json.JSONArray next=lvPositions();if(!next.toString().equals(original.toString())){notice("LV geändert. Neu öffnen.");return;}next.remove(index);if(saveLv(next))showLv();}).show());
@@ -2042,6 +2051,7 @@ public class MainActivity extends Activity {
     String expected=("asphaltLong".equals(chosen)||"asphaltRecut".equals(chosen))?("lfm".equals(unit)?"lfm":"m"):"length".equals(chosen)?"m":"volume".equals(chosen)?"m³":("manual".equals(chosen)||"ansatz".equals(chosen))?unit:"m²";
     if(!expected.equals(unit)){fields[2].setError("Einheit "+expected+" erforderlich");return;}
     org.json.JSONObject item=old==null?new org.json.JSONObject():new org.json.JSONObject(old.toString());item.remove("target");item.remove("quantity");item.put("oz",oz).put("title",title).put("unit",unit).put("source",chosen);
+    item.remove("transverseCuts");if(("asphaltLong".equals(chosen)||"asphaltRecut".equals(chosen))&&crossLength.length()>0){double extra=number(crossLength);if(!Double.isFinite(extra)||extra<0){crossLength.setError("Länge ab 0 m erforderlich");return;}item.put("transverseCuts",extra);}
     for(int j=3;j<5;j++){if(j==4&&!"manual".equals(chosen))continue;if(fields[j].length()==0)continue;double value=number(fields[j]);if(!Double.isFinite(value)||value<0){fields[j].setError("Menge ab 0 erforderlich");return;}item.put(keys[j],value);}
     org.json.JSONArray next=lvPositions();if(!next.toString().equals(original.toString())){notice("LV geändert. Neu öffnen.");return;}
     for(int j=0;j<next.length();j++){org.json.JSONObject o=next.optJSONObject(j);if(j!=index&&o!=null&&oz.equals(o.optString("oz"))){fields[0].setError("Ordnungszahl bereits vorhanden");return;}}
