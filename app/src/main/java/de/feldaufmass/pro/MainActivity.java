@@ -1406,7 +1406,7 @@ public class MainActivity extends Activity {
    if(existing!=null)chooser.setNeutralButton("Entfernen",(dialog,which)->{
     route.singleObjects.remove(existing);route.changed.run();route.invalidate();
    });
-   else chooser.setNeutralButton("Typ sprechen",null);
+   else chooser.setNeutralButton("Objekttyp diktieren",null);
    android.app.AlertDialog picker=chooser.show();
    if(existing==null)picker.getButton(-3).setOnClickListener(v->startEditorDictation(speech->{
     if(activeRouteEditor!=route||!picker.isShowing())return;
