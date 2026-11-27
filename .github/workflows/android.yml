@@ -56,9 +56,14 @@ jobs:
           script: |
             adb shell cmd overlay enable-exclusive --user current --category com.android.internal.systemui.navbar.threebutton
             gradle :app:connectedDebugAndroidTest --rerun-tasks --stacktrace
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb shell am instrument -w -r -e class de.feldaufmass.pro.UiScreenshotTest de.feldaufmass.pro.test/androidx.test.runner.AndroidJUnitRunner > screenshot-test.log
+            cat screenshot-test.log
+            grep -F 'OK (5 tests)' screenshot-test.log
             mkdir -p ui-screenshots
             adb shell run-as de.feldaufmass.pro ls files/ui-screenshots
-            for name in 01-start-menu 02-normal-portrait 03-normal-landscape 04-full-portrait 05-full-landscape; do adb exec-out run-as de.feldaufmass.pro cat files/ui-screenshots/$name.png > ui-screenshots/$name.png; done
+            for name in 01-start-menu 02-normal-portrait 03-normal-landscape 04-full-portrait 05-full-landscape; do adb exec-out run-as de.feldaufmass.pro cat files/ui-screenshots/$name.png > ui-screenshots/$name.png && test -s ui-screenshots/$name.png || exit 1; done
       - name: Upload real UI screenshots
         uses: actions/upload-artifact@v4
         with:
