@@ -1411,6 +1411,21 @@ public class MainActivity extends Activity {
    final String material=surfaceRow==null?covering:surfaceRow.optString("surface",covering);
    final double leftCut=surfaceRow==null?0:surfaceRow.optDouble("left",0),rightCut=surfaceRow==null?0:surfaceRow.optDouble("right",0);
    Button lengthValue=new Button(this);styleEditorButton(lengthValue,false);lengthValue.setText(Double.isFinite(route.vertices.get(index+1).metres)&&route.vertices.get(index+1).metres>0?String.format(java.util.Locale.GERMANY,"Länge  %.2f m",route.vertices.get(index+1).metres):"Länge · Maß fehlt");lengthValue.setTextSize(11);lengthValue.setMinHeight(0);sectionEditor.addView(lengthValue,new LinearLayout.LayoutParams(-1,dp(32)));lengthValue.setOnClickListener(v->measureSegment(route,index+1));
+   Button splitSection=new Button(this);styleEditorButton(splitSection,false);splitSection.setText("Abschnitt teilen");splitSection.setTextSize(11);sectionEditor.addView(splitSection,new LinearLayout.LayoutParams(-1,dp(34)));
+   splitSection.setEnabled(Double.isFinite(from)&&Double.isFinite(to)&&to>from);
+   splitSection.setOnClickListener(v->{
+    if(index+1>=route.vertices.size())return;
+    final RouteSketch.Vertex first=route.vertices.get(index),last=route.vertices.get(index+1);final double length=last.metres;
+    EditText distance=new EditText(this);distance.setInputType(8194);distance.setHint("Ab Abschnittsbeginn (m)");distance.setText(String.format(java.util.Locale.GERMANY,"%.2f",length/2));
+    android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Abschnitt teilen").setView(distance).setNegativeButton("Abbrechen",null).setPositiveButton("Teilen",null).create();
+    dialog.setOnShowListener(d->dialog.getButton(-1).setOnClickListener(btn->{try{
+     double cut=number(distance);if(!Double.isFinite(cut)||cut<=0||cut>=length){distance.setError("Maß innerhalb des Abschnitts eingeben");return;}
+     if(index+1>=route.vertices.size()||route.vertices.get(index)!=first||route.vertices.get(index+1)!=last||Double.compare(last.metres,length)!=0){dialog.dismiss();notice("Abschnitt erneut auswählen.");return;}
+     float f=(float)(cut/length);android.graphics.PointF point=new android.graphics.PointF(first.point.x+(last.point.x-first.point.x)*f,first.point.y+(last.point.y-first.point.y)*f);
+     if((point.x==first.point.x&&point.y==first.point.y)||(point.x==last.point.x&&point.y==last.point.y)){distance.setError("Teilung zu nah am Endpunkt");return;}
+     RouteSketch.Vertex middle=new RouteSketch.Vertex(point,cut);last.metres=length-cut;route.vertices.add(index+1,middle);route.highlight=-1;route.dragged=-1;selectedSectionStart[0]=middle.id;selectedSectionEnd[0]=last.id;route.invalidate();if(route.changed!=null)route.changed.run();dialog.dismiss();
+    }catch(Exception ex){distance.setError("Ungültiges Maß");}}));dialog.show();
+   });
    EditText widthField=referenceField(sectionEditor,"Breite (B)",String.format(java.util.Locale.GERMANY,"%.2f",bw),true);
    EditText depthField=referenceField(sectionEditor,"Tiefe (T)",String.format(java.util.Locale.GERMANY,"%.2f",bd),true);
    final String[] selectedMaterial={material};
@@ -1437,9 +1452,11 @@ public class MainActivity extends Activity {
     Button card=new Button(this);styleEditorButton(card,selectedSection[0]==j);
     card.setText(String.format(java.util.Locale.GERMANY,"A%d",j+1)+"  "+(Double.isFinite(length)&&length>0?(Double.isFinite(end)?String.format(java.util.Locale.GERMANY,"%.2f – %.2f m",station,end):"Station offen"):"Maß fehlt")+(Double.isFinite(length)&&length>0?String.format(java.util.Locale.GERMANY,"\n%.2f m",length):""));
     LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(sectionCards.getOrientation()==LinearLayout.VERTICAL?-1:dp(104),dp(48));cp.setMargins(dp(2),0,dp(2),0);sectionCards.addView(card,cp);
-    card.setOnClickListener(v->{if(index+1>=route.vertices.size())return;selectedSection[0]=index;selectedSectionStart[0]=route.vertices.get(index).id;selectedSectionEnd[0]=route.vertices.get(index+1).id;sectionPosition.setText("Abschnitt "+(index+1)+" / "+count);for(int k=0;k<sectionCards.getChildCount();k++)styleEditorButton((Button)sectionCards.getChildAt(k),k==index);if(!Double.isFinite(route.vertices.get(index+1).metres)||route.vertices.get(index+1).metres<=0)measureSegment(route,index+1);});
+    card.setOnClickListener(v->{if(index+1>=route.vertices.size())return;selectedSection[0]=index;selectedSectionStart[0]=route.vertices.get(index).id;selectedSectionEnd[0]=route.vertices.get(index+1).id;sectionPosition.setText("Abschnitt "+(index+1)+" / "+count);for(int k=0;k<count;k++)styleEditorButton((Button)sectionCards.getChildAt(k),k==index);if(!Double.isFinite(route.vertices.get(index+1).metres)||route.vertices.get(index+1).metres<=0)measureSegment(route,index+1);});
     station=Double.isFinite(length)&&length>0&&Double.isFinite(end)?end:Double.NaN;
    }
+   Button addSection=new Button(this);styleEditorButton(addSection,false);addSection.setText("+ Neu");addSection.setContentDescription("Neuen Abschnitt zeichnen");sectionCards.addView(addSection,new LinearLayout.LayoutParams(sectionCards.getOrientation()==LinearLayout.VERTICAL?-1:dp(84),dp(48)));
+   addSection.setOnClickListener(v->{route.selectionOnly=false;mode.setSelection(0);notice("Nächsten Trassenpunkt antippen.");});
   };
   refreshSections.run();
   route.inspectorSelection=index->{selectedSection[0]=index;selectedSectionStart[0]=null;selectedSectionEnd[0]=null;refreshSections.run();};
