@@ -292,17 +292,17 @@ public class MainActivity extends Activity {
   }));dialog.show();
  }
  void showProjectStart(){
-  LinearLayout start=page();start.setGravity(Gravity.TOP);start.setPadding(dp(20),dp(16),dp(20),dp(12));setContentView(start);fitSystemPanels(start);
+  LinearLayout start=page();start.setGravity(Gravity.TOP);start.setBackgroundColor(Color.BLACK);start.setPadding(dp(20),dp(16),dp(20),dp(12));setContentView(start);fitSystemPanels(start);
   ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);start.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-  LinearLayout content=page();content.setPadding(0,0,0,0);scroll.addView(content);
-  TextView brand=sheetText("Feldaufmaß Pro",28,true);content.addView(brand);
+  LinearLayout content=page();content.setPadding(0,0,0,0);content.setBackgroundColor(Color.BLACK);scroll.addView(content);
+  TextView brand=sheetText("Feldaufmaß Pro",26,true);content.addView(brand);
   TextView subtitle=sheetText("Tiefbau · Leitungsbau",14,false);subtitle.setTextColor(0xff9aabaa);content.addView(subtitle);
-  TextView heading=sheetText("Projekte",20,true);heading.setPadding(0,dp(24),0,dp(12));content.addView(heading);
+  TextView heading=sheetText("Projekte",20,true);heading.setPadding(0,dp(18),0,dp(8));content.addView(heading);
   overviewAction(content,"Neues Projekt erstellen","objects",()->newProjectDialog());
   Button create=(Button)content.getChildAt(content.getChildCount()-1);
   create.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x33ffffff),editorShape(TEAL,10),null));
   overviewAction(content,"Bestehendes Projekt öffnen","layers",()->showProjects());
-  TextView recent=sheetText("Vorhandene Projekte",18,true);recent.setPadding(0,dp(20),0,dp(8));content.addView(recent);
+  TextView recent=sheetText("Vorhandene Projekte",18,true);recent.setPadding(0,dp(16),0,dp(6));content.addView(recent);
   java.util.ArrayList<String> ids=new java.util.ArrayList<>(projectRegistry().getStringSet("ids",java.util.Collections.emptySet()));
   ids.remove(LEGACY_PROJECT);
   java.util.Collections.sort(ids,(a,b)->projectStorage(a).getString("project","").compareToIgnoreCase(projectStorage(b).getString("project","")));
@@ -317,6 +317,7 @@ public class MainActivity extends Activity {
    });
   }
   overviewAction(start,"Cloud","cloud",()->openCloud());
+  for(LinearLayout group:new LinearLayout[]{content,start})for(int k=0;k<group.getChildCount();k++){View child=group.getChildAt(k);if(child instanceof Button){Button b=(Button)child;b.setMinHeight(dp(48));b.setMinimumHeight(dp(48));b.setTextSize(14);b.setPadding(dp(12),dp(6),dp(12),dp(6));android.view.ViewGroup.LayoutParams lp=b.getLayoutParams();lp.height=dp(52);b.setLayoutParams(lp);}}
  }
  void enterProject(){projectChosen=true;startLiveGps();setContentView(shell);fitSystemPanels(shell);if(length.length()>0&&width.length()>0&&depth.length()>0)calculate();showPage(planPage);}
  void showProjects(){
