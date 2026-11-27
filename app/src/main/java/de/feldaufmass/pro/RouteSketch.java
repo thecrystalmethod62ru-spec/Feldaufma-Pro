@@ -516,6 +516,25 @@ final class RouteSketch extends View {
   paint.setTextSize(13*density);
  }
  private android.location.Location liveFix;
+ // Independent GPS observations: never replace manually measured vertices.
+ static final class GpsLayer {
+  final ArrayList<android.location.Location> observations=new ArrayList<>();
+  GpsLayer(){}
+  GpsLayer(String data){
+   try{JSONArray rows=new JSONArray(data);for(int i=0;i<rows.length();i++){
+    JSONArray row=rows.getJSONArray(i);android.location.Location fix=new android.location.Location("gps");
+    fix.setLatitude(row.getDouble(0));fix.setLongitude(row.getDouble(1));fix.setAccuracy((float)row.getDouble(2));fix.setTime(row.optLong(3));observations.add(fix);
+   }}catch(JSONException e){observations.clear();}
+  }
+  String encode(){
+   JSONArray rows=new JSONArray();try{for(android.location.Location fix:observations)rows.put(new JSONArray().put(fix.getLatitude()).put(fix.getLongitude()).put((double)fix.getAccuracy()).put(fix.getTime()));}catch(JSONException e){throw new IllegalStateException(e);}return rows.toString();
+  }
+  ArrayList<PointF> alignedPoints(RouteSketch manual){
+   ArrayList<PointF> points=new ArrayList<>();
+   for(android.location.Location fix:observations){PointF p=manual.gpsPosition(fix.getLatitude(),fix.getLongitude(),-1);if(p==null){points.clear();return points;}points.add(p);}
+   return points;
+  }
+ }
  static final class GpsRecording {
   final ArrayList<android.location.Location> samples=new ArrayList<>();
   boolean add(android.location.Location fix){
@@ -528,6 +547,7 @@ final class RouteSketch extends View {
    if(samples.size()>=10000)return false;
    samples.add(new android.location.Location(fix));return true;
   }
+  GpsLayer snapshot(){GpsLayer layer=new GpsLayer();for(android.location.Location fix:samples)layer.observations.add(new android.location.Location(fix));return layer;}
   boolean apply(RouteSketch route){
    if(!route.vertices.isEmpty()||samples.size()<2)return false;
    android.location.Location origin=samples.get(0);
