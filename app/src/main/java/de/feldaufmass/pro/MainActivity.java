@@ -1449,9 +1449,9 @@ public class MainActivity extends Activity {
   profileWork.addOnLayoutChangeListener((view,left,top,right,bottom,oldLeft,oldTop,oldRight,oldBottom)->{
    if(right<=left||bottom<=top)return;
    boolean wide=right-left>=dp(560);
-   int orientation=wide?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL;
-   if(profileWork.getOrientation()==orientation)return;
-   profileWork.setOrientation(orientation);
+   int profileOrientation=wide?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL;
+   if(profileWork.getOrientation()==profileOrientation)return;
+   profileWork.setOrientation(profileOrientation);
    fullCross.setLayoutParams(wide?new LinearLayout.LayoutParams(0,-1,3):new LinearLayout.LayoutParams(-1,0,3));
    profileInfoScroll.setLayoutParams(wide?new LinearLayout.LayoutParams(0,-1,2):new LinearLayout.LayoutParams(-1,0,2));
   });
