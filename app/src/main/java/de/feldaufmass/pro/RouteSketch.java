@@ -575,8 +575,27 @@ final class RouteSketch extends View {
   }
   return new double[]{count==0?0:sum/count,max};
  }
- void setIndependentGpsTrack(JSONArray rows){independentGpsTrack=rows==null?new JSONArray():rows;invalidate();}
+ void setIndependentGpsTrack(JSONArray rows){independentGpsTrack=rows==null?new JSONArray():rows;deviationKey=null;invalidate();}
+ private static final class GpsDeviationLine{
+  final PointF a,b;final int color;final boolean reverse;
+  GpsDeviationLine(PointF a,PointF b,int color,boolean reverse){this.a=a;this.b=b;this.color=color;this.reverse=reverse;}
+ }
+ private String deviationKey="";
+ private final java.util.ArrayList<GpsDeviationLine> deviationCache=new java.util.ArrayList<>();
+ private String gpsGeometryKey(){
+  StringBuilder key=new StringBuilder();
+  for(Vertex v:vertices)key.append(v.point.x).append(',').append(v.point.y).append(',').append(v.latitude).append(',').append(v.longitude).append(',').append(v.accuracy).append(';');
+  return key.toString();
+ }
  void drawGpsDeviations(Canvas c,float density){
+  if(!layerVisible(LAYER_GPS_DEVIATIONS))return;
+  String key=gpsGeometryKey();
+  if(!key.equals(deviationKey)){deviationCache.clear();rebuildGpsDeviations();deviationKey=key;}
+  paint.setStrokeWidth(1.5f*density);
+  android.graphics.DashPathEffect dash=new android.graphics.DashPathEffect(new float[]{4*density,3*density},0);
+  try{for(GpsDeviationLine item:deviationCache){paint.setPathEffect(item.reverse?dash:null);paint.setColor(item.color);line(c,item.a,item.b);}}finally{paint.setPathEffect(null);}
+ }
+ private void rebuildGpsDeviations(){
   if(!layerVisible(LAYER_GPS_DEVIATIONS)||vertices.size()<2||independentGpsTrack.length()<2)return;
   java.util.ArrayList<PointF> points=new java.util.ArrayList<>();
   double metres=0,span=0;org.json.JSONObject last=null;
@@ -592,16 +611,14 @@ final class RouteSketch extends View {
   double factor=metres/span;
   java.util.ArrayList<PointF> manual=new java.util.ArrayList<>();
   for(Vertex v:vertices)manual.add(v.point);
-  drawDeviationDirection(c,density,points,manual,factor,false);
-  drawDeviationDirection(c,density,manual,points,factor,true);
+  cacheDeviationDirection(points,manual,factor,false);
+  cacheDeviationDirection(manual,points,factor,true);
  }
- private void drawDeviationDirection(Canvas c,float density,java.util.List<PointF> from,java.util.List<PointF> to,double factor,boolean reverse){
+ private void cacheDeviationDirection(java.util.List<PointF> from,java.util.List<PointF> to,double factor,boolean reverse){
   double length=0;for(int i=1;i<from.size();i++)length+=distance(from.get(i-1),from.get(i));
   if(length<=0)return;
   double step=Math.max(1/factor,length/99),next=0,offset=0;int count=0;
-  paint.setStrokeWidth(1.5f*density);
-  try{
-   if(reverse)paint.setPathEffect(new android.graphics.DashPathEffect(new float[]{4*density,3*density},0));
+
    for(int i=1;i<from.size();i++){
     PointF start=from.get(i-1),end=from.get(i);double len=distance(start,end);if(len<=0)continue;
     while(next<=offset+len&&count<100){
@@ -614,12 +631,11 @@ final class RouteSketch extends View {
       PointF q=new PointF((float)(a.x+t*dx),(float)(a.y+t*dy));double d=distance(p,q);
       if(d<best){best=d;nearest=q;}
      }
-     if(nearest!=null){double m=best*factor;paint.setColor(m<=1?0xff69cdbb:m<=3?0xffe9b63c:0xffef5350);line(c,p,nearest);}
+     if(nearest!=null){double m=best*factor;deviationCache.add(new GpsDeviationLine(p,nearest,m<=1?0xff69cdbb:m<=3?0xffe9b63c:0xffef5350,reverse));}
      next+=step;count++;
     }
     offset+=len;
    }
-  }finally{paint.setPathEffect(null);}
  }
  void drawIndependentGpsTrack(Canvas c,float density){
   if(!layerVisible(LAYER_GPS_TRACK)||independentGpsTrack.length()==0)return;
