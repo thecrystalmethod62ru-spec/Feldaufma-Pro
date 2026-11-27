@@ -1655,9 +1655,23 @@ public class MainActivity extends Activity {
   if(row==null||!unit.equals(row.optString("unit")))return Double.NaN;
   double value=row.optDouble("quantity");return Double.isFinite(value)&&value>=0?value:Double.NaN;
  }
+ static boolean duplicateSegmentArea(org.json.JSONObject a,org.json.JSONObject b){
+  if(a==null||b==null||!"segment".equals(a.optString("kind"))||!"segment".equals(b.optString("kind")))return false;
+  String am=a.optString("mode"),bm=b.optString("mode");
+  if(!("area".equals(am)||"cut".equals(am))||!("area".equals(bm)||"cut".equals(bm)))return false;
+  try{org.json.JSONObject x=new org.json.JSONObject(a.getString("snapshot")),y=new org.json.JSONObject(b.getString("snapshot"));
+   double af=x.getDouble("from"),at=x.getDouble("to"),bf=y.getDouble("from"),bt=y.getDouble("to");
+   return Double.isFinite(af+at+bf+bt)&&at>af&&bt>bf&&Math.min(at,bt)>Math.max(af,bf)+1e-9;
+  }catch(Exception e){return false;}
+ }
+ static boolean conflictingSegmentAreas(org.json.JSONArray rows){
+  if(rows==null)return false;
+  for(int j=0;j<rows.length();j++)for(int k=0;k<j;k++)if(duplicateSegmentArea(rows.optJSONObject(j),rows.optJSONObject(k)))return true;
+  return false;
+ }
  static double sumAnsatz(org.json.JSONObject position){
   org.json.JSONArray rows=position.optJSONArray("ansatz");
-  if(rows==null||rows.length()==0)return Double.NaN;
+  if(rows==null||rows.length()==0||conflictingSegmentAreas(rows))return Double.NaN;
   double sum=0;for(int j=0;j<rows.length();j++){double q=ansatzQuantity(rows.optJSONObject(j),position.optString("unit"));if(!Double.isFinite(q))return Double.NaN;sum+=q;}
   return Double.isFinite(sum)?sum:Double.NaN;
  }
@@ -1703,6 +1717,7 @@ public class MainActivity extends Activity {
   form.addView(sheetText(lvLabel(position),16,true));
   form.addView(sheetText("Mengenansätze sind bestätigte Messwert-Schnappschüsse. Geänderte Quellen neu übernehmen. Keine automatische Addition zu anderen LV-Positionen oder Abzüge.",14,false));
   double sum=sumAnsatz(position);form.addView(sheetText("Summe: "+(Double.isFinite(sum)?csvNumber(sum)+" "+position.optString("unit"):"offen"),16,true));
+  if(conflictingSegmentAreas(stored)){TextView warning=sheetText("Überlappende Flächenansätze: Grabenfläche und Fläche mit Nachschnitt nicht doppelt ansetzen. Überzähligen Ansatz entfernen.",14,false);warning.setTextColor(0xffffb16e);form.addView(warning);}
   for(int j=0;j<stored.length();j++){final int rowIndex=j;org.json.JSONObject row=stored.optJSONObject(j);if(row==null)continue;
    Button b=new Button(this);b.setAllCaps(false);b.setText(row.optString("label")+"\n"+csvNumber(ansatzQuantity(row,position.optString("unit")))+" "+row.optString("unit")+(ansatzSourceCurrent(row)?"":" · Quelle prüfen"));
    b.setOnClickListener(v->new android.app.AlertDialog.Builder(this).setTitle("Mengenansatz entfernen?").setNegativeButton("Abbrechen",null).setPositiveButton("Entfernen",(x,y)->{if(!lvPositions().toString().equals(original.toString())){notice("LV geändert. Neu öffnen.");return;}stored.remove(rowIndex);persistAnsatz(original,index,stored);}).show());form.addView(b);
@@ -1721,6 +1736,7 @@ public class MainActivity extends Activity {
     if(!lvPositions().toString().equals(original.toString())||!ansatzSourceCurrent(row)){notice("Daten geändert. Neu öffnen.");return;}
     org.json.JSONArray stored=position.optJSONArray("ansatz");if(stored==null)stored=new org.json.JSONArray();
     for(int j=0;j<stored.length();j++){org.json.JSONObject old=stored.optJSONObject(j);if(old!=null&&old.optString("kind").equals(row.optString("kind"))&&old.optString("snapshot").equals(row.optString("snapshot"))&&old.optString("mode").equals(row.optString("mode"))){notice("Dieser Mengenansatz ist bereits vorhanden.");return;}}
+    for(int j=0;j<stored.length();j++)if(duplicateSegmentArea(stored.optJSONObject(j),row)){notice("Überlappende Fläche bereits in dieser LV-Position. Vorhandenen Ansatz prüfen oder ersetzen.");return;}
     stored.put(row);persistAnsatz(original,index,stored);
    }).show();
   }).setNegativeButton("Abbrechen",null).show();
