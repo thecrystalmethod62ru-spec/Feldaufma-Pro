@@ -16,6 +16,7 @@ final class ProfilePageLayout {
  final ScrollView profileInfoScroll;
  Button profileEdit,editSectionProfile,baseSettings,applyProfile;
  Button[] fullButtons;
+ private Button standardCard,sectionCard;
  private final Context context;
  ProfilePageLayout(Context context){
  this.context=context;
@@ -76,9 +77,18 @@ final class ProfilePageLayout {
   for(Button b:new Button[]{editSectionProfile,baseSettings}){android.graphics.drawable.Drawable icon=b.getCompoundDrawables()[1];b.setCompoundDrawables(icon,null,null,null);b.setMinHeight(0);b.setMinimumHeight(0);b.setTextSize(12);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(dp(6),0,dp(6),0);}
   profileInfo.addView(editSectionProfile,new LinearLayout.LayoutParams(-1,dp(44)));
   TextView catalogTitle=sheetText("Profilkatalog",14,true);catalogTitle.setTextColor(0xff28d5c7);profileCatalog.addView(catalogTitle);
-  Button standard=new Button(context);style.accept(standard,true);standard.setText("Standardprofil");configureAction(standard);standard.setOnClickListener(v->baseSettings.performClick());profileCatalog.addView(standard,new LinearLayout.LayoutParams(-1,dp(44)));
-  Button section=new Button(context);style.accept(section,false);section.setText("Abschnitt");configureAction(section);section.setOnClickListener(v->editSectionProfile.performClick());profileCatalog.addView(section,new LinearLayout.LayoutParams(-1,dp(44)));
+  Button standard=new Button(context);standardCard=standard;style.accept(standard,true);standard.setText("Standardprofil");configureAction(standard);standard.setOnClickListener(v->baseSettings.performClick());profileCatalog.addView(standard,new LinearLayout.LayoutParams(-1,dp(58)));
+  Button section=new Button(context);sectionCard=section;style.accept(section,false);section.setText("Abschnitt");configureAction(section);section.setOnClickListener(v->editSectionProfile.performClick());profileCatalog.addView(section,new LinearLayout.LayoutParams(-1,dp(58)));
   for(Button b:new Button[]{baseSettings,profileEdit,applyProfile})profileActions.addView(b,new LinearLayout.LayoutParams(0,-1,1));
+ }
+ void updateCatalog(String standard,String section,boolean sectionSelected){
+  if(standardCard==null||sectionCard==null)return;
+  standardCard.setText("Standardprofil\n"+standard);
+  sectionCard.setText(section==null?"Abschnitt auswählen":section);
+  standardCard.setSelected(!sectionSelected);sectionCard.setSelected(sectionSelected);
+  standardCard.setBackground(panelFrame());sectionCard.setBackground(panelFrame());
+  standardCard.setTextColor(sectionSelected?Color.WHITE:0xff28d5c7);
+  sectionCard.setTextColor(sectionSelected?0xff28d5c7:Color.WHITE);
  }
  private static void detach(View view){if(view.getParent() instanceof android.view.ViewGroup)((android.view.ViewGroup)view.getParent()).removeView(view);}
  private boolean getResourcesLandscape(){return context.getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE;}
