@@ -342,9 +342,30 @@ public class MainActivity extends Activity {
   public void onProviderEnabled(String provider){}
   public void onStatusChanged(String provider,int status,android.os.Bundle extras){}
  };
+ void showGpsDeviationReport(RouteSketch route){
+  RouteSketch.GpsLayer layer=new RouteSketch.GpsLayer(getPreferences(0).getString("gpsRouteLayer","[]"));
+  if(route.vertices.size()<2||layer.observations.size()<2){notice("Zwei Trassen erforderlich.");return;}
+  if(getPreferences(0).getBoolean("gpsEndpointAlignment",false)){notice("Metervergleich bei schematischer Ausrichtung nicht möglich.");return;}
+  for(RouteSketch.Vertex v:route.vertices)if(!Double.isFinite(v.latitude)||Math.abs(v.latitude)>85||!Double.isFinite(v.longitude)||Math.abs(v.longitude)>180||!RouteSketch.preciseGps(v.accuracy)){notice("Metervergleich benötigt präzise GPS-Koordinaten an allen manuellen Trassenpunkten.");return;}
+  double sum=0,max=0,accuracy=0;int count=0;
+  for(android.location.Location fix:layer.observations){
+   double best=Double.POSITIVE_INFINITY,cos=Math.cos(Math.toRadians(fix.getLatitude()));
+   for(int j=1;j<route.vertices.size();j++){
+    RouteSketch.Vertex a=route.vertices.get(j-1),b=route.vertices.get(j);
+    double ax=((a.longitude-fix.getLongitude()+540)%360-180)*cos*111195,ay=(a.latitude-fix.getLatitude())*111195;
+    double bx=((b.longitude-fix.getLongitude()+540)%360-180)*cos*111195,by=(b.latitude-fix.getLatitude())*111195;
+    double dx=bx-ax,dy=by-ay,den=dx*dx+dy*dy,t=den==0?0:Math.max(0,Math.min(1,-(ax*dx+ay*dy)/den));
+    best=Math.min(best,Math.hypot(ax+t*dx,ay+t*dy));
+   }
+   if(Double.isFinite(best)){sum+=best;max=Math.max(max,best);accuracy+=fix.getAccuracy();count++;}
+  }
+  if(count==0){notice("Keine vergleichbaren GPS-Punkte.");return;}
+  new android.app.AlertDialog.Builder(this).setTitle("GPS-Abweichungsbericht").setMessage(String.format(java.util.Locale.GERMANY,"Mittlere Abweichung: %.2f m\nMaximale Abweichung: %.2f m\nGPS-Genauigkeit (Mittel): ± %.2f m\nGPS-Punkte: %d\n\nOrientierungswerte, keine Vermessung oder Abrechnungsmaße. Vergleich GPS-Punkt zur nächsten manuellen Strecke.",sum/count,max,accuracy/count,count)).setPositiveButton("Schließen",null).show();
+ }
  void showGpsLayerOptions(RouteSketch route){
   boolean approximate=getPreferences(0).getBoolean("gpsEndpointAlignment",false);
-  new android.app.AlertDialog.Builder(this).setTitle("GPS-Ebene").setItems(new String[]{"GPS als Vorlage übernehmen","Start- und Endpunkt ausrichten"+(approximate?" (aktiv)":""),"GPS-Referenzpunkte verwenden"+(!approximate?" (aktiv)":""),"Aufnahmerichtung umkehren","Transparenz einstellen",getPreferences(0).getBoolean("gpsShowDeviations",false)?"Abweichungen ausblenden":"Abweichungen anzeigen"},(d,w)->{
+  new android.app.AlertDialog.Builder(this).setTitle("GPS-Ebene").setItems(new String[]{"GPS als Vorlage übernehmen","Start- und Endpunkt ausrichten"+(approximate?" (aktiv)":""),"GPS-Referenzpunkte verwenden"+(!approximate?" (aktiv)":""),"Aufnahmerichtung umkehren","Transparenz einstellen",getPreferences(0).getBoolean("gpsShowDeviations",false)?"Abweichungen ausblenden":"Abweichungen anzeigen","GPS-Abweichungsbericht"},(d,w)->{
+   if(w==6){showGpsDeviationReport(route);return;}
    if(w==5){getPreferences(0).edit().putBoolean("gpsShowDeviations",!getPreferences(0).getBoolean("gpsShowDeviations",false)).apply();route.invalidate();return;}
    if(w==3){if(!approximate){notice("Nur für schematische Ausrichtung erforderlich.");return;}getPreferences(0).edit().putBoolean("gpsLayerReverse",!getPreferences(0).getBoolean("gpsLayerReverse",false)).apply();route.invalidate();return;}
    if(w==4){android.widget.SeekBar slider=new android.widget.SeekBar(this);slider.setMax(230);slider.setProgress(Math.max(0,Math.min(230,getPreferences(0).getInt("gpsLayerAlpha",255)-25)));new android.app.AlertDialog.Builder(this).setTitle("GPS-Deckkraft").setView(slider).setNegativeButton("Abbrechen",null).setPositiveButton("Übernehmen",(dd,ww)->{getPreferences(0).edit().putInt("gpsLayerAlpha",slider.getProgress()+25).apply();route.invalidate();}).show();return;}
