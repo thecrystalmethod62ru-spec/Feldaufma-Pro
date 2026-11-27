@@ -15,7 +15,7 @@ import java.util.Locale;
 
 /** Coordinates describe a schematic only. Metres are entered in the field. */
 final class RouteSketch extends View {
- static final int LAYER_ROUTE=1,LAYER_DIMENSIONS=2,LAYER_NAMES=4,LAYER_GPS=8,LAYER_PHOTOS=16,LAYER_OBJECTS=32,LAYER_SURFACES=64,LAYER_SURFACE_DIMENSIONS=128,ALL_LAYERS=255;
+ static final int LAYER_ROUTE=1,LAYER_DIMENSIONS=2,LAYER_NAMES=4,LAYER_GPS=8,LAYER_PHOTOS=16,LAYER_OBJECTS=32,LAYER_SURFACES=64,LAYER_SURFACE_DIMENSIONS=128,LAYER_GPS_TRACK=256,ALL_LAYERS=511;
  int visibleLayers=ALL_LAYERS;
  boolean layerVisible(int layer){return (visibleLayers&layer)!=0;}
  void setVisibleLayers(int layers){visibleLayers=layers&ALL_LAYERS;invalidate();}
@@ -531,6 +531,18 @@ final class RouteSketch extends View {
   paint.setTextSize(13*density);
  }
  private android.location.Location liveFix;
+ JSONArray independentGpsTrack=new JSONArray();
+ void setIndependentGpsTrack(JSONArray rows){independentGpsTrack=rows==null?new JSONArray():rows;invalidate();}
+ void drawIndependentGpsTrack(Canvas c,float density){
+  if(!layerVisible(LAYER_GPS_TRACK)||independentGpsTrack.length()==0)return;
+  PointF previous=null;paint.setColor(0xff35b9ff);paint.setStrokeWidth(3*density);
+  for(int i=0;i<independentGpsTrack.length();i++){
+   org.json.JSONObject row=independentGpsTrack.optJSONObject(i);
+   PointF p=row==null?null:gpsPosition(row.optDouble("lat"),row.optDouble("lon"),-1);
+   if(p!=null){if(previous!=null)line(c,previous,p);c.drawCircle(left()+scale()*p.x,top()+scale()*p.y,3*density,paint);}
+   previous=p;
+  }
+ }
  void setLiveFix(android.location.Location fix){liveFix=fix;invalidate();}
  float zoom=1,centerX=.5f,centerY=.5f;
  boolean moving,gesture;
@@ -732,6 +744,7 @@ final class RouteSketch extends View {
   }
   drawSurfaceDimensions(c,density);
   drawStationObjects(c,density);
+  drawIndependentGpsTrack(c,density);
   if(layerVisible(LAYER_GPS)&&liveFix!=null){
    PointF gps=gpsPosition(liveFix.getLatitude(),liveFix.getLongitude(),-1);
    if(gps!=null){
