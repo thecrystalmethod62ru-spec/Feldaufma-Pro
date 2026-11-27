@@ -3828,7 +3828,7 @@ public class MainActivity extends Activity {
  actionButtonSingle(planPage,"Schichtvolumen berechnen",()->{
   try{
    if(segments.length()==0){notice("Keine Oberflächenabschnitte vorhanden.");return;}
-   StringBuilder report=new StringBuilder("Vorberechnung – gemeinsame Schichtstärken\n\n");
+   StringBuilder report=new StringBuilder("Vorberechnung – abschnittsbezogene Schichtstärken\n\n");
    java.util.TreeMap<String,Double> totals=new java.util.TreeMap<>();
    for(int i=0;i<segments.length();i++){
     org.json.JSONObject row=segments.getJSONObject(i);
@@ -3841,14 +3841,14 @@ public class MainActivity extends Activity {
     report.append(String.format(java.util.Locale.GERMANY,"%.2f – %.2f m | %s\n",from,to,type));
     boolean asphaltLayer=type.equals("Asphalt"),stoneLayer=type.toLowerCase(java.util.Locale.ROOT).matches(".*(pflaster|platten).*");
     if(asphaltLayer||stoneLayer){
-     double thickness=optional(asphaltLayer?asphaltInput:stoneDepth)/(asphaltLayer?1:100);
+     double thickness=row.has("topThickness")?row.optDouble("topThickness"):optional(asphaltLayer?asphaltInput:stoneDepth)/(asphaltLayer?1:100);
      if(Double.isFinite(thickness)&&thickness>0){
       double volume=CivilGeometry.rectangularVolume(to-from,cut,thickness);
       totals.put(type,totals.getOrDefault(type,0.0)+volume);
       report.append(String.format(java.util.Locale.GERMANY,"Deckschicht: %.3f m³%s\n",volume,row.has("cutWidth")?"":" (nur Graben; Nachschnitt unbekannt)"));
      }else report.append("Deckschichtstärke fehlt\n");
     }else report.append("Deckschicht nicht berechnet\n");
-    double baseThickness=optional(baseInput);
+    double baseThickness=row.has("baseThickness")?row.optDouble("baseThickness"):optional(baseInput);
     if(Double.isFinite(baseThickness)&&baseThickness>0&&(asphaltLayer||stoneLayer)){
      double volume=CivilGeometry.rectangularVolume(to-from,bw,baseThickness);totals.put("Tragschicht",totals.getOrDefault("Tragschicht",0.0)+volume);
      report.append(String.format(java.util.Locale.GERMANY,"Tragschicht (Grabenbreite): %.3f m³\n",volume));
@@ -3856,7 +3856,7 @@ public class MainActivity extends Activity {
    }
    report.append("\nTeilsummen (nur erfasste Schichten)\n");
    for(java.util.Map.Entry<String,Double> entry:totals.entrySet())report.append(String.format(java.util.Locale.GERMANY,"%s: %.3f m³\n",entry.getKey(),entry.getValue()));
-   report.append("\nGemeinsame Stärken fachlich je Abschnitt prüfen. Bettung und Altbelag nicht berechnet. Nicht zusätzlich zum Bruttoaushub addieren.");
+   report.append("\nNicht individuell erfasste Stärken verwenden das Standardprofil. Bettung und Altbelag nicht berechnet. Nicht zusätzlich zum Bruttoaushub addieren.");
    TextView resultText=new TextView(this);resultText.setPadding(dp(16),dp(12),dp(16),dp(12));resultText.setText(report.toString());ScrollView scroll=new ScrollView(this);scroll.addView(resultText);
    new android.app.AlertDialog.Builder(this).setTitle("Oberflächenaufbau – Schichtvolumen").setView(scroll).setPositiveButton("Schließen",null).show();
   }catch(Exception ex){notice("Schichtvolumen: "+ex.getMessage());}
@@ -4058,21 +4058,32 @@ public class MainActivity extends Activity {
    picker.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,labels));
    LinearLayout controls=page();body.addView(controls);PipeLayoutView view=new PipeLayoutView(this);controls.addView(view,new LinearLayout.LayoutParams(-1,dp(240)));
    EditText bw=new EditText(this),bd=new EditText(this);bw.setHint("Grabenbreite (m)");bd.setHint("Grabentiefe (m)");controls.addView(bw);utilitySlider(controls,bw,"Grabenbreite (m)",0.1,6,0.01,true);controls.addView(bd);utilitySlider(controls,bd,"Grabentiefe (m)",0.1,8,0.01,true);
+   EditText cutL=new EditText(this),cutR=new EditText(this),topLayer=new EditText(this),baseLayer=new EditText(this);
+   EditText[] extras={cutL,cutR,topLayer,baseLayer};String[] extraLabels={"Nachschnitt links (m)","Nachschnitt rechts (m)","Deckschicht (m)","Tragschicht (m)"};
+   for(int j=0;j<extras.length;j++){extras[j].setHint(extraLabels[j]);controls.addView(extras[j]);utilitySlider(controls,extras[j],extraLabels[j],0,j<2?2:1,0.01,true);}
    TextView quantity=sheetText("",14,false);controls.addView(quantity);
    final boolean[] loading={false};
    Runnable preview=()->{if(loading[0])return;try{org.json.JSONObject p=rows.get(picker.getSelectedItemPosition()-1);double ww=number(bw),dd=number(bd);if(!Double.isFinite(ww)||!Double.isFinite(dd)||ww<=0||dd<=0)return;view.setLayoutData(PipeLayoutStore.decode(p.getJSONArray("pipes").toString()),ww,dd);quantity.setText(String.format(java.util.Locale.GERMANY,"Aushub (brutto): %.3f m³",(p.getDouble("to")-p.getDouble("from"))*ww*dd));}catch(Exception ignored){}};
    android.text.TextWatcher watcher=new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int a,int c,int f){}public void onTextChanged(CharSequence s,int a,int b,int c){preview.run();}public void afterTextChanged(android.text.Editable e){}};
-   bw.addTextChangedListener(watcher);bd.addTextChangedListener(watcher);
-   java.util.function.IntConsumer load=i->{boolean standard=i==0;controls.setVisibility(standard?View.GONE:View.VISIBLE);for(int j=0;j<profilePage.getChildCount();j++){View child=profilePage.getChildAt(j);if(child!=sectionProfilePanel)child.setVisibility(standard?View.VISIBLE:View.GONE);}if(standard)return;org.json.JSONObject p=rows.get(i-1);loading[0]=true;bw.setText(String.valueOf(p.optDouble("width")));bd.setText(p.optDouble("depth")>0?String.valueOf(p.optDouble("depth")):"");loading[0]=false;preview.run();};
+   bw.addTextChangedListener(watcher);bd.addTextChangedListener(watcher);for(EditText field:extras)field.addTextChangedListener(watcher);
+   java.util.function.IntConsumer load=i->{boolean standard=i==0;controls.setVisibility(standard?View.GONE:View.VISIBLE);for(int j=0;j<profilePage.getChildCount();j++){View child=profilePage.getChildAt(j);if(child!=sectionProfilePanel)child.setVisibility(standard?View.VISIBLE:View.GONE);}if(standard)return;org.json.JSONObject p=rows.get(i-1);loading[0]=true;bw.setText(String.valueOf(p.optDouble("width")));bd.setText(p.optDouble("depth")>0?String.valueOf(p.optDouble("depth")):"");org.json.JSONObject seg=findSurfaceSection(p);String[] keys={"left","right","topThickness","baseThickness"};for(int j=0;j<extras.length;j++)extras[j].setText(seg==null?"":seg.optString(keys[j],""));loading[0]=false;preview.run();};
    onChoice(picker,load);load.accept(0);
    actionButtonSingle(controls,"Abschnitt speichern",()->{try{
     int i=picker.getSelectedItemPosition()-1;org.json.JSONObject p=rows.get(i);double ww=number(bw),dd=number(bd);
+    double cl=optional(cutL),cr=optional(cutR),tl=optional(topLayer),bl=optional(baseLayer);
+    if((Double.isFinite(tl)?tl:0)+(Double.isFinite(bl)?bl:0)>dd)throw new IllegalArgumentException("Schichtstärken überschreiten Grabentiefe");
+    org.json.JSONObject seg=findSurfaceSection(p);
+    if(seg==null&&(cutL.length()>0||cutR.length()>0||topLayer.length()>0||baseLayer.length()>0))throw new IllegalArgumentException("Passenden Oberflächenabschnitt anlegen");
     new PipeLayoutStore(getPreferences(0)).saveSection(p.getDouble("from"),p.getDouble("to"),ww,dd,PipeLayoutStore.decode(p.getJSONArray("pipes").toString()));
+    if(seg!=null){seg.put("width",ww);String[] keys={"left","right","topThickness","baseThickness"};double[] vals={cl,cr,tl,bl};for(int j=0;j<keys.length;j++){if(Double.isFinite(vals[j]))seg.put(keys[j],vals[j]);else seg.remove(keys[j]);}if(Double.isFinite(cl)&&Double.isFinite(cr))seg.put("cutWidth",ww+cl+cr);else seg.remove("cutWidth");persistSegments();}
     p.put("width",ww).put("depth",dd);if(sketch!=null)sketch.invalidate();refreshMainQuantities();notice("Abschnittsprofil gespeichert.");
    }catch(Exception ex){notice("Abschnittsprofil: "+ex.getMessage());}});
    controls.addView(sheetText("Vor dem Wechsel Änderungen speichern. Standardprofil bleibt unverändert.",13,false));
    
   }catch(Exception ex){notice("Abschnittsprofile: "+ex.getMessage());}
+ }
+ org.json.JSONObject findSurfaceSection(org.json.JSONObject p){
+  for(int j=0;j<segments.length();j++){org.json.JSONObject seg=segments.optJSONObject(j);if(seg!=null&&seg.optDouble("from")==p.optDouble("from")&&seg.optDouble("to")==p.optDouble("to"))return seg;}return null;
  }
  void actionButton(LinearLayout bar,String label,Runnable action){
   Button button=actionButtonSingle(bar,label,action);button.setLayoutParams(new LinearLayout.LayoutParams(0,-2,1));
