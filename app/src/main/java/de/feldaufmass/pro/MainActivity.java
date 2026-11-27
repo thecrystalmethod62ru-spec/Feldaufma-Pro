@@ -1753,7 +1753,7 @@ public class MainActivity extends Activity {
    if("length".equals(source)&&"m".equals(o.optString("unit")))value=l;
    if("area".equals(source)&&"m²".equals(o.optString("unit")))value=currentTrenchQuantities()[0];
    if("volume".equals(source)&&"m³".equals(o.optString("unit")))value=currentTrenchQuantities()[1];
-   if("cut".equals(source)&&"m²".equals(o.optString("unit"))&&Double.isFinite(left)&&Double.isFinite(right))value=l*(w+left+right);
+   if("cut".equals(source)&&"m²".equals(o.optString("unit")))value=currentCutArea();
   }
   return Double.isFinite(value)&&value>=0?value:Double.NaN;
  }
@@ -4775,8 +4775,10 @@ public class MainActivity extends Activity {
    }else if("area".equals(source)||"volume".equals(source)){
     for(String formula:trenchRebFormulas(l,w,d,new PipeLayoutStore(getPreferences(0)).sections(),"volume".equals(source)))
      out.append(RebExport.record(oz,formula,address++)).append("\r\n");
+   }else if("cut".equals(source)){
+    for(double[] part:currentCutIntervals())out.append(RebExport.record(oz,RebExport.product(part[0],part[1]),address++)).append("\r\n");
    }else{
-    String formula="length".equals(source)?RebExport.product(l):"cut".equals(source)?RebExport.product(l,w+left+right):RebExport.product(qty);
+    String formula="length".equals(source)?RebExport.product(l):RebExport.product(qty);
     out.append(RebExport.record(oz,formula,address++)).append("\r\n");
    }
   }
@@ -4838,7 +4840,8 @@ public class MainActivity extends Activity {
   String basis=Double.isFinite(trench[0])?(sectional?"Abschnittsprofile berücksichtigt; keine Abzüge":"Standardprofil; keine Abzüge"):"Abschnittsprofile prüfen – Menge offen";
   csvRow(out,name,"Haupttrasse","Aushub – geometrisch",0,l,l,sectional?n:w,sectional?n:d,trench[1],"m³",basis);
   csvRow(out,name,"Haupttrasse","Grundfläche",0,l,l,sectional?n:w,n,trench[0],"m²",basis+"; Bezugsfläche, nicht addieren");
-  if(Double.isFinite(left)&&Double.isFinite(right))csvRow(out,name,"Haupttrasse","Fläche mit Nachschnitt",0,l,l,w+left+right,n,l*(w+left+right),"m²","Alternative Bezugsfläche, nicht zusätzlich zur Grundfläche");
+  double cutArea=currentCutArea();
+  csvRow(out,name,"Haupttrasse","Fläche mit Nachschnitt",0,l,l,n,n,cutArea,"m²",Double.isFinite(cutArea)?"Abschnittsbreiten berücksichtigt; alternative Bezugsfläche, nicht zusätzlich zur Grundfläche":"Nachschnittmaße oder Abschnittsgrenzen prüfen");
   for(int j=0;j<segments.length();j++){
    org.json.JSONObject o=segments.optJSONObject(j);if(o==null)continue;double a=o.optDouble("from"),b=o.optDouble("to"),width=o.optDouble("width"),len=b-a;
    boolean valid=Double.isFinite(a)&&Double.isFinite(b)&&a>=0&&b<=l&&len>0&&Double.isFinite(width)&&width>0;
@@ -5081,6 +5084,43 @@ public class MainActivity extends Activity {
   if(cursor<l)formulas.add(volume?RebExport.product(l-cursor,w,d):RebExport.product(l-cursor,w));
   return formulas;
  }
+ static java.util.List<double[]> cutIntervals(double l,double w,double d,double left,double right,org.json.JSONArray profiles,org.json.JSONArray surfaces)throws Exception{
+  mainTrenchQuantities(l,w,d,profiles);
+  java.util.TreeSet<Double> boundaries=new java.util.TreeSet<>();boundaries.add(0.0);boundaries.add(l);
+  for(org.json.JSONArray rows:new org.json.JSONArray[]{profiles,surfaces}){
+   for(int i=0;i<rows.length();i++){
+    org.json.JSONObject row=rows.getJSONObject(i);double a=row.getDouble("from"),b=row.getDouble("to");
+    if(!Double.isFinite(a+b)||a<0||b<=a||b>l)throw new IllegalArgumentException("Ungültige Abschnittsgrenzen");
+    for(int j=0;j<i;j++){org.json.JSONObject q=rows.getJSONObject(j);if(a<q.getDouble("to")&&b>q.getDouble("from"))throw new IllegalArgumentException("Abschnitte überlappen");}
+    boundaries.add(a);boundaries.add(b);
+   }
+  }
+  java.util.List<double[]> parts=new java.util.ArrayList<>();Double previous=null;
+  for(double end:boundaries){
+   if(previous==null){previous=end;continue;}
+   double start=previous,mid=start+(end-start)/2,bw=w,cut=Double.NaN;
+   for(int i=0;i<profiles.length();i++){org.json.JSONObject p=profiles.getJSONObject(i);if(mid>=p.getDouble("from")&&mid<p.getDouble("to")){bw=p.getDouble("width");break;}}
+   for(int i=0;i<surfaces.length();i++){
+    org.json.JSONObject p=surfaces.getJSONObject(i);if(mid<p.getDouble("from")||mid>=p.getDouble("to"))continue;
+    if(p.has("cutWidth")){cut=p.getDouble("cutWidth");if(!Double.isFinite(cut)||cut<bw-1e-9)throw new IllegalArgumentException("Nachschnittbreite kleiner als Grabenbreite");}
+    break;
+   }
+   if(!Double.isFinite(cut)){
+    if(!Double.isFinite(left)||!Double.isFinite(right)||left<0||right<0)throw new IllegalArgumentException("Nachschnittmaße fehlen");
+    cut=bw+left+right;
+   }
+   if(!Double.isFinite(cut)||cut<=0)throw new IllegalArgumentException("Ungültige Nachschnittbreite");
+   parts.add(new double[]{end-start,cut});previous=end;
+  }
+  return parts;
+ }
+ java.util.List<double[]> currentCutIntervals()throws Exception{
+  return cutIntervals(l,w,d,left,right,new PipeLayoutStore(getPreferences(0)).sections(),segments);
+ }
+ double currentCutArea(){
+  try{double area=0;for(double[] part:currentCutIntervals())area+=part[0]*part[1];return Double.isFinite(area)?area:Double.NaN;}
+  catch(Exception e){return Double.NaN;}
+ }
  double[] currentTrenchQuantities(){
   try{return mainTrenchQuantities(l,w,d,new PipeLayoutStore(getPreferences(0)).sections());}
   catch(Exception e){return new double[]{Double.NaN,Double.NaN};}
@@ -5092,6 +5132,7 @@ public class MainActivity extends Activity {
    double[] q=currentTrenchQuantities();
    basic=Double.isFinite(q[0])?String.format(java.util.Locale.GERMANY,"Aushub: %.2f m³\nGrundfläche: %.2f m²",q[1],q[0]):"Abschnittsprofile prüfen – Mengen nicht eindeutig";
   }
+  double cutArea=currentCutArea();if(Double.isFinite(cutArea))basic+=String.format(java.util.Locale.GERMANY,"\nFläche mit Nachschnitt: %.2f m² (alternativ)",cutArea);
   double measured=new RouteSketch(this,routeData()).measuredLength();
   result.setText(basic+routeLengthWarning(measured));
   if(shoringQuantities!=null)shoringQuantities.setText(shoringReport());
