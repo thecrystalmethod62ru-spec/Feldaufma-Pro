@@ -458,6 +458,38 @@ final class RouteSketch extends View {
    }
   }catch(Exception ignored){}
  }
+ // Offset cuts follow each measured segment; corners are schematic, not billing geometry.
+ private void drawAsphaltCuts(Canvas c,float density){
+  if(!layerVisible(LAYER_SURFACES))return;
+  Paint cut=new Paint(Paint.ANTI_ALIAS_FLAG);cut.setStrokeWidth(1.5f*density);
+  double total=measuredLength();if(!Double.isFinite(total)||total<=0)return;
+  for(int j=0;j<surfaceSections.length();j++){
+   JSONObject row=surfaceSections.optJSONObject(j);if(row==null||!"Asphalt".equals(row.optString("surface")))continue;
+   double from=row.optDouble("from"),to=row.optDouble("to"),width=row.optDouble("width");
+   if(!Double.isFinite(from+to+width)||from<0||to<=from||to>total+1e-8||width<=0)continue;
+   double start=0;
+   for(int i=1;i<vertices.size();i++){
+    Vertex a=vertices.get(i-1),b=vertices.get(i);
+    double dx=b.point.x-a.point.x,dy=b.point.y-a.point.y,n=Math.hypot(dx,dy),len=b.metres,end=start+len;
+    if(!Double.isFinite(len)||len<=0)return;
+    double lo=Math.max(from,start),hi=Math.min(to,end);
+    if(hi>lo&&n>1e-8){
+     double nx=dy/n,ny=-dx/n,unit=n/len,t1=(lo-start)/len,t2=(hi-start)/len;
+     for(int side=0;side<2;side++){
+      double extra=row.optDouble(side==0?"left":"right");
+      for(int pass=0;pass<2;pass++){
+       if(pass==1&&(!Double.isFinite(extra)||extra<=0))continue;
+       double offset=(side==0?1:-1)*(width/2+(pass==1?extra:0))*unit;
+       cut.setColor(pass==1?0xffe49a42:darkPalette()?0xffd5d9dc:0xff465968);
+       cut.setPathEffect(pass==1?new android.graphics.DashPathEffect(new float[]{5*density,3*density},0):null);
+       c.drawLine(left()+scale()*(float)(a.point.x+dx*t1+nx*offset),top()+scale()*(float)(a.point.y+dy*t1+ny*offset),left()+scale()*(float)(a.point.x+dx*t2+nx*offset),top()+scale()*(float)(a.point.y+dy*t2+ny*offset),cut);
+      }
+     }
+    }
+    start=end;
+   }
+  }
+ }
  void drawSurfaceSections(Canvas c,float density){
   if(!layerVisible(LAYER_SURFACES))return;
   org.json.JSONObject settings=legendSettings();
@@ -891,6 +923,7 @@ final class RouteSketch extends View {
   paint.setTextSize(13*density);
   dimensionHits.clear();
   drawSurfaceSections(c,density);
+  drawAsphaltCuts(c,density);
   drawShoring(c,density);
   for(int i=1;i<vertices.size();i++){
    PointF a=vertices.get(i-1).point,b=vertices.get(i).point;
