@@ -347,13 +347,34 @@ public class MainActivity extends Activity {
   if(liveManager==null){notice("Bitte GPS aktivieren.");return;}
   RouteSketch.GpsRecording recording=new RouteSketch.GpsRecording();
   android.os.Handler handler=new android.os.Handler(android.os.Looper.getMainLooper());
-  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("GPS-Aufzeichnung").setMessage("Bitte entlang der Trasse gehen.").setNegativeButton("Abbrechen",null).setPositiveButton("Stopp",(d,w)->{
+  android.view.View preview=new android.view.View(this){
+   final android.graphics.Paint pen=new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+   @Override protected void onDraw(android.graphics.Canvas c){
+    super.onDraw(c);c.drawColor(0xff101010);
+    if(recording.samples.isEmpty())return;
+    android.location.Location origin=recording.samples.get(0);
+    java.util.ArrayList<android.graphics.PointF> pts=new java.util.ArrayList<>();
+    float minX=0,maxX=0,minY=0,maxY=0;
+    for(android.location.Location fix:recording.samples){
+     double delta=(fix.getLongitude()-origin.getLongitude()+540)%360-180;
+     float x=(float)(delta*Math.cos(Math.toRadians(origin.getLatitude()))*111195),y=(float)((origin.getLatitude()-fix.getLatitude())*111195);
+     pts.add(new android.graphics.PointF(x,y));minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);
+    }
+    float scale=Math.min(Math.max(1,getWidth()-dp(32))/Math.max(1,maxX-minX),Math.max(1,getHeight()-dp(32))/Math.max(1,maxY-minY));
+    android.graphics.Path line=new android.graphics.Path();float x=0,y=0;
+    for(int i=0;i<pts.size();i++){android.graphics.PointF p=pts.get(i);x=getWidth()/2f+(p.x-(minX+maxX)/2)*scale;y=getHeight()/2f+(p.y-(minY+maxY)/2)*scale;if(i==0)line.moveTo(x,y);else line.lineTo(x,y);}
+    pen.setColor(0xff62b3ff);pen.setStyle(android.graphics.Paint.Style.STROKE);pen.setStrokeWidth(dp(3));pen.setStrokeJoin(android.graphics.Paint.Join.ROUND);c.drawPath(line,pen);
+    pen.setStyle(android.graphics.Paint.Style.FILL);c.drawCircle(x,y,dp(6),pen);
+   }
+  };
+  android.widget.LinearLayout previewBox=new android.widget.LinearLayout(this);previewBox.setPadding(dp(16),dp(8),dp(16),dp(8));previewBox.addView(preview,new android.widget.LinearLayout.LayoutParams(-1,dp(180)));
+  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("GPS-Aufzeichnung").setView(previewBox).setMessage("Bitte entlang der Trasse gehen.").setNegativeButton("Abbrechen",null).setPositiveButton("Stopp",(d,w)->{
    if(!editor.isShowing())return;
    if(recording.apply(route))notice("GPS-Trasse übernommen. Maße bitte eintragen.");else notice("Zu wenige gültige GPS-Punkte oder Trasse nicht leer.");
   }).create();
   Runnable tick=new Runnable(){public void run(){
    if(!dialog.isShowing()||!editor.isShowing()||isFinishing()||isDestroyed()){dialog.dismiss();return;}
-   recording.add(liveFix);
+   recording.add(liveFix);preview.invalidate();
    dialog.setMessage("Gültige Punkte: "+recording.samples.size()+"\n"+(liveFix!=null&&liveFix.hasAccuracy()?String.format(java.util.Locale.GERMANY,"Genauigkeit: ± %.1f m",liveFix.getAccuracy()):"GPS-Signal wird gesucht …")+"\nBitte entlang der Trasse gehen.");
    dialog.getButton(-1).setEnabled(recording.samples.size()>=2);
    handler.postDelayed(this,1000);
