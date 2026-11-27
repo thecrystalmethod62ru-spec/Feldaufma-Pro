@@ -6983,6 +6983,18 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  }
  if(Double.isFinite(base)){p.setColor(0xff626253);c.drawRect(20,layerTop,340,layerTop+(float)(base*scale),p);}
  if(!covering.equals("Asphalt")&&!covering.equals("Unbekannt")&&!covering.equals("Unbefestigt")&&!covering.equals("Sonstiges")){p.setColor(0xff777777);c.drawLine(20,top,340,top,p);for(int i=20;i<340;i+=covering.contains("platten")||covering.contains("Platten")?28:12)c.drawLine(i,top-4,i,top,p);}
+ if("Asphalt".equals(covering)){
+  // Original cut edges and additional recut edges are distinct.
+  float cutBottom=Math.max(top+9,layerTop);
+  p.setStrokeWidth(1.5f);p.setColor(0xffd5d9dc);
+  c.drawLine(x,top-5,x,cutBottom,p);c.drawLine(z,top-5,z,cutBottom,p);
+  p.setColor(0xffffb267);
+  android.graphics.PathEffect prior=p.getPathEffect();
+  p.setPathEffect(new android.graphics.DashPathEffect(new float[]{4,2},0));
+  if(nl>0){float edge=x-(float)(nl*scale);c.drawLine(edge,top-5,edge,cutBottom,p);}
+  if(nr>0){float edge=z+(float)(nr*scale);c.drawLine(edge,top-5,edge,cutBottom,p);}
+  p.setPathEffect(prior);
+ }
  double previewPipe=pipe;try{previewPipe=optional(pipeInput);}catch(Exception ignored){}
  org.json.JSONArray utilities=dragRows==null?extraUtilities():dragRows;
  int conflicts=utilityCollisionCount(utilities,Double.isFinite(l)&&l>0?l:Double.POSITIVE_INFINITY);
