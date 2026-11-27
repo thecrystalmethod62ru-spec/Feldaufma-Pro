@@ -5621,6 +5621,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     double from=row.optDouble("from"),to=row.optDouble("to"),bw=row.optDouble("width");
     if(!Double.isFinite(from+to+bw)||from<0||to<=from||to>route.measuredLength()+1e-8||bw<=0)continue;
     double st=0;
+    float[] lastX=new float[4],lastY=new float[4];double[] lastStation={Double.NaN,Double.NaN,Double.NaN,Double.NaN};
     for(int i=1;i<route.vertices.size();i++){
      RouteSketch.Vertex aa=route.vertices.get(i-1),bb=route.vertices.get(i);
      double len=bb.metres,dx=bb.point.x-aa.point.x,dy=bb.point.y-aa.point.y,n=Math.hypot(dx,dy);
@@ -5633,7 +5634,11 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
        double t1=(lo-st)/len,t2=(hi-st)/len;
        asphaltPen.setColor(pass==1?0xffb66b16:0xff465968);
        asphaltPen.setPathEffect(pass==1?new android.graphics.DashPathEffect(new float[]{4,3},0):null);
-       c.drawLine((float)(40+(aa.point.x+dx*t1+nx-minX)*unit),(float)(85+(aa.point.y+dy*t1+ny-minY)*unit),(float)(40+(aa.point.x+dx*t2+nx-minX)*unit),(float)(85+(aa.point.y+dy*t2+ny-minY)*unit),asphaltPen);
+       float x1=(float)(40+(aa.point.x+dx*t1+nx-minX)*unit),y1=(float)(85+(aa.point.y+dy*t1+ny-minY)*unit);
+       float x2=(float)(40+(aa.point.x+dx*t2+nx-minX)*unit),y2=(float)(85+(aa.point.y+dy*t2+ny-minY)*unit);
+       int index=side*2+pass;
+       if(Double.isFinite(lastStation[index])&&Math.abs(lastStation[index]-lo)<1e-8)c.drawLine(lastX[index],lastY[index],x1,y1,asphaltPen);
+       c.drawLine(x1,y1,x2,y2,asphaltPen);lastX[index]=x2;lastY[index]=y2;lastStation[index]=hi;
        if(pass==1)recutCuts=true;else originalCuts=true;
       }
      }
