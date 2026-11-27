@@ -5,15 +5,17 @@ import android.graphics.Paint;
 
 /** Material rendering independent of pipe geometry and touch handling. */
 final class ProfileMaterialRenderer {
+    enum Pattern { ASPHALT, GRAVEL, BACKFILL, NATIVE_SOIL }
     private ProfileMaterialRenderer(){}
-    static void draw(Canvas c,Paint p,int viewWidth,int viewHeight,float d,float l,float t,float r,float b,int fill,int grain,boolean gravel){
+    static void draw(Canvas c,Paint p,int viewWidth,int viewHeight,float d,float l,float t,float r,float b,Pattern pattern){
         l=Math.max(0,l);t=Math.max(0,t);r=Math.min(viewWidth,r);b=Math.min(viewHeight,b);
         if(r<=l||b<=t)return;
         p.setStyle(Paint.Style.FILL);p.setColor(0xff080c0d);c.drawRect(l,t,r,b,p);
         c.save();c.clipRect(l,t,r,b);
         p.setColor(0xffb7c1c1);p.setStrokeWidth(Math.max(0.7f,d*.65f));
-        boolean asphalt=fill==0xff383c3f;
-        boolean nativeSoil=fill==0xff292520||fill==0xff302922;
+        boolean asphalt=pattern==Pattern.ASPHALT;
+        boolean nativeSoil=pattern==Pattern.NATIVE_SOIL;
+        boolean gravel=pattern==Pattern.GRAVEL;
         if(asphalt||nativeSoil){
             float step=(nativeSoil?14:6)*d;
             if(nativeSoil){

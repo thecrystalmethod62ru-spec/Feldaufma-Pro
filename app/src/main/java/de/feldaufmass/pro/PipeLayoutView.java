@@ -44,8 +44,8 @@ public final class PipeLayoutView extends View {
     }
     public String dimensionSummary(){return String.format(java.util.Locale.GERMANY,"Breite: %.2f m\nTiefe: %.2f m",width,depth);}
     public void setSelection(Selection selection){this.selection=selection;}
-    private void texture(Canvas c,float l,float t,float r,float b,int fill,int grain,boolean gravel){
-        ProfileMaterialRenderer.draw(c,p,getWidth(),getHeight(),getResources().getDisplayMetrics().density,l,t,r,b,fill,grain,gravel);
+    private void texture(Canvas c,float l,float t,float r,float b,ProfileMaterialRenderer.Pattern pattern){
+        ProfileMaterialRenderer.draw(c,p,getWidth(),getHeight(),getResources().getDisplayMetrics().density,l,t,r,b,pattern);
     }
     @Override protected void onDraw(Canvas c){
         super.onDraw(c);
@@ -60,16 +60,16 @@ public final class PipeLayoutView extends View {
         else{cx=getWidth()/2f+(float)((leftExtent-rightExtent)*scale/2);bottom=getHeight()-pad;}
         if(!Float.isFinite(scale)||scale<=0)return;
         float left=cx-(float)(width*scale/2),right=cx+(float)(width*scale/2),top=bottom-(float)(depth*scale);
-        texture(c,left,top,right,bottom,0xff503a29,0xffb18a62,false);
-        if(civilProfile){float dt=top+(float)(Math.min(depth,deck)*scale),bt=top+(float)(Math.min(depth,deck+base)*scale);texture(c,left,top,right,dt,asphaltProfile?0xff383c3f:surfaceColor,0xffaaaaaa,!asphaltProfile);texture(c,left,dt,right,bt,0xff666052,0xffaaaaaa,true);p.setColor(0xffeeeeee);c.drawLine(left,dt,right,dt,p);c.drawLine(left,bt,right,bt,p);}
+        texture(c,left,top,right,bottom,ProfileMaterialRenderer.Pattern.BACKFILL);
+        if(civilProfile){float dt=top+(float)(Math.min(depth,deck)*scale),bt=top+(float)(Math.min(depth,deck+base)*scale);texture(c,left,top,right,dt,asphaltProfile?ProfileMaterialRenderer.Pattern.ASPHALT:ProfileMaterialRenderer.Pattern.GRAVEL);texture(c,left,dt,right,bt,ProfileMaterialRenderer.Pattern.GRAVEL);p.setColor(0xffeeeeee);c.drawLine(left,dt,right,dt,p);c.drawLine(left,bt,right,bt,p);}
         p.setColor(0xffeeeeee);p.setStrokeWidth(1.5f);c.drawLine(left,top,right,top,p);
         p.setColor(0xffeeeeee);c.drawLine(left,top,left,bottom,p);c.drawLine(right,top,right,bottom,p);c.drawLine(left,bottom,right,bottom,p);
         if(civilProfile){
             float a=left-(float)(cutLeft*scale),b=right+(float)(cutRight*scale);
-            texture(c,0,top,left,bottom,0xff292520,0xff82705c,false);texture(c,right,top,getWidth(),bottom,0xff302922,0xff78634d,false);
+            texture(c,0,top,left,bottom,ProfileMaterialRenderer.Pattern.NATIVE_SOIL);texture(c,right,top,getWidth(),bottom,ProfileMaterialRenderer.Pattern.NATIVE_SOIL);
             float deckBottom=top+(float)(Math.min(depth,deck)*scale),baseBottom=top+(float)(Math.min(depth,deck+base)*scale);
-            texture(c,0,top,a,deckBottom,asphaltProfile?0xff383c3f:surfaceColor,asphaltProfile?0xff777b7e:0xff96938a, !asphaltProfile);texture(c,b,top,getWidth(),deckBottom,asphaltProfile?0xff383c3f:surfaceColor,asphaltProfile?0xff777b7e:0xff96938a,!asphaltProfile);
-            texture(c,0,deckBottom,left,baseBottom,0xff666052,0xffa39a83,true);texture(c,right,deckBottom,getWidth(),baseBottom,0xff666052,0xffa39a83,true);
+            texture(c,0,top,a,deckBottom,asphaltProfile?ProfileMaterialRenderer.Pattern.ASPHALT:ProfileMaterialRenderer.Pattern.GRAVEL);texture(c,b,top,getWidth(),deckBottom,asphaltProfile?ProfileMaterialRenderer.Pattern.ASPHALT:ProfileMaterialRenderer.Pattern.GRAVEL);
+            texture(c,0,deckBottom,left,baseBottom,ProfileMaterialRenderer.Pattern.GRAVEL);texture(c,right,deckBottom,getWidth(),baseBottom,ProfileMaterialRenderer.Pattern.GRAVEL);
             p.setColor(0xffeeeeee);p.setStrokeWidth(1.5f);c.drawLine(left,top,left,bottom,p);c.drawLine(right,top,right,bottom,p);c.drawLine(left,bottom,right,bottom,p);
             p.setTextSize(11*getResources().getDisplayMetrics().scaledDensity);
 
