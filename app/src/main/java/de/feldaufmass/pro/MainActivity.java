@@ -5372,7 +5372,7 @@ minX-=margin;maxX+=margin;minY-=margin;maxY+=margin;
    double u=factor*1000*72/25.4/candidate;
    for(int f=0;f<formats.length;f++)for(int orientation=0;orientation<2;orientation++){
     int pw=formats[f][orientation],ph=formats[f][1-orientation];
-    if((maxX-minX)*u<=pw-80&&(maxY-minY)*u<=ph-152){denominator=candidate;unit=u;width=pw;height=ph;format=4-f;break search;}
+    if((maxX-minX)*u<=pw-80&&(maxY-minY)*u<=ph-240){denominator=candidate;unit=u;width=pw;height=ph;format=4-f;break search;}
    }
   }
   if(denominator==0)return pageNumber;
@@ -5535,7 +5535,9 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     if(!pdfDepthValid){p.setColor(0xffb3261e);p.setTextSize(9);c.drawText("Tiefenabschnitte ungültig – Tiefenprüfung nicht möglich",36,height-98,p);}
     if(utilities.length()>0){p.setColor(INK);p.setTextSize(9);c.drawText(omitted?"Zusatzleitungen: ungültige Abschnitte rot markiert; fehlende Maße ggf. ausgelassen":"Zusatzleitungen: Profilversatz ab linker Kante; Verbindungen schematisch",36,height-110,p);}
    }
-   p.setColor(INK);p.setStrokeWidth(1);float bar=(float)(50*72/25.4);float by=height-47;c.drawLine(40,by,40+bar,by,p);c.drawLine(40,by-4,40,by+4,p);c.drawLine(40+bar,by-4,40+bar,by+4,p);c.drawText("50 mm Kontrollmaß",40,by+17,p);
+   p.setColor(INK);p.setStrokeWidth(1);float bar=(float)(50*72/25.4);float by=height-47;c.drawLine(40,by,40+bar,by,p);c.drawLine(40,by-4,40,by+4,p);c.drawLine(40+bar,by-4,40+bar,by+4,p);p.setTextSize(10);c.drawText("50 mm Kontrollmaß",40,by+17,p);
+   c.drawText("Entspricht "+reportMeasure(denominator*0.05)+" in der Örtlichkeit",40+bar+20,by+4,p);
+   c.drawText("Blatt "+(pageNumber-1),width-85,height-30,p);
   }finally{pdf.finishPage(page);}
   return pageNumber;
  }
