@@ -83,8 +83,8 @@ public final class PipeLayoutView extends View {
             p.setTextSize(11*getResources().getDisplayMetrics().scaledDensity);
 
             if(cutLeft+cutRight>0)dimension(c,a,top-pad/2,b,top-pad/2,width+cutLeft+cutRight);
-            if(asphaltProfile){
-                float cutBottom=Math.max(top+6,deckBottom);
+            if(asphaltProfile&&deck>0){
+                float cutBottom=deckBottom;
                 p.setColor(0xffd5d9dc);p.setStrokeWidth(1.5f);
                 c.drawLine(left,top-4,left,cutBottom,p);c.drawLine(right,top-4,right,cutBottom,p);
                 android.graphics.PathEffect prior=p.getPathEffect();
