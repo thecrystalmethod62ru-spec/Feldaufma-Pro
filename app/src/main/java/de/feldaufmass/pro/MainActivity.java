@@ -5362,7 +5362,7 @@ public class MainActivity extends Activity {
    double[] q=currentTrenchQuantities();
    basic=Double.isFinite(q[0])?String.format(java.util.Locale.GERMANY,"Aushub: %.2f m³\nGrundfläche: %.2f m²",q[1],q[0]):"Abschnittsprofile prüfen – Mengen nicht eindeutig";
   }
-  double cutArea=currentCutArea();if(Double.isFinite(cutArea))basic+=String.format(java.util.Locale.GERMANY,"\nFläche mit Nachschnitt: %.2f m² (alternativ)",cutArea);
+  double cutArea=currentCutArea();double groundArea=currentTrenchQuantities()[0];if(Double.isFinite(cutArea)&&Double.isFinite(groundArea)&&cutArea>groundArea+1e-9)basic+=String.format(java.util.Locale.GERMANY,"\nFläche mit Nachschnitt: %.2f m² (alternativ)",cutArea);
   RouteSketch route=new RouteSketch(this,routeData());double measured=route.measuredLength();
   String overlap=mainOverlapNotice(route);
   result.setText(basic+routeLengthWarning(measured)+(overlap.isEmpty()?"":"\n"+overlap));
@@ -5639,7 +5639,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
     if(row.has("cutWidth")){
      double cut=row.getDouble("cutWidth");if(!Double.isFinite(cut)||cut<bw)throw new IllegalArgumentException("Ungültige Nachschnittbreite");
      double extra=len*(cut-bw);sum[1]+=extra;
-     report.append(String.format(java.util.Locale.GERMANY,"Nachschnitt zusätzlich: %.3f m² | Gesamt: %.3f m²\n",extra,area+extra));
+     if(extra>1e-9)report.append(String.format(java.util.Locale.GERMANY,"Nachschnitt zusätzlich: %.3f m² | Gesamt: %.3f m²\n",extra,area+extra));
     }else{sum[2]+=len;report.append("Nachschnitt nicht erfasst\n");}
    }
    report.append("\nSummen nach Oberfläche\n");
@@ -5698,7 +5698,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  }
  int appendProjectInformation(android.graphics.pdf.PdfDocument pdf,int next,RouteSketch route)throws Exception{
   String report=(route.vertices.size()>1?"Trassenskizze – Abschnittsmaße\n"+route.measurements()+"\n\n":"")+"Oberflächenaufbau\n"+surfaceLayers.getText()+"\n\n"+result.getText()+"\n"+legend.getText()+"\n"+
-    "Nachschnitt links: "+reportMeasure(left)+" | rechts: "+reportMeasure(right)+"\n"+
+    ((left==0&&right==0)?"":"Nachschnitt links: "+reportMeasure(left)+" | rechts: "+reportMeasure(right)+"\n")+
     "Asphaltstärke: "+reportMeasure(asphalt)+"\nTragschicht: "+reportMeasure(base)+"\n\n"+
     "Trassenobjekte\n"+objectList.getText()+detailQuantities.getText()+"\n\n"+segmentsView.getText()+"\n\n"+shoringReport()+surfaceReportForExport();
   StringBuilder body=new StringBuilder(projectHeader.getText()).append("\n\n").append(report);
@@ -6554,7 +6554,7 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  void showSegments(){StringBuilder out=new StringBuilder();java.util.TreeMap<String,Double> totals=new java.util.TreeMap<>();
  for(int i=0;i<segments.length();i++){org.json.JSONObject o=segments.optJSONObject(i);if(o==null)continue;double a=o.optDouble("from"),b=o.optDouble("to"),area=(b-a)*o.optDouble("width");String type=o.optString("surface");
  out.append(String.format(java.util.Locale.GERMANY,"RP %02d | %.2f–%.2f m | %s | %.2f m² (Graben)\n",i+1,a,b,type,area));
- if(o.has("cutWidth"))out.append(String.format(java.util.Locale.GERMANY,"Mit Nachschnitt: %.2f m²\n",(b-a)*o.optDouble("cutWidth")));
+ if(o.optDouble("cutWidth")>o.optDouble("width")+1e-9)out.append(String.format(java.util.Locale.GERMANY,"Mit Nachschnitt: %.2f m²\n",(b-a)*o.optDouble("cutWidth")));
  totals.put(type,totals.getOrDefault(type,0.0)+area);}
  for(java.util.Map.Entry<String,Double> e:totals.entrySet())out.append(String.format(java.util.Locale.GERMANY,"%s gesamt: %.2f m² (Graben)\n",e.getKey(),e.getValue()));
  segmentsView.setText(out.toString());}
@@ -7007,8 +7007,8 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
  p.setColor(0xff4cdbb5);c.drawLine(x,bottom+14,z,bottom+14,p);c.drawLine(x,bottom+8,x,bottom+20,p);c.drawLine(z,bottom+8,z,bottom+20,p);
  p.setTextSize(13);String widthLabel=m(w);c.drawText(widthLabel,(x+z-p.measureText(widthLabel))/2,bottom+29,p);
  c.drawLine(z+12,top,z+12,bottom,p);c.drawLine(z+7,top,z+17,top,p);c.drawLine(z+7,bottom,z+17,bottom,p);c.drawText(m(d),z+18,(top+bottom)/2,p);
- if(Double.isFinite(left)&&Double.isFinite(right)){float a=x-(float)(nl*scale),b=z+(float)(nr*scale);c.drawLine(a,35,b,35,p);c.drawLine(a,30,a,45,p);c.drawLine(b,30,b,45,p);p.setTextSize(13);String cutLabel=m(w+nl+nr);c.drawText(cutLabel,(a+b-p.measureText(cutLabel))/2,27,p);}
- else label(c,"Nachschnitt: nicht vollständig erfasst",20,27);
+ if(Double.isFinite(left)&&Double.isFinite(right)&&(nl+nr)>0){float a=x-(float)(nl*scale),b=z+(float)(nr*scale);c.drawLine(a,35,b,35,p);c.drawLine(a,30,a,45,p);c.drawLine(b,30,b,45,p);p.setTextSize(13);String cutLabel=m(w+nl+nr);c.drawText(cutLabel,(a+b-p.measureText(cutLabel))/2,27,p);}
+ else if(!Double.isFinite(left)||!Double.isFinite(right))label(c,"Nachschnitt: nicht vollständig erfasst",20,27);
  label(c,"Oberfläche: "+covering,20,238);
  label(c,Double.isFinite(topThickness)?"Belagsstärke: "+m(topThickness):"Belagsstärke: nicht erfasst",20,252);
  label(c,utilities.length()>0?"Leitungen: "+(utilities.length()+(Double.isFinite(previewPipe)?1:0))+" (Lage symbolisch)":Double.isFinite(previewPipe)?"Rohr Ø "+previewPipe+" mm (Lage symbolisch)":"Rohrmaße: unbekannt",20,266);
