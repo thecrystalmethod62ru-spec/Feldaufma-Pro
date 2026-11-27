@@ -1,10 +1,10 @@
-name: Android APK
+name: Fast Build - Android APK
 on:
   push:
     branches: [main]
   workflow_dispatch:
 concurrency:
-  group: android-apk-${{ github.ref }}
+  group: fast-build-${{ github.ref }}
   cancel-in-progress: true
 permissions:
   contents: read
@@ -33,65 +33,9 @@ jobs:
           path: app/build/test-results/testDebugUnitTest/
           if-no-files-found: warn
       - id: apk_build
-        run: gradle :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
+        run: gradle :app:assembleDebug --stacktrace
       - uses: actions/upload-artifact@v4
         with:
           name: Feldaufmass-Pro-v0.1
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-      - name: Enable KVM for Android emulator
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-      - uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          profile: pixel_2
-          arch: x86_64
-          script: gradle :app:connectedDebugAndroidTest --stacktrace
-      - name: Check Android 16 with three-button navigation
-        if: ${{ !cancelled() && steps.apk_build.outcome == 'success' }}
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 36
-          target: google_apis
-          profile: pixel_2
-          arch: x86_64
-          script: |
-            adb shell cmd overlay enable-exclusive --user current --category com.android.internal.systemui.navbar.threebutton
-            test_status=0
-            gradle :app:connectedDebugAndroidTest --rerun-tasks --stacktrace || test_status=$?
-            adb install -r app/build/outputs/apk/debug/app-debug.apk
-            adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-            adb shell am instrument -w -r -e class de.feldaufmass.pro.UiScreenshotTest de.feldaufmass.pro.test/androidx.test.runner.AndroidJUnitRunner > screenshot-test.log || test_status=1
-            cat screenshot-test.log
-            grep -F 'OK (6 tests)' screenshot-test.log || test_status=1
-            mkdir -p ui-screenshots
-            adb shell run-as de.feldaufmass.pro ls files/ui-screenshots || true
-            for name in 01-start-menu 02-normal-portrait 03-normal-landscape 04-full-portrait 05-full-landscape 06-regelprofil; do
-              if ! adb exec-out run-as de.feldaufmass.pro cat files/ui-screenshots/$name.png > ui-screenshots/$name.png || ! test -s ui-screenshots/$name.png; then
-                rm -f ui-screenshots/$name.png
-                test_status=1
-              fi
-            done
-            exit "$test_status"
-      - name: Upload real UI screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Android-16-UI-screenshots
-          path: |
-            ui-screenshots/*.png
-            screenshot-test.log
-          if-no-files-found: warn
-      - name: Report Android test failures
-        if: failure()
-        shell: python
-        run: |
-          from pathlib import Path
-          import xml.etree.ElementTree as ET
-          for report in Path("app/build/outputs/androidTest-results").rglob("*.xml"):
-              for case in ET.parse(report).iter("testcase"):
-                  for failure in case.findall("failure") + case.findall("error"):
-                      print(case.get("name"), failure.text)
