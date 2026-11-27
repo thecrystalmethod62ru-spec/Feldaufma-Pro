@@ -800,6 +800,9 @@ final class RouteSketch extends View {
   if(layerVisible(LAYER_OBJECTS))for(int j=0;j<stationObjects.length();j++){
    org.json.JSONObject o=stationObjects.optJSONObject(j);if(o!=null)entries.put(o.optString("type","Objekt"),0xffa65e19);
   }
+  if(layerVisible(LAYER_OBJECTS))for(SingleObject o:singleObjects)entries.put(o.type,darkPalette()?0xffffb267:0xff884208);
+  if(layerVisible(LAYER_GPS_TRACK)&&independentGpsTrack.length()>0)entries.put("GPS-Aufzeichnung",0xff35b9ff);
+  if(layerVisible(LAYER_GPS_REFERENCE)&&importedGpsReference.length()>0)entries.put("GPS-Referenz",0xffeab54d);
   for(Vertex v:vertices){
    if(layerVisible(LAYER_GPS)&&Double.isFinite(v.latitude)&&Double.isFinite(v.longitude))entries.put("GPS-Punkt",0xff4285ef);
    if(layerVisible(LAYER_PHOTOS)&&v.photos.length()>0)entries.put("Foto",0xff536c80);
