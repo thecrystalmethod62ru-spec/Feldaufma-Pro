@@ -1521,6 +1521,17 @@ public class MainActivity extends Activity {
   CheckBox[] layerChecks=new CheckBox[layerMasks.length];for(int k=0;k<layerMasks.length;k++)layerChecks[k]=(CheckBox)layerChoices.getChildAt(k);
   CheckBox templateVisible=new CheckBox(this);templateVisible.setText("Ausführungsplan");templateVisible.setTextColor(Color.WHITE);templateVisible.setTextSize(12);templateVisible.setButtonTintList(android.content.res.ColorStateList.valueOf(TEAL));templateVisible.setChecked(getPreferences(0).getInt("routeUnderlayHidden",0)==0);layerChoices.addView(templateVisible,new LinearLayout.LayoutParams(-1,dp(32)));
   layerChoices.removeView(layerChecks[11]);layerChoices.addView(layerChecks[11],layerChoices.indexOfChild(templateVisible)+1);
+  // Reuse the editor's vector icons, without replacing the layer checkboxes.
+  CheckBox[] visibleLayerRows={layerChecks[0],layerChecks[5],layerChecks[6],templateVisible,layerChecks[11]};
+  String[] visibleLayerIcons={"sections","pipe","map","document","image"};
+  for(int k=0;k<visibleLayerRows.length;k++){
+   CheckBox row=visibleLayerRows[k];Button iconSource=new Button(this);compactToolIcon(iconSource,"",visibleLayerIcons[k]);
+   android.graphics.drawable.Drawable glyph=iconSource.getCompoundDrawables()[1];
+   glyph.setBounds(0,0,dp(18),dp(18));row.setCompoundDrawables(glyph,null,null,null);row.setCompoundDrawablePadding(dp(6));
+   row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(4),0,dp(4),0);
+   android.graphics.drawable.GradientDrawable rowFrame=editorShape(k==0?0xff07383c:0xff041012,4);rowFrame.setStroke(dp(1),k==0?0xff00c8d0:0xff203638);row.setBackground(rowFrame);
+   LinearLayout.LayoutParams rowParams=new LinearLayout.LayoutParams(-1,dp(38));rowParams.setMargins(0,0,0,dp(4));row.setLayoutParams(rowParams);
+  }
   TextView alphaLabel=sheetText("Deckkraft",12,false);layerChoices.addView(alphaLabel);alphaLabel.setVisibility(View.GONE);
   SeekBar layerOpacity=new SeekBar(this);layerOpacity.setMax(255);layerOpacity.setProgress(Math.max(0,Math.min(255,getPreferences(0).getInt("routeUnderlayAlpha",150))));layerChoices.addView(layerOpacity,new LinearLayout.LayoutParams(-1,dp(30)));layerOpacity.setVisibility(View.GONE);layerOpacity.setProgressTintList(android.content.res.ColorStateList.valueOf(0xff00e5ee));layerOpacity.setThumbTintList(android.content.res.ColorStateList.valueOf(0xff00e5ee));
   alphaLabel.setText("Deckkraft "+Math.round(layerOpacity.getProgress()*100f/255)+" %");
