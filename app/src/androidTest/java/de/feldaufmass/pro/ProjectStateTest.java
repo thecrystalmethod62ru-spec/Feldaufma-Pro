@@ -341,6 +341,7 @@ public class ProjectStateTest {
    });
   }
  }
+ @androidx.test.filters.SdkSuppress(minSdkVersion=29)
  @Test public void fullscreenSaveReopensWithMeasuredRouteAndSurfaceBoundary(){
   String projectId=java.util.UUID.randomUUID().toString();
   String[] original=new String[1],expectedRoute=new String[1];
@@ -354,11 +355,14 @@ public class ProjectStateTest {
      assertTrue(activity.projectRegistry().edit().putString("active",projectId).commit());
     });
     scenario.recreate();
-    scenario.onActivity(activity->activity.editRoute(false,true));
-    androidx.test.espresso.Espresso.onView(androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom(RouteSketch.class))
-     .check((view,error)->{
-      if(error!=null)throw error;
-      RouteSketch route=(RouteSketch)view;
+    scenario.onActivity(activity->{
+      activity.editRoute(false,true);
+      RouteSketch route=null;
+      for(android.view.View root:android.view.inspector.WindowInspector.getGlobalWindowViews()){
+       RouteSketch found=fullscreenSketch(root);
+       if(found!=null)route=found;
+      }
+      assertNotNull("Trasse im Vollbild",route);
       route.vertices.get(2).metres=6;
       route.changed.run();
       expectedRoute[0]=route.encode();
@@ -418,6 +422,17 @@ public class ProjectStateTest {
     activity.getPreferences(0).edit().remove("routeSketch").commit();
    });
   }
+ }
+ private RouteSketch fullscreenSketch(android.view.View view){
+  if(view instanceof RouteSketch && ((RouteSketch)view).darkEditor)return (RouteSketch)view;
+  if(view instanceof android.view.ViewGroup){
+   android.view.ViewGroup group=(android.view.ViewGroup)view;
+   for(int i=0;i<group.getChildCount();i++){
+    RouteSketch found=fullscreenSketch(group.getChildAt(i));
+    if(found!=null)return found;
+   }
+  }
+  return null;
  }
  private void touch(RouteSketch route,int action,float x,float y){
   android.view.MotionEvent e=android.view.MotionEvent.obtain(0,10,action,x,y,0);
