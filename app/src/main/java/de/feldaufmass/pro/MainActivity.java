@@ -346,9 +346,34 @@ public class MainActivity extends Activity {
 
  RouteSketch livePreview;
  android.location.Location liveFix;
+ boolean recordingGpsTrack=false;
+ org.json.JSONArray gpsTrack(){try{return new org.json.JSONArray(getPreferences(0).getString("independentGpsTrack","[]"));}catch(org.json.JSONException e){return new org.json.JSONArray();}}
+ void appendGpsTrack(android.location.Location fix){
+  if(!recordingGpsTrack||fix==null||!fix.hasAccuracy()||fix.getAccuracy()<=0||fix.getAccuracy()>15)return;
+  org.json.JSONArray rows=gpsTrack();
+  if(rows.length()>=10000){recordingGpsTrack=false;notice("GPS-Aufzeichnung: Punktlimit erreicht.");return;}
+  if(rows.length()>0){
+   org.json.JSONObject last=rows.optJSONObject(rows.length()-1);
+   if(last!=null){float[] distance=new float[1];android.location.Location.distanceBetween(last.optDouble("lat"),last.optDouble("lon"),fix.getLatitude(),fix.getLongitude(),distance);
+    if(fix.getTime()<=last.optLong("time")||distance[0]<Math.max(2,fix.getAccuracy()))return;}
+  }
+  try{org.json.JSONObject row=new org.json.JSONObject();row.put("lat",fix.getLatitude());row.put("lon",fix.getLongitude());row.put("accuracy",fix.getAccuracy());row.put("time",fix.getTime());rows.put(row);
+   if(!getPreferences(0).edit().putString("independentGpsTrack",rows.toString()).commit()){recordingGpsTrack=false;notice("GPS-Aufzeichnung konnte nicht gespeichert werden.");}
+  }catch(org.json.JSONException e){recordingGpsTrack=false;notice("Ungültiger GPS-Punkt.");}
+ }
+ void showGpsTrackControls(){
+  org.json.JSONArray rows=gpsTrack();
+  new android.app.AlertDialog.Builder(this).setTitle("GPS-Aufzeichnung").setMessage((recordingGpsTrack?"Aufzeichnung aktiv":"Aufzeichnung gestoppt")+" · "+rows.length()+" Punkte\nUnabhängig von der manuellen Trasse.")
+   .setPositiveButton(recordingGpsTrack?"Stoppen":"Fortsetzen",(d,w)->{
+    if(recordingGpsTrack){recordingGpsTrack=false;return;}
+    if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=android.content.pm.PackageManager.PERMISSION_GRANTED){notice("Bitte zuerst GPS-Berechtigung erteilen.");return;}
+    startLiveGps();if(liveManager==null){notice("GPS nicht verfügbar.");return;}recordingGpsTrack=true;notice("GPS-Aufzeichnung gestartet.");
+   }).setNeutralButton("Spur löschen",(d,w)->new android.app.AlertDialog.Builder(this).setMessage("Gespeicherte GPS-Spur wirklich löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(dd,ww)->{recordingGpsTrack=false;if(!getPreferences(0).edit().remove("independentGpsTrack").commit())notice("GPS-Spur konnte nicht gelöscht werden.");}).show()).setNegativeButton("Schließen",null).show();
+ }
+
  android.location.LocationManager liveManager;
  final android.location.LocationListener liveListener=new android.location.LocationListener(){
-  public void onLocationChanged(android.location.Location fix){liveFix=fix;if(livePreview!=null)livePreview.setLiveFix(fix);}
+  public void onLocationChanged(android.location.Location fix){liveFix=fix;appendGpsTrack(fix);if(livePreview!=null)livePreview.setLiveFix(fix);}
   public void onProviderDisabled(String provider){liveFix=null;if(livePreview!=null)livePreview.setLiveFix(null);}
   public void onProviderEnabled(String provider){}
   public void onStatusChanged(String provider,int status,android.os.Bundle extras){}
@@ -361,7 +386,7 @@ public class MainActivity extends Activity {
  }
  @Override protected void onResume(){super.onResume();if(projectChosen)startLiveGps();autosaveHandler.removeCallbacks(autosaveTick);autosaveHandler.postDelayed(autosaveTick,AUTOSAVE_INTERVAL_MS);}
  @Override protected void onPause(){
-  autosaveHandler.removeCallbacks(autosaveTick);saveDraft();
+  recordingGpsTrack=false;autosaveHandler.removeCallbacks(autosaveTick);saveDraft();
   if(liveManager!=null){liveManager.removeUpdates(liveListener);liveManager=null;}
   liveFix=null;if(livePreview!=null)livePreview.setLiveFix(null);super.onPause();
  }
@@ -5562,13 +5587,15 @@ boolean omitted=false;java.util.LinkedHashMap<String,Integer> utilityLegend=new 
    menu.getMenu().add(0,10,1,String.format(java.util.Locale.GERMANY,"%.7f° / %.7f°",point.latitude,point.longitude)).setEnabled(false);
    menu.getMenu().add(0,11,2,Double.isFinite(point.accuracy)?String.format(java.util.Locale.GERMANY,"GPS ± %.2f m",point.accuracy):"GPS: Genauigkeit unbekannt").setEnabled(false);
   }else menu.getMenu().add(0,10,1,"Keine GPS-Koordinaten").setEnabled(false);
-  menu.getMenu().add(0,1,3,"GPS-Punkt zuordnen");
+  menu.getMenu().add(0,12,3,"GPS-Aufzeichnung");
+  menu.getMenu().add(0,1,4,"GPS-Punkt zuordnen");
   menu.getMenu().add(0,2,4,"Foto aufnehmen");
   menu.getMenu().add(0,3,5,"Punkt umbenennen");
   menu.getMenu().add(0,4,6,"GNSS / RTK – NMEA importieren");
   if(point.gpsUndo!=null)menu.getMenu().add(0,5,7,"GPS-Verschiebung rückgängig machen");
   for(int i=0;i<point.photos.length();i++)menu.getMenu().add(0,100+i,8+i,"Foto "+(i+1)+" · Details");
   menu.setOnMenuItemClickListener(item->{switch(item.getItemId()){
+   case 12:showGpsTrackControls();return true;
    case 1:assignGps(id);return true;
    case 2:selectedPoint=id;capturePhoto();return true;
    case 3:renamePoint(id,null);return true;
