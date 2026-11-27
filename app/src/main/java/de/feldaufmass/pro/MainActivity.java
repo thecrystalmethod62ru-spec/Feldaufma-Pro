@@ -1395,12 +1395,12 @@ public class MainActivity extends Activity {
   root.addView(sectionStrip,new LinearLayout.LayoutParams(-1,-2));
   final int[] selectedSection={-1};
   final String[] selectedSectionStart={null},selectedSectionEnd={null};
-  final TextView sectionPosition=sheetText("Abschnitt auswählen",12,false);sectionPosition.setTextColor(0xff69d6b7);sectionStrip.addView(sectionPosition,1);
-  LinearLayout sectionEditor=new LinearLayout(this);sectionEditor.setOrientation(1);sectionEditor.setPadding(dp(4),dp(4),dp(4),dp(4));sectionEditor.setBackground(proButtonShape(false));
+  final TextView sectionPosition=sheetText("Abschnitt auswählen",12,false);sectionPosition.setTextColor(0xff69d6b7);sectionStrip.addView(sectionPosition,1);sectionPosition.setVisibility(View.GONE);
+  LinearLayout sectionEditor=new LinearLayout(this);sectionEditor.setOrientation(1);sectionEditor.setPadding(dp(4),dp(4),dp(4),dp(4));android.graphics.drawable.GradientDrawable editorFrame=editorShape(0xff041012,4);editorFrame.setStroke(dp(1),0xff008b93);sectionEditor.setBackground(editorFrame);
   sectionStrip.addView(sectionEditor,new LinearLayout.LayoutParams(-1,-2));sectionEditor.setVisibility(View.GONE);
   Runnable refreshSectionEditor=()->{
    sectionEditor.removeAllViews();int index=selectedSection[0];if(index<0||index+1>=route.vertices.size()){sectionEditor.setVisibility(View.GONE);return;}
-   sectionEditor.setVisibility(View.VISIBLE);sectionEditor.addView(sheetText("A"+(index+1)+"  Abschnitt bearbeiten",13,true));
+   sectionEditor.setVisibility(View.VISIBLE);sectionEditor.addView(sheetText("A"+(index+1)+"  Abschnitt",13,true));
    double start=0;for(int j=0;j<index;j++){double length=route.vertices.get(j+1).metres;if(!Double.isFinite(length)||length<=0){start=Double.NaN;break;}start+=length;}final double from=start,to=start+route.vertices.get(index+1).metres;
    SharedPreferences defaults=getSharedPreferences("base_profile_defaults",MODE_PRIVATE);
    double bw=defaults.getFloat("width",0.4f),bd=defaults.getFloat("depth",1f);
@@ -1412,7 +1412,7 @@ public class MainActivity extends Activity {
    final double leftCut=surfaceRow==null?0:surfaceRow.optDouble("left",0),rightCut=surfaceRow==null?0:surfaceRow.optDouble("right",0);
    Button lengthValue=new Button(this);styleEditorButton(lengthValue,false);lengthValue.setText(Double.isFinite(route.vertices.get(index+1).metres)&&route.vertices.get(index+1).metres>0?String.format(java.util.Locale.GERMANY,"Länge  %.2f m",route.vertices.get(index+1).metres):"Länge · Maß fehlt");lengthValue.setTextSize(11);lengthValue.setMinHeight(0);sectionEditor.addView(lengthValue,new LinearLayout.LayoutParams(-1,dp(32)));lengthValue.setOnClickListener(v->measureSegment(route,index+1));
    Button splitSection=new Button(this);styleEditorButton(splitSection,false);splitSection.setText("Abschnitt teilen");splitSection.setTextSize(11);sectionEditor.addView(splitSection,new LinearLayout.LayoutParams(-1,dp(34)));
-   splitSection.setEnabled(Double.isFinite(from)&&Double.isFinite(to)&&to>from);
+   sectionEditor.removeView(splitSection);splitSection.setEnabled(Double.isFinite(from)&&Double.isFinite(to)&&to>from);
    splitSection.setOnClickListener(v->{
     if(index+1>=route.vertices.size())return;
     final RouteSketch.Vertex first=route.vertices.get(index),last=route.vertices.get(index+1);final double length=last.metres;
@@ -1426,6 +1426,7 @@ public class MainActivity extends Activity {
      RouteSketch.Vertex middle=new RouteSketch.Vertex(point,cut);last.metres=length-cut;route.vertices.add(index+1,middle);route.highlight=-1;route.dragged=-1;selectedSectionStart[0]=middle.id;selectedSectionEnd[0]=last.id;route.invalidate();if(route.changed!=null)route.changed.run();dialog.dismiss();
     }catch(Exception ex){distance.setError("Ungültiges Maß");}}));dialog.show();
    });
+   lengthValue.setOnLongClickListener(v->{splitSection.performClick();return true;});lengthValue.setContentDescription("Länge bearbeiten; lange drücken zum Teilen");
    EditText widthField=referenceField(sectionEditor,"Breite (B)",String.format(java.util.Locale.GERMANY,"%.2f",bw),true);
    EditText depthField=referenceField(sectionEditor,"Tiefe (T)",String.format(java.util.Locale.GERMANY,"%.2f",bd),true);
    final String[] selectedMaterial={material};
@@ -1451,7 +1452,7 @@ public class MainActivity extends Activity {
     final int index=j;double length=route.vertices.get(j+1).metres;double end=station+length;
     Button card=new Button(this);styleEditorButton(card,selectedSection[0]==j);
     card.setText(String.format(java.util.Locale.GERMANY,"A%d",j+1)+"  "+(Double.isFinite(length)&&length>0?(Double.isFinite(end)?String.format(java.util.Locale.GERMANY,"%.2f – %.2f m",station,end):"Station offen"):"Maß fehlt")+(Double.isFinite(length)&&length>0?String.format(java.util.Locale.GERMANY,"\n%.2f m",length):""));
-    LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(sectionCards.getOrientation()==LinearLayout.VERTICAL?-1:dp(104),dp(48));cp.setMargins(dp(2),0,dp(2),0);sectionCards.addView(card,cp);
+    LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(sectionCards.getOrientation()==LinearLayout.VERTICAL?-1:dp(104),dp(48));card.setGravity(Gravity.CENTER_VERTICAL|Gravity.START);card.setPadding(dp(8),dp(2),dp(6),dp(2));card.setTextSize(12);card.setMinHeight(0);card.setMinimumHeight(0);cp.setMargins(dp(2),dp(2),dp(2),dp(2));sectionCards.addView(card,cp);
     card.setOnClickListener(v->{if(index+1>=route.vertices.size())return;selectedSection[0]=index;selectedSectionStart[0]=route.vertices.get(index).id;selectedSectionEnd[0]=route.vertices.get(index+1).id;sectionPosition.setText("Abschnitt "+(index+1)+" / "+count);for(int k=0;k<count;k++)styleEditorButton((Button)sectionCards.getChildAt(k),k==index);if(!Double.isFinite(route.vertices.get(index+1).metres)||route.vertices.get(index+1).metres<=0)measureSegment(route,index+1);});
     station=Double.isFinite(length)&&length>0&&Double.isFinite(end)?end:Double.NaN;
    }
