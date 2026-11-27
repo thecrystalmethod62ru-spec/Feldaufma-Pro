@@ -350,8 +350,10 @@ public class MainActivity extends Activity {
  LinearLayout routePreviewBox;
  String routeData(){return getPreferences(0).getString("routeSketch","[]");}
 
- RouteSketch livePreview;
+ RouteSketch livePreview,activeRouteEditor;
  android.location.Location liveFix;
+ void updateLiveFix(android.location.Location fix){liveFix=fix;if(livePreview!=null)livePreview.setLiveFix(fix);if(activeRouteEditor!=null)activeRouteEditor.setLiveFix(fix);}
+ void updateRecordedTrack(org.json.JSONArray rows){if(livePreview!=null)livePreview.setIndependentGpsTrack(rows);if(activeRouteEditor!=null)activeRouteEditor.setIndependentGpsTrack(rows);}
  boolean recordingGpsTrack=false;
  String gpsRecordingProject=null;
  org.json.JSONArray gpsTrack(){try{return new org.json.JSONArray(getPreferences(0).getString("independentGpsTrack","[]"));}catch(org.json.JSONException e){return new org.json.JSONArray();}}
@@ -369,7 +371,7 @@ public class MainActivity extends Activity {
     if(fix.getTime()<=last.optLong("time")||distance[0]<Math.max(2,fix.getAccuracy()))return;}
   }
   try{org.json.JSONObject row=new org.json.JSONObject();row.put("lat",fix.getLatitude());row.put("lon",fix.getLongitude());row.put("accuracy",fix.getAccuracy());row.put("time",fix.getTime());rows.put(row);
-   if(!getPreferences(0).edit().putString("independentGpsTrack",rows.toString()).commit()){recordingGpsTrack=false;notice("GPS-Aufzeichnung konnte nicht gespeichert werden.");}else if(livePreview!=null)livePreview.setIndependentGpsTrack(rows);
+   if(!getPreferences(0).edit().putString("independentGpsTrack",rows.toString()).commit()){recordingGpsTrack=false;notice("GPS-Aufzeichnung konnte nicht gespeichert werden.");}else updateRecordedTrack(rows);
   }catch(org.json.JSONException e){recordingGpsTrack=false;notice("Ungültiger GPS-Punkt.");}
  }
  void showGpsTrackComparison(){
@@ -472,13 +474,13 @@ public class MainActivity extends Activity {
     android.location.LocationManager manager=(android.location.LocationManager)getSystemService(LOCATION_SERVICE);
     if(manager==null||!manager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)){notice("Bitte GPS in den Android-Einstellungen aktivieren.");return;}
     startLiveGps();if(liveManager==null){notice("GPS nicht verfügbar.");return;}gpsRecordingProject=activeProject;recordingGpsTrack=true;applyDrawingLayers(drawingLayers()|RouteSketch.LAYER_GPS_TRACK);notice("GPS-Aufzeichnung gestartet.");
-   }).setNeutralButton("Spur löschen",(d,w)->new android.app.AlertDialog.Builder(this).setMessage("Gespeicherte GPS-Spur wirklich löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(dd,ww)->{recordingGpsTrack=false;if(!getPreferences(0).edit().remove("independentGpsTrack").commit())notice("GPS-Spur konnte nicht gelöscht werden.");else if(livePreview!=null)livePreview.setIndependentGpsTrack(gpsTrack());}).show()).setNegativeButton("Dateien",(d,w)->requestGpsExport()).show();
+   }).setNeutralButton("Spur löschen",(d,w)->new android.app.AlertDialog.Builder(this).setMessage("Gespeicherte GPS-Spur wirklich löschen?").setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(dd,ww)->{recordingGpsTrack=false;if(!getPreferences(0).edit().remove("independentGpsTrack").commit())notice("GPS-Spur konnte nicht gelöscht werden.");else updateRecordedTrack(gpsTrack());}).show()).setNegativeButton("Dateien",(d,w)->requestGpsExport()).show();
  }
 
  android.location.LocationManager liveManager;
  final android.location.LocationListener liveListener=new android.location.LocationListener(){
-  public void onLocationChanged(android.location.Location fix){liveFix=fix;appendGpsTrack(fix);if(livePreview!=null)livePreview.setLiveFix(fix);}
-  public void onProviderDisabled(String provider){liveFix=null;if(livePreview!=null)livePreview.setLiveFix(null);if(recordingGpsTrack){recordingGpsTrack=false;gpsRecordingProject=null;notice("GPS deaktiviert. Aufzeichnung gestoppt; gespeicherte Punkte bleiben erhalten.");}}
+  public void onLocationChanged(android.location.Location fix){updateLiveFix(fix);appendGpsTrack(fix);}
+  public void onProviderDisabled(String provider){updateLiveFix(null);if(recordingGpsTrack){recordingGpsTrack=false;gpsRecordingProject=null;notice("GPS deaktiviert. Aufzeichnung gestoppt; gespeicherte Punkte bleiben erhalten.");}}
   public void onProviderEnabled(String provider){}
   public void onStatusChanged(String provider,int status,android.os.Bundle extras){}
  };
@@ -492,7 +494,7 @@ public class MainActivity extends Activity {
  @Override protected void onPause(){
   recordingGpsTrack=false;autosaveHandler.removeCallbacks(autosaveTick);saveDraft();
   if(liveManager!=null){liveManager.removeUpdates(liveListener);liveManager=null;}
-  liveFix=null;if(livePreview!=null)livePreview.setLiveFix(null);super.onPause();
+  updateLiveFix(null);super.onPause();
  }
  org.json.JSONArray importedGpsReference(){try{return new org.json.JSONArray(getPreferences(0).getString("importedGpsReference","[]"));}catch(org.json.JSONException e){return new org.json.JSONArray();}}
  int drawingLayers(){
@@ -530,6 +532,7 @@ public class MainActivity extends Activity {
  boolean applyDrawingLayers(int mask){
   if(!getSharedPreferences("drawing_view",MODE_PRIVATE).edit().putInt(activeProject,mask).commit()){notice("Ebenen konnten nicht gespeichert werden.");return false;}
   if(livePreview!=null)livePreview.setVisibleLayers(mask);
+  if(activeRouteEditor!=null)activeRouteEditor.setVisibleLayers(mask);
   return true;
  }
  void refreshStationLayers(){
@@ -1286,7 +1289,8 @@ public class MainActivity extends Activity {
   route.changed.run();
   android.app.AlertDialog editor=new android.app.AlertDialog.Builder(this).setTitle("Trasse skizzieren").setView(scroll)
    .setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
-  editor.show();
+  editor.setOnDismissListener(dialog->{if(activeRouteEditor==route)activeRouteEditor=null;});
+  editor.show();activeRouteEditor=route;route.setLiveFix(liveFix);
   editor.getButton(-1).setOnClickListener(v->{
    if(!initialSaved.equals(routeData())){notice("Trasse wurde zwischenzeitlich geändert. Editor neu öffnen.");return;}
    history.record(route.encode());
