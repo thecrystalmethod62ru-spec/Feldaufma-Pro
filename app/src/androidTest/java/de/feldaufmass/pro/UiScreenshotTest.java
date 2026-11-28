@@ -109,7 +109,7 @@ public class UiScreenshotTest {
     InstrumentationRegistry.getInstrumentation().waitForIdleSync();
     scenario.onActivity(a->{
      for(android.view.View root:android.view.inspector.WindowInspector.getGlobalWindowViews()){
-      if(root.hasWindowFocus()&&visibleButton(root,"Zeichnungsebene")!=null&&visibleButton(root,"Maße bearbeiten")!=null&&visibleProfile(root)){visible[0]=true;break;}
+      if(root.hasWindowFocus()&&visibleButton(root,"Zeichnungsebene")!=null&&visibleProfile(root)&&visibleButton(root,"Katalog")!=null){visible[0]=true;break;}
      }
     });
     if(!visible[0])android.os.SystemClock.sleep(250);
@@ -119,7 +119,7 @@ public class UiScreenshotTest {
    scenario.onActivity(a->{
     boolean stillVisible=false;
     for(android.view.View root:android.view.inspector.WindowInspector.getGlobalWindowViews()){
-     if(root.hasWindowFocus()&&visibleButton(root,"Zeichnungsebene")!=null&&visibleButton(root,"Maße bearbeiten")!=null&&visibleProfile(root)){stillVisible=true;break;}
+     if(root.hasWindowFocus()&&visibleButton(root,"Zeichnungsebene")!=null&&visibleProfile(root)&&visibleButton(root,"Katalog")!=null){stillVisible=true;break;}
     }
     assertTrue("Regelprofil must remain foreground during capture",stillVisible);
    });
