@@ -23,6 +23,20 @@ public class UiScreenshotTest {
    .putString(PipeLayoutStore.KEY,"[{\"name\":\"DN 150\",\"offset\":0.0,\"diameter\":0.15,\"wall\":0.006,\"bedding\":0.1}]").commit();
   a.project.setText("NB-2025-017");a.width.setText("0,40");a.depth.setText("1,00");a.length.setText("52,20");
   if(a.surface!=null)for(int i=0;i<a.surface.getCount();i++){if("Asphalt".equals(String.valueOf(a.surface.getItemAtPosition(i)))){a.surface.setSelection(i);break;}}
+  // Match the illustrative pavement dimensions discussed for the reference.
+  // Never write these values into production defaults.
+  try {
+   org.json.JSONArray surfaces=new org.json.JSONArray();
+   double[] stations={0,18.4,31.0,52.2};
+   PipeLayoutStore store=new PipeLayoutStore(a.getPreferences(0));
+   java.util.List<PipeLayout.Pipe> pipes=store.load();
+   for(int i=1;i<stations.length;i++){
+    surfaces.put(new org.json.JSONObject().put("from",stations[i-1]).put("to",stations[i])
+     .put("width",0.40).put("surface","Asphalt").put("topThickness",0.04).put("baseThickness",0.08));
+    store.saveSectionWithSurfaces(stations[i-1],stations[i],0.40,1.00,pipes,surfaces);
+   }
+   a.segments=surfaces;
+  }catch(org.json.JSONException e){throw new AssertionError("Invalid preview pavement fixture",e);}
   a.covering="Asphalt";
  }
  private void capture(String name) throws Exception {
