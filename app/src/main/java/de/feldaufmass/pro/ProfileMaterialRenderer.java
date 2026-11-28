@@ -17,19 +17,19 @@ final class ProfileMaterialRenderer {
         boolean nativeSoil=pattern==Pattern.NATIVE_SOIL;
         boolean gravel=pattern==Pattern.GRAVEL;
         if(asphalt||nativeSoil){
-            float step=(nativeSoil?7:4)*d;
-            for(float x=l-(b-t);x<r;x+=step)c.drawLine(x,b,x+b-t,t,p);
-            if(asphalt)for(float x=l;x<r+b-t;x+=step)c.drawLine(x,b,x-(b-t),t,p);
+            float step=(nativeSoil?6:3.5f)*d;
+            for(float k=(float)Math.floor((l+t)/step)*step;k<r+b;k+=step)c.drawLine(k-b,b,k-t,t,p);
+            if(asphalt)for(float k=(float)Math.floor((l-b)/step)*step;k<r-t;k+=step)c.drawLine(k+b,b,k+t,t,p);
         }else{
             if(pattern==Pattern.BACKFILL){
                 p.setColor(0xff565656);
-                for(float x=l-(b-t);x<r;x+=8*d)c.drawLine(x,b,x+b-t,t,p);
+                float hatch=8*d;for(float k=(float)Math.floor((l+t)/hatch)*hatch;k<r+b;k+=hatch)c.drawLine(k-b,b,k-t,t,p);
                 p.setColor(0xffa3a3a3);
             }
-            float step=(gravel?8:pattern==Pattern.SAND?2.8f:4.5f)*d;
-            for(int row=0; t+row*step<b;row++)for(int col=0;l+col*step<r;col++){
-                float x=l+(col+.25f+((row*7+col*3)%5)*.1f)*step;
-                float y=t+(row+.25f+((row*3+col*7)%5)*.1f)*step;
+            float step=(gravel?6.5f:pattern==Pattern.SAND?2.6f:4.5f)*d;
+            for(int row=(int)Math.floor(t/step); row*step<b;row++)for(int col=(int)Math.floor(l/step);col*step<r;col++){
+                float x=(col+.20f+((row*7+col*3)%5)*.11f)*step;
+                float y=(row+.20f+((row*3+col*7)%5)*.11f)*step;
                 if(gravel){p.setStyle(Paint.Style.STROKE);android.graphics.Path stone=new android.graphics.Path();stone.moveTo(x,y+step*.20f);stone.lineTo(x+step*.18f,y);stone.lineTo(x+step*.47f,y+step*.08f);stone.lineTo(x+step*.55f,y+step*.30f);stone.lineTo(x+step*.24f,y+step*.43f);stone.close();c.drawPath(stone,p);}
                 else{p.setStyle(Paint.Style.FILL);c.drawCircle(x,y,Math.max(.5f,d*.42f),p);}
             }

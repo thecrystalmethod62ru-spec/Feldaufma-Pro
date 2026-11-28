@@ -92,10 +92,14 @@ public final class PipeLayoutView extends View {
             p.setColor(0xffeeeeee);p.setStrokeWidth(1.5f);c.drawLine(left,top,left,bottom,p);c.drawLine(right,top,right,bottom,p);c.drawLine(left,bottom,right,bottom,p);
             p.setTextSize(11*getResources().getDisplayMetrics().scaledDensity);
 
+            p.setColor(0xffeeeeee);p.setStrokeWidth(Math.max(.7f,density*.7f));
+            c.drawLine(0,top,getWidth(),top,p);
+            if(deckBottom>top)c.drawLine(0,deckBottom,getWidth(),deckBottom,p);
+            if(baseBottom>deckBottom)c.drawLine(0,baseBottom,getWidth(),baseBottom,p);
             if(cutLeft+cutRight>0)annotations.dimension(c,a,top-pad*.80f,b,top-pad*.80f,width+cutLeft+cutRight);
             // Show actual layer values, not illustrative sample dimensions.
-            if(deck>0&&deckBottom-top>=10*density)annotations.leader(c,String.format(java.util.Locale.GERMANY,"%s %.2f m",asphaltProfile?"Asphalt":"Deckschicht",Math.min(depth,deck)),right-3*density,(top+deckBottom)/2,right+12*density,(top+deckBottom)/2+4*density,0xffeeeeee);
-            if(base>0&&baseBottom-deckBottom>=10*density)annotations.leader(c,String.format(java.util.Locale.GERMANY,"Tragschicht %.2f m",Math.min(base,Math.max(0,depth-deck))),right-3*density,(deckBottom+baseBottom)/2,right+12*density,(deckBottom+baseBottom)/2+4*density,0xffeeeeee);
+            if(deck>0&&deckBottom>top&&(technicalSheet||deckBottom-top>=10*density))annotations.leader(c,String.format(java.util.Locale.GERMANY,"%s %.2f m",asphaltProfile?"Asphalt":"Deckschicht",Math.min(depth,deck)),right-3*density,(top+deckBottom)/2,right+12*density,(top+deckBottom)/2+4*density,0xffeeeeee);
+            if(base>0&&baseBottom>deckBottom&&(technicalSheet||baseBottom-deckBottom>=10*density))annotations.leader(c,String.format(java.util.Locale.GERMANY,"Tragschicht %.2f m",Math.min(base,Math.max(0,depth-deck))),right-3*density,(deckBottom+baseBottom)/2,right+12*density,(deckBottom+baseBottom)/2+4*density,0xffeeeeee);
             if(asphaltProfile&&deck>0){
                 float cutBottom=deckBottom;
                 p.setColor(0xffd5d9dc);p.setStrokeWidth(1.5f);
