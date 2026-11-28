@@ -98,7 +98,7 @@ final class ProfilePageLayout {
   editSectionProfile=new Button(context);style.accept(editSectionProfile,false);settingsIcon.accept(editSectionProfile,"Abschnitt bearbeiten");
   baseSettings=new Button(context);style.accept(baseSettings,false);settingsIcon.accept(baseSettings,"Standard-Profil verwalten");
   applyProfile=new Button(context);style.accept(applyProfile,true);applyProfile.setText("Übernehmen");configureAction(applyProfile);
-  LinearLayout fullTabs=new LinearLayout(context);fullTabs.setPadding(dp(4),0,dp(4),dp(4));profileCenter.addView(fullTabs,0,new LinearLayout.LayoutParams(-1,dp(44)));profilePage.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,orr,ob)->{boolean wide=getResourcesLandscape();int next=wide?dp(44):0;fullTabs.setVisibility(wide?View.VISIBLE:View.GONE);if(fullTabs.getLayoutParams().height!=next){fullTabs.getLayoutParams().height=next;fullTabs.requestLayout();}});
+  LinearLayout fullTabs=new LinearLayout(context);fullTabs.setPadding(dp(4),0,dp(4),dp(4));profileCenter.addView(fullTabs,0,new LinearLayout.LayoutParams(-1,dp(44)));profilePage.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,orr,ob)->{boolean wide=getResourcesLandscape();int next=wide?dp(30):0;fullTabs.setVisibility(wide?View.VISIBLE:View.GONE);if(fullTabs.getLayoutParams().height!=next){fullTabs.getLayoutParams().height=next;fullTabs.requestLayout();}});
   String[] names={"Aufbau","Leitungen","Material","Berechnung"};fullButtons=new Button[names.length];
   for(int i=0;i<names.length;i++){Button b=new Button(context);fullButtons[i]=b;style.accept(b,i==0);b.setText(names[i]);b.setAllCaps(false);b.setTextSize(11);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(0,0,0,0);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-1,1);lp.setMargins(dp(2),0,dp(2),0);fullTabs.addView(b,lp);}
   LinearLayout profileActions=new LinearLayout(context);profilePage.addView(profileActions,new LinearLayout.LayoutParams(-1,dp(40)));
@@ -116,7 +116,7 @@ final class ProfilePageLayout {
    for(int i=0;i<actions.length;i++)menu.getMenu().add(0,i,i,actions[i].getText());
    menu.setOnMenuItemClickListener(item->{actions[item.getItemId()].performClick();return true;});menu.show();});
   profilePage.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,orr,ob)->{
-   boolean wide=getResourcesLandscape();profileActions.setVisibility(wide?View.VISIBLE:View.GONE);more.setVisibility(wide?View.GONE:View.VISIBLE);
+   boolean wide=getResourcesLandscape();profileActions.setVisibility(View.GONE);more.setVisibility(View.VISIBLE);
   });
  }
  void bindSavedProfiles(java.util.List<ProfileTemplateStore.Template> templates,Runnable add,java.util.function.Consumer<ProfileTemplateStore.Template> choose){

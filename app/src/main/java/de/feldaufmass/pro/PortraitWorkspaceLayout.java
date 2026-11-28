@@ -23,7 +23,7 @@ final class PortraitWorkspaceLayout {
   if(landscape){
    shortcuts.setVisibility(View.VISIBLE);
    project.setOnLongClickListener(null);
-   canvas.addView(rotate,oldRotate);
+   identity.addView(rotate,new LinearLayout.LayoutParams(dp(36),dp(40)));
    back.setLayoutParams(new LinearLayout.LayoutParams(dp(44),dp(44)));
    project.setLayoutParams(new LinearLayout.LayoutParams(0,dp(40),1));
    project.setTextSize(12);
