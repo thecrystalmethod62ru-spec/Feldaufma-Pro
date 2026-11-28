@@ -1002,8 +1002,8 @@ final class RouteSketch extends View {
    if(!Float.isFinite(sw)||sw<=0)sw=24*density;
    sw=Math.max(2*density,Math.min(sw,Math.max(getWidth(),getHeight())*2f));
    float x1=left()+a.point.x*scale(),y1=top()+a.point.y*scale(),x2=left()+b.point.x*scale(),y2=top()+b.point.y*scale();
-   p.setColor(0xff00e5ee);p.setStrokeWidth(sw+3*density);c.drawLine(x1,y1,x2,y2,p);
-   p.setColor(0xff674323);p.setStrokeWidth(sw);c.drawLine(x1,y1,x2,y2,p);
+   p.setColor(0xff00e5ee);p.setStrokeWidth(sw+1.6f*density);c.drawLine(x1,y1,x2,y2,p);
+   p.setColor(0xff493723);p.setStrokeWidth(sw);c.drawLine(x1,y1,x2,y2,p);
    if(pixels>1&&sw>=6*density){
     float nx=(float)((y2-y1)/pixels),ny=(float)((x1-x2)/pixels);
     Paint marks=new Paint(Paint.ANTI_ALIAS_FLAG);marks.setColor(0xff746451);marks.setStrokeWidth(density);
@@ -1028,7 +1028,7 @@ final class RouteSketch extends View {
   drawUnderlay(c);
   drawUtilitySheets(c);
   float density=getResources().getDisplayMetrics().density;
-  paint.setTextSize(13*density);
+  paint.setTextSize((darkEditor&&!printPlan?11:13)*density);
   dimensionHits.clear();
   JSONArray dimensionProfiles=darkEditor&&!printPlan?trenchProfiles():new JSONArray();
   if(darkEditor&&!printPlan&&layerVisible(LAYER_ROUTE))drawTrenchPlan(c,density);
@@ -1037,7 +1037,7 @@ final class RouteSketch extends View {
   drawShoring(c,density);
   for(int i=1;i<vertices.size();i++){
    PointF a=vertices.get(i-1).point,b=vertices.get(i).point;
-   if(layerVisible(LAYER_ROUTE)){paint.setColor(printPlan?0xff174dcc:darkPalette()?0xff00e5ee:0xff13665f);paint.setStrokeWidth(darkEditor&&!printPlan?2*density:4);if(darkEditor&&!printPlan)paint.setPathEffect(new android.graphics.DashPathEffect(new float[]{8*density,5*density},0));line(c,a,b);paint.setPathEffect(null);}
+   if(layerVisible(LAYER_ROUTE)){paint.setColor(printPlan?0xff174dcc:darkPalette()?0xff00e5ee:0xff13665f);paint.setStrokeWidth(darkEditor&&!printPlan?.9f*density:4);if(darkEditor&&!printPlan)paint.setPathEffect(new android.graphics.DashPathEffect(new float[]{6*density,4*density},0));line(c,a,b);paint.setPathEffect(null);}
    if(!layerVisible(LAYER_DIMENSIONS))continue;
    double metres=vertices.get(i).metres;
    String label=Double.isFinite(metres)&&metres>0?String.format(Locale.GERMANY,"%.2f m",metres):"Maß fehlt";
@@ -1050,8 +1050,8 @@ final class RouteSketch extends View {
      double start=0;for(int j=1;j<i;j++){double length=vertices.get(j).metres;start=Double.isFinite(length)&&length>0?start+length:Double.NaN;}
      double w=trenchSectionWidth(dimensionProfiles,start,metres);
      float half=(float)(Double.isFinite(metres)&&metres>0?px*w/metres/2:12*density*w/0.4);half=Math.max(density,Math.min(half,Math.max(getWidth(),getHeight())));
-     float offset=half+22*density;float x1=ax+nx*offset,y1=ay+ny*offset,x2=bx+nx*offset,y2=by+ny*offset;
-     Paint dim=new Paint(Paint.ANTI_ALIAS_FLAG);dim.setColor(0xff9aafb1);dim.setStrokeWidth(density);
+     float offset=half+18*density;float x1=ax+nx*offset,y1=ay+ny*offset,x2=bx+nx*offset,y2=by+ny*offset;
+     Paint dim=new Paint(Paint.ANTI_ALIAS_FLAG);dim.setColor(0xffd5e0df);dim.setStrokeWidth(.75f*density);
      c.drawLine(ax+nx*(half+4*density),ay+ny*(half+4*density),x1+nx*4*density,y1+ny*4*density,dim);
      c.drawLine(bx+nx*(half+4*density),by+ny*(half+4*density),x2+nx*4*density,y2+ny*4*density,dim);
      c.drawLine(x1,y1,x2,y2,dim);
@@ -1082,16 +1082,28 @@ final class RouteSketch extends View {
    }
    dimensionHits.add(new DimensionHit(key,bounds,0,0,0));
    c.save();c.translate(tx,ty);c.rotate(angle);
-   paint.setColor(Double.isFinite(metres)?(darkPalette()?0xff202827:Color.WHITE):0xffffcf73);
-   c.drawRoundRect(-2*density,-14*density,paint.measureText(label)+2*density,3*density,4,4,paint);
-   if(darkEditor&&!printPlan){paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(density);paint.setColor(Double.isFinite(metres)&&metres>0?0xff00e5ee:0xffffcf73);c.drawRoundRect(-2*density,-14*density,paint.measureText(label)+2*density,3*density,4,4,paint);paint.setStyle(Paint.Style.FILL);}paint.setColor(!Double.isFinite(metres)?0xff173c42:darkPalette()?0xffe3f0ed:0xff173c42);c.drawText(label,0,0,paint);c.restore();
+   boolean known=Double.isFinite(metres)&&metres>0;
+   if(darkEditor&&!printPlan){
+    paint.setColor(known?Color.BLACK:0xffffcf73);
+    c.drawRect(-2*density,-12*density,paint.measureText(label)+2*density,3*density,paint);
+    if(!known){paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(.8f*density);paint.setColor(0xffffcf73);c.drawRect(-2*density,-12*density,paint.measureText(label)+2*density,3*density,paint);paint.setStyle(Paint.Style.FILL);}
+    paint.setColor(known?0xffe6efee:0xff173c42);
+   }else{
+    paint.setColor(Double.isFinite(metres)?(darkPalette()?0xff202827:Color.WHITE):0xffffcf73);
+    c.drawRoundRect(-2*density,-14*density,paint.measureText(label)+2*density,3*density,4,4,paint);
+    paint.setColor(!Double.isFinite(metres)?0xff173c42:darkPalette()?0xffe3f0ed:0xff173c42);
+   }
+   c.drawText(label,0,0,paint);c.restore();
   }
   for(int i=0;i<vertices.size();i++){
    PointF p=vertices.get(i).point;
    if(layerVisible(LAYER_ROUTE)){
    paint.setColor(i==highlight?0xffdf8c14:printPlan?0xff174dcc:darkPalette()?0xff55c7b5:0xff13665f);
-   c.drawCircle(left()+scale()*p.x,top()+scale()*p.y,5*density,paint);
-   paint.setColor(Color.WHITE);c.drawCircle(left()+scale()*p.x,top()+scale()*p.y,2*density,paint);
+   float vx=left()+scale()*p.x,vy=top()+scale()*p.y;
+   if(darkEditor&&!printPlan){
+    int nodeColor=paint.getColor();paint.setColor(Color.BLACK);c.drawCircle(vx,vy,4*density,paint);
+    paint.setColor(nodeColor);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.2f*density);c.drawCircle(vx,vy,4*density,paint);paint.setStyle(Paint.Style.FILL);c.drawCircle(vx,vy,1.3f*density,paint);
+   }else{c.drawCircle(vx,vy,5*density,paint);paint.setColor(Color.WHITE);c.drawCircle(vx,vy,2*density,paint);}
    }
    Vertex vertex=vertices.get(i);float px=left()+scale()*p.x,py=top()+scale()*p.y;
    if(layerVisible(LAYER_GPS)&&Double.isFinite(vertex.latitude)&&Double.isFinite(vertex.longitude)){
