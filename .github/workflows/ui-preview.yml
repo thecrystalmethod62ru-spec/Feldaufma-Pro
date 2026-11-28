@@ -10,7 +10,7 @@ on:
       source_run_id:
         description: Android APK build run ID
         required: true
-        default: '46117908443'
+        default: '46125522287'
 permissions:
   contents: read
   actions: read
@@ -18,7 +18,7 @@ jobs:
   preview:
     runs-on: ubuntu-latest
     env:
-      SOURCE_RUN: ${{ inputs.source_run_id || '46117908443' }}
+      SOURCE_RUN: ${{ inputs.source_run_id || '46125522287' }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Resolve APK source revision
@@ -114,6 +114,7 @@ jobs:
             mkdir -p ui-screenshots
             for method in fullPortrait fullLandscape regelprofil regelprofilLandscape; do adb shell am instrument -w -r -e class "de.feldaufmass.pro.UiScreenshotTest#$method" de.feldaufmass.pro.test/androidx.test.runner.AndroidJUnitRunner > "ui-screenshots/$method.log" || true; done
             for name in 04-full-portrait 05-full-landscape 06-regelprofil 07-regelprofil-landscape; do adb exec-out run-as de.feldaufmass.pro cat "files/ui-screenshots/$name.png" > "ui-screenshots/$name.png" || true; if ! test -s "ui-screenshots/$name.png"; then rm -f "ui-screenshots/$name.png"; fi; done
+            for log in ui-screenshots/*.log; do echo "=== $log ==="; cat "$log"; done
             python3 -c 'from pathlib import Path; files=list(Path("ui-screenshots").glob("*.png")); bad=[p for p in files if p.read_bytes()[:8]!=bytes.fromhex("89504e470d0a1a0a") or len(p.read_bytes())<1024]; [p.unlink() for p in bad]; assert len(files)==4 and not bad, "Missing or invalid PNG screenshots"'
             for log in ui-screenshots/*.log; do grep -F "OK (1 test)" "$log" || exit 1; done
       - name: Compare with approved portrait mockups
