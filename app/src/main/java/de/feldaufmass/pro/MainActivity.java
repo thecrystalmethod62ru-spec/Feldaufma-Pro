@@ -1633,6 +1633,35 @@ public class MainActivity extends Activity {
   canvasFrame.addView(profilePage,new android.widget.FrameLayout.LayoutParams(-1,-1));
   Runnable refreshFullProfile=()->{profilePageTitle.setText(selectedSection[0]<0?"Regelprofil · Standardprofil":"Regelprofil · "+sectionPosition.getText());showBaseCross.accept(fullCross);profileDimensions.setText(fullCross.dimensionSummary());profileMaterial.setText("Oberfläche: "+covering);profileLayout.updateCatalog(String.format(java.util.Locale.GERMANY,"%.2f × %.2f m",baseProfilePrefs.getFloat("width",0.4f),baseProfilePrefs.getFloat("depth",1.0f)),selectedSection[0]<0?null:sectionPosition.getText()+"\n"+fullCross.dimensionSummary().replace("\n"," · "),selectedSection[0]>=0);if(selectedSection[0]<0||selectedSection[0]+1>=route.vertices.size())return;double[] stationRange=ProfileStationRange.resolve(selectedSection[0],index->route.vertices.get(index).metres);if(stationRange==null)return;double start=stationRange[0],end=stationRange[1];try{org.json.JSONArray rows=new PipeLayoutStore(getPreferences(0)).sections();for(int j=0;j<rows.length();j++){org.json.JSONObject p=rows.getJSONObject(j);if(!(Math.abs(p.optDouble("from")-start)<0.001&&Math.abs(p.optDouble("to")-end)<0.001))continue;double w=p.optDouble("width"),d=p.optDouble("depth");if(Double.isFinite(w)&&Double.isFinite(d)&&w>0&&d>0){fullCross.setLayoutData(PipeLayoutStore.decode(p.getJSONArray("pipes").toString()),w,d);org.json.JSONObject seg=findSurfaceSection(p);String type=seg==null?covering:seg.optString("surface",covering);fullCross.setAsphaltProfile("Asphalt".equals(type));fullCross.setCivilProfile(seg==null?0:seg.optDouble("left",0),seg==null?0:seg.optDouble("right",0),seg==null?0:seg.optDouble("topThickness",0),seg==null?0:seg.optDouble("baseThickness",0),route.configuredSurfaceColor(type,route.legendSettings()));profileMaterial.setText("Oberfläche: "+type);fullCross.setVisibility(View.VISIBLE);profileDimensions.setText(fullCross.dimensionSummary());profileLayout.updateCatalog(String.format(java.util.Locale.GERMANY,"%.2f × %.2f m",baseProfilePrefs.getFloat("width",0.4f),baseProfilePrefs.getFloat("depth",1.0f)),sectionPosition.getText()+"\n"+String.format(java.util.Locale.GERMANY,"%.2f × %.2f m",w,d),true);}break;}}catch(Exception ignored){}};
   applyProfile.setOnClickListener(v->{refreshFullProfile.run();updateFloatingCross.run();save.performClick();});
+  ProfileTemplateStore templateStore=new ProfileTemplateStore(getSharedPreferences("profile_templates",MODE_PRIVATE));
+  Runnable[] reloadTemplates=new Runnable[1];
+  Runnable addTemplate=()->{
+   EditText nameInput=new EditText(this);nameInput.setSingleLine(true);nameInput.setHint("Profilname");
+   android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Aktuelles Profil speichern").setView(nameInput).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create();
+   dialog.show();dialog.getButton(-1).setOnClickListener(v->{try{
+    templateStore.add(nameInput.getText().toString(),fullCross.profileWidth(),fullCross.profileDepth(),fullCross.profilePipes());
+    dialog.dismiss();reloadTemplates[0].run();
+   }catch(Exception ex){nameInput.setError("Profil konnte nicht gespeichert werden");}});
+  };
+  java.util.function.Consumer<ProfileTemplateStore.Template> chooseTemplate=template->{
+   int chosen=selectedSection[0];
+   new android.app.AlertDialog.Builder(this).setTitle(template.label()).setMessage(chosen<0?"Bitte zuerst einen vermessenen Abschnitt auswählen.":"Geometrie und Leitungen für A"+(chosen+1)+" ersetzen? Die vorhandenen Oberflächen bleiben unverändert.")
+    .setNegativeButton("Abbrechen",null)
+    .setNeutralButton("Vorlage löschen",(dialog,which)->new android.app.AlertDialog.Builder(this).setTitle("Vorlage löschen?").setMessage(template.name).setNegativeButton("Abbrechen",null).setPositiveButton("Löschen",(a,b)->{try{templateStore.remove(template.id);reloadTemplates[0].run();}catch(Exception ex){notice("Vorlage konnte nicht gelöscht werden.");}}).show())
+    .setPositiveButton("Übernehmen",(dialog,which)->{
+     if(chosen<0||chosen!=selectedSection[0]){notice("Bitte einen Abschnitt auswählen.");return;}
+     double[] range=ProfileStationRange.resolve(chosen,index->route.vertices.get(index).metres);
+     if(range==null){notice("Bitte zuerst die Abschnittsmaße eingeben.");return;}
+     try{
+      new PipeLayoutStore(getPreferences(0)).saveSection(range[0],range[1],template.width,template.depth,template.pipes);
+      refreshMainQuantities();refreshFullProfile.run();updateFloatingCross.run();route.invalidate();
+      notice("Profil für A"+(chosen+1)+" übernommen.");
+     }catch(Exception ex){notice("Profil konnte nicht übernommen werden: "+ex.getMessage());}
+    }).show();
+  };
+  reloadTemplates[0]=()->{try{profileLayout.bindSavedProfiles(templateStore.load(),addTemplate,chooseTemplate);}catch(Exception ex){notice("Profilkatalog konnte nicht geladen werden.");}};
+  reloadTemplates[0].run();
+
   baseSettings.setOnClickListener(v->{
    LinearLayout fields=new LinearLayout(this);fields.setOrientation(1);fields.setPadding(dp(20),dp(8),dp(20),dp(8));
    EditText bw=new EditText(this),bd=new EditText(this);

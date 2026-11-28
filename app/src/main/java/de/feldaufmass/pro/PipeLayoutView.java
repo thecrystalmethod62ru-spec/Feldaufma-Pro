@@ -42,6 +42,9 @@ public final class PipeLayoutView extends View {
         if(!Double.isFinite(width)||width<=0||!Double.isFinite(depth)||depth<=0)throw new IllegalArgumentException("Ungültige Grabenmaße");
         this.pipes=new ArrayList<>(pipes);this.width=width;this.depth=depth;invalidate();
     }
+    double profileWidth(){return width;}
+    double profileDepth(){return depth;}
+    List<PipeLayout.Pipe> profilePipes(){return new ArrayList<>(pipes);}
     public String dimensionSummary(){return String.format(java.util.Locale.GERMANY,"Breite: %.2f m\nTiefe: %.2f m",width,depth);}
     public void setSelection(Selection selection){this.selection=selection;}
     private void texture(Canvas c,float l,float t,float r,float b,ProfileMaterialRenderer.Pattern pattern){

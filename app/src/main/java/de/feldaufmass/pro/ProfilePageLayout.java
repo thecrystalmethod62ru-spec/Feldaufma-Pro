@@ -17,11 +17,13 @@ final class ProfilePageLayout {
  Button profileEdit,editSectionProfile,baseSettings,applyProfile;
  Button[] fullButtons;
  private Button standardCard,sectionCard;
+ private Button catalogShortcut;
+ private LinearLayout savedProfiles;
  private final Context context;
  ProfilePageLayout(Context context){
  this.context=context;
  profilePage=new LinearLayout(context);profilePage.setOrientation(1);profilePage.setBackgroundColor(Color.BLACK);profilePage.setVisibility(View.GONE);
-  profilePageTitle=sheetText("Regelprofil",16,true);profilePageTitle.setTextColor(Color.WHITE);profilePageTitle.setPadding(dp(6),dp(3),dp(4),dp(3));LinearLayout titleRow=new LinearLayout(context);titleRow.setGravity(android.view.Gravity.CENTER_VERTICAL);titleRow.addView(profilePageTitle,new LinearLayout.LayoutParams(0,-2,1));Button catalogShortcut=new Button(context);catalogShortcut.setText("Katalog");configureAction(catalogShortcut);catalogShortcut.setTextColor(0xff28d5c7);catalogShortcut.setBackground(panelFrame());titleRow.addView(catalogShortcut,new LinearLayout.LayoutParams(dp(72),dp(32)));profilePage.addView(titleRow);catalogShortcut.setOnClickListener(v->{if(baseSettings!=null)baseSettings.performClick();});
+  profilePageTitle=sheetText("Regelprofil",16,true);profilePageTitle.setTextColor(Color.WHITE);profilePageTitle.setPadding(dp(6),dp(3),dp(4),dp(3));LinearLayout titleRow=new LinearLayout(context);titleRow.setGravity(android.view.Gravity.CENTER_VERTICAL);titleRow.addView(profilePageTitle,new LinearLayout.LayoutParams(0,-2,1));catalogShortcut=new Button(context);catalogShortcut.setText("Katalog");configureAction(catalogShortcut);catalogShortcut.setTextColor(0xff28d5c7);catalogShortcut.setBackground(panelFrame());titleRow.addView(catalogShortcut,new LinearLayout.LayoutParams(dp(72),dp(32)));profilePage.addView(titleRow);catalogShortcut.setOnClickListener(v->{if(baseSettings!=null)baseSettings.performClick();});
   profileWork=new LinearLayout(context);profileWork.setOrientation(0);profilePage.addView(profileWork,new LinearLayout.LayoutParams(-1,0,1));profileWork.setPadding(dp(6),dp(4),dp(6),dp(4));
   profileCatalog=new LinearLayout(context);profileCatalog.setOrientation(LinearLayout.VERTICAL);profileCatalog.setPadding(dp(6),dp(6),dp(6),dp(6));profileCatalog.setBackground(panelFrame());profileCatalog.setVisibility(View.GONE);profileWork.addView(profileCatalog,new LinearLayout.LayoutParams(dp(140),-1));
   profileCenter=new LinearLayout(context);profileCenter.setOrientation(LinearLayout.VERTICAL);profileWork.addView(profileCenter,new LinearLayout.LayoutParams(-1,0,3));
@@ -93,6 +95,7 @@ final class ProfilePageLayout {
   TextView catalogTitle=sheetText("Profilkatalog",12,true);catalogTitle.setTextColor(0xff28d5c7);profileCatalog.addView(catalogTitle);
   Button standard=new Button(context);standardCard=standard;style.accept(standard,true);standard.setText("Standardprofil");configureAction(standard);standard.setOnClickListener(v->baseSettings.performClick());profileCatalog.addView(standard,new LinearLayout.LayoutParams(-1,dp(30)));
   Button section=new Button(context);sectionCard=section;style.accept(section,false);section.setText("Abschnitt");configureAction(section);section.setOnClickListener(v->editSectionProfile.performClick());profileCatalog.addView(section,new LinearLayout.LayoutParams(-1,dp(30)));
+  savedProfiles=new LinearLayout(context);savedProfiles.setOrientation(LinearLayout.VERTICAL);profileCatalog.addView(savedProfiles);
   for(Button b:new Button[]{baseSettings,profileEdit,applyProfile})profileActions.addView(b,new LinearLayout.LayoutParams(0,-1,1));
   Button more=new Button(context);more.setText("Weitere Aktionen ▾");configureAction(more);style.accept(more,false);configureAction(more);
   profileCatalog.addView(more,new LinearLayout.LayoutParams(-1,dp(28)));
@@ -102,6 +105,25 @@ final class ProfilePageLayout {
    menu.setOnMenuItemClickListener(item->{actions[item.getItemId()].performClick();return true;});menu.show();});
   profilePage.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,orr,ob)->{
    boolean wide=getResourcesLandscape();profileActions.setVisibility(wide?View.VISIBLE:View.GONE);more.setVisibility(wide?View.GONE:View.VISIBLE);
+  });
+ }
+ void bindSavedProfiles(java.util.List<ProfileTemplateStore.Template> templates,Runnable add,java.util.function.Consumer<ProfileTemplateStore.Template> choose){
+  if(savedProfiles==null)return;
+  savedProfiles.removeAllViews();
+  for(ProfileTemplateStore.Template template:templates){
+   Button row=new Button(context);configureAction(row);row.setTextSize(10);row.setTextColor(Color.WHITE);row.setBackground(panelFrame());
+   row.setText(template.label());row.setSingleLine(true);row.setEllipsize(android.text.TextUtils.TruncateAt.END);
+   savedProfiles.addView(row,new LinearLayout.LayoutParams(-1,dp(28)));row.setOnClickListener(v->choose.accept(template));
+  }
+  Button addButton=new Button(context);configureAction(addButton);addButton.setText("+ Profil speichern");addButton.setTextColor(0xff28d5c7);addButton.setBackground(panelFrame());
+  savedProfiles.addView(addButton,new LinearLayout.LayoutParams(-1,dp(28)));addButton.setOnClickListener(v->add.run());
+  catalogShortcut.setOnClickListener(v->{
+   android.widget.PopupMenu menu=new android.widget.PopupMenu(context,catalogShortcut);
+   menu.getMenu().add(0,0,0,"Standardprofil bearbeiten");
+   menu.getMenu().add(0,1,1,"Aktuelles Profil speichern");
+   for(int i=0;i<templates.size();i++)menu.getMenu().add(0,i+2,i+2,templates.get(i).label());
+   menu.setOnMenuItemClickListener(item->{int id=item.getItemId();if(id==0)baseSettings.performClick();else if(id==1)add.run();else choose.accept(templates.get(id-2));return true;});
+   menu.show();
   });
  }
  void updateCatalog(String standard,String section,boolean sectionSelected){
