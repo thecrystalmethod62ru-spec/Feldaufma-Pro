@@ -26,10 +26,24 @@ final class ProfilePageLayout {
   profileCatalog=new LinearLayout(context);profileCatalog.setOrientation(LinearLayout.VERTICAL);profileCatalog.setPadding(dp(6),dp(6),dp(6),dp(6));profileCatalog.setBackground(panelFrame());profileCatalog.setVisibility(View.GONE);profileWork.addView(profileCatalog,new LinearLayout.LayoutParams(dp(140),-1));
   profileCenter=new LinearLayout(context);profileCenter.setOrientation(LinearLayout.VERTICAL);profileWork.addView(profileCenter,new LinearLayout.LayoutParams(-1,0,3));
   fullCross=new PipeLayoutView(context);profileCenter.addView(fullCross,new LinearLayout.LayoutParams(-1,0,1));profileWork.setOrientation(LinearLayout.VERTICAL);
-  profileInfo=new LinearLayout(context);profileInfo.setOrientation(1);profileInfo.setPadding(dp(4),dp(3),dp(4),dp(3));android.graphics.drawable.GradientDrawable parameterFrame=editorShape(0xff041012,8);parameterFrame.setStroke(dp(1),0xff008b93);profileInfo.setBackground(parameterFrame);
+  profileInfo=new LinearLayout(context);profileInfo.setOrientation(1);profileInfo.setPadding(dp(4),dp(3),dp(4),dp(3));android.graphics.drawable.GradientDrawable parameterFrame=editorShape(0xff041012,2);parameterFrame.setStroke(dp(1),0xff008b93);profileInfo.setBackground(parameterFrame);
   profileInfoScroll=new ScrollView(context);profileInfoScroll.addView(profileInfo);profileInfoScroll.setFillViewport(true);profileWork.addView(profileInfoScroll,new LinearLayout.LayoutParams(-1,0,2));
-  profileDimensions=sheetText("",11,false);profileDimensions.setTextColor(0xff28d5c7);TextView parameterTitle=sheetText("Parameter",12,true);parameterTitle.setTextColor(0xff28d5c7);profileInfo.addView(parameterTitle);profileInfo.addView(profileDimensions);profileDimensions.setPadding(dp(4),dp(3),dp(4),dp(3));android.graphics.drawable.GradientDrawable dimensionFrame=editorShape(Color.BLACK,4);dimensionFrame.setStroke(dp(1),0xff008b93);profileDimensions.setBackground(dimensionFrame);
+  profileDimensions=sheetText("",11,false);profileDimensions.setTextColor(0xff28d5c7);TextView parameterTitle=sheetText("Parameter",12,true);parameterTitle.setTextColor(0xff28d5c7);profileInfo.addView(parameterTitle);profileInfo.addView(profileDimensions);profileDimensions.setPadding(dp(4),dp(3),dp(4),dp(3));android.graphics.drawable.GradientDrawable dimensionFrame=editorShape(Color.BLACK,4);dimensionFrame.setStroke(dp(1),0xff008b93);profileDimensions.setBackground(dimensionFrame);profileDimensions.setVisibility(View.GONE);
   profileMaterial=sheetText("",11,false);profileMaterial.setTextColor(0xffcbd6d5);profileInfo.addView(profileMaterial);profileMaterial.setPadding(dp(4),dp(3),dp(4),dp(3));
+  LinearLayout parameterRows=new LinearLayout(context);parameterRows.setOrientation(LinearLayout.VERTICAL);
+  profileInfo.addView(parameterRows,1,new LinearLayout.LayoutParams(-1,-2));
+  TextView widthValue=parameterRow(parameterRows,"Breite"),depthValue=parameterRow(parameterRows,"Tiefe");
+  profileDimensions.addTextChangedListener(new android.text.TextWatcher(){
+   public void beforeTextChanged(CharSequence s,int start,int count,int after){}
+   public void onTextChanged(CharSequence s,int start,int before,int count){
+    String[] lines=s.toString().split("\\n");
+    widthValue.setText(valueFor(lines,"Breite"));
+    depthValue.setText(valueFor(lines,"Tiefe"));
+   }
+   public void afterTextChanged(android.text.Editable e){}
+  });
+  parameterRows.setOnClickListener(v->{if(profileEdit!=null)profileEdit.performClick();});
+  parameterRows.setContentDescription("Grabenbreite und Grabentiefe bearbeiten");
   final LinearLayout portraitPanels=new LinearLayout(context);
   portraitPanels.setOrientation(LinearLayout.HORIZONTAL);
   final ScrollView catalogScroll=new ScrollView(context);
@@ -99,9 +113,22 @@ final class ProfilePageLayout {
   standardCard.setTextColor(sectionSelected?Color.WHITE:0xff28d5c7);
   sectionCard.setTextColor(sectionSelected?0xff28d5c7:Color.WHITE);
  }
+ private static String valueFor(String[] lines,String label){
+  for(String line:lines){int colon=line.indexOf(':');if(colon>=0&&line.substring(0,colon).trim().equalsIgnoreCase(label))return line.substring(colon+1).trim();}
+  return "—";
+ }
+ private TextView parameterRow(LinearLayout parent,String name){
+  LinearLayout row=new LinearLayout(context);row.setGravity(android.view.Gravity.CENTER_VERTICAL);row.setPadding(dp(3),0,dp(3),0);
+  TextView key=sheetText(name,11,false);key.setTextColor(0xffd0d5d5);
+  TextView value=sheetText("—",11,true);value.setTextColor(Color.WHITE);value.setGravity(android.view.Gravity.END);
+  row.addView(key,new LinearLayout.LayoutParams(0,-2,1));row.addView(value,new LinearLayout.LayoutParams(-2,-2));
+  parent.addView(row,new LinearLayout.LayoutParams(-1,dp(22)));
+  View rule=new View(context);rule.setBackgroundColor(0xff263b3d);parent.addView(rule,new LinearLayout.LayoutParams(-1,dp(1)));
+  return value;
+ }
  private static void detach(View view){if(view.getParent() instanceof android.view.ViewGroup)((android.view.ViewGroup)view.getParent()).removeView(view);}
  private boolean getResourcesLandscape(){return context.getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE;}
- private GradientDrawable panelFrame(){GradientDrawable d=editorShape(0xff041012,8);d.setStroke(dp(1),0xff008b93);return d;}
+ private GradientDrawable panelFrame(){GradientDrawable d=editorShape(0xff041012,2);d.setStroke(dp(1),0xff008b93);return d;}
  private void configureAction(Button b){b.setAllCaps(false);b.setMinHeight(0);b.setMinimumHeight(0);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(dp(4),0,dp(4),0);b.setTextSize(12);}
  private int dp(int value){return Math.round(value*context.getResources().getDisplayMetrics().density);}
  private TextView sheetText(String text,int size,boolean bold){TextView v=new TextView(context);v.setText(text);v.setTextSize(size);if(bold)v.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return v;}
