@@ -58,6 +58,17 @@ public class UiScreenshotTest {
  @Test public void normalLandscape() throws Exception {editor(false,true,"03-normal-landscape");}
  @Test public void fullPortrait() throws Exception {editor(true,false,"04-full-portrait");}
  @Test public void fullLandscape() throws Exception {editor(true,true,"05-full-landscape");}
+ private boolean visibleProfile(android.view.View view){
+  if(view instanceof PipeLayoutView){
+   android.graphics.Rect bounds=new android.graphics.Rect();
+   if(view.isShown()&&view.getGlobalVisibleRect(bounds)&&bounds.width()>80&&bounds.height()>80)return true;
+  }
+  if(view instanceof android.view.ViewGroup){
+   android.view.ViewGroup group=(android.view.ViewGroup)view;
+   for(int i=0;i<group.getChildCount();i++)if(visibleProfile(group.getChildAt(i)))return true;
+  }
+  return false;
+ }
  private android.widget.Button visibleButton(android.view.View view,String label){
   if(view instanceof android.widget.Button){
    android.widget.Button b=(android.widget.Button)view;
@@ -87,7 +98,7 @@ public class UiScreenshotTest {
     scenario.onActivity(a->{
      for(android.view.View root:android.view.inspector.WindowInspector.getGlobalWindowViews()){
       android.widget.Button tab=visibleButton(root,"Regelprofil");
-      if(tab!=null){assertTrue(tab.performClick());opened[0]=true;break;}
+      if(tab!=null&&root.hasWindowFocus()&&visibleButton(root,"Zeichnungsebene")!=null){assertTrue(tab.performClick());opened[0]=true;break;}
      }
     });
     if(!opened[0])android.os.SystemClock.sleep(250);
@@ -98,13 +109,20 @@ public class UiScreenshotTest {
     InstrumentationRegistry.getInstrumentation().waitForIdleSync();
     scenario.onActivity(a->{
      for(android.view.View root:android.view.inspector.WindowInspector.getGlobalWindowViews()){
-      if(visibleButton(root,"Maße bearbeiten")!=null){visible[0]=true;break;}
+      if(root.hasWindowFocus()&&visibleButton(root,"Zeichnungsebene")!=null&&visibleButton(root,"Maße bearbeiten")!=null&&visibleProfile(root)){visible[0]=true;break;}
      }
     });
     if(!visible[0])android.os.SystemClock.sleep(250);
    }
    assertTrue("Regelprofil content not visible after switching tabs",visible[0]);
    capture(name);
+   scenario.onActivity(a->{
+    boolean stillVisible=false;
+    for(android.view.View root:android.view.inspector.WindowInspector.getGlobalWindowViews()){
+     if(root.hasWindowFocus()&&visibleButton(root,"Zeichnungsebene")!=null&&visibleButton(root,"Maße bearbeiten")!=null&&visibleProfile(root)){stillVisible=true;break;}
+    }
+    assertTrue("Regelprofil must remain foreground during capture",stillVisible);
+   });
   }
  }
 }
