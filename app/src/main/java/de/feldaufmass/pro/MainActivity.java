@@ -1290,6 +1290,14 @@ public class MainActivity extends Activity {
   android.graphics.drawable.GradientDrawable shape=primary?new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0xff008b91,0xff034347}):editorShape(0xff041012,8);
   shape.setCornerRadius(dp(8));shape.setStroke(dp(1),primary?0xff00e5ee:0xff008b93);return shape;
  }
+ void styleSectionCard(Button b,boolean selected){
+  android.graphics.drawable.GradientDrawable bg=editorShape(selected?0xff103638:Color.BLACK,2);
+  bg.setStroke(dp(1),selected?0xff28d5c7:0xff25474a);
+  b.setBackgroundTintList(null);
+  b.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x3328d5c7),bg,null));
+  b.setTextColor(selected?0xff28d5c7:0xffe6efee);
+  b.setSelected(selected);
+ }
  void styleEditorButton(Button b,boolean primary){
   b.setAllCaps(false);b.setTextSize(primary?15:12);b.setTextColor(Color.WHITE);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(dp(4),dp(4),dp(4),dp(4));b.setBackgroundTintList(null);
   b.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x3312665f),proButtonShape(primary),null));
@@ -1386,8 +1394,8 @@ public class MainActivity extends Activity {
   Button settingsTool=new Button(this);styleEditorButton(settingsTool,false);compactToolIcon(settingsTool,"","settings");settingsTool.setContentDescription("Zeichenoptionen");settingsTool.setMinHeight(0);header.addView(settingsTool,new LinearLayout.LayoutParams(dp(40),dp(40)));controls.setVisibility(View.GONE);
   settingsTool.setOnClickListener(v->new android.app.AlertDialog.Builder(this).setTitle("Zeichenoptionen").setItems(new String[]{"Zeichenmodus / Winkel / Smart","Auto / Quer / Hoch","Legende"},(dialog,which)->{if(which==0){controls.setVisibility(controls.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE);}else if(which==1){new android.app.AlertDialog.Builder(this).setTitle("Ausrichtung").setItems(new String[]{"Auto","Quer","Hoch"},(d,k)->{orientation.setSelection(k);setRequestedOrientation(k==1?android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE:k==2?android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT:android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);}).show();}else route.editLegend();}).show());
   route.darkEditor=true;route.invalidate();root.addView(route,new LinearLayout.LayoutParams(-1,0,1));
-  LinearLayout sectionStrip=new LinearLayout(this);sectionStrip.setOrientation(1);sectionStrip.setPadding(dp(6),dp(2),dp(6),dp(2));android.graphics.drawable.GradientDrawable sectionFrame=editorShape(0xff041012,8);sectionFrame.setStroke(dp(1),0xff008b93);sectionStrip.setBackground(sectionFrame);
-  TextView sectionTitle=sheetText("Abschnitte",13,true);sectionStrip.addView(sectionTitle);
+  LinearLayout sectionStrip=new LinearLayout(this);sectionStrip.setOrientation(1);sectionStrip.setPadding(dp(6),dp(2),dp(6),dp(2));android.graphics.drawable.GradientDrawable sectionFrame=editorShape(Color.BLACK,2);sectionFrame.setStroke(dp(1),0xff008b93);sectionStrip.setBackground(sectionFrame);
+  TextView sectionTitle=sheetText("Abschnitte",12,true);sectionTitle.setTextColor(0xff28d5c7);sectionStrip.addView(sectionTitle);
   android.widget.HorizontalScrollView sectionScroll=new android.widget.HorizontalScrollView(this);sectionScroll.setHorizontalScrollBarEnabled(false);sectionStrip.addView(sectionScroll);sectionTitle.setText("Abschnitte ▴");final boolean[] sectionsCollapsed={false};sectionScroll.setVisibility(View.VISIBLE);
   LinearLayout sectionCards=new LinearLayout(this);sectionScroll.addView(sectionCards);
   ScrollView verticalSections=new ScrollView(this);verticalSections.setFillViewport(false);verticalSections.setVisibility(View.GONE);
@@ -1435,7 +1443,7 @@ public class MainActivity extends Activity {
    selectedSectionStart[0]=selectedSection[0]<0?null:route.vertices.get(selectedSection[0]).id;selectedSectionEnd[0]=selectedSection[0]<0?null:route.vertices.get(selectedSection[0]+1).id;sectionTitle.setText("Abschnitte ("+count+") "+(sectionsCollapsed[0]?"▾":"▴"));sectionPosition.setText(selectedSection[0]>=0?"Abschnitt "+(selectedSection[0]+1)+" / "+count:"Abschnitt auswählen");double station=0;
    for(int j=0;j<count;j++){
     final int index=j;double length=route.vertices.get(j+1).metres;double end=station+length;
-    Button card=new Button(this);styleEditorButton(card,selectedSection[0]==j);
+    Button card=new Button(this);styleSectionCard(card,selectedSection[0]==j);
     card.setText(String.format(java.util.Locale.GERMANY,"A%d",j+1)+"  "+(Double.isFinite(length)&&length>0?(Double.isFinite(end)?String.format(java.util.Locale.GERMANY,"%.2f – %.2f m",station,end):"Station offen"):"Maß fehlt")+(Double.isFinite(length)&&length>0?String.format(java.util.Locale.GERMANY,"\n%.2f m",length):""));
     boolean compactPortrait=getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_PORTRAIT;
     if(compactPortrait){
@@ -1446,7 +1454,7 @@ public class MainActivity extends Activity {
     }
     card.setAllCaps(false);card.setTextSize(compactPortrait?10:11);card.setSingleLine(false);card.setMaxLines(compactPortrait?2:3);card.setIncludeFontPadding(!compactPortrait);card.setMinHeight(0);card.setMinimumHeight(0);card.setMinWidth(0);card.setMinimumWidth(0);card.setPadding(dp(6),dp(compactPortrait?0:3),dp(6),dp(compactPortrait?0:3));card.setGravity(Gravity.CENTER_VERTICAL|Gravity.START);LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(sectionCards.getOrientation()==LinearLayout.VERTICAL?-1:dp(132),dp(compactPortrait?32:58));cp.setMargins(dp(3),dp(compactPortrait?1:2),dp(3),dp(compactPortrait?1:2));sectionCards.addView(card,cp);
     card.setOnLongClickListener(v->{if(getResources().getConfiguration().orientation!=android.content.res.Configuration.ORIENTATION_PORTRAIT)return false;card.performClick();sectionPosition.performClick();return true;});
-    card.setOnClickListener(v->{if(index+1>=route.vertices.size())return;selectedSection[0]=index;selectedSectionStart[0]=route.vertices.get(index).id;selectedSectionEnd[0]=route.vertices.get(index+1).id;route.highlight=index+1;route.invalidate();sectionPosition.setText("Abschnitt "+(index+1)+" / "+count);for(int k=0;k<sectionCards.getChildCount();k++)styleEditorButton((Button)sectionCards.getChildAt(k),k==index);if(!Double.isFinite(route.vertices.get(index+1).metres)||route.vertices.get(index+1).metres<=0)measureSegment(route,index+1);});
+    card.setOnClickListener(v->{if(index+1>=route.vertices.size())return;selectedSection[0]=index;selectedSectionStart[0]=route.vertices.get(index).id;selectedSectionEnd[0]=route.vertices.get(index+1).id;route.highlight=index+1;route.invalidate();sectionPosition.setText("Abschnitt "+(index+1)+" / "+count);for(int k=0;k<sectionCards.getChildCount();k++)styleSectionCard((Button)sectionCards.getChildAt(k),k==index);if(!Double.isFinite(route.vertices.get(index+1).metres)||route.vertices.get(index+1).metres<=0)measureSegment(route,index+1);});
     station=Double.isFinite(length)&&length>0&&Double.isFinite(end)?end:Double.NaN;
    }
   };
@@ -1514,8 +1522,8 @@ public class MainActivity extends Activity {
   int canvasIndex=root.indexOfChild(route);root.removeView(route);root.addView(canvasFrame,canvasIndex,new LinearLayout.LayoutParams(-1,0,1));
   canvasFrame.addView(route,new android.widget.FrameLayout.LayoutParams(-1,-1));
   android.graphics.drawable.GradientDrawable drawingBorder=editorShape(Color.TRANSPARENT,0);drawingBorder.setStroke(dp(1),0xff008b93);canvasFrame.setForeground(drawingBorder);
-  LinearLayout layerPanel=new LinearLayout(this);layerPanel.setOrientation(1);layerPanel.setPadding(dp(8),dp(4),dp(8),dp(4));android.graphics.drawable.GradientDrawable layerFrame=editorShape(0xff041012,8);layerFrame.setStroke(dp(1),0xff008b93);layerPanel.setBackground(layerFrame);
-  layerPanel.addView(sheetText("Ebenen",14,true));
+  LinearLayout layerPanel=new LinearLayout(this);layerPanel.setOrientation(1);layerPanel.setPadding(dp(4),dp(3),dp(4),dp(3));android.graphics.drawable.GradientDrawable layerFrame=editorShape(Color.BLACK,2);layerFrame.setStroke(dp(1),0xff008b93);layerPanel.setBackground(layerFrame);
+  TextView layerTitle=sheetText("Ebenen",12,true);layerTitle.setTextColor(0xff28d5c7);layerPanel.addView(layerTitle);
   ScrollView layerScroll=new ScrollView(this);LinearLayout layerChoices=new LinearLayout(this);layerChoices.setOrientation(1);layerScroll.addView(layerChoices);layerPanel.addView(layerScroll,new LinearLayout.LayoutParams(-1,0,1));
   String[] layerNames={"Trasse","Oberflächen","Bemaßung","Oberflächenmaße","Punktnamen","Objekte","Schachtscheine","GPS","GPS-Spur","GPS-Abweichung","GPX-Referenz","Fotos"};
   int[] layerMasks={RouteSketch.LAYER_ROUTE,RouteSketch.LAYER_SURFACES,RouteSketch.LAYER_DIMENSIONS,RouteSketch.LAYER_SURFACE_DIMENSIONS,RouteSketch.LAYER_NAMES,RouteSketch.LAYER_OBJECTS,RouteSketch.LAYER_SCHACHTSCHEINE,RouteSketch.LAYER_GPS,RouteSketch.LAYER_GPS_TRACK,RouteSketch.LAYER_GPS_DEVIATIONS,RouteSketch.LAYER_GPS_REFERENCE,RouteSketch.LAYER_PHOTOS};
