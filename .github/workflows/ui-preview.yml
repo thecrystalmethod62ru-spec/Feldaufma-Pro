@@ -116,6 +116,16 @@ jobs:
             for name in 04-full-portrait 05-full-landscape 06-regelprofil 07-regelprofil-landscape; do adb exec-out run-as de.feldaufmass.pro cat "files/ui-screenshots/$name.png" > "ui-screenshots/$name.png" || true; if ! test -s "ui-screenshots/$name.png"; then rm -f "ui-screenshots/$name.png"; fi; done
             python3 -c 'from pathlib import Path; files=list(Path("ui-screenshots").glob("*.png")); bad=[p for p in files if p.read_bytes()[:8]!=bytes.fromhex("89504e470d0a1a0a") or len(p.read_bytes())<1024]; [p.unlink() for p in bad]; assert len(files)==4 and not bad, "Missing or invalid PNG screenshots"'
             for log in ui-screenshots/*.log; do grep -F "OK (1 test)" "$log" || exit 1; done
+      - name: Compare with approved portrait mockups
+        if: always()
+        run: |
+          mkdir -p preview-reference
+          for name in drawing profile; do
+            gh api "repos/${GITHUB_REPOSITORY}/contents/design/reference/${name}.png?ref=${GITHUB_SHA}" -H 'Accept: application/vnd.github.raw+json' > "preview-reference/$name.png" || rm -f "preview-reference/$name.png"
+          done
+          gh api "repos/${GITHUB_REPOSITORY}/contents/tools/compare_preview.py?ref=${GITHUB_SHA}" -H 'Accept: application/vnd.github.raw+json' > compare_preview.py
+          python3 -m pip install Pillow
+          python3 compare_preview.py
       - name: Upload screenshots and logs
         if: always()
         uses: actions/upload-artifact@v4
