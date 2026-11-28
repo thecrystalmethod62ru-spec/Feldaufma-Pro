@@ -34,16 +34,28 @@ final class ProfilePageLayout {
   profileMaterial=sheetText("",11,false);profileMaterial.setTextColor(0xffcbd6d5);profileInfo.addView(profileMaterial);profileMaterial.setPadding(dp(4),dp(3),dp(4),dp(3));
   LinearLayout parameterRows=new LinearLayout(context);parameterRows.setOrientation(LinearLayout.VERTICAL);
   profileInfo.addView(parameterRows,1,new LinearLayout.LayoutParams(-1,-2));
-  TextView widthValue=parameterRow(parameterRows,"Breite"),depthValue=parameterRow(parameterRows,"Tiefe");
-  profileDimensions.addTextChangedListener(new android.text.TextWatcher(){
+  TextView widthValue=parameterRow(parameterRows,"Grabenbreite"),depthValue=parameterRow(parameterRows,"Grabentiefe");
+  TextView pipeValue=parameterRow(parameterRows,"Rohrdimension"),bedValue=parameterRow(parameterRows,"Bettung"),surfaceValue=parameterRow(parameterRows,"Oberbau");
+  Runnable refreshValues=()->{
+   widthValue.setText(String.format(java.util.Locale.GERMANY,"%.2f m",fullCross.profileWidth()));
+   depthValue.setText(String.format(java.util.Locale.GERMANY,"%.2f m",fullCross.profileDepth()));
+   java.util.List<PipeLayout.Pipe> pipes=fullCross.profilePipes();
+   java.util.LinkedHashSet<String> names=new java.util.LinkedHashSet<>();
+   double min=Double.POSITIVE_INFINITY,max=0;
+   for(PipeLayout.Pipe pipe:pipes){names.add(pipe.name);min=Math.min(min,pipe.bedding);max=Math.max(max,pipe.bedding);}
+   pipeValue.setText(pipes.isEmpty()?"—":android.text.TextUtils.join(", ",names));
+   bedValue.setText(pipes.isEmpty()?"—":Math.abs(max-min)<1e-8?String.format(java.util.Locale.GERMANY,"%.2f m",min):String.format(java.util.Locale.GERMANY,"%.2f–%.2f m",min,max));
+   String material=profileMaterial.getText().toString();
+   surfaceValue.setText(material.startsWith("Oberfläche: ")?material.substring(12):material);
+  };
+  android.text.TextWatcher refreshWatcher=new android.text.TextWatcher(){
    public void beforeTextChanged(CharSequence s,int start,int count,int after){}
-   public void onTextChanged(CharSequence s,int start,int before,int count){
-    String[] lines=s.toString().split("\\n");
-    widthValue.setText(valueFor(lines,"Breite"));
-    depthValue.setText(valueFor(lines,"Tiefe"));
-   }
+   public void onTextChanged(CharSequence s,int start,int before,int count){refreshValues.run();}
    public void afterTextChanged(android.text.Editable e){}
-  });
+  };
+  profileDimensions.addTextChangedListener(refreshWatcher);
+  profileMaterial.addTextChangedListener(refreshWatcher);
+  profileMaterial.setVisibility(View.GONE);
   parameterRows.setOnClickListener(v->{if(profileEdit!=null)profileEdit.performClick();});
   parameterRows.setContentDescription("Grabenbreite und Grabentiefe bearbeiten");
   final LinearLayout portraitPanels=new LinearLayout(context);
@@ -56,7 +68,7 @@ final class ProfilePageLayout {
    int height=b-t-profileWork.getPaddingTop()-profileWork.getPaddingBottom();
    if(width<=0||height<=0)return;
    boolean wide=getResourcesLandscape();
-   int panelHeight=Math.min(dp(190),Math.max(dp(105),Math.round(height*.25f)));
+   int panelHeight=Math.min(dp(190),Math.max(dp(150),Math.round(height*.28f)));
    if(initialized[0]&&lastWide[0]==wide){
     if(!wide&&portraitPanels.getLayoutParams().height!=panelHeight)portraitPanels.setLayoutParams(new LinearLayout.LayoutParams(-1,panelHeight));
     return;
@@ -143,7 +155,7 @@ final class ProfilePageLayout {
   LinearLayout row=new LinearLayout(context);row.setGravity(android.view.Gravity.CENTER_VERTICAL);row.setPadding(dp(3),0,dp(3),0);
   TextView key=sheetText(name,11,false);key.setTextColor(0xffd0d5d5);
   TextView value=sheetText("—",11,true);value.setTextColor(Color.WHITE);value.setGravity(android.view.Gravity.END);
-  row.addView(key,new LinearLayout.LayoutParams(0,-2,1));row.addView(value,new LinearLayout.LayoutParams(-2,-2));
+  row.addView(key,new LinearLayout.LayoutParams(0,-2,1));value.setMaxLines(2);value.setEllipsize(android.text.TextUtils.TruncateAt.END);row.addView(value,new LinearLayout.LayoutParams(0,-2,1));
   parent.addView(row,new LinearLayout.LayoutParams(-1,dp(22)));
   View rule=new View(context);rule.setBackgroundColor(0xff263b3d);parent.addView(rule,new LinearLayout.LayoutParams(-1,dp(1)));
   return value;
