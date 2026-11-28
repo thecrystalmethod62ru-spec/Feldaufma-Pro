@@ -54,13 +54,15 @@ public final class PipeLayoutView extends View {
         super.onDraw(c);
         annotations.begin(getWidth(),getHeight(),getResources().getDisplayMetrics().density);
         float density=getResources().getDisplayMetrics().density;
-        float pad=Math.min(40*density,Math.min(getWidth(),getHeight())*.17f);
+        float pad=Math.min(32*density,Math.min(getWidth(),getHeight())*.14f);
+        boolean technicalSheet=civilProfile&&getWidth()/density>=280&&getHeight()/density>=200;
         if(getWidth()<=0||getHeight()<=0)return;
         double leftExtent=width/2+cutLeft,rightExtent=width/2+cutRight,above=depth;
         for(PipeLayout.Pipe pipe:pipes){leftExtent=Math.max(leftExtent,-pipe.offset+pipe.diameter/2);rightExtent=Math.max(rightExtent,pipe.offset+pipe.diameter/2);above=Math.max(above,pipe.bedding+pipe.diameter);}
-        scale=(float)Math.min((getWidth()-2*pad)/(leftExtent+rightExtent),(getHeight()-2*pad)/above);
+        float annotationGutter=technicalSheet?Math.min(96*density,getWidth()*.24f):pad;
+        scale=(float)Math.min((getWidth()-pad-annotationGutter)/(leftExtent+rightExtent),(getHeight()-2*pad)/above);
         if(dragged>=0&&dragScale>0){scale=dragScale;cx=dragCx;bottom=dragBottom;}
-        else{cx=getWidth()/2f+(float)((leftExtent-rightExtent)*scale/2);bottom=getHeight()-pad;}
+        else{cx=(pad+getWidth()-annotationGutter)/2f+(float)((leftExtent-rightExtent)*scale/2);bottom=getHeight()-pad;}
         if(!Float.isFinite(scale)||scale<=0)return;
         float left=cx-(float)(width*scale/2),right=cx+(float)(width*scale/2),top=bottom-(float)(depth*scale);
         texture(c,left,top,right,bottom,ProfileMaterialRenderer.Pattern.BACKFILL);
@@ -126,8 +128,14 @@ public final class PipeLayoutView extends View {
                 double gap=Math.hypot(pipe.offset-other.offset,pipe.centerHeight()-other.centerHeight())-(pipe.diameter+other.diameter)/2;
                 if(gap+1e-9<Math.max(minGap,Math.max(pipe.minGap,other.minGap)))conflict=true;
             }
-            p.setColor(conflict?0xffd32f2f:colors[i%colors.length]);c.drawCircle(x,y,r,p);
-            p.setColor(0xff101719);c.drawCircle(x,y,Math.max(0,r-(float)(pipe.wall*scale)),p);
+            p.setStyle(Paint.Style.FILL);p.setColor(conflict?0xffd32f2f:colors[i%colors.length]);c.drawCircle(x,y,r,p);
+            float inner=Math.max(0,r-(float)(pipe.wall*scale));
+            p.setColor(0xff080c0d);c.drawCircle(x,y,inner,p);
+            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(Math.max(.7f,density*.7f));
+            p.setColor(conflict?0xffff8a80:0xffeeeeee);c.drawCircle(x,y,r,p);
+            if(inner>0)c.drawCircle(x,y,inner,p);
+            p.setStyle(Paint.Style.FILL);
+            if(technicalSheet){p.setColor(0xff949d9d);p.setStrokeWidth(Math.max(.7f,density*.5f));float axis=Math.min(r*.55f,5*density);c.drawLine(x-axis,y,x+axis,y,p);c.drawLine(x,y-axis,x,y+axis,p);}
             String label=pipe.name+(pipe.fixed?" [fix]":"");annotations.drawLabel(c,label,x-p.measureText(label)/2,y-r-4,conflict?0xffff8a80:0xffeeeeee);
         }
         // Dimension the selected pipe while dragging, or the only pipe in the section.
@@ -135,7 +143,7 @@ public final class PipeLayoutView extends View {
         if(selected>=0&&selected<pipes.size()){
             PipeLayout.Pipe a=pipes.get(selected);
             float x=cx+(float)(a.offset*scale),y=bottom-(float)(a.centerHeight()*scale),r=(float)(a.diameter*scale/2);
-            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2);p.setColor(0xff55c7b5);c.drawCircle(x,y,r+4,p);p.setStyle(Paint.Style.FILL);
+            if(dragged>=0||selectedPipe>=0){p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2);p.setColor(0xff55c7b5);c.drawCircle(x,y,r+4,p);p.setStyle(Paint.Style.FILL);}
             annotations.dimension(c,left,y,x-r,y,width/2+a.offset-a.diameter/2);
             annotations.dimension(c,x+r,y,right,y,width/2-a.offset-a.diameter/2);
             annotations.dimension(c,x,top,x,y-r,depth-a.bedding-a.diameter);

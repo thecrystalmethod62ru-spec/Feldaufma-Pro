@@ -20,10 +20,10 @@ final class ProfileDimensionRenderer {
         float d=density;
         // A dark underlay keeps dimensions readable over dense material hatches.
         p.setColor(0xff000000);
-        p.setStrokeWidth(3.5f*d);
+        p.setStrokeWidth(2.4f*d);
         c.drawLine(x1,y1,x2,y2,p);
         p.setColor(color);
-        p.setStrokeWidth(1.2f*d);
+        p.setStrokeWidth(.8f*d);
         c.drawLine(x1,y1,x2,y2,p);
         double length=Math.hypot(x2-x1,y2-y1);
         if(length>0){
@@ -61,7 +61,7 @@ final class ProfileDimensionRenderer {
             p.setColor(color);p.setStrokeWidth(d);
             c.drawLine((x1+x2)/2,(y1+y2)/2,x+textWidth/2,y-textHeight/2,p);
         }
-        p.setStyle(Paint.Style.FILL);p.setColor(0xff000000);c.drawRoundRect(x-3*d,y-p.getTextSize(),x+p.measureText(label)+3*d,y+3*d,3*d,3*d,p);
+        p.setStyle(Paint.Style.FILL);p.setColor(0xff000000);c.drawRect(x-2*d,y-p.getTextSize(),x+p.measureText(label)+2*d,y+2*d,p);
         p.setStyle(Paint.Style.FILL);p.setColor(color);c.drawText(label,x,y,p);
     }
     void drawLabel(Canvas c,String label,float x,float y,int color){
