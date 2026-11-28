@@ -5,7 +5,7 @@ import android.graphics.Paint;
 
 /** Material rendering independent of pipe geometry and touch handling. */
 final class ProfileMaterialRenderer {
-    enum Pattern { ASPHALT, GRAVEL, BACKFILL, NATIVE_SOIL }
+    enum Pattern { ASPHALT, GRAVEL, BACKFILL, NATIVE_SOIL, SAND }
     private ProfileMaterialRenderer(){}
     static void draw(Canvas c,Paint p,int viewWidth,int viewHeight,float d,float l,float t,float r,float b,Pattern pattern){
         l=Math.max(0,l);t=Math.max(0,t);r=Math.min(viewWidth,r);b=Math.min(viewHeight,b);
@@ -26,7 +26,7 @@ final class ProfileMaterialRenderer {
                 for(float x=l-(b-t);x<r;x+=8*d)c.drawLine(x,b,x+b-t,t,p);
                 p.setColor(0xffa3a3a3);
             }
-            float step=(gravel?8:4.5f)*d;
+            float step=(gravel?8:pattern==Pattern.SAND?2.8f:4.5f)*d;
             for(int row=0; t+row*step<b;row++)for(int col=0;l+col*step<r;col++){
                 float x=l+(col+.25f+((row*7+col*3)%5)*.1f)*step;
                 float y=t+(row+.25f+((row*3+col*7)%5)*.1f)*step;

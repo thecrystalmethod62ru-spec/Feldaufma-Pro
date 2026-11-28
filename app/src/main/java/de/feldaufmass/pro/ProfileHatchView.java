@@ -14,7 +14,7 @@ final class ProfileHatchView extends View {
   super.onDraw(c);
   float w=getWidth(),h=getHeight(),d=getResources().getDisplayMetrics().density;
   // Use the same material renderer as the actual trench cross-section.
-  ProfileMaterialRenderer.Pattern[] fills={ProfileMaterialRenderer.Pattern.ASPHALT,ProfileMaterialRenderer.Pattern.GRAVEL,ProfileMaterialRenderer.Pattern.BACKFILL,ProfileMaterialRenderer.Pattern.NATIVE_SOIL};
+  ProfileMaterialRenderer.Pattern[] fills={ProfileMaterialRenderer.Pattern.ASPHALT,ProfileMaterialRenderer.Pattern.GRAVEL,ProfileMaterialRenderer.Pattern.BACKFILL,ProfileMaterialRenderer.Pattern.NATIVE_SOIL,ProfileMaterialRenderer.Pattern.SAND};
   int index=Math.max(0,Math.min(pattern,fills.length-1));
   ProfileMaterialRenderer.draw(c,ink,getWidth(),getHeight(),d,0,0,w,h,fills[index]);
   ink.setStyle(Paint.Style.STROKE);ink.setColor(0xffb7c1c1);ink.setStrokeWidth(Math.max(.7f,d*.65f));
