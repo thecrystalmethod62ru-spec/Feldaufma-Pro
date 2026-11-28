@@ -27,6 +27,8 @@ final class PortraitWorkspaceLayout {
    back.setLayoutParams(new LinearLayout.LayoutParams(dp(44),dp(44)));
    project.setLayoutParams(new LinearLayout.LayoutParams(0,dp(40),1));
    project.setTextSize(12);
+   project.setGravity(Gravity.CENTER);
+   for(int i=0;i<heading.getChildCount();i++)if(heading.getChildAt(i) instanceof TextView)((TextView)heading.getChildAt(i)).setTextSize(i==0?16:10);
    for(int i=0;i<shortcuts.getChildCount();i++){View v=shortcuts.getChildAt(i);if(v instanceof Button){v.setLayoutParams(new LinearLayout.LayoutParams(dp(40),dp(40)));}}
    return;
   }
@@ -35,6 +37,10 @@ final class PortraitWorkspaceLayout {
   back.setLayoutParams(new LinearLayout.LayoutParams(dp(30),dp(36)));
   project.setLayoutParams(new LinearLayout.LayoutParams(0,dp(36),1));
   project.setTextSize(10);
+  project.setPadding(dp(2),0,dp(2),0);
+  project.setGravity(Gravity.CENTER_VERTICAL|Gravity.END);
+  project.setBackgroundColor(Color.TRANSPARENT);
+  for(int i=0;i<heading.getChildCount();i++){View child=heading.getChildAt(i);if(child instanceof TextView){TextView label=(TextView)child;label.setTextSize(i==0?14:9);label.setSingleLine(true);label.setEllipsize(android.text.TextUtils.TruncateAt.END);}}
   identity.addView(rotate,new LinearLayout.LayoutParams(dp(32),dp(36)));
   shortcuts.setGravity(Gravity.CENTER_VERTICAL);
   shortcuts.setVisibility(View.GONE);
@@ -50,7 +56,8 @@ final class PortraitWorkspaceLayout {
    View v=toolbar.getChildAt(i);if(!(v instanceof Button))continue;Button b=(Button)v;
    b.setMinHeight(0);b.setMinimumHeight(0);b.setMinWidth(0);b.setMinimumWidth(0);
    b.setPadding(dp(1),0,dp(1),0);b.setIncludeFontPadding(false);b.setTextSize(9);b.setSingleLine(false);b.setMaxLines(2);b.setCompoundDrawablePadding(0);
-   LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,dp(54),b==build||b==docs?1.25f:1f);p.setMargins(dp(1),0,dp(1),0);b.setLayoutParams(p);
+   android.graphics.drawable.Drawable icon=b.getCompoundDrawables()[1];if(icon!=null)icon.setBounds(0,0,dp(19),dp(19));b.setCompoundDrawables(null,icon,null,null);
+   LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,dp(52),b==build||b==docs?1.25f:1f);p.setMargins(dp(1),0,dp(1),0);b.setLayoutParams(p);
   }
  }
 }

@@ -1488,11 +1488,17 @@ public class MainActivity extends Activity {
   Button[] modeTools={selectTool,drawTool,editTool,measureList};
   String[] modeLabels={"Auswählen","Zeichnen","Bearbeiten","Maße"},modeIcons={"cursor","pencil","nodes","measure"};
   int[] modeValues={2,0,2,1};
-  java.util.function.IntConsumer highlightTool=active->{for(int k=0;k<modeTools.length;k++)styleEditorButton(modeTools[k],k==active);};
+  java.util.function.IntConsumer highlightTool=active->{for(int k=0;k<modeTools.length;k++){
+   Button tool=modeTools[k];boolean selected=k==active;
+   styleEditorButton(tool,selected);
+   if(getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_PORTRAIT){
+    android.graphics.drawable.GradientDrawable bg=editorShape(selected?0xff008b93:Color.BLACK,2);bg.setStroke(dp(1),0xff008b93);tool.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x3328d5c7),bg,null));tool.setTextSize(9);tool.setPadding(dp(1),0,dp(1),0);tool.setIncludeFontPadding(false);
+   }
+  }};
   for(int k=0;k<modeTools.length;k++){final int index=k;Button tool=modeTools[k];styleEditorButton(tool,false);compactToolIcon(tool,modeLabels[k],modeIcons[k]);tools.addView(tool,new LinearLayout.LayoutParams(0,dp(54),1));tool.setOnClickListener(v->{route.selectionOnly=index==0;mode.setSelection(modeValues[index]);highlightTool.accept(index);if(index==3)showFullscreenMeasures(route);});}
   highlightTool.accept(mode.getSelectedItemPosition()==0?1:mode.getSelectedItemPosition()==1?3:2);
   for(Button tool:new Button[]{buildTool,docsTool,assistantTool})styleEditorButton(tool,false);
-  compactToolIcon(buildTool,"Leitungsbau ▾","pipe");compactToolIcon(docsTool,"Unterlagen ▾","folder");compactToolIcon(assistantTool,"Assistent","mic");
+  compactToolIcon(buildTool,"Leitungsbau ▾","pipe");compactToolIcon(docsTool,"Unterlagen ▾","map");compactToolIcon(assistantTool,"Assistent","mic");
   buildTool.setOnClickListener(v->new android.app.AlertDialog.Builder(this).setTitle("Leitungsbau").setItems(new String[]{"Leitungen / Formstücke / Objekte","Objekt platzieren","Objekt bearbeiten","Einzelobjekt ohne Trasse"},(d,i)->{if(i==0)openObjects.run();else{route.selectionOnly=false;mode.setSelection(i+2);}}).show());
   docsTool.setOnClickListener(v->new android.app.AlertDialog.Builder(this).setTitle("Unterlagen").setItems(new String[]{"Schachtscheine","Ausführungsplan / Foto / Skizze","Legende","Zentrieren","Cloud"},(d,i)->{if(i==0)showUtilitySheets();else if(i==1){if(templateAction!=null)templateAction.performClick();else notice("Keine Zeichenvorlage verfügbar.");}else if(i==2)route.editLegend();else if(i==3)resetZoom.performClick();else openCloud();}).show());
   assistantTool.setOnClickListener(v->mic.performClick());
