@@ -10,7 +10,7 @@ on:
       source_run_id:
         description: Android APK build run ID
         required: true
-        default: '46125522287'
+        default: '46134584552'
 permissions:
   contents: read
   actions: read
@@ -18,7 +18,7 @@ jobs:
   preview:
     runs-on: ubuntu-latest
     env:
-      SOURCE_RUN: ${{ inputs.source_run_id || '46125522287' }}
+      SOURCE_RUN: ${{ inputs.source_run_id || '46134584552' }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Resolve APK source revision
