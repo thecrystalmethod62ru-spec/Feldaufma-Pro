@@ -51,7 +51,7 @@ public final class PipeLayoutView extends View {
         super.onDraw(c);
         annotations.begin(getWidth(),getHeight(),getResources().getDisplayMetrics().density);
         float density=getResources().getDisplayMetrics().density;
-        float pad=Math.min(52*density,Math.min(getWidth(),getHeight())*.21f);
+        float pad=Math.min(40*density,Math.min(getWidth(),getHeight())*.17f);
         if(getWidth()<=0||getHeight()<=0)return;
         double leftExtent=width/2+cutLeft,rightExtent=width/2+cutRight,above=depth;
         for(PipeLayout.Pipe pipe:pipes){leftExtent=Math.max(leftExtent,-pipe.offset+pipe.diameter/2);rightExtent=Math.max(rightExtent,pipe.offset+pipe.diameter/2);above=Math.max(above,pipe.bedding+pipe.diameter);}
@@ -61,7 +61,7 @@ public final class PipeLayoutView extends View {
         if(!Float.isFinite(scale)||scale<=0)return;
         float left=cx-(float)(width*scale/2),right=cx+(float)(width*scale/2),top=bottom-(float)(depth*scale);
         texture(c,left,top,right,bottom,ProfileMaterialRenderer.Pattern.BACKFILL);
-        if(civilProfile){float dt=top+(float)(Math.min(depth,deck)*scale),bt=top+(float)(Math.min(depth,deck+base)*scale);texture(c,left,top,right,dt,asphaltProfile?ProfileMaterialRenderer.Pattern.ASPHALT:ProfileMaterialRenderer.Pattern.GRAVEL);texture(c,left,dt,right,bt,ProfileMaterialRenderer.Pattern.GRAVEL);p.setColor(0xffeeeeee);c.drawLine(left,dt,right,dt,p);c.drawLine(left,bt,right,bt,p);}
+        if(civilProfile){float dt=top+(float)(Math.min(depth,deck)*scale),bt=top+(float)(Math.min(depth,deck+base)*scale);texture(c,left,top,right,dt,asphaltProfile?ProfileMaterialRenderer.Pattern.ASPHALT:ProfileMaterialRenderer.Pattern.GRAVEL);texture(c,left,dt,right,bt,ProfileMaterialRenderer.Pattern.GRAVEL);p.setColor(0xffeeeeee);if(deck>0)c.drawLine(left,dt,right,dt,p);if(base>0)c.drawLine(left,bt,right,bt,p);}
         p.setColor(0xffeeeeee);p.setStrokeWidth(1.5f);c.drawLine(left,top,right,top,p);
         p.setColor(0xffeeeeee);c.drawLine(left,top,left,bottom,p);c.drawLine(right,top,right,bottom,p);c.drawLine(left,bottom,right,bottom,p);
         if(civilProfile){
