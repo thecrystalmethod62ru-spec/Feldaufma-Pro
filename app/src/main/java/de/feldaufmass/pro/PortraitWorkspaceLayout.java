@@ -23,8 +23,6 @@ final class PortraitWorkspaceLayout {
   if(landscape){
    shortcuts.setVisibility(View.VISIBLE);
    project.setOnLongClickListener(null);
-   shortcuts.setVisibility(View.VISIBLE);
-   project.setOnLongClickListener(null);
    canvas.addView(rotate,oldRotate);
    back.setLayoutParams(new LinearLayout.LayoutParams(dp(44),dp(44)));
    project.setLayoutParams(new LinearLayout.LayoutParams(0,dp(40),1));
@@ -33,24 +31,6 @@ final class PortraitWorkspaceLayout {
    return;
   }
   block.setPadding(dp(4),dp(2),dp(4),dp(2));
-  // Keep the approved single-row header; secondary actions remain accessible through its menu.
-  shortcuts.setVisibility(View.GONE);
-  project.setOnLongClickListener(v->{
-   android.widget.PopupMenu menu=new android.widget.PopupMenu(context,project);
-   java.util.ArrayList<Button> actions=new java.util.ArrayList<>();
-   for(int i=0;i<shortcuts.getChildCount();i++){
-    View child=shortcuts.getChildAt(i);
-    if(!(child instanceof Button)||child.getVisibility()!=View.VISIBLE)continue;
-    Button action=(Button)child;
-    CharSequence label=action.getContentDescription();
-    if(label==null||label.length()==0)label=action.getText();
-    if(label==null||label.length()==0)continue;
-    menu.getMenu().add(0,actions.size(),actions.size(),label);
-    actions.add(action);
-   }
-   menu.setOnMenuItemClickListener(item->{actions.get(item.getItemId()).performClick();return true;});
-   menu.show();return true;
-  });
   identity.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(40)));
   back.setLayoutParams(new LinearLayout.LayoutParams(dp(30),dp(36)));
   project.setLayoutParams(new LinearLayout.LayoutParams(0,dp(36),1));
@@ -69,8 +49,8 @@ final class PortraitWorkspaceLayout {
   for(int i=0;i<toolbar.getChildCount();i++){
    View v=toolbar.getChildAt(i);if(!(v instanceof Button))continue;Button b=(Button)v;
    b.setMinHeight(0);b.setMinimumHeight(0);b.setMinWidth(0);b.setMinimumWidth(0);
-   b.setPadding(dp(1),dp(2),dp(1),dp(2));b.setIncludeFontPadding(false);b.setTextSize(9);b.setMaxLines(2);b.setCompoundDrawablePadding(dp(2));
-   LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,dp(44),b==build||b==docs?1.18f:1f);p.setMargins(dp(1),0,dp(1),0);b.setLayoutParams(p);
+   b.setPadding(dp(1),0,dp(1),0);b.setIncludeFontPadding(false);b.setTextSize(9);b.setSingleLine(false);b.setMaxLines(2);b.setCompoundDrawablePadding(0);
+   LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,dp(54),b==build||b==docs?1.25f:1f);p.setMargins(dp(1),0,dp(1),0);b.setLayoutParams(p);
   }
  }
 }
