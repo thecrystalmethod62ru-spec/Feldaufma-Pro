@@ -65,6 +65,12 @@ final class ProfileDimensionRenderer {
         p.setStyle(Paint.Style.FILL);p.setColor(color);c.drawText(label,x,y,p);
     }
     void drawLabel(Canvas c,String label,float x,float y,int color){
+        drawLabelInternal(c,label,x,y,color,Float.NaN,Float.NaN);
+    }
+    void leader(Canvas c,String label,float anchorX,float anchorY,float x,float y,int color){
+        drawLabelInternal(c,label,x,y,color,anchorX,anchorY);
+    }
+    private void drawLabelInternal(Canvas c,String label,float x,float y,int color,float anchorX,float anchorY){
         float d=density,w=p.measureText(label),h=p.getTextSize();
         x=Math.max(4*d,Math.min(x,width-w-4*d));
         float originalY=y;
@@ -79,6 +85,15 @@ final class ProfileDimensionRenderer {
         }
         dimensionLabels.add(new android.graphics.RectF(bounds));
         Paint.Style previous=p.getStyle();float stroke=p.getStrokeWidth();
+        if(Float.isFinite(anchorX)&&Float.isFinite(anchorY)){
+            float endX=anchorX<x+w/2?x-3*d:x+w+3*d;
+            float endY=y-h/2;
+            float elbow=endX+(anchorX<endX?-6*d:6*d);
+            p.setStyle(Paint.Style.FILL);p.setColor(0xff000000);p.setStrokeWidth(2.5f*d);
+            c.drawLine(anchorX,anchorY,elbow,endY,p);c.drawLine(elbow,endY,endX,endY,p);
+            p.setColor(color);p.setStrokeWidth(Math.max(0.7f,d*.7f));
+            c.drawLine(anchorX,anchorY,elbow,endY,p);c.drawLine(elbow,endY,endX,endY,p);c.drawCircle(anchorX,anchorY,1.3f*d,p);
+        }
         p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);p.setColor(0xff141414);c.drawText(label,x,y,p);
         p.setStyle(Paint.Style.FILL);p.setColor(color);c.drawText(label,x,y,p);
         p.setStyle(previous);p.setStrokeWidth(stroke);

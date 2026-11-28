@@ -64,11 +64,13 @@ public final class PipeLayoutView extends View {
         if(civilProfile){float dt=top+(float)(Math.min(depth,deck)*scale),bt=top+(float)(Math.min(depth,deck+base)*scale);texture(c,left,top,right,dt,asphaltProfile?ProfileMaterialRenderer.Pattern.ASPHALT:ProfileMaterialRenderer.Pattern.GRAVEL);texture(c,left,dt,right,bt,ProfileMaterialRenderer.Pattern.GRAVEL);p.setColor(0xffeeeeee);if(deck>0)c.drawLine(left,dt,right,dt,p);if(base>0)c.drawLine(left,bt,right,bt,p);}
         // Bedding is the stored distance from trench bottom to pipe underside.
         // Do not assume a material thickness or cover that is not in the project.
+        float beddingTop=bottom;
         if(civilProfile&&!pipes.isEmpty()){
             double bedding=Double.POSITIVE_INFINITY;
             for(PipeLayout.Pipe pipe:pipes)bedding=Math.min(bedding,pipe.bedding);
             if(Double.isFinite(bedding)&&bedding>0){
                 float bedTop=bottom-(float)(Math.min(bedding,Math.max(0,depth-deck-base))*scale);
+                beddingTop=bedTop;
                 texture(c,left,bedTop,right,bottom,ProfileMaterialRenderer.Pattern.SAND);
                 p.setColor(0xffeeeeee);p.setStrokeWidth(Math.max(1f,density*.7f));
                 c.drawLine(left,bedTop,right,bedTop,p);
@@ -87,8 +89,8 @@ public final class PipeLayoutView extends View {
 
             if(cutLeft+cutRight>0)annotations.dimension(c,a,top-pad*.80f,b,top-pad*.80f,width+cutLeft+cutRight);
             // Show actual layer values, not illustrative sample dimensions.
-            if(deck>0&&deckBottom-top>=10*density)annotations.drawLabel(c,String.format(java.util.Locale.GERMANY,"%s %.2f m",asphaltProfile?"Asphalt":"Deckschicht",Math.min(depth,deck)),right+6*density,(top+deckBottom)/2+4*density,0xffdce9e8);
-            if(base>0&&baseBottom-deckBottom>=10*density)annotations.drawLabel(c,String.format(java.util.Locale.GERMANY,"Tragschicht %.2f m",Math.min(base,Math.max(0,depth-deck))),right+6*density,(deckBottom+baseBottom)/2+4*density,0xffdce9e8);
+            if(deck>0&&deckBottom-top>=10*density)annotations.leader(c,String.format(java.util.Locale.GERMANY,"%s %.2f m",asphaltProfile?"Asphalt":"Deckschicht",Math.min(depth,deck)),right-3*density,(top+deckBottom)/2,right+12*density,(top+deckBottom)/2+4*density,0xffeeeeee);
+            if(base>0&&baseBottom-deckBottom>=10*density)annotations.leader(c,String.format(java.util.Locale.GERMANY,"Tragschicht %.2f m",Math.min(base,Math.max(0,depth-deck))),right-3*density,(deckBottom+baseBottom)/2,right+12*density,(deckBottom+baseBottom)/2+4*density,0xffeeeeee);
             if(asphaltProfile&&deck>0){
                 float cutBottom=deckBottom;
                 p.setColor(0xffd5d9dc);p.setStrokeWidth(1.5f);
@@ -104,6 +106,11 @@ public final class PipeLayoutView extends View {
         p.setTextSize(11*getResources().getDisplayMetrics().scaledDensity);
         annotations.dimension(c,left,top-pad*.28f,right,top-pad*.28f,width);
         annotations.dimension(c,left-pad*.55f,top,left-pad*.55f,bottom,depth);
+        if(civilProfile&&getWidth()/density>=280&&getHeight()/density>=220){
+            float fillTop=top+(float)(Math.min(depth,deck+base)*scale);
+            if(beddingTop-fillTop>18*density)annotations.leader(c,"Verfüllung",right-4*density,(fillTop+beddingTop)/2,right+12*density,(fillTop+beddingTop)/2,0xffeeeeee);
+            if(bottom-beddingTop>3*density)annotations.leader(c,String.format(java.util.Locale.GERMANY,"Bettung %.2f m",(bottom-beddingTop)/scale),right-4*density,(beddingTop+bottom)/2,right+12*density,bottom-4*density,0xffeeeeee);
+        }
         int[] colors={0xffeeeeee,0xffd4ab35,0xff398b75,0xff9567b8};
         p.setTextSize(12*getResources().getDisplayMetrics().scaledDensity);
         for(int i=0;i<pipes.size();i++){
