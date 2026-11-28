@@ -98,8 +98,8 @@ public final class PipeLayoutView extends View {
             if(baseBottom>deckBottom)c.drawLine(0,baseBottom,getWidth(),baseBottom,p);
             if(cutLeft+cutRight>0)annotations.dimension(c,a,top-pad*.80f,b,top-pad*.80f,width+cutLeft+cutRight);
             // Show actual layer values, not illustrative sample dimensions.
-            if(deck>0&&deckBottom>top&&(technicalSheet||deckBottom-top>=10*density))annotations.leader(c,String.format(java.util.Locale.GERMANY,"%s %.2f m",asphaltProfile?"Asphalt":"Deckschicht",Math.min(depth,deck)),right-3*density,(top+deckBottom)/2,right+12*density,(top+deckBottom)/2+4*density,0xffeeeeee);
-            if(base>0&&baseBottom>deckBottom&&(technicalSheet||baseBottom-deckBottom>=10*density))annotations.leader(c,String.format(java.util.Locale.GERMANY,"Tragschicht %.2f m",Math.min(base,Math.max(0,depth-deck))),right-3*density,(deckBottom+baseBottom)/2,right+12*density,(deckBottom+baseBottom)/2+4*density,0xffeeeeee);
+            if(deck>0&&deckBottom>top&&(technicalSheet||deckBottom-top>=10*density))annotations.leader(c,String.format(java.util.Locale.GERMANY,"%s %.2f m",asphaltProfile?"Asphalt":"Deckschicht",Math.min(depth,deck)),right-3*density,(top+deckBottom)/2,right+12*density,top+12*density,0xffeeeeee);
+            if(base>0&&baseBottom>deckBottom&&(technicalSheet||baseBottom-deckBottom>=10*density))annotations.leader(c,String.format(java.util.Locale.GERMANY,"Tragschicht %.2f m",Math.min(base,Math.max(0,depth-deck))),right-3*density,(deckBottom+baseBottom)/2,right+12*density,Math.max(deckBottom+12*density,top+32*density),0xffeeeeee);
             if(asphaltProfile&&deck>0){
                 float cutBottom=deckBottom;
                 p.setColor(0xffd5d9dc);p.setStrokeWidth(1.5f);
@@ -113,8 +113,14 @@ public final class PipeLayoutView extends View {
             }
         }
         p.setTextSize(11*getResources().getDisplayMetrics().scaledDensity);
-        annotations.dimension(c,left,top-pad*.28f,right,top-pad*.28f,width);
-        annotations.dimension(c,left-pad*.55f,top,left-pad*.55f,bottom,depth);
+        float widthY=top-pad*.28f,depthX=left-pad*.55f;
+        p.setColor(0xffcbd6d5);p.setStrokeWidth(Math.max(.6f,density*.55f));
+        c.drawLine(left,top,left,widthY-3*density,p);
+        c.drawLine(right,top,right,widthY-3*density,p);
+        c.drawLine(left,top,depthX-3*density,top,p);
+        c.drawLine(left,bottom,depthX-3*density,bottom,p);
+        annotations.dimension(c,left,widthY,right,widthY,width);
+        annotations.dimension(c,depthX,top,depthX,bottom,depth);
         if(civilProfile&&getWidth()/density>=280&&getHeight()/density>=220){
             float fillTop=top+(float)(Math.min(depth,deck+base)*scale);
             if(beddingTop-fillTop>18*density)annotations.leader(c,"Verfüllung",right-4*density,(fillTop+beddingTop)/2,right+12*density,(fillTop+beddingTop)/2,0xffeeeeee);
@@ -140,7 +146,9 @@ public final class PipeLayoutView extends View {
             if(inner>0)c.drawCircle(x,y,inner,p);
             p.setStyle(Paint.Style.FILL);
             if(technicalSheet){p.setColor(0xff949d9d);p.setStrokeWidth(Math.max(.7f,density*.5f));float axis=Math.min(r*.55f,5*density);c.drawLine(x-axis,y,x+axis,y,p);c.drawLine(x,y-axis,x,y+axis,p);}
-            String label=pipe.name+(pipe.fixed?" [fix]":"");annotations.drawLabel(c,label,x-p.measureText(label)/2,y-r-4,conflict?0xffff8a80:0xffeeeeee);
+            String label=pipe.name+(pipe.fixed?" [fix]":"");
+            if(technicalSheet)annotations.leader(c,label,x+r,y,right+12*density,y-r-4*density,conflict?0xffff8a80:0xffeeeeee);
+            else annotations.drawLabel(c,label,x-p.measureText(label)/2,y-r-4,conflict?0xffff8a80:0xffeeeeee);
         }
         // Dimension the selected pipe while dragging, or the only pipe in the section.
         int selected=dragged>=0?dragged:(selectedPipe>=0?selectedPipe:(pipes.size()==1?0:-1));
