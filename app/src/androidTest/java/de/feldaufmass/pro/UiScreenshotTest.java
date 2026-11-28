@@ -20,7 +20,7 @@ public class UiScreenshotTest {
    .putString("project","NB-2025-017")
    .putString("routeSketch","[[0.32,0.12,null,\"preview-a\"],[0.20,0.40,18.4,\"preview-b\"],[0.42,0.63,12.6,\"preview-c\"],[0.84,0.76,21.2,\"preview-d\"]]")
    .putString("width","0.40").putString("depth","1.00").putString("length","52.20")
-   .putString(PipeLayoutStore.KEY,"[{\"name\":\"DN 150\",\"offset\":0.2,\"diameter\":0.15,\"wall\":0.006,\"bedding\":0.1}]").commit();
+   .putString(PipeLayoutStore.KEY,"[{\"name\":\"DN 150\",\"offset\":0.0,\"diameter\":0.15,\"wall\":0.006,\"bedding\":0.1}]").commit();
   a.project.setText("NB-2025-017");a.width.setText("0,40");a.depth.setText("1,00");a.length.setText("52,20");
   if(a.surface!=null)for(int i=0;i<a.surface.getCount();i++){if("Asphalt".equals(String.valueOf(a.surface.getItemAtPosition(i)))){a.surface.setSelection(i);break;}}
   a.covering="Asphalt";
