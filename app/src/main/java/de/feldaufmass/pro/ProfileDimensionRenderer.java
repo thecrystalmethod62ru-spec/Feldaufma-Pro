@@ -16,7 +16,7 @@ final class ProfileDimensionRenderer {
   this.width=width;this.height=height;this.density=density;dimensionLabels.clear();
  }
     void dimension(Canvas c,float x1,float y1,float x2,float y2,double metres){
-        int color=metres<0?0xffff8a80:0xff5fe1db;
+        int color=metres<0?0xffff8a80:0xffeeeeee;
         float d=density;
         // A dark underlay keeps dimensions readable over dense material hatches.
         p.setColor(0xff000000);
@@ -36,7 +36,7 @@ final class ProfileDimensionRenderer {
             c.drawLine(x1,y1,x1+ux+nx,y1+uy+ny,p);c.drawLine(x1,y1,x1+ux-nx,y1+uy-ny,p);
             c.drawLine(x2,y2,x2-ux+nx,y2-uy+ny,p);c.drawLine(x2,y2,x2-ux-nx,y2-uy-ny,p);
         }
-        String label=String.format(java.util.Locale.GERMANY,"%.3f m",metres);
+        String label=String.format(java.util.Locale.GERMANY,Math.abs(metres*100-Math.rint(metres*100))<1e-7?"%.2f m":"%.3f m",metres);
         float x=(x1+x2-p.measureText(label))/2,y=(y1+y2)/2-5*d;
         x=Math.max(4*d,Math.min(x,width-p.measureText(label)-4*d));y=Math.max(p.getTextSize()+4*d,Math.min(y,height-4*d));
         float textWidth=p.measureText(label), textHeight=p.getTextSize();
