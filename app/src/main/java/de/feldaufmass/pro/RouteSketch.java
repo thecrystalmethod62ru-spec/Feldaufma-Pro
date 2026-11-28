@@ -1023,6 +1023,42 @@ final class RouteSketch extends View {
    station=measured?end:Double.NaN;
   }
  }
+ private void drawPlanReference(Canvas c,float d){
+  if(!darkEditor||printPlan||!layerVisible(LAYER_ROUTE))return;
+  Paint ref=new Paint(Paint.ANTI_ALIAS_FLAG);ref.setTextSize(10*d);ref.setStrokeWidth(d);
+  double metresPerUnit=uniformMetresPerUnit();
+  if(Double.isFinite(metresPerUnit)&&metresPerUnit>0&&scale()>0){
+   double pxPerMetre=scale()/metresPerUnit;
+   double target=Math.min(100*d,getWidth()*.30)/pxPerMetre;
+   if(Double.isFinite(target)&&target>0){
+    double power=Math.pow(10,Math.floor(Math.log10(target))),n=target/power;
+    double metres=(n>=5?5:n>=2?2:1)*power;
+    float length=(float)(metres*pxPerMetre),x=12*d,y=getHeight()-14*d;
+    if(length>=12*d&&y>25*d){
+     String label=String.format(Locale.GERMANY,"%.3f",metres).replaceAll("0+$","").replaceAll(",$","")+" m";
+     ref.setColor(Color.BLACK);c.drawRect(x-4*d,y-23*d,x+Math.max(length,ref.measureText(label))+4*d,y+6*d,ref);
+     ref.setColor(0xffe6efee);c.drawText(label,x,y-9*d,ref);
+     c.drawLine(x,y,x+length,y,ref);
+     for(int i=0;i<=4;i++){float xx=x+length*i/4;c.drawLine(xx,y-3*d,xx,y+3*d,ref);}
+    }
+   }
+  }
+  GpsTransform gps=gpsTransform(-1);
+  if(gps!=null){
+   double norm=Math.hypot(gps.real,gps.imag);
+   if(Double.isFinite(norm)&&norm>0){
+    float nx=(float)(gps.imag/norm),ny=(float)(-gps.real/norm),x=getWidth()-25*d,y=53*d;
+    if(getWidth()>80*d&&getHeight()>100*d){
+     ref.setColor(Color.BLACK);c.drawCircle(x,y,22*d,ref);
+     ref.setColor(0xffe6efee);float tipX=x+nx*14*d,tipY=y+ny*14*d;
+     c.drawLine(x-nx*9*d,y-ny*9*d,tipX,tipY,ref);
+     c.drawLine(tipX,tipY,tipX-nx*6*d-ny*4*d,tipY-ny*6*d+nx*4*d,ref);
+     c.drawLine(tipX,tipY,tipX-nx*6*d+ny*4*d,tipY-ny*6*d-nx*4*d,ref);
+     c.drawText("N",x-ref.measureText("N")/2,y+25*d,ref);
+    }
+   }
+  }
+ }
  @Override protected void onDraw(Canvas c){
   c.drawColor(darkPalette()?Color.BLACK:Color.WHITE);
   drawUnderlay(c);
@@ -1042,6 +1078,7 @@ final class RouteSketch extends View {
    double metres=vertices.get(i).metres;
    String label=Double.isFinite(metres)&&metres>0?String.format(Locale.GERMANY,"%.2f m",metres):"Maß fehlt";
    if(printPlan)label=String.format(Locale.GERMANY,"A%02d · %s",i,label);
+   else if(darkEditor)label="A"+i+" · "+label;
    float tx=left()+(a.x+b.x)*scale()/2,ty=top()+(a.y+b.y)*scale()/2-6*density;
    if(darkEditor&&!printPlan&&layerVisible(LAYER_ROUTE)){
     float ax=left()+a.x*scale(),ay=top()+a.y*scale(),bx=left()+b.x*scale(),by=top()+b.y*scale(),px=(float)Math.hypot(bx-ax,by-ay);
@@ -1115,6 +1152,7 @@ final class RouteSketch extends View {
    String name=vertex.name;if(layerVisible(LAYER_NAMES)&&!name.isEmpty()){paint.setColor(darkPalette()?0xffe3f0ed:0xff173c42);c.drawText(name,left()+scale()*p.x+8*density,top()+scale()*p.y+16*density,paint);}
   }
   drawSurfaceDimensions(c,density);
+  drawPlanReference(c,density);
   drawStationObjects(c,density);
   if(layerVisible(LAYER_OBJECTS))for(SingleObject o:singleObjects){
    float x=left()+scale()*o.point.x,y=top()+scale()*o.point.y;
